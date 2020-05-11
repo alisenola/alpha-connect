@@ -6,9 +6,10 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/quickfixgo/enum"
-	mdir "github.com/quickfixgo/fix50/marketdataincrementalrefresh"
+	fix50mdir "github.com/quickfixgo/fix50/marketdataincrementalrefresh"
+	fix50mdr "github.com/quickfixgo/fix50/marketdatarequest"
+	fix50mdsfr "github.com/quickfixgo/fix50/marketdatasnapshotfullrefresh"
 	"github.com/shopspring/decimal"
-	exchangeModels "gitlab.com/alphaticks/alphac/messages/exchanges"
 	"gitlab.com/alphaticks/alphac/messages/executor"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
@@ -30,7 +31,7 @@ type InstrumentData struct {
 	lastUpdateID     uint64
 	lastUpdateTime   uint64
 	lastHBTime       time.Time
-	aggTrade         *mdir.NoMDEntriesRepeatingGroup
+	aggTrade         *fix50mdir.NoMDEntriesRepeatingGroup
 	aggTradeID       uint64
 	lastAggTradeTime time.Time
 }
@@ -91,9 +92,9 @@ func (state *Listener) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *executor.GetOrderBookL2Request:
-		if err := state.GetOrderBookL2Request(context); err != nil {
-			state.logger.Error("error processing GetOrderBookL2Request", log.Error(err))
+	case *fix50mdr.MarketDataRequest:
+		if err := state.OnFIX50MarketDataRequest(context); err != nil {
+			state.logger.Error("error processing FIX50MarketDataRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -102,6 +103,7 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing readSocket", log.Error(err))
 			panic(err)
 		}
+
 	case *postAggTrade:
 		state.postAggTrade(context)
 	}
@@ -266,29 +268,66 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) GetOrderBookL2Request(context actor.Context) error {
-	msg := context.Message().(*executor.GetOrderBookL2Request)
-	if msg.Instrument.DefaultFormat() != state.instrument.DefaultFormat() {
-		err := fmt.Errorf("order book not tracked by listener")
-		context.Respond(&executor.GetOrderBookL2Response{
-			RequestID: msg.RequestID,
-			Error:     err,
-			Snapshot:  nil})
-		return nil
+func (state *Listener) OnFIX50MarketDataRequest(context actor.Context) error {
+	msg := context.Message().(*fix50mdr.MarketDataRequest)
+
+	response := fix50mdsfr.New()
+	response.SetSymbol(state.instrument.DefaultFormat())
+	reqID, err := msg.GetMDReqID()
+	if err != nil {
+		return fmt.Errorf("error getting MDReqID field: %v", err)
+	}
+	response.SetMDReqID(reqID)
+	entries := fix50mdsfr.NewNoMDEntriesRepeatingGroup()
+
+	entryTypes, err := msg.GetNoMDEntryTypes()
+	if err != nil {
+		return fmt.Errorf("error getting entry types field: %v", err)
+	}
+	for i := 0; i < entryTypes.Len(); i++ {
+		entryType := entryTypes.Get(i)
+		typ, err := entryType.GetMDEntryType()
+		if err != nil {
+			return fmt.Errorf("error getting type field: %v", err)
+		}
+		switch typ {
+		case enum.MDEntryType_BID:
+			depth, err := msg.GetMarketDepth()
+			if err != nil {
+				return fmt.Errorf("error getting market depth field: %v", err)
+			}
+			bids := state.instrumentData.orderBook.GetAbsoluteRawBids(depth)
+			for _, b := range bids {
+				entry := entries.Add()
+				entry.SetMDEntryType(enum.MDEntryType_BID)
+				entry.SetMDEntryPx(
+					decimal.New(int64(b.Price), int32(state.instrument.TickPrecision)),
+					int32(state.instrument.TickPrecision))
+				entry.SetMDEntrySize(
+					decimal.New(int64(b.Quantity), int32(state.instrument.LotPrecision)),
+					int32(state.instrument.LotPrecision))
+			}
+
+		case enum.MDEntryType_OFFER:
+			depth, err := msg.GetMarketDepth()
+			if err != nil {
+				return fmt.Errorf("error getting market depth field: %v", err)
+			}
+			asks := state.instrumentData.orderBook.GetAbsoluteRawBids(depth)
+			for _, a := range asks {
+				entry := entries.Add()
+				entry.SetMDEntryType(enum.MDEntryType_OFFER)
+				entry.SetMDEntryPx(
+					decimal.New(int64(a.Price), int32(state.instrument.TickPrecision)),
+					int32(state.instrument.TickPrecision))
+				entry.SetMDEntrySize(
+					decimal.New(int64(a.Quantity), int32(state.instrument.LotPrecision)),
+					int32(state.instrument.LotPrecision))
+			}
+		}
 	}
 
-	snapshot := &exchangeModels.OBL2Snapshot{
-		Instrument: msg.Instrument,
-		Bids:       state.instrumentData.orderBook.GetAbsoluteRawBids(0),
-		Asks:       state.instrumentData.orderBook.GetAbsoluteRawAsks(0),
-		Timestamp:  utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		ID:         state.instrumentData.lastUpdateID,
-	}
-	context.Respond(&executor.GetOrderBookL2Response{
-		RequestID: msg.RequestID,
-		Error:     nil,
-		Snapshot:  snapshot})
-
+	context.Respond(&response)
 	return nil
 }
 
@@ -324,7 +363,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				aggregateID = uint64(tradeData.BuyerOrderID)
 			}
 
-			var entry mdir.NoMDEntries
+			var entry fix50mdir.NoMDEntries
 			var tradeTime time.Time
 
 			if state.instrumentData.aggTradeID != aggregateID {
@@ -335,7 +374,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				}
 
 				// Create a new one
-				aggTrade := mdir.NewNoMDEntriesRepeatingGroup()
+				aggTrade := fix50mdir.NewNoMDEntriesRepeatingGroup()
 				entry = aggTrade.Add()
 				state.instrumentData.aggTradeID = aggregateID
 				state.instrumentData.aggTrade = &aggTrade
@@ -403,7 +442,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 		return fmt.Errorf("error converting depth data: %s ", err.Error())
 	}
 
-	rg := mdir.NewNoMDEntriesRepeatingGroup()
+	rg := fix50mdir.NewNoMDEntriesRepeatingGroup()
 	for _, bid := range bids {
 		entry := rg.Add()
 		entry.SetSymbol(state.instrument.DefaultFormat())
@@ -429,7 +468,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 	state.instrumentData.lastUpdateID = depthData.FinalUpdateID
 	state.instrumentData.lastUpdateTime = depthData.EventTime
 
-	refresh := mdir.New()
+	refresh := fix50mdir.New()
 	refresh.SetMDBookType(enum.MDBookType_PRICE_DEPTH)
 	refresh.SetNoMDEntries(rg)
 
@@ -475,13 +514,13 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 
 func (state *Listener) postAggTrade(context actor.Context) {
 	for el := state.stashedTrades.Front(); el != nil; el = state.stashedTrades.Front() {
-		trd := el.Value.(*mdir.NoMDEntriesRepeatingGroup)
+		trd := el.Value.(*fix50mdir.NoMDEntriesRepeatingGroup)
 		entry := trd.Get(0)
 		entryDate, _ := entry.GetMDEntryDate()
 		entryTime, _ := entry.GetMDEntryTime()
 		ts, _ := time.Parse(utils.FIX_UTCDateTime_LAYOUT, entryDate+"-"+entryTime)
 		if time.Now().Sub(ts) > 20*time.Millisecond {
-			refresh := mdir.New()
+			refresh := fix50mdir.New()
 			refresh.SetNoMDEntries(*trd)
 			context.Send(context.Parent(), &refresh)
 			// At this point, the state.instrumentData.aggTrade can be our trade, or it can be a new one
