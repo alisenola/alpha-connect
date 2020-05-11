@@ -16,15 +16,6 @@ require (
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	gitlab.com/alphaticks/gorderbook v0.0.0-20200219145956-352654c82287
 	gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77
-	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200330122509-3e19a6a55d22 // indirect
 )
 
-//replace github.com/AsynkronIT/protoactor-go => github.com/melaurent/protoactor-go v0.0.0-20190621170414-c8a6a9f53ffe
-
-//replace github.com/melaurent/kafero => ../../../github.com/melaurent/kafero
-
 //replace gitlab.com/alphaticks/xchanger => ../../alphaticks/xchanger
-
-//replace gitlab.com/lmeunier/tickstore => ../tickstore
-
-//replace gitlab.com/tachikoma.ai/tickstore-go-client => ../../../tachikoma.ai/tickstore-go-client
