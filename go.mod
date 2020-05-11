@@ -10,7 +10,7 @@ require (
 	github.com/quickfixgo/field v0.0.0-20171007195410-74cea5ec78c7 // indirect
 	github.com/quickfixgo/fix50 v0.0.0-20171007213247-d09e70735b64
 	github.com/quickfixgo/fixt11 v0.0.0-20171007213433-d9788ca97f5d // indirect
-	github.com/quickfixgo/quickfix v0.6.0 // indirect
+	github.com/quickfixgo/quickfix v0.6.0
 	github.com/quickfixgo/tag v0.0.0-20171007194743-cbb465760521 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24

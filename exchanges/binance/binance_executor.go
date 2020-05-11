@@ -6,16 +6,19 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"github.com/quickfixgo/enum"
+	fix50sl "github.com/quickfixgo/fix50/securitylist"
+	"github.com/shopspring/decimal"
+	"gitlab.com/alphaticks/alphac/utils"
 	//fix50nso "github.com/quickfixgo/quickfix/fix50/newordersingle"
+	fix50slr "github.com/quickfixgo/fix50/securitylistrequest"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
 	models "gitlab.com/alphaticks/alphac/messages/exchanges"
 	"gitlab.com/alphaticks/alphac/messages/executor"
-	"gitlab.com/alphaticks/xchanger/asset"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/binance"
-	"math"
 	"net/http"
 	"reflect"
 	"time"
@@ -41,6 +44,7 @@ type Executor struct {
 	dayOrderRateLimit    *exchanges.RateLimit
 	globalRateLimit      *exchanges.RateLimit
 	queryRunner          *actor.PID
+	exchangeInfo         *binance.ExchangeInfo
 	logger               *log.Logger
 }
 
@@ -102,6 +106,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting exchange info: %s", exchangeInfo.Msg)
 	}
 
+	state.exchangeInfo = &exchangeInfo
 	// Initialize rate limit
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
@@ -118,7 +123,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("unable to set second or day rate limit")
 	}
 
-	// Update rate limit with weight from the current exchange info fetch
+	// Update rate limit with weight for the current exchange info fetch
 	state.globalRateLimit.Request(weight)
 	return nil
 }
@@ -127,9 +132,8 @@ func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetInstrumentsRequest(context actor.Context) error {
+func (state *Executor) updateExchangeInfos(context actor.Context) error {
 	// Get http request and the expected response
-	msg := context.Message().(*executor.GetInstrumentsRequest)
 	request, weight, err := binance.GetExchangeInfo()
 	if err != nil {
 		return err
@@ -145,90 +149,31 @@ func (state *Executor) GetInstrumentsRequest(context actor.Context) error {
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
+
 		if err != nil {
-			context.Respond(&executor.GetInstrumentsResponse{
-				RequestID:   msg.RequestID,
-				Error:       err,
-				Instruments: nil})
-			return
-		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&executor.GetInstrumentsResponse{
-					RequestID:   msg.RequestID,
-					Error:       err,
-					Instruments: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&executor.GetInstrumentsResponse{
-					RequestID:   msg.RequestID,
-					Error:       err,
-					Instruments: nil})
-			}
-			return
-		}
-		var exchangeInfo binance.ExchangeInfo
-		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&executor.GetInstrumentsResponse{
-				RequestID:   msg.RequestID,
-				Error:       err,
-				Instruments: nil})
-			return
-		}
-		if exchangeInfo.Code != 0 {
-			err = fmt.Errorf(
-				"binance api error: %d %s",
-				exchangeInfo.Code,
-				exchangeInfo.Msg)
-			context.Respond(&executor.GetInstrumentsResponse{
-				RequestID:   msg.RequestID,
-				Error:       err,
-				Instruments: nil})
+			// TODO LOG
 			return
 		}
 
-		var instruments []*exchanges.Instrument
-		for _, symbol := range exchangeInfo.Symbols {
-			if symbol.Status == "TRADING" {
-				baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
-				if !ok {
-					continue
-				}
-				quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
-				if !ok {
-					continue
-				}
-				pair := asset.NewPair(&baseCurrency, &quoteCurrency)
-				instrument := exchanges.Instrument{}
-				instrument.Exchange = constants.BINANCE
-				instrument.Pair = pair
-				instrument.Type = exchanges.SPOT
-				for _, filter := range symbol.Filters {
-					if filter.FilterType == "PRICE_FILTER" {
-						instrument.TickPrecision = uint64(math.Round(1.0 / filter.TickSize))
-					} else if filter.FilterType == "LOT_SIZE" {
-						instrument.LotPrecision = uint64(math.Round(1.0 / filter.StepSize))
-					}
-				}
-				instruments = append(instruments, &instrument)
-			}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			// TODO LOG
+			return
 		}
-		context.Respond(&executor.GetInstrumentsResponse{
-			RequestID:   msg.RequestID,
-			Error:       nil,
-			Instruments: instruments})
+
+		var exchangeInfo binance.ExchangeInfo
+		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
+		if err != nil {
+			// TODO LOG
+			return
+		}
+
+		if exchangeInfo.Code != 0 {
+			// TODO LOG
+			return
+		}
+
+		state.exchangeInfo = &exchangeInfo
 	})
 
 	return nil
@@ -333,22 +278,72 @@ func (state *Executor) OnFIX50NewOrderSingle(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
+func (state *Executor) OnFIX50SecurityListRequest(context actor.Context) error {
+	req := context.Message().(*fix50slr.SecurityListRequest)
+	reqTyp, ferr := req.GetSecurityListRequestType()
+	if ferr != nil {
+		return fmt.Errorf("error getting SecurityListRequestType field: %v", ferr)
+	}
+	if reqTyp != enum.SecurityListRequestType_ALL_SECURITIES {
+		return fmt.Errorf("SecurityListRequestType not supported")
+	}
+	reqID, ferr := req.GetSecurityReqID()
+	if ferr != nil {
+		return fmt.Errorf("error getting SecurityListRequestID field: %v", ferr)
+	}
+
+	response := fix50sl.New()
+	response.SetSecurityReqID(reqID)
+	response.SetSecurityResponseID(reqID)
+
+	if state.exchangeInfo == nil {
+		response.SetSecurityRequestResult(enum.SecurityRequestResult_INSTRUMENT_DATA_TEMPORARILY_UNAVAILABLE)
+		context.Respond(&response)
+		return nil
+	}
+
+	securities := fix50sl.NewNoRelatedSymRepeatingGroup()
+	for _, symbol := range state.exchangeInfo.Symbols {
+		// TODO logging
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
+		if !ok {
+			continue
+		}
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
+		if !ok {
+			continue
+		}
+
+		secID := fmt.Sprintf("%d", utils.SecurityID("SPOT", baseCurrency.Symbol, quoteCurrency.Symbol, constants.BINANCE))
+
+		security := securities.Add()
+		security.SetSymbol(symbol.Symbol)
+		security.SetSecurityExchange(constants.BINANCE)
+		security.SetCurrency(quoteCurrency.Symbol)
+		security.SetProduct(enum.Product_CURRENCY)
+		security.SetSecurityID(secID)
+		security.SetSecurityType("SPOT")
+
+		if symbol.Status == "TRADING" {
+			security.SetSecurityStatus(enum.SecurityStatus_ACTIVE)
+		} else {
+			security.SetSecurityStatus(enum.SecurityStatus_INACTIVE)
+		}
+
+		for _, filter := range symbol.Filters {
+			if filter.FilterType == "PRICE_FILTER" {
+				dec := decimal.NewFromFloat(filter.TickSize)
+				security.SetMinPriceIncrement(dec, dec.Exponent())
+			} else if filter.FilterType == "LOT_SIZE" {
+				dec := decimal.NewFromFloat(filter.StepSize)
+				security.SetRoundLot(dec, dec.Exponent())
+			}
+		}
+	}
+
 	return nil
 }
 
-func (state *Executor) GetOpenOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OpenOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseAllOrdersRequest(context actor.Context) error {
+func (state *Executor) OnFIX50SecurityDefinitionRequest(context actor.Context) error {
 	return nil
 }
