@@ -7,12 +7,14 @@ import (
 	"sort"
 )
 
-func SecurityID(typ, base, quote, exchange string) uint64 {
+func SecurityID(typ, base, quote, exchange string, tickPrecision, lotPrecision int) uint64 {
 	tags := map[string]string{
-		"type":     typ,
-		"base":     base,
-		"quote":    quote,
-		"exchange": exchange,
+		"type":          typ,
+		"base":          base,
+		"quote":         quote,
+		"exchange":      exchange,
+		"tickPrecision": fmt.Sprintf("%d", tickPrecision),
+		"lotPrecision":  fmt.Sprintf("%d", lotPrecision),
 	}
 	var keys []string
 	for k := range tags {

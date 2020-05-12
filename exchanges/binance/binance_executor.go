@@ -313,10 +313,28 @@ func (state *Executor) OnFIX50SecurityListRequest(context actor.Context) error {
 		if !ok {
 			continue
 		}
-
-		secID := fmt.Sprintf("%d", utils.SecurityID("SPOT", baseCurrency.Symbol, quoteCurrency.Symbol, constants.BINANCE))
-
 		security := securities.Add()
+		if symbol.Status == "TRADING" {
+			security.SetSecurityStatus(enum.SecurityStatus_ACTIVE)
+		} else {
+			security.SetSecurityStatus(enum.SecurityStatus_INACTIVE)
+		}
+
+		var tickPrecision int
+		var lotPrecision int
+		for _, filter := range symbol.Filters {
+			if filter.FilterType == "PRICE_FILTER" {
+				dec := decimal.NewFromFloat(filter.TickSize)
+				tickPrecision = int(1. / filter.TickSize)
+				security.SetMinPriceIncrement(dec, dec.Exponent())
+			} else if filter.FilterType == "LOT_SIZE" {
+				dec := decimal.NewFromFloat(filter.StepSize)
+				lotPrecision = int(1. / filter.StepSize)
+				security.SetRoundLot(dec, dec.Exponent())
+			}
+		}
+
+		secID := fmt.Sprintf("%d", utils.SecurityID("SPOT", baseCurrency.Symbol, quoteCurrency.Symbol, constants.BINANCE, tickPrecision, lotPrecision))
 		security.SetSymbol(symbol.Symbol)
 		security.SetSecurityExchange(constants.BINANCE)
 		security.SetCurrency(quoteCurrency.Symbol)
@@ -324,21 +342,6 @@ func (state *Executor) OnFIX50SecurityListRequest(context actor.Context) error {
 		security.SetSecurityID(secID)
 		security.SetSecurityType("SPOT")
 
-		if symbol.Status == "TRADING" {
-			security.SetSecurityStatus(enum.SecurityStatus_ACTIVE)
-		} else {
-			security.SetSecurityStatus(enum.SecurityStatus_INACTIVE)
-		}
-
-		for _, filter := range symbol.Filters {
-			if filter.FilterType == "PRICE_FILTER" {
-				dec := decimal.NewFromFloat(filter.TickSize)
-				security.SetMinPriceIncrement(dec, dec.Exponent())
-			} else if filter.FilterType == "LOT_SIZE" {
-				dec := decimal.NewFromFloat(filter.StepSize)
-				security.SetRoundLot(dec, dec.Exponent())
-			}
-		}
 	}
 
 	return nil
