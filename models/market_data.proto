@@ -1,0 +1,47 @@
+syntax = "proto3";
+package models;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "gitlab.com/alphaticks/gorderbook/protos.proto";
+
+message OBL2Update {
+    repeated gorderbook.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 2;
+    uint64 SeqNum = 3;
+    bool trade = 4;
+}
+
+message OBL2Snapshot {
+    repeated gorderbook.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 4;
+    uint64 SeqNum = 5;
+}
+
+message OBL3Update {
+    repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 4;
+    uint64 SeqNum = 5;
+}
+
+message OBL3Snapshot {
+    repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 4;
+    uint64 SeqNum = 5;
+}
+
+message Trade {
+    double price = 1;
+    double quantity = 2;
+    uint64 ID = 3;
+}
+
+message AggregatedTrade {
+    bool bid = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    uint64 aggregateID = 3;
+    repeated Trade trades = 4 [(gogoproto.nullable) = false];
+}

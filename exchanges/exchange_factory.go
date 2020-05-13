@@ -3,14 +3,15 @@ package exchanges
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alphac/exchanges/binance"
+	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
-func NewInstrumentListenerProducer(instrument *exchanges.Instrument) actor.Producer {
-	switch instrument.Exchange {
-	case constants.BINANCE:
-		return func() actor.Actor { return binance.NewListener(instrument) }
+func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
+	switch security.Exchange.ID {
+	case constants.BINANCE.ID:
+		return func() actor.Actor { return binance.NewListener(security) }
 		/*
 			case constants.BITFINEX:
 				return func() actor.Actor { return bitfinex.NewListener(instrument) }
@@ -47,9 +48,9 @@ func NewInstrumentListenerProducer(instrument *exchanges.Instrument) actor.Produ
 	}
 }
 
-func NewExchangeExecutorProducer(name string) actor.Producer {
-	switch name {
-	case constants.BINANCE:
+func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
+	switch exchange.ID {
+	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewExecutor() }
 		/*
 			case constants.BITFINEX:

@@ -4,26 +4,11 @@ package messages;
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 import "google/protobuf/any.proto";
 
-/*
-type RemotePubSubMessage struct {
-	Topic 	string
-	ID 		int64
-	Message interface{}
-}
-*/
-
 message RemotePubSubMessage {
     uint64 ID = 1;
     string topic = 2;
     google.protobuf.Any message = 3;
 }
-
-/*
-type PubSubSubscribeRequest struct {
-	Pattern		string
-	Subscriber	actor.PID
-}
-*/
 
 message PubSubSubscribeRequest {
     int64 requestID = 1;
@@ -31,23 +16,10 @@ message PubSubSubscribeRequest {
     actor.PID subscriber = 3;
 }
 
-/*
-type PubSubSubscribeResponse struct {
-
-}
-*/
-
 message PubSubSubscribeResponse {
     int64 requestID = 1;
     string error = 2;
 }
-
-/*
-type PubSubUnsubscribeRequest struct {
-	Pattern		string
-	Subscriber	actor.PID
-}
-*/
 
 message PubSubUnsubscribeRequest {
     int64 requestID = 1;
@@ -55,22 +27,9 @@ message PubSubUnsubscribeRequest {
     actor.PID subscriber = 3;
 }
 
-
-/*
-type PubSubUnsubscribeResponse struct {
-
-}
-*/
-
 message PubSubUnsubscribeResponse {
     int64 requestID = 1;
 }
-
-/*
-type PubSubUnsubscribeAll struct {
-	Subscriber	actor.PID
-}
-*/
 
 message PubSubUnsubscribeAll {
     actor.PID subscriber = 4;

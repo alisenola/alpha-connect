@@ -1,0 +1,33 @@
+syntax = "proto3";
+package models;
+
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "google/protobuf/wrappers.proto";
+
+/*
+type Security struct {
+	Exchange		Exchange
+	Pair 			asset.Pair
+	TickPrecision 	uint32
+	LotPrecision 	uint32
+	Type 			string
+	Settle 			time.Time
+}
+*/
+
+message Security {
+    uint64 securityID = 1;
+    string securityType = 2;
+    models.Exchange exchange = 3;
+    string symbol = 4;
+    double min_price_increment = 5;
+    double round_lot = 6;
+    string type = 7;
+    models.Asset underlying = 8;
+    models.Asset quote_currency = 9;
+    bool enabled = 10;
+    bool is_inverse = 11;
+    google.protobuf.DoubleValue maker_fee = 12;
+    google.protobuf.DoubleValue taker_fee = 13;
+    google.protobuf.DoubleValue multiplier = 14;
+}

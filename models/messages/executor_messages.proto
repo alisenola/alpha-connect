@@ -1,0 +1,54 @@
+syntax = "proto3";
+package messages;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "gitlab.com/alphaticks/gorderbook/protos.proto";
+import "gitlab.com/alphaticks/alphac/models/market_data.proto";
+import "gitlab.com/alphaticks/alphac/models/security.proto";
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+
+message Instrument {
+    uint64 securityID = 1;
+    models.Exchange exchange = 2;
+    string symbol = 3;
+}
+
+message MarketDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    Instrument instrument = 3;
+}
+
+message MarketDataRequestReject {
+    uint64 requestID = 1;
+    string reason = 2;
+}
+
+message MarketDataSnapshot {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.OBL2Snapshot snapshotL2 = 3;
+    models.OBL3Snapshot snapshotL3 = 4;
+    repeated models.AggregatedTrade trades = 5;
+}
+
+message MarketDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.OBL2Update updateL2 = 3;
+    models.OBL3Update updateL3 = 4;
+    repeated models.AggregatedTrade trades = 5;
+}
+
+message SecurityListRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+}
+
+message SecurityList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    string error = 3;
+    repeated models.Security securities = 4;
+}

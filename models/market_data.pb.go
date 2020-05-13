@@ -1,4 +1,4 @@
-package exchanges
+package models
 
 import (
 	encoding_binary "encoding/binary"
@@ -7,7 +7,6 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	types "github.com/gogo/protobuf/types"
 	gorderbook "gitlab.com/alphaticks/gorderbook"
-	exchanges "gitlab.com/alphaticks/xchanger/exchanges"
 	io "io"
 	math "math"
 	reflect "reflect"
@@ -25,25 +24,24 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type OBDelta struct {
+type OBL2Update struct {
 	Levels    []gorderbook.OrderBookLevel `protobuf:"bytes,1,rep,name=levels,proto3" json:"levels"`
 	Timestamp *types.Timestamp            `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	FirstID   uint64                      `protobuf:"varint,3,opt,name=firstID,proto3" json:"firstID,omitempty"`
-	ID        uint64                      `protobuf:"varint,4,opt,name=ID,proto3" json:"ID,omitempty"`
-	Trade     bool                        `protobuf:"varint,5,opt,name=trade,proto3" json:"trade,omitempty"`
+	SeqNum    uint64                      `protobuf:"varint,3,opt,name=SeqNum,proto3" json:"SeqNum,omitempty"`
+	Trade     bool                        `protobuf:"varint,4,opt,name=trade,proto3" json:"trade,omitempty"`
 }
 
-func (m *OBDelta) Reset()      { *m = OBDelta{} }
-func (*OBDelta) ProtoMessage() {}
-func (*OBDelta) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d3e3cdea260f13f0, []int{0}
+func (m *OBL2Update) Reset()      { *m = OBL2Update{} }
+func (*OBL2Update) ProtoMessage() {}
+func (*OBL2Update) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fe080a1ca5f6ba79, []int{0}
 }
-func (m *OBDelta) XXX_Unmarshal(b []byte) error {
+func (m *OBL2Update) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *OBDelta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *OBL2Update) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_OBDelta.Marshal(b, m, deterministic)
+		return xxx_messageInfo_OBL2Update.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalTo(b)
@@ -53,47 +51,40 @@ func (m *OBDelta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
-func (m *OBDelta) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_OBDelta.Merge(m, src)
+func (m *OBL2Update) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OBL2Update.Merge(m, src)
 }
-func (m *OBDelta) XXX_Size() int {
+func (m *OBL2Update) XXX_Size() int {
 	return m.Size()
 }
-func (m *OBDelta) XXX_DiscardUnknown() {
-	xxx_messageInfo_OBDelta.DiscardUnknown(m)
+func (m *OBL2Update) XXX_DiscardUnknown() {
+	xxx_messageInfo_OBL2Update.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_OBDelta proto.InternalMessageInfo
+var xxx_messageInfo_OBL2Update proto.InternalMessageInfo
 
-func (m *OBDelta) GetLevels() []gorderbook.OrderBookLevel {
+func (m *OBL2Update) GetLevels() []gorderbook.OrderBookLevel {
 	if m != nil {
 		return m.Levels
 	}
 	return nil
 }
 
-func (m *OBDelta) GetTimestamp() *types.Timestamp {
+func (m *OBL2Update) GetTimestamp() *types.Timestamp {
 	if m != nil {
 		return m.Timestamp
 	}
 	return nil
 }
 
-func (m *OBDelta) GetFirstID() uint64 {
+func (m *OBL2Update) GetSeqNum() uint64 {
 	if m != nil {
-		return m.FirstID
+		return m.SeqNum
 	}
 	return 0
 }
 
-func (m *OBDelta) GetID() uint64 {
-	if m != nil {
-		return m.ID
-	}
-	return 0
-}
-
-func (m *OBDelta) GetTrade() bool {
+func (m *OBL2Update) GetTrade() bool {
 	if m != nil {
 		return m.Trade
 	}
@@ -101,17 +92,16 @@ func (m *OBDelta) GetTrade() bool {
 }
 
 type OBL2Snapshot struct {
-	Instrument *exchanges.Instrument          `protobuf:"bytes,1,opt,name=instrument,proto3" json:"instrument,omitempty"`
-	Bids       []gorderbook.RawOrderBookLevel `protobuf:"bytes,2,rep,name=bids,proto3" json:"bids"`
-	Asks       []gorderbook.RawOrderBookLevel `protobuf:"bytes,3,rep,name=asks,proto3" json:"asks"`
-	Timestamp  *types.Timestamp               `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	ID         uint64                         `protobuf:"varint,5,opt,name=ID,proto3" json:"ID,omitempty"`
+	Bids      []gorderbook.OrderBookLevel `protobuf:"bytes,2,rep,name=bids,proto3" json:"bids"`
+	Asks      []gorderbook.OrderBookLevel `protobuf:"bytes,3,rep,name=asks,proto3" json:"asks"`
+	Timestamp *types.Timestamp            `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	SeqNum    uint64                      `protobuf:"varint,5,opt,name=SeqNum,proto3" json:"SeqNum,omitempty"`
 }
 
 func (m *OBL2Snapshot) Reset()      { *m = OBL2Snapshot{} }
 func (*OBL2Snapshot) ProtoMessage() {}
 func (*OBL2Snapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d3e3cdea260f13f0, []int{1}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{1}
 }
 func (m *OBL2Snapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -140,21 +130,14 @@ func (m *OBL2Snapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_OBL2Snapshot proto.InternalMessageInfo
 
-func (m *OBL2Snapshot) GetInstrument() *exchanges.Instrument {
-	if m != nil {
-		return m.Instrument
-	}
-	return nil
-}
-
-func (m *OBL2Snapshot) GetBids() []gorderbook.RawOrderBookLevel {
+func (m *OBL2Snapshot) GetBids() []gorderbook.OrderBookLevel {
 	if m != nil {
 		return m.Bids
 	}
 	return nil
 }
 
-func (m *OBL2Snapshot) GetAsks() []gorderbook.RawOrderBookLevel {
+func (m *OBL2Snapshot) GetAsks() []gorderbook.OrderBookLevel {
 	if m != nil {
 		return m.Asks
 	}
@@ -168,25 +151,91 @@ func (m *OBL2Snapshot) GetTimestamp() *types.Timestamp {
 	return nil
 }
 
-func (m *OBL2Snapshot) GetID() uint64 {
+func (m *OBL2Snapshot) GetSeqNum() uint64 {
 	if m != nil {
-		return m.ID
+		return m.SeqNum
+	}
+	return 0
+}
+
+type OBL3Update struct {
+	Bids      []gorderbook.Order `protobuf:"bytes,2,rep,name=bids,proto3" json:"bids"`
+	Asks      []gorderbook.Order `protobuf:"bytes,3,rep,name=asks,proto3" json:"asks"`
+	Timestamp *types.Timestamp   `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	SeqNum    uint64             `protobuf:"varint,5,opt,name=SeqNum,proto3" json:"SeqNum,omitempty"`
+}
+
+func (m *OBL3Update) Reset()      { *m = OBL3Update{} }
+func (*OBL3Update) ProtoMessage() {}
+func (*OBL3Update) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fe080a1ca5f6ba79, []int{2}
+}
+func (m *OBL3Update) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *OBL3Update) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_OBL3Update.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *OBL3Update) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OBL3Update.Merge(m, src)
+}
+func (m *OBL3Update) XXX_Size() int {
+	return m.Size()
+}
+func (m *OBL3Update) XXX_DiscardUnknown() {
+	xxx_messageInfo_OBL3Update.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_OBL3Update proto.InternalMessageInfo
+
+func (m *OBL3Update) GetBids() []gorderbook.Order {
+	if m != nil {
+		return m.Bids
+	}
+	return nil
+}
+
+func (m *OBL3Update) GetAsks() []gorderbook.Order {
+	if m != nil {
+		return m.Asks
+	}
+	return nil
+}
+
+func (m *OBL3Update) GetTimestamp() *types.Timestamp {
+	if m != nil {
+		return m.Timestamp
+	}
+	return nil
+}
+
+func (m *OBL3Update) GetSeqNum() uint64 {
+	if m != nil {
+		return m.SeqNum
 	}
 	return 0
 }
 
 type OBL3Snapshot struct {
-	Instrument *exchanges.Instrument `protobuf:"bytes,1,opt,name=instrument,proto3" json:"instrument,omitempty"`
-	Bids       []gorderbook.RawOrder `protobuf:"bytes,2,rep,name=bids,proto3" json:"bids"`
-	Asks       []gorderbook.RawOrder `protobuf:"bytes,3,rep,name=asks,proto3" json:"asks"`
-	Timestamp  *types.Timestamp      `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	ID         uint64                `protobuf:"varint,5,opt,name=ID,proto3" json:"ID,omitempty"`
+	Bids      []gorderbook.Order `protobuf:"bytes,2,rep,name=bids,proto3" json:"bids"`
+	Asks      []gorderbook.Order `protobuf:"bytes,3,rep,name=asks,proto3" json:"asks"`
+	Timestamp *types.Timestamp   `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	SeqNum    uint64             `protobuf:"varint,5,opt,name=SeqNum,proto3" json:"SeqNum,omitempty"`
 }
 
 func (m *OBL3Snapshot) Reset()      { *m = OBL3Snapshot{} }
 func (*OBL3Snapshot) ProtoMessage() {}
 func (*OBL3Snapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d3e3cdea260f13f0, []int{2}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{3}
 }
 func (m *OBL3Snapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -215,21 +264,14 @@ func (m *OBL3Snapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_OBL3Snapshot proto.InternalMessageInfo
 
-func (m *OBL3Snapshot) GetInstrument() *exchanges.Instrument {
-	if m != nil {
-		return m.Instrument
-	}
-	return nil
-}
-
-func (m *OBL3Snapshot) GetBids() []gorderbook.RawOrder {
+func (m *OBL3Snapshot) GetBids() []gorderbook.Order {
 	if m != nil {
 		return m.Bids
 	}
 	return nil
 }
 
-func (m *OBL3Snapshot) GetAsks() []gorderbook.RawOrder {
+func (m *OBL3Snapshot) GetAsks() []gorderbook.Order {
 	if m != nil {
 		return m.Asks
 	}
@@ -243,9 +285,9 @@ func (m *OBL3Snapshot) GetTimestamp() *types.Timestamp {
 	return nil
 }
 
-func (m *OBL3Snapshot) GetID() uint64 {
+func (m *OBL3Snapshot) GetSeqNum() uint64 {
 	if m != nil {
-		return m.ID
+		return m.SeqNum
 	}
 	return 0
 }
@@ -259,7 +301,7 @@ type Trade struct {
 func (m *Trade) Reset()      { *m = Trade{} }
 func (*Trade) ProtoMessage() {}
 func (*Trade) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d3e3cdea260f13f0, []int{3}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{4}
 }
 func (m *Trade) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -319,7 +361,7 @@ type AggregatedTrade struct {
 func (m *AggregatedTrade) Reset()      { *m = AggregatedTrade{} }
 func (*AggregatedTrade) ProtoMessage() {}
 func (*AggregatedTrade) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d3e3cdea260f13f0, []int{4}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{5}
 }
 func (m *AggregatedTrade) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -377,61 +419,60 @@ func (m *AggregatedTrade) GetTrades() []Trade {
 }
 
 func init() {
-	proto.RegisterType((*OBDelta)(nil), "exchanges.OBDelta")
-	proto.RegisterType((*OBL2Snapshot)(nil), "exchanges.OBL2Snapshot")
-	proto.RegisterType((*OBL3Snapshot)(nil), "exchanges.OBL3Snapshot")
-	proto.RegisterType((*Trade)(nil), "exchanges.Trade")
-	proto.RegisterType((*AggregatedTrade)(nil), "exchanges.AggregatedTrade")
+	proto.RegisterType((*OBL2Update)(nil), "models.OBL2Update")
+	proto.RegisterType((*OBL2Snapshot)(nil), "models.OBL2Snapshot")
+	proto.RegisterType((*OBL3Update)(nil), "models.OBL3Update")
+	proto.RegisterType((*OBL3Snapshot)(nil), "models.OBL3Snapshot")
+	proto.RegisterType((*Trade)(nil), "models.Trade")
+	proto.RegisterType((*AggregatedTrade)(nil), "models.AggregatedTrade")
 }
 
-func init() { proto.RegisterFile("market_data_messages.proto", fileDescriptor_d3e3cdea260f13f0) }
+func init() { proto.RegisterFile("market_data.proto", fileDescriptor_fe080a1ca5f6ba79) }
 
-var fileDescriptor_d3e3cdea260f13f0 = []byte{
-	// 543 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x53, 0xcb, 0x6a, 0x1b, 0x31,
-	0x14, 0x1d, 0xd9, 0xe3, 0xc4, 0x51, 0x4a, 0x1b, 0x86, 0x14, 0x84, 0xa1, 0x8a, 0xf1, 0xca, 0x9b,
-	0xca, 0x90, 0x34, 0x34, 0xdb, 0x1a, 0x6f, 0x0c, 0x01, 0xc3, 0x34, 0xfb, 0xa0, 0xf1, 0x28, 0xb2,
-	0xf0, 0x8c, 0xe5, 0x4a, 0x72, 0x1f, 0xbb, 0xf6, 0x0f, 0xfa, 0x19, 0xdd, 0xf5, 0x0b, 0xba, 0xcf,
-	0xd2, 0xcb, 0xac, 0x4a, 0x3d, 0xde, 0x74, 0xd7, 0x7c, 0x42, 0x19, 0xcd, 0xc3, 0x63, 0x30, 0x85,
-	0x90, 0xee, 0x74, 0x35, 0xe7, 0x9c, 0x7b, 0xcf, 0xd1, 0x1d, 0xd8, 0x8a, 0xa9, 0x9a, 0x32, 0x73,
-	0x1d, 0x52, 0x43, 0xaf, 0x63, 0xa6, 0x35, 0xe5, 0x4c, 0x93, 0xb9, 0x92, 0x46, 0x7a, 0x07, 0xec,
-	0xe3, 0x78, 0x42, 0x67, 0x9c, 0xe9, 0xd6, 0x4b, 0x2e, 0xcc, 0x64, 0x11, 0x90, 0xb1, 0x8c, 0x7b,
-	0x5c, 0x72, 0xd9, 0xb3, 0x88, 0x60, 0x71, 0x63, 0x2b, 0x5b, 0xd8, 0x53, 0xc6, 0x6c, 0x9d, 0x70,
-	0x29, 0x79, 0xc4, 0x36, 0x28, 0x23, 0x62, 0xa6, 0x0d, 0x8d, 0xe7, 0x39, 0xe0, 0x9c, 0x0b, 0x13,
-	0xd1, 0x4c, 0x8f, 0x46, 0xf3, 0x09, 0x35, 0x62, 0x3c, 0xd5, 0xbd, 0xbc, 0x9f, 0xea, 0x95, 0x9d,
-	0x33, 0x89, 0x7c, 0x22, 0x3b, 0xc6, 0x0e, 0x1a, 0x97, 0x2a, 0x64, 0x2a, 0x90, 0x72, 0xba, 0x05,
-	0xef, 0xfc, 0x00, 0x70, 0x7f, 0xd4, 0x1f, 0xb0, 0xc8, 0x50, 0xef, 0x02, 0xee, 0x45, 0xec, 0x3d,
-	0x8b, 0x34, 0x02, 0xed, 0x7a, 0xf7, 0xf0, 0xb4, 0x45, 0x36, 0x2c, 0x32, 0x4a, 0x4f, 0x7d, 0x29,
-	0xa7, 0x97, 0x29, 0xa4, 0xef, 0xde, 0xfe, 0x3c, 0x71, 0xfc, 0x1c, 0xef, 0x5d, 0xc0, 0x83, 0x72,
-	0x7c, 0x54, 0x6b, 0x83, 0x9c, 0x9c, 0x1a, 0x24, 0x85, 0x41, 0x72, 0x55, 0x20, 0xfc, 0x0d, 0xd8,
-	0x43, 0x70, 0xff, 0x46, 0x28, 0x6d, 0x86, 0x03, 0x54, 0x6f, 0x83, 0xae, 0xeb, 0x17, 0xa5, 0xf7,
-	0x14, 0xd6, 0x86, 0x03, 0xe4, 0xda, 0xcb, 0xda, 0x70, 0xe0, 0x1d, 0xc3, 0x86, 0x51, 0x34, 0x64,
-	0xa8, 0xd1, 0x06, 0xdd, 0xa6, 0x9f, 0x15, 0x9d, 0x2f, 0x35, 0xf8, 0x64, 0xd4, 0xbf, 0x3c, 0x7d,
-	0x3b, 0xa3, 0x73, 0x3d, 0x91, 0xc6, 0x3b, 0x87, 0x50, 0xcc, 0xb4, 0x51, 0x8b, 0x98, 0xcd, 0x0c,
-	0x02, 0x76, 0x96, 0xe7, 0xa4, 0x0c, 0x8b, 0x0c, 0xcb, 0x8f, 0x7e, 0x05, 0xe8, 0xbd, 0x86, 0x6e,
-	0x20, 0x42, 0x8d, 0x6a, 0xd6, 0xf9, 0x8b, 0xaa, 0x73, 0x9f, 0x7e, 0xd8, 0x69, 0xde, 0x12, 0x52,
-	0x22, 0xd5, 0x53, 0x8d, 0xea, 0x0f, 0x20, 0xa6, 0x84, 0xed, 0xcc, 0xdc, 0x87, 0x64, 0x96, 0x25,
-	0xd3, 0x28, 0x92, 0xe9, 0xfc, 0x01, 0x36, 0x83, 0xb3, 0xc7, 0x66, 0x40, 0xb6, 0x32, 0x38, 0xde,
-	0x69, 0xa5, 0x6a, 0x9d, 0x6c, 0x59, 0xff, 0x27, 0xfe, 0x3f, 0x3b, 0x1e, 0xc2, 0xc6, 0x55, 0xfa,
-	0xfc, 0xe9, 0x52, 0xcc, 0x95, 0x18, 0x33, 0x6b, 0x12, 0xf8, 0x59, 0xe1, 0xb5, 0x60, 0xf3, 0xdd,
-	0x82, 0xce, 0x8c, 0x30, 0x9f, 0xec, 0x36, 0x02, 0xbf, 0xac, 0x73, 0xa9, 0x7a, 0x29, 0xf5, 0x1d,
-	0xc0, 0x67, 0x6f, 0x38, 0x57, 0x8c, 0x53, 0xc3, 0xc2, 0x4c, 0xf5, 0x08, 0xd6, 0x03, 0x11, 0x5a,
-	0xcd, 0xa6, 0x9f, 0x1e, 0x1f, 0xb1, 0xe0, 0x6d, 0x78, 0x48, 0x0b, 0xf9, 0xb2, 0x71, 0xf5, 0xca,
-	0x23, 0x70, 0xcf, 0xee, 0xb2, 0x46, 0xae, 0x0d, 0xf2, 0xa8, 0xf2, 0x52, 0x76, 0x9e, 0xe2, 0x67,
-	0xcb, 0x50, 0xfd, 0x57, 0xcb, 0x15, 0x76, 0xee, 0x56, 0xd8, 0xb9, 0x5f, 0x61, 0xf0, 0x39, 0xc1,
-	0xe0, 0x5b, 0x82, 0xc1, 0x6d, 0x82, 0xc1, 0x32, 0xc1, 0xe0, 0x57, 0x82, 0xc1, 0xef, 0x04, 0x3b,
-	0xf7, 0x09, 0x06, 0x5f, 0xd7, 0xd8, 0x59, 0xae, 0xb1, 0x73, 0xb7, 0xc6, 0x4e, 0xb0, 0x67, 0xc7,
-	0x3c, 0xfb, 0x1b, 0x00, 0x00, 0xff, 0xff, 0x4c, 0xba, 0x09, 0x88, 0xce, 0x04, 0x00, 0x00,
+var fileDescriptor_fe080a1ca5f6ba79 = []byte{
+	// 501 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x54, 0x3d, 0x6b, 0xdb, 0x40,
+	0x18, 0xd6, 0x6b, 0xcb, 0xc2, 0xbd, 0xf4, 0x2b, 0xa2, 0x14, 0xe1, 0xe1, 0x22, 0x3c, 0x19, 0x4c,
+	0x65, 0x88, 0x33, 0x64, 0xad, 0xc9, 0x62, 0x08, 0x0d, 0x28, 0xe9, 0x5c, 0x4e, 0xd6, 0xf5, 0x2c,
+	0x24, 0xe5, 0x14, 0xdd, 0xb9, 0xd0, 0xad, 0x3f, 0xa1, 0x3f, 0xa3, 0x43, 0xe9, 0x5c, 0xfa, 0x0b,
+	0x32, 0x74, 0xf0, 0x98, 0xa9, 0xd4, 0xf2, 0xd2, 0x31, 0x3f, 0xa1, 0xdc, 0x9d, 0xfc, 0x45, 0x29,
+	0x84, 0x96, 0x0e, 0xdd, 0xee, 0x91, 0x9e, 0xe7, 0xd5, 0xf3, 0xbc, 0xf7, 0xbe, 0x42, 0xfb, 0x39,
+	0x29, 0x53, 0x2a, 0x5f, 0xc5, 0x44, 0x92, 0xa0, 0x28, 0xb9, 0xe4, 0xae, 0x93, 0xf3, 0x98, 0x66,
+	0xa2, 0xf3, 0x8c, 0x25, 0x72, 0x3a, 0x8b, 0x82, 0x09, 0xcf, 0x07, 0x8c, 0x33, 0x3e, 0xd0, 0xaf,
+	0xa3, 0xd9, 0x6b, 0x8d, 0x34, 0xd0, 0x27, 0x23, 0xeb, 0x1c, 0x30, 0xce, 0x59, 0x46, 0x37, 0x2c,
+	0x99, 0xe4, 0x54, 0x48, 0x92, 0x17, 0x35, 0x41, 0xd5, 0xcb, 0x88, 0xa9, 0x47, 0xb2, 0x62, 0x4a,
+	0x64, 0x32, 0x49, 0xc5, 0x80, 0xf1, 0x32, 0xa6, 0x65, 0xc4, 0x79, 0x6a, 0xa4, 0xc2, 0xd0, 0xbb,
+	0x9f, 0x00, 0xa1, 0xb3, 0xd1, 0xe9, 0xe1, 0xcb, 0x22, 0x26, 0x92, 0xba, 0xc7, 0xc8, 0xc9, 0xe8,
+	0x1b, 0x9a, 0x09, 0x0f, 0xfc, 0x66, 0x6f, 0xef, 0xb0, 0x13, 0x6c, 0x84, 0xc1, 0x99, 0x3a, 0x8d,
+	0x38, 0x4f, 0x4f, 0x15, 0x65, 0x64, 0x5f, 0x7f, 0x3b, 0xb0, 0xc2, 0x9a, 0xef, 0x1e, 0xa3, 0x7b,
+	0x6b, 0x2b, 0x5e, 0xc3, 0x87, 0x5a, 0xac, 0xcc, 0x06, 0x2b, 0xb3, 0xc1, 0xc5, 0x8a, 0x11, 0x6e,
+	0xc8, 0xee, 0x53, 0xe4, 0x9c, 0xd3, 0xab, 0x17, 0xb3, 0xdc, 0x6b, 0xfa, 0xd0, 0xb3, 0xc3, 0x1a,
+	0xb9, 0x4f, 0x50, 0x4b, 0x96, 0x24, 0xa6, 0x9e, 0xed, 0x43, 0xaf, 0x1d, 0x1a, 0xd0, 0xfd, 0x0a,
+	0xe8, 0xbe, 0x32, 0x7c, 0x7e, 0x49, 0x0a, 0x31, 0xe5, 0xd2, 0x3d, 0x42, 0x76, 0x94, 0xc4, 0xc2,
+	0x6b, 0xdc, 0xd1, 0xb0, 0x66, 0x2b, 0x15, 0x11, 0xa9, 0xf0, 0x9a, 0x77, 0x55, 0x29, 0xf6, 0x6e,
+	0x48, 0xfb, 0xcf, 0x42, 0xb6, 0xb6, 0x43, 0x76, 0x3f, 0x9b, 0xfe, 0x0f, 0xeb, 0xfe, 0xf7, 0x77,
+	0xc2, 0xec, 0xff, 0x6a, 0x6b, 0x3b, 0x43, 0x7f, 0x27, 0xc3, 0xef, 0xc9, 0xff, 0xc8, 0xfa, 0x17,
+	0x73, 0x13, 0xc3, 0xf5, 0x4d, 0xfc, 0x4f, 0xe6, 0xc7, 0xa8, 0x75, 0xa1, 0xe6, 0x49, 0x4d, 0x59,
+	0x51, 0x26, 0x13, 0xea, 0x81, 0x0f, 0x3d, 0x08, 0x0d, 0x70, 0x3b, 0xa8, 0x7d, 0x35, 0x23, 0x97,
+	0x32, 0x91, 0x6f, 0xf5, 0x30, 0x43, 0xb8, 0xc6, 0xee, 0x43, 0xd4, 0x18, 0x9f, 0xd4, 0xb3, 0xda,
+	0x18, 0x9f, 0x74, 0x3f, 0x02, 0x7a, 0xf4, 0x9c, 0xb1, 0x92, 0x32, 0x22, 0x69, 0x6c, 0xaa, 0x3e,
+	0x46, 0xcd, 0x28, 0x89, 0x75, 0xcd, 0x76, 0xa8, 0x8e, 0x7f, 0xb1, 0x1f, 0x3e, 0xda, 0x23, 0xab,
+	0xf2, 0xeb, 0x0f, 0x6f, 0x3f, 0x72, 0xfb, 0xc8, 0xd1, 0xcb, 0x21, 0x3c, 0x5b, 0x77, 0xf3, 0x41,
+	0x60, 0x7e, 0x2e, 0x81, 0x36, 0xb3, 0x5a, 0x54, 0x43, 0x19, 0x1d, 0xcd, 0x17, 0xd8, 0xba, 0x59,
+	0x60, 0xeb, 0x76, 0x81, 0xe1, 0x5d, 0x85, 0xe1, 0x43, 0x85, 0xe1, 0xba, 0xc2, 0x30, 0xaf, 0x30,
+	0x7c, 0xaf, 0x30, 0xfc, 0xa8, 0xb0, 0x75, 0x5b, 0x61, 0x78, 0xbf, 0xc4, 0xd6, 0x7c, 0x89, 0xad,
+	0x9b, 0x25, 0xb6, 0x22, 0x47, 0x7b, 0x1c, 0xfe, 0x0c, 0x00, 0x00, 0xff, 0xff, 0x9c, 0x1c, 0x13,
+	0x3d, 0xca, 0x04, 0x00, 0x00,
 }
 
-func (this *OBDelta) Equal(that interface{}) bool {
+func (this *OBL2Update) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*OBDelta)
+	that1, ok := that.(*OBL2Update)
 	if !ok {
-		that2, ok := that.(OBDelta)
+		that2, ok := that.(OBL2Update)
 		if ok {
 			that1 = &that2
 		} else {
@@ -454,10 +495,7 @@ func (this *OBDelta) Equal(that interface{}) bool {
 	if !this.Timestamp.Equal(that1.Timestamp) {
 		return false
 	}
-	if this.FirstID != that1.FirstID {
-		return false
-	}
-	if this.ID != that1.ID {
+	if this.SeqNum != that1.SeqNum {
 		return false
 	}
 	if this.Trade != that1.Trade {
@@ -484,7 +522,47 @@ func (this *OBL2Snapshot) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if !this.Instrument.Equal(that1.Instrument) {
+	if len(this.Bids) != len(that1.Bids) {
+		return false
+	}
+	for i := range this.Bids {
+		if !this.Bids[i].Equal(&that1.Bids[i]) {
+			return false
+		}
+	}
+	if len(this.Asks) != len(that1.Asks) {
+		return false
+	}
+	for i := range this.Asks {
+		if !this.Asks[i].Equal(&that1.Asks[i]) {
+			return false
+		}
+	}
+	if !this.Timestamp.Equal(that1.Timestamp) {
+		return false
+	}
+	if this.SeqNum != that1.SeqNum {
+		return false
+	}
+	return true
+}
+func (this *OBL3Update) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*OBL3Update)
+	if !ok {
+		that2, ok := that.(OBL3Update)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
 		return false
 	}
 	if len(this.Bids) != len(that1.Bids) {
@@ -506,7 +584,7 @@ func (this *OBL2Snapshot) Equal(that interface{}) bool {
 	if !this.Timestamp.Equal(that1.Timestamp) {
 		return false
 	}
-	if this.ID != that1.ID {
+	if this.SeqNum != that1.SeqNum {
 		return false
 	}
 	return true
@@ -530,9 +608,6 @@ func (this *OBL3Snapshot) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if !this.Instrument.Equal(that1.Instrument) {
-		return false
-	}
 	if len(this.Bids) != len(that1.Bids) {
 		return false
 	}
@@ -552,7 +627,7 @@ func (this *OBL3Snapshot) Equal(that interface{}) bool {
 	if !this.Timestamp.Equal(that1.Timestamp) {
 		return false
 	}
-	if this.ID != that1.ID {
+	if this.SeqNum != that1.SeqNum {
 		return false
 	}
 	return true
@@ -625,12 +700,12 @@ func (this *AggregatedTrade) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *OBDelta) GoString() string {
+func (this *OBL2Update) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 9)
-	s = append(s, "&exchanges.OBDelta{")
+	s := make([]string, 0, 8)
+	s = append(s, "&models.OBL2Update{")
 	if this.Levels != nil {
 		vs := make([]*gorderbook.OrderBookLevel, len(this.Levels))
 		for i := range vs {
@@ -641,8 +716,7 @@ func (this *OBDelta) GoString() string {
 	if this.Timestamp != nil {
 		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
 	}
-	s = append(s, "FirstID: "+fmt.Sprintf("%#v", this.FirstID)+",\n")
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "SeqNum: "+fmt.Sprintf("%#v", this.SeqNum)+",\n")
 	s = append(s, "Trade: "+fmt.Sprintf("%#v", this.Trade)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
@@ -651,20 +725,17 @@ func (this *OBL2Snapshot) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 9)
-	s = append(s, "&exchanges.OBL2Snapshot{")
-	if this.Instrument != nil {
-		s = append(s, "Instrument: "+fmt.Sprintf("%#v", this.Instrument)+",\n")
-	}
+	s := make([]string, 0, 8)
+	s = append(s, "&models.OBL2Snapshot{")
 	if this.Bids != nil {
-		vs := make([]*gorderbook.RawOrderBookLevel, len(this.Bids))
+		vs := make([]*gorderbook.OrderBookLevel, len(this.Bids))
 		for i := range vs {
 			vs[i] = &this.Bids[i]
 		}
 		s = append(s, "Bids: "+fmt.Sprintf("%#v", vs)+",\n")
 	}
 	if this.Asks != nil {
-		vs := make([]*gorderbook.RawOrderBookLevel, len(this.Asks))
+		vs := make([]*gorderbook.OrderBookLevel, len(this.Asks))
 		for i := range vs {
 			vs[i] = &this.Asks[i]
 		}
@@ -673,7 +744,34 @@ func (this *OBL2Snapshot) GoString() string {
 	if this.Timestamp != nil {
 		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
 	}
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "SeqNum: "+fmt.Sprintf("%#v", this.SeqNum)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *OBL3Update) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 8)
+	s = append(s, "&models.OBL3Update{")
+	if this.Bids != nil {
+		vs := make([]*gorderbook.Order, len(this.Bids))
+		for i := range vs {
+			vs[i] = &this.Bids[i]
+		}
+		s = append(s, "Bids: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	if this.Asks != nil {
+		vs := make([]*gorderbook.Order, len(this.Asks))
+		for i := range vs {
+			vs[i] = &this.Asks[i]
+		}
+		s = append(s, "Asks: "+fmt.Sprintf("%#v", vs)+",\n")
+	}
+	if this.Timestamp != nil {
+		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
+	}
+	s = append(s, "SeqNum: "+fmt.Sprintf("%#v", this.SeqNum)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -681,20 +779,17 @@ func (this *OBL3Snapshot) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 9)
-	s = append(s, "&exchanges.OBL3Snapshot{")
-	if this.Instrument != nil {
-		s = append(s, "Instrument: "+fmt.Sprintf("%#v", this.Instrument)+",\n")
-	}
+	s := make([]string, 0, 8)
+	s = append(s, "&models.OBL3Snapshot{")
 	if this.Bids != nil {
-		vs := make([]*gorderbook.RawOrder, len(this.Bids))
+		vs := make([]*gorderbook.Order, len(this.Bids))
 		for i := range vs {
 			vs[i] = &this.Bids[i]
 		}
 		s = append(s, "Bids: "+fmt.Sprintf("%#v", vs)+",\n")
 	}
 	if this.Asks != nil {
-		vs := make([]*gorderbook.RawOrder, len(this.Asks))
+		vs := make([]*gorderbook.Order, len(this.Asks))
 		for i := range vs {
 			vs[i] = &this.Asks[i]
 		}
@@ -703,7 +798,7 @@ func (this *OBL3Snapshot) GoString() string {
 	if this.Timestamp != nil {
 		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
 	}
-	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "SeqNum: "+fmt.Sprintf("%#v", this.SeqNum)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -712,7 +807,7 @@ func (this *Trade) GoString() string {
 		return "nil"
 	}
 	s := make([]string, 0, 7)
-	s = append(s, "&exchanges.Trade{")
+	s = append(s, "&models.Trade{")
 	s = append(s, "Price: "+fmt.Sprintf("%#v", this.Price)+",\n")
 	s = append(s, "Quantity: "+fmt.Sprintf("%#v", this.Quantity)+",\n")
 	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
@@ -724,7 +819,7 @@ func (this *AggregatedTrade) GoString() string {
 		return "nil"
 	}
 	s := make([]string, 0, 8)
-	s = append(s, "&exchanges.AggregatedTrade{")
+	s = append(s, "&models.AggregatedTrade{")
 	s = append(s, "Bid: "+fmt.Sprintf("%#v", this.Bid)+",\n")
 	if this.Timestamp != nil {
 		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
@@ -740,7 +835,7 @@ func (this *AggregatedTrade) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func valueToGoStringMarketDataMessages(v interface{}, typ string) string {
+func valueToGoStringMarketData(v interface{}, typ string) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
 		return "nil"
@@ -748,7 +843,7 @@ func valueToGoStringMarketDataMessages(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
-func (m *OBDelta) Marshal() (dAtA []byte, err error) {
+func (m *OBL2Update) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -758,7 +853,7 @@ func (m *OBDelta) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *OBDelta) MarshalTo(dAtA []byte) (int, error) {
+func (m *OBL2Update) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -767,7 +862,7 @@ func (m *OBDelta) MarshalTo(dAtA []byte) (int, error) {
 		for _, msg := range m.Levels {
 			dAtA[i] = 0xa
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -778,25 +873,20 @@ func (m *OBDelta) MarshalTo(dAtA []byte) (int, error) {
 	if m.Timestamp != nil {
 		dAtA[i] = 0x12
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Timestamp.Size()))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
 		n1, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n1
 	}
-	if m.FirstID != 0 {
+	if m.SeqNum != 0 {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.FirstID))
-	}
-	if m.ID != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.ID))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.SeqNum))
 	}
 	if m.Trade {
-		dAtA[i] = 0x28
+		dAtA[i] = 0x20
 		i++
 		if m.Trade {
 			dAtA[i] = 1
@@ -823,21 +913,11 @@ func (m *OBL2Snapshot) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Instrument != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Instrument.Size()))
-		n2, err := m.Instrument.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n2
-	}
 	if len(m.Bids) > 0 {
 		for _, msg := range m.Bids {
 			dAtA[i] = 0x12
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -849,7 +929,7 @@ func (m *OBL2Snapshot) MarshalTo(dAtA []byte) (int, error) {
 		for _, msg := range m.Asks {
 			dAtA[i] = 0x1a
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -860,17 +940,74 @@ func (m *OBL2Snapshot) MarshalTo(dAtA []byte) (int, error) {
 	if m.Timestamp != nil {
 		dAtA[i] = 0x22
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Timestamp.Size()))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
+		n2, err := m.Timestamp.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	if m.SeqNum != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintMarketData(dAtA, i, uint64(m.SeqNum))
+	}
+	return i, nil
+}
+
+func (m *OBL3Update) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *OBL3Update) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Bids) > 0 {
+		for _, msg := range m.Bids {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.Asks) > 0 {
+		for _, msg := range m.Asks {
+			dAtA[i] = 0x1a
+			i++
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Timestamp != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
 		n3, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n3
 	}
-	if m.ID != 0 {
+	if m.SeqNum != 0 {
 		dAtA[i] = 0x28
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.ID))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.SeqNum))
 	}
 	return i, nil
 }
@@ -890,21 +1027,11 @@ func (m *OBL3Snapshot) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Instrument != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Instrument.Size()))
-		n4, err := m.Instrument.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n4
-	}
 	if len(m.Bids) > 0 {
 		for _, msg := range m.Bids {
 			dAtA[i] = 0x12
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -916,7 +1043,7 @@ func (m *OBL3Snapshot) MarshalTo(dAtA []byte) (int, error) {
 		for _, msg := range m.Asks {
 			dAtA[i] = 0x1a
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -927,17 +1054,17 @@ func (m *OBL3Snapshot) MarshalTo(dAtA []byte) (int, error) {
 	if m.Timestamp != nil {
 		dAtA[i] = 0x22
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Timestamp.Size()))
-		n5, err := m.Timestamp.MarshalTo(dAtA[i:])
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
+		n4, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n4
 	}
-	if m.ID != 0 {
+	if m.SeqNum != 0 {
 		dAtA[i] = 0x28
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.ID))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.SeqNum))
 	}
 	return i, nil
 }
@@ -972,7 +1099,7 @@ func (m *Trade) MarshalTo(dAtA []byte) (int, error) {
 	if m.ID != 0 {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.ID))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.ID))
 	}
 	return i, nil
 }
@@ -1005,23 +1132,23 @@ func (m *AggregatedTrade) MarshalTo(dAtA []byte) (int, error) {
 	if m.Timestamp != nil {
 		dAtA[i] = 0x12
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.Timestamp.Size()))
-		n6, err := m.Timestamp.MarshalTo(dAtA[i:])
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
+		n5, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n5
 	}
 	if m.AggregateID != 0 {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintMarketDataMessages(dAtA, i, uint64(m.AggregateID))
+		i = encodeVarintMarketData(dAtA, i, uint64(m.AggregateID))
 	}
 	if len(m.Trades) > 0 {
 		for _, msg := range m.Trades {
 			dAtA[i] = 0x22
 			i++
-			i = encodeVarintMarketDataMessages(dAtA, i, uint64(msg.Size()))
+			i = encodeVarintMarketData(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
@@ -1032,7 +1159,7 @@ func (m *AggregatedTrade) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func encodeVarintMarketDataMessages(dAtA []byte, offset int, v uint64) int {
+func encodeVarintMarketData(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
@@ -1041,7 +1168,7 @@ func encodeVarintMarketDataMessages(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *OBDelta) Size() (n int) {
+func (m *OBL2Update) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1050,18 +1177,15 @@ func (m *OBDelta) Size() (n int) {
 	if len(m.Levels) > 0 {
 		for _, e := range m.Levels {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	if m.Timestamp != nil {
 		l = m.Timestamp.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
+		n += 1 + l + sovMarketData(uint64(l))
 	}
-	if m.FirstID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.FirstID))
-	}
-	if m.ID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.ID))
+	if m.SeqNum != 0 {
+		n += 1 + sovMarketData(uint64(m.SeqNum))
 	}
 	if m.Trade {
 		n += 2
@@ -1075,28 +1199,52 @@ func (m *OBL2Snapshot) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Instrument != nil {
-		l = m.Instrument.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
-	}
 	if len(m.Bids) > 0 {
 		for _, e := range m.Bids {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	if len(m.Asks) > 0 {
 		for _, e := range m.Asks {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	if m.Timestamp != nil {
 		l = m.Timestamp.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
+		n += 1 + l + sovMarketData(uint64(l))
 	}
-	if m.ID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.ID))
+	if m.SeqNum != 0 {
+		n += 1 + sovMarketData(uint64(m.SeqNum))
+	}
+	return n
+}
+
+func (m *OBL3Update) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Bids) > 0 {
+		for _, e := range m.Bids {
+			l = e.Size()
+			n += 1 + l + sovMarketData(uint64(l))
+		}
+	}
+	if len(m.Asks) > 0 {
+		for _, e := range m.Asks {
+			l = e.Size()
+			n += 1 + l + sovMarketData(uint64(l))
+		}
+	}
+	if m.Timestamp != nil {
+		l = m.Timestamp.Size()
+		n += 1 + l + sovMarketData(uint64(l))
+	}
+	if m.SeqNum != 0 {
+		n += 1 + sovMarketData(uint64(m.SeqNum))
 	}
 	return n
 }
@@ -1107,28 +1255,24 @@ func (m *OBL3Snapshot) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Instrument != nil {
-		l = m.Instrument.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
-	}
 	if len(m.Bids) > 0 {
 		for _, e := range m.Bids {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	if len(m.Asks) > 0 {
 		for _, e := range m.Asks {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	if m.Timestamp != nil {
 		l = m.Timestamp.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
+		n += 1 + l + sovMarketData(uint64(l))
 	}
-	if m.ID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.ID))
+	if m.SeqNum != 0 {
+		n += 1 + sovMarketData(uint64(m.SeqNum))
 	}
 	return n
 }
@@ -1146,7 +1290,7 @@ func (m *Trade) Size() (n int) {
 		n += 9
 	}
 	if m.ID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.ID))
+		n += 1 + sovMarketData(uint64(m.ID))
 	}
 	return n
 }
@@ -1162,21 +1306,21 @@ func (m *AggregatedTrade) Size() (n int) {
 	}
 	if m.Timestamp != nil {
 		l = m.Timestamp.Size()
-		n += 1 + l + sovMarketDataMessages(uint64(l))
+		n += 1 + l + sovMarketData(uint64(l))
 	}
 	if m.AggregateID != 0 {
-		n += 1 + sovMarketDataMessages(uint64(m.AggregateID))
+		n += 1 + sovMarketData(uint64(m.AggregateID))
 	}
 	if len(m.Trades) > 0 {
 		for _, e := range m.Trades {
 			l = e.Size()
-			n += 1 + l + sovMarketDataMessages(uint64(l))
+			n += 1 + l + sovMarketData(uint64(l))
 		}
 	}
 	return n
 }
 
-func sovMarketDataMessages(x uint64) (n int) {
+func sovMarketData(x uint64) (n int) {
 	for {
 		n++
 		x >>= 7
@@ -1186,18 +1330,17 @@ func sovMarketDataMessages(x uint64) (n int) {
 	}
 	return n
 }
-func sozMarketDataMessages(x uint64) (n int) {
-	return sovMarketDataMessages(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+func sozMarketData(x uint64) (n int) {
+	return sovMarketData(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *OBDelta) String() string {
+func (this *OBL2Update) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&OBDelta{`,
+	s := strings.Join([]string{`&OBL2Update{`,
 		`Levels:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Levels), "OrderBookLevel", "gorderbook.OrderBookLevel", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
-		`FirstID:` + fmt.Sprintf("%v", this.FirstID) + `,`,
-		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`SeqNum:` + fmt.Sprintf("%v", this.SeqNum) + `,`,
 		`Trade:` + fmt.Sprintf("%v", this.Trade) + `,`,
 		`}`,
 	}, "")
@@ -1208,11 +1351,23 @@ func (this *OBL2Snapshot) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&OBL2Snapshot{`,
-		`Instrument:` + strings.Replace(fmt.Sprintf("%v", this.Instrument), "Instrument", "exchanges.Instrument", 1) + `,`,
-		`Bids:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Bids), "RawOrderBookLevel", "gorderbook.RawOrderBookLevel", 1), `&`, ``, 1) + `,`,
-		`Asks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Asks), "RawOrderBookLevel", "gorderbook.RawOrderBookLevel", 1), `&`, ``, 1) + `,`,
+		`Bids:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Bids), "OrderBookLevel", "gorderbook.OrderBookLevel", 1), `&`, ``, 1) + `,`,
+		`Asks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Asks), "OrderBookLevel", "gorderbook.OrderBookLevel", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
-		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`SeqNum:` + fmt.Sprintf("%v", this.SeqNum) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *OBL3Update) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&OBL3Update{`,
+		`Bids:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Bids), "Order", "gorderbook.Order", 1), `&`, ``, 1) + `,`,
+		`Asks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Asks), "Order", "gorderbook.Order", 1), `&`, ``, 1) + `,`,
+		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
+		`SeqNum:` + fmt.Sprintf("%v", this.SeqNum) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1222,11 +1377,10 @@ func (this *OBL3Snapshot) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&OBL3Snapshot{`,
-		`Instrument:` + strings.Replace(fmt.Sprintf("%v", this.Instrument), "Instrument", "exchanges.Instrument", 1) + `,`,
-		`Bids:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Bids), "RawOrder", "gorderbook.RawOrder", 1), `&`, ``, 1) + `,`,
-		`Asks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Asks), "RawOrder", "gorderbook.RawOrder", 1), `&`, ``, 1) + `,`,
+		`Bids:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Bids), "Order", "gorderbook.Order", 1), `&`, ``, 1) + `,`,
+		`Asks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Asks), "Order", "gorderbook.Order", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
-		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`SeqNum:` + fmt.Sprintf("%v", this.SeqNum) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1256,7 +1410,7 @@ func (this *AggregatedTrade) String() string {
 	}, "")
 	return s
 }
-func valueToStringMarketDataMessages(v interface{}) string {
+func valueToStringMarketData(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
 		return "nil"
@@ -1264,7 +1418,7 @@ func valueToStringMarketDataMessages(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *OBDelta) Unmarshal(dAtA []byte) error {
+func (m *OBL2Update) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1272,7 +1426,7 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return ErrIntOverflowMarketDataMessages
+				return ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -1287,10 +1441,10 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: OBDelta: wiretype end group for non-group")
+			return fmt.Errorf("proto: OBL2Update: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: OBDelta: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: OBL2Update: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1300,7 +1454,7 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1313,11 +1467,11 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -1334,7 +1488,7 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1347,11 +1501,11 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -1365,50 +1519,31 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field FirstID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SeqNum", wireType)
 			}
-			m.FirstID = 0
+			m.SeqNum = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.FirstID |= uint64(b&0x7F) << shift
+				m.SeqNum |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 4:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
-			}
-			m.ID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.ID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
-			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Trade", wireType)
 			}
 			var v int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1423,15 +1558,15 @@ func (m *OBDelta) Unmarshal(dAtA []byte) error {
 			m.Trade = bool(v != 0)
 		default:
 			iNdEx = preIndex
-			skippy, err := skipMarketDataMessages(dAtA[iNdEx:])
+			skippy, err := skipMarketData(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
 			if skippy < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -1453,7 +1588,7 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return ErrIntOverflowMarketDataMessages
+				return ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -1474,42 +1609,6 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: OBL2Snapshot: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Instrument", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Instrument == nil {
-				m.Instrument = &exchanges.Instrument{}
-			}
-			if err := m.Instrument.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Bids", wireType)
@@ -1517,7 +1616,7 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1530,16 +1629,16 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Bids = append(m.Bids, gorderbook.RawOrderBookLevel{})
+			m.Bids = append(m.Bids, gorderbook.OrderBookLevel{})
 			if err := m.Bids[len(m.Bids)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1551,7 +1650,7 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1564,16 +1663,16 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Asks = append(m.Asks, gorderbook.RawOrderBookLevel{})
+			m.Asks = append(m.Asks, gorderbook.OrderBookLevel{})
 			if err := m.Asks[len(m.Asks)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1585,7 +1684,7 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1598,11 +1697,11 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -1616,34 +1715,210 @@ func (m *OBL2Snapshot) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SeqNum", wireType)
 			}
-			m.ID = 0
+			m.SeqNum = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ID |= uint64(b&0x7F) << shift
+				m.SeqNum |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipMarketDataMessages(dAtA[iNdEx:])
+			skippy, err := skipMarketData(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
 			if skippy < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *OBL3Update) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMarketData
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: OBL3Update: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: OBL3Update: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bids", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Bids = append(m.Bids, gorderbook.Order{})
+			if err := m.Bids[len(m.Bids)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Asks", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Asks = append(m.Asks, gorderbook.Order{})
+			if err := m.Asks[len(m.Asks)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Timestamp == nil {
+				m.Timestamp = &types.Timestamp{}
+			}
+			if err := m.Timestamp.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SeqNum", wireType)
+			}
+			m.SeqNum = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SeqNum |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMarketData(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -1665,7 +1940,7 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return ErrIntOverflowMarketDataMessages
+				return ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -1686,42 +1961,6 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: OBL3Snapshot: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Instrument", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Instrument == nil {
-				m.Instrument = &exchanges.Instrument{}
-			}
-			if err := m.Instrument.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Bids", wireType)
@@ -1729,7 +1968,7 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1742,16 +1981,16 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Bids = append(m.Bids, gorderbook.RawOrder{})
+			m.Bids = append(m.Bids, gorderbook.Order{})
 			if err := m.Bids[len(m.Bids)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1763,7 +2002,7 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1776,16 +2015,16 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Asks = append(m.Asks, gorderbook.RawOrder{})
+			m.Asks = append(m.Asks, gorderbook.Order{})
 			if err := m.Asks[len(m.Asks)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -1797,7 +2036,7 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1810,11 +2049,11 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -1828,34 +2067,34 @@ func (m *OBL3Snapshot) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SeqNum", wireType)
 			}
-			m.ID = 0
+			m.SeqNum = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ID |= uint64(b&0x7F) << shift
+				m.SeqNum |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipMarketDataMessages(dAtA[iNdEx:])
+			skippy, err := skipMarketData(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
 			if skippy < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -1877,7 +2116,7 @@ func (m *Trade) Unmarshal(dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return ErrIntOverflowMarketDataMessages
+				return ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -1927,7 +2166,7 @@ func (m *Trade) Unmarshal(dAtA []byte) error {
 			m.ID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -1941,15 +2180,15 @@ func (m *Trade) Unmarshal(dAtA []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipMarketDataMessages(dAtA[iNdEx:])
+			skippy, err := skipMarketData(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
 			if skippy < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -1971,7 +2210,7 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return ErrIntOverflowMarketDataMessages
+				return ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -1999,7 +2238,7 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 			var v int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -2019,7 +2258,7 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -2032,11 +2271,11 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -2055,7 +2294,7 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 			m.AggregateID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -2074,7 +2313,7 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return ErrIntOverflowMarketDataMessages
+					return ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -2087,11 +2326,11 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -2103,15 +2342,15 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipMarketDataMessages(dAtA[iNdEx:])
+			skippy, err := skipMarketData(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
 			if skippy < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthMarketDataMessages
+				return ErrInvalidLengthMarketData
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -2125,14 +2364,14 @@ func (m *AggregatedTrade) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func skipMarketDataMessages(dAtA []byte) (n int, err error) {
+func skipMarketData(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return 0, ErrIntOverflowMarketDataMessages
+				return 0, ErrIntOverflowMarketData
 			}
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
@@ -2149,7 +2388,7 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 		case 0:
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return 0, ErrIntOverflowMarketDataMessages
+					return 0, ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
@@ -2167,7 +2406,7 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 			var length int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return 0, ErrIntOverflowMarketDataMessages
+					return 0, ErrIntOverflowMarketData
 				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
@@ -2180,11 +2419,11 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 				}
 			}
 			if length < 0 {
-				return 0, ErrInvalidLengthMarketDataMessages
+				return 0, ErrInvalidLengthMarketData
 			}
 			iNdEx += length
 			if iNdEx < 0 {
-				return 0, ErrInvalidLengthMarketDataMessages
+				return 0, ErrInvalidLengthMarketData
 			}
 			return iNdEx, nil
 		case 3:
@@ -2193,7 +2432,7 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 				var start int = iNdEx
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
-						return 0, ErrIntOverflowMarketDataMessages
+						return 0, ErrIntOverflowMarketData
 					}
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
@@ -2209,13 +2448,13 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipMarketDataMessages(dAtA[start:])
+				next, err := skipMarketData(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
 				iNdEx = start + next
 				if iNdEx < 0 {
-					return 0, ErrInvalidLengthMarketDataMessages
+					return 0, ErrInvalidLengthMarketData
 				}
 			}
 			return iNdEx, nil
@@ -2232,6 +2471,6 @@ func skipMarketDataMessages(dAtA []byte) (n int, err error) {
 }
 
 var (
-	ErrInvalidLengthMarketDataMessages = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowMarketDataMessages   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthMarketData = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowMarketData   = fmt.Errorf("proto: integer overflow")
 )

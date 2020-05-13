@@ -1,0 +1,9 @@
+syntax = "proto3";
+package models;
+
+import "google/protobuf/any.proto";
+
+message Order {
+    string internalID = 1;
+    string externalID = 2;
+}

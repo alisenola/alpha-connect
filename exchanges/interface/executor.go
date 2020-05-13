@@ -3,17 +3,16 @@ package _interface
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	fix50sdr "github.com/quickfixgo/fix50/securitydefinitionrequest"
-	fix50nso "github.com/quickfixgo/quickfix/fix50/newordersingle"
+	"gitlab.com/alphaticks/alphac/models/messages"
 )
 
 type ExchangeExecutor interface {
 	actor.Actor
+	OnSecurityListRequest(context actor.Context) error
+	OnMarketDataRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
-	OnFIX50NewOrderSingle(context actor.Context) error
-	OnFIX50SecurityDefinitionRequest(context actor.Context) error
 }
 
 func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
@@ -42,15 +41,15 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 		}
 		state.GetLogger().Info("actor restarting")
 
-	case *fix50nso.NewOrderSingle:
-		if err := state.OnFIX50NewOrderSingle(context); err != nil {
-			state.GetLogger().Error("error processing FIX50NewOrderSingle", log.Error(err))
+	case *messages.SecurityListRequest:
+		if err := state.OnSecurityListRequest(context); err != nil {
+			state.GetLogger().Error("error processing SecurityListRequest", log.Error(err))
 			panic(err)
 		}
 
-	case *fix50sdr.SecurityDefinitionRequest:
-		if err := state.OnFIX50SecurityDefinitionRequest(context); err != nil {
-			state.GetLogger().Error("error processing FIX50SecurityDefinitionRequest", log.Error(err))
+	case *messages.MarketDataRequest:
+		if err := state.OnMarketDataRequest(context); err != nil {
+			state.GetLogger().Error("error processing MarketDataRequest", log.Error(err))
 			panic(err)
 		}
 	}

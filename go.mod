@@ -14,8 +14,8 @@ require (
 	github.com/quickfixgo/tag v0.0.0-20171007194743-cbb465760521 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
-	gitlab.com/alphaticks/gorderbook v0.0.0-20200219145956-352654c82287
-	gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77
+	gitlab.com/alphaticks/gorderbook v0.0.0-20200513101946-928ffaaf764f
+	gitlab.com/alphaticks/xchanger v0.0.0-20200513102043-880ac569064b
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../../alphaticks/xchanger
