@@ -95,7 +95,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
+	state.instruments = make(map[uint64]*actor.PID)
+	state.slSubscribers = make(map[uint64]*actor.PID)
 	// Spawn all exchange executors
+	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.exchanges {
 		producer := NewExchangeExecutorProducer(exch)
 		if producer == nil {
