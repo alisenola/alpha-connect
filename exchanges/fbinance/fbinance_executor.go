@@ -1,4 +1,4 @@
-package binance
+package fbinance
 
 import (
 	"encoding/json"
@@ -14,7 +14,8 @@ import (
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
+	"math"
 	"net/http"
 	"reflect"
 	"time"
@@ -36,8 +37,7 @@ import (
 
 type Executor struct {
 	client               *http.Client
-	secondOrderRateLimit *exchanges.RateLimit
-	dayOrderRateLimit    *exchanges.RateLimit
+	minuteOrderRateLimit *exchanges.RateLimit
 	globalRateLimit      *exchanges.RateLimit
 	queryRunner          *actor.PID
 	logger               *log.Logger
@@ -46,10 +46,10 @@ type Executor struct {
 func NewExecutor() actor.Actor {
 	return &Executor{
 		client:               nil,
-		secondOrderRateLimit: nil,
-		dayOrderRateLimit:    nil,
+		minuteOrderRateLimit: nil,
 		globalRateLimit:      nil,
 		queryRunner:          nil,
+		logger:               nil,
 	}
 }
 
@@ -62,12 +62,6 @@ func (state *Executor) GetLogger() *log.Logger {
 }
 
 func (state *Executor) Initialize(context actor.Context) error {
-	state.logger = log.New(
-		log.InfoLevel,
-		"",
-		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
-
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
@@ -75,14 +69,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 		},
 		Timeout: 10 * time.Second,
 	}
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()))
 
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
 	state.queryRunner = context.Spawn(props)
 
-	request, weight, err := binance.GetExchangeInfo()
-	// Launch an APIQuery actor with the given request and target
+	request, weight, err := fbinance.GetExchangeInfo()
 
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
@@ -94,7 +92,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting exchange info: status code %d", queryResponse.StatusCode)
 	}
 
-	var exchangeInfo binance.ExchangeInfo
+	var exchangeInfo fbinance.ExchangeInfo
 	err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
 	if err != nil {
 		return fmt.Errorf("error decoding query response: %v", err)
@@ -106,17 +104,15 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Initialize rate limit
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
-			if rateLimit.Interval == "SECOND" {
-				state.secondOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Second)
-			} else if rateLimit.Interval == "DAY" {
-				state.dayOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Hour*24)
+			if rateLimit.Interval == "MINUTE" {
+				state.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 			state.globalRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
 		}
 	}
-	if state.secondOrderRateLimit == nil || state.dayOrderRateLimit == nil {
-		return fmt.Errorf("unable to set second or day rate limit")
+	if state.minuteOrderRateLimit == nil || state.globalRateLimit == nil {
+		return fmt.Errorf("unable to set minute or global rate limit")
 	}
 
 	// Update rate limit with weight from the current exchange info fetch
@@ -131,7 +127,7 @@ func (state *Executor) Clean(context actor.Context) error {
 func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
-	request, weight, err := binance.GetExchangeInfo()
+	request, weight, err := fbinance.GetExchangeInfo()
 	if err != nil {
 		return err
 	}
@@ -178,7 +174,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 			}
 			return
 		}
-		var exchangeInfo binance.ExchangeInfo
+		var exchangeInfo fbinance.ExchangeInfo
 		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
 		if err != nil {
 			err = fmt.Errorf(
@@ -193,7 +189,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		}
 		if exchangeInfo.Code != 0 {
 			err = fmt.Errorf(
-				"binance api error: %d %s",
+				"fbinance api error: %d %s",
 				exchangeInfo.Code,
 				exchangeInfo.Msg)
 			context.Respond(&messages.SecurityList{
@@ -219,16 +215,12 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 			security.Underlying = &baseCurrency
 			security.QuoteCurrency = &quoteCurrency
 			security.Enabled = symbol.Status == "TRADING"
-			security.Exchange = &constants.BINANCE
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+			security.Exchange = &constants.FBINANCE
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			for _, filter := range symbol.Filters {
-				if filter.FilterType == "PRICE_FILTER" {
-					security.MinPriceIncrement = filter.TickSize
-				} else if filter.FilterType == "LOT_SIZE" {
-					security.RoundLot = filter.StepSize
-				}
-			}
+			security.MinPriceIncrement = 1. / math.Pow10(symbol.PricePrecision)
+			security.RoundLot = 1. / math.Pow10(symbol.QuantityPrecision)
+			security.IsInverse = false
 			securities = append(securities, &security)
 		}
 		context.Respond(&messages.SecurityList{
@@ -251,7 +243,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol
 	// Get http request and the expected response
-	request, weight, err := binance.GetOrderBook(symbol, 1000)
+	request, weight, err := fbinance.GetOrderBook(symbol, 1000)
 	if err != nil {
 		return err
 	}
@@ -292,7 +284,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			}
 			return
 		}
-		var obData binance.OrderBookData
+		var obData fbinance.OrderBookData
 		err = json.Unmarshal(queryResponse.Response, &obData)
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
@@ -329,5 +321,25 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			SnapshotL2: snapshot})
 	})
 
+	return nil
+}
+
+func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) GetOpenOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OpenOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) CloseOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) CloseAllOrdersRequest(context actor.Context) error {
 	return nil
 }

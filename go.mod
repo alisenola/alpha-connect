@@ -8,8 +8,8 @@ require (
 	github.com/melaurent/gopactor v0.0.0-20190619082820-8be34b07aaaa // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
-	gitlab.com/alphaticks/gorderbook v0.0.0-20200513101946-928ffaaf764f
-	gitlab.com/alphaticks/xchanger v0.0.0-20200513102043-880ac569064b
+	gitlab.com/alphaticks/gorderbook v0.0.0-20200514150550-2800aed69dfe
+	gitlab.com/alphaticks/xchanger v0.0.0-20200514205238-39b56344ca24
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../../alphaticks/xchanger

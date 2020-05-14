@@ -7,6 +7,7 @@ import "gitlab.com/alphaticks/gorderbook/protos.proto";
 import "gitlab.com/alphaticks/alphac/models/market_data.proto";
 import "gitlab.com/alphaticks/alphac/models/security.proto";
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
 message Instrument {
     uint64 securityID = 1;
@@ -14,10 +15,17 @@ message Instrument {
     string symbol = 3;
 }
 
+enum OrderBookAggregation {
+    L2 = 0;
+    L3 = 1;
+}
+
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
     Instrument instrument = 3;
+    actor.PID subscriber = 4;
+    OrderBookAggregation aggregation = 5;
 }
 
 message MarketDataRequestReject {
@@ -44,6 +52,7 @@ message MarketDataIncrementalRefresh {
 message SecurityListRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
+    actor.PID subscriber = 3;
 }
 
 message SecurityList {

@@ -1,22 +1,24 @@
-package binance
+package bitfinex
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
-	"gitlab.com/alphaticks/alphac/models"
+	models "gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
+	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -30,26 +32,19 @@ import (
 
 // The role of a Binance Executor is to
 // process api request
-
-// The global rate limit is per IP and the orderRateLimit is per
-// account.
-
 type Executor struct {
-	client               *http.Client
-	secondOrderRateLimit *exchanges.RateLimit
-	dayOrderRateLimit    *exchanges.RateLimit
-	globalRateLimit      *exchanges.RateLimit
-	queryRunner          *actor.PID
-	logger               *log.Logger
+	client      *http.Client
+	rateLimit   *exchanges.RateLimit
+	queryRunner *actor.PID
+	logger      *log.Logger
 }
 
 func NewExecutor() actor.Actor {
 	return &Executor{
-		client:               nil,
-		secondOrderRateLimit: nil,
-		dayOrderRateLimit:    nil,
-		globalRateLimit:      nil,
-		queryRunner:          nil,
+		client:      nil,
+		rateLimit:   nil,
+		queryRunner: nil,
+		logger:      nil,
 	}
 }
 
@@ -62,12 +57,6 @@ func (state *Executor) GetLogger() *log.Logger {
 }
 
 func (state *Executor) Initialize(context actor.Context) error {
-	state.logger = log.New(
-		log.InfoLevel,
-		"",
-		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
-
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
@@ -75,52 +64,17 @@ func (state *Executor) Initialize(context actor.Context) error {
 		},
 		Timeout: 10 * time.Second,
 	}
-
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()))
+	// TODO rate limiting
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
 	state.queryRunner = context.Spawn(props)
 
-	request, weight, err := binance.GetExchangeInfo()
-	// Launch an APIQuery actor with the given request and target
-
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-	res, err := future.Result()
-	if err != nil {
-		return err
-	}
-	queryResponse := res.(*jobs.PerformQueryResponse)
-	if queryResponse.StatusCode != 200 {
-		return fmt.Errorf("error getting exchange info: status code %d", queryResponse.StatusCode)
-	}
-
-	var exchangeInfo binance.ExchangeInfo
-	err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
-	if err != nil {
-		return fmt.Errorf("error decoding query response: %v", err)
-	}
-	if exchangeInfo.Code != 0 {
-		return fmt.Errorf("error getting exchange info: %s", exchangeInfo.Msg)
-	}
-
-	// Initialize rate limit
-	for _, rateLimit := range exchangeInfo.RateLimits {
-		if rateLimit.RateLimitType == "ORDERS" {
-			if rateLimit.Interval == "SECOND" {
-				state.secondOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Second)
-			} else if rateLimit.Interval == "DAY" {
-				state.dayOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Hour*24)
-			}
-		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
-			state.globalRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
-		}
-	}
-	if state.secondOrderRateLimit == nil || state.dayOrderRateLimit == nil {
-		return fmt.Errorf("unable to set second or day rate limit")
-	}
-
-	// Update rate limit with weight from the current exchange info fetch
-	state.globalRateLimit.Request(weight)
 	return nil
 }
 
@@ -129,21 +83,13 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
-	request, weight, err := binance.GetExchangeInfo()
+	request, _, err := bitfinex.GetSymbolsDetails()
 	if err != nil {
 		return err
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
-		time.Sleep(state.globalRateLimit.DurationBeforeNextRequest(weight))
-		return nil
-	}
-
-	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			context.Respond(&messages.SecurityList{
@@ -178,24 +124,11 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 			}
 			return
 		}
-		var exchangeInfo binance.ExchangeInfo
-		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
+
+		var symbolDetails []bitfinex.SymbolDetail
+		err = json.Unmarshal(queryResponse.Response, &symbolDetails)
 		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
-		if exchangeInfo.Code != 0 {
-			err = fmt.Errorf(
-				"binance api error: %d %s",
-				exchangeInfo.Code,
-				exchangeInfo.Msg)
+			err = fmt.Errorf("error decoding query response: %v", err)
 			context.Respond(&messages.SecurityList{
 				RequestID:  msg.RequestID,
 				ResponseID: uint64(time.Now().UnixNano()),
@@ -205,32 +138,49 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		}
 
 		var securities []*models.Security
-		for _, symbol := range exchangeInfo.Symbols {
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
+		for _, symbol := range symbolDetails {
+			if len(symbol.Pair) != 6 {
+				//state.logger.Warning(fmt.Sprintf("unknown symbol type: %s", symbol.Pair))
+				continue
+			}
+			symbolStr := strings.ToUpper(symbol.Pair[:3])
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
 			if !ok {
 				continue
 			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
+			symbolStr = strings.ToUpper(symbol.Pair[3:])
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
 			if !ok {
 				continue
+			}
+
+			pair := xchangerModels.Pair{
+				Base:  &baseCurrency,
+				Quote: &quoteCurrency,
 			}
 			security := models.Security{}
-			security.Symbol = symbol.Symbol
+			security.Symbol = symbol.Pair
 			security.Underlying = &baseCurrency
 			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = symbol.Status == "TRADING"
-			security.Exchange = &constants.BINANCE
+			security.Exchange = &constants.BITFINEX
 			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			for _, filter := range symbol.Filters {
-				if filter.FilterType == "PRICE_FILTER" {
-					security.MinPriceIncrement = filter.TickSize
-				} else if filter.FilterType == "LOT_SIZE" {
-					security.RoundLot = filter.StepSize
-				}
+			security.RoundLot = 1. / 100000000.
+			tickPrecision, ok := bitfinex.TickPrecisions[pair.String()]
+			if !ok {
+				//state.logger.Warning(fmt.Sprintf("TickPrecisions not defined for %s", instrument.DefaultFormat()))
+				continue
 			}
+			security.MinPriceIncrement = 1. / float64(tickPrecision)
 			securities = append(securities, &security)
 		}
+
 		context.Respond(&messages.SecurityList{
 			RequestID:  msg.RequestID,
 			ResponseID: uint64(time.Now().UnixNano()),
@@ -244,26 +194,12 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.MarketDataRequest)
-	if msg.Subscribe {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "market data subscription not supported on executor"})
-	}
-	symbol := msg.Instrument.Symbol
 	// Get http request and the expected response
-	request, weight, err := binance.GetOrderBook(symbol, 1000)
+	request, _, err := bitfinex.GetOrderBook(msg.Instrument.Symbol, 100, 100)
 	if err != nil {
 		return err
 	}
-
-	if state.globalRateLimit.IsRateLimited() {
-		time.Sleep(state.globalRateLimit.DurationBeforeNextRequest(weight))
-		return nil
-	}
-
-	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			context.Respond(&messages.MarketDataRequestReject{
@@ -272,6 +208,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
+
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
 				err := fmt.Errorf(
@@ -292,7 +229,8 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			}
 			return
 		}
-		var obData binance.OrderBookData
+
+		var obData bitfinex.OrderBookData
 		err = json.Unmarshal(queryResponse.Response, &obData)
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
@@ -301,33 +239,61 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 				Reason:    err.Error()})
 			return
 		}
-		if obData.Code != 0 {
-			err = fmt.Errorf("error getting orderbook: %d %s", obData.Code, obData.Msg)
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
-			return
+		var bids []gorderbook.OrderBookLevel
+		var asks []gorderbook.OrderBookLevel
+		// TS is float in seconds, * 1000 + rounding to get millisecond
+		var ts uint64 = 0
+		for _, bid := range obData.Bids {
+			if uint64(bid.Timestamp*1000) > ts {
+				ts = uint64(bid.Timestamp * 1000)
+			}
+			bids = append(bids, gorderbook.OrderBookLevel{
+				Price:    bid.Price,
+				Quantity: bid.Amount,
+				Bid:      true,
+			})
+		}
+		for _, ask := range obData.Asks {
+			if uint64(ask.Timestamp*1000) > ts {
+				ts = uint64(ask.Timestamp * 1000)
+			}
+			asks = append(asks, gorderbook.OrderBookLevel{
+				Price:    ask.Price,
+				Quantity: ask.Amount,
+				Bid:      false,
+			})
 		}
 
-		bids, asks, err := obData.ToBidAsk()
-		if err != nil {
-			err = fmt.Errorf("error converting orderbook: %v", err)
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
-			return
-		}
 		snapshot = &models.OBL2Snapshot{
 			Bids:      bids,
 			Asks:      asks,
-			Timestamp: &types.Timestamp{Seconds: 0, Nanos: 0},
-			SeqNum:    obData.LastUpdateID,
+			Timestamp: utils.MilliToTimestamp(ts),
+			SeqNum:    ts,
 		}
 		context.Respond(&messages.MarketDataSnapshot{
 			RequestID:  msg.RequestID,
 			ResponseID: uint64(time.Now().UnixNano()),
 			SnapshotL2: snapshot})
 	})
+	return nil
+}
 
+func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) GetOpenOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OpenOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) CloseOrdersRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) CloseAllOrdersRequest(context actor.Context) error {
 	return nil
 }

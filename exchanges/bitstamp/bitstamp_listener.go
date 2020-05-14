@@ -1,4 +1,4 @@
-package binance
+package bitstamp
 
 import (
 	"container/list"
@@ -9,39 +9,37 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	"math"
 	"reflect"
-	"strings"
 	"time"
 )
 
-// OBType: OBL2
-// OBL2 Timestamps: ordered & consistent with sequence ID
-// Trades: Impossible to infer from deltas
-// Status: ready
 type readSocket struct{}
 type postAggTrade struct{}
 
 type InstrumentData struct {
+	tickPrecision  uint64
+	lotPrecision   uint64
 	orderBook      *gorderbook.OrderBookL2
 	seqNum         uint64
-	lastUpdateID   uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
 	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
 }
 
+// OBType: OBL2
+
 type Listener struct {
-	obWs            *binance.Websocket
-	tradeWs         *binance.Websocket
-	wsChan          chan *binance.WebsocketMessage
+	obWs            *bitstamp.Websocket
+	tradeWs         *bitstamp.Websocket
+	wsChan          chan *bitstamp.WebsocketMessage
 	security        *models.Security
 	instrumentData  *InstrumentData
-	binanceExecutor *actor.PID
+	executorManager *actor.PID
 	logger          *log.Logger
+	lastPingTime    time.Time
 	stashedTrades   *list.List
 }
 
@@ -58,7 +56,7 @@ func NewListener(security *models.Security) actor.Actor {
 		wsChan:          nil,
 		security:        security,
 		instrumentData:  nil,
-		binanceExecutor: nil,
+		executorManager: nil,
 		logger:          nil,
 		stashedTrades:   nil,
 	}
@@ -101,6 +99,7 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing readSocket", log.Error(err))
 			panic(err)
 		}
+
 	case *postAggTrade:
 		state.postAggTrade(context)
 	}
@@ -115,16 +114,19 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.binanceExecutor = actor.NewLocalPID("executor/" + constants.BINANCE.Name + "_executor")
-	state.wsChan = make(chan *binance.WebsocketMessage, 10000)
+	state.wsChan = make(chan *bitstamp.WebsocketMessage, 10000)
+	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
 
 	context.Send(context.Self(), &readSocket{})
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
 
 	state.instrumentData = &InstrumentData{
+		tickPrecision:  tickPrecision,
+		lotPrecision:   lotPrecision,
 		orderBook:      nil,
 		seqNum:         0,
-		lastUpdateID:   0,
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
 		aggTrade:       nil,
@@ -161,103 +163,47 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		_ = state.obWs.Disconnect()
 	}
 
-	obWs := binance.NewWebsocket()
-	symbol := strings.ToLower(state.security.Symbol)
-	err := obWs.Connect(
-		symbol,
-		[]string{binance.WSDepthStream100ms})
-	if err != nil {
-		return err
+	ws := bitstamp.NewWebsocket()
+	if err := ws.Connect(); err != nil {
+		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 
-	state.obWs = obWs
-
-	time.Sleep(5 * time.Second)
-	fut := context.RequestFuture(
-		state.binanceExecutor,
-		&messages.MarketDataRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			Subscribe: false,
-			Instrument: &messages.Instrument{
-				SecurityID: state.security.SecurityID,
-				Exchange:   state.security.Exchange,
-				Symbol:     state.security.Symbol,
-			},
-			Aggregation: messages.L2,
-		},
-		20*time.Second)
-
-	res, err := fut.Result()
-	if err != nil {
-		return fmt.Errorf("error getting OBL2")
+	if err := ws.Subscribe(state.security.Symbol, bitstamp.WSOrderBookChannel); err != nil {
+		return fmt.Errorf("error subscribing to depth stream for symbol %s", state.security.Symbol)
 	}
-	msg, ok := res.(*messages.MarketDataSnapshot)
+
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading message: %v", ws.Err)
+	}
+	_, ok := ws.Msg.Message.(bitstamp.WSSubscribedMessage)
 	if !ok {
-		reject, ok := res.(*messages.MarketDataRequestReject)
-		if ok {
-			return fmt.Errorf("impossible to fetch OBL2 from executor: %s", reject.Reason)
-		} else {
-			return fmt.Errorf("was expecting MarketDataSnapshot, got %s", reflect.TypeOf(msg).String())
-		}
-	}
-	if msg.SnapshotL2 == nil {
-		return fmt.Errorf("market data snapshot has no OBL2")
+		return fmt.Errorf("was expecting WSSubsribed message, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
-	bestAsk := msg.SnapshotL2.Asks[0].Price
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-
-	if depth > 10000 {
-		depth = 10000
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading message: %v", ws.Err)
+	}
+	depthData, ok := ws.Msg.Message.(bitstamp.OrderBookL2)
+	if !ok {
+		return fmt.Errorf("was expecting depth data, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
+	bids, asks := depthData.ToBidAsk()
 	ob := gorderbook.NewOrderBookL2(
-		tickPrecision,
-		lotPrecision,
-		depth,
-	)
+		state.instrumentData.tickPrecision,
+		state.instrumentData.lotPrecision,
+		1000)
+	ob.Sync(bids, asks)
 
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
-	state.instrumentData.lastUpdateID = msg.SnapshotL2.SeqNum
-	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
+	ts := uint64(ws.Msg.Time.UnixNano()) / 1000
 
-	synced := false
-	for !synced {
-		if !obWs.ReadMessage() {
-			return fmt.Errorf("error reading message: %v", obWs.Err)
-		}
-		depthData, ok := obWs.Msg.Message.(binance.WSDepthData)
-		if !ok {
-			return fmt.Errorf("was expecting depth data, got %s", reflect.TypeOf(obWs.Msg.Message).String())
-		}
-
-		if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
-			continue
-		}
-
-		bids, asks, err := depthData.ToBidAsk()
-		if err != nil {
-			return fmt.Errorf("error converting depth data: %s ", err.Error())
-		}
-		for _, bid := range bids {
-			ob.UpdateOrderBookLevel(bid)
-		}
-		for _, ask := range asks {
-			ob.UpdateOrderBookLevel(ask)
-		}
-
-		state.instrumentData.lastUpdateID = depthData.FinalUpdateID
-		state.instrumentData.lastUpdateTime = uint64(obWs.Msg.Time.UnixNano() / 1000000)
-
-		synced = true
-	}
-
-	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = 0
+	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.orderBook = ob
 
-	go func(ws *binance.Websocket) {
+	state.obWs = ws
+
+	go func(ws *bitstamp.Websocket) {
 		for ws.ReadMessage() {
 			state.wsChan <- ws.Msg
 		}
@@ -270,17 +216,18 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	if state.tradeWs != nil {
 		_ = state.tradeWs.Disconnect()
 	}
-	tradeWs := binance.NewWebsocket()
-	symbol := strings.ToLower(state.security.Symbol)
-	err := tradeWs.Connect(
-		symbol,
-		[]string{binance.WSTradeStream})
-	if err != nil {
-		return err
+	ws := bitstamp.NewWebsocket()
+	if err := ws.Connect(); err != nil {
+		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
-	state.tradeWs = tradeWs
 
-	go func(ws *binance.Websocket) {
+	if err := ws.Subscribe(state.security.Symbol, bitstamp.WSLiveTradesChannel); err != nil {
+		return fmt.Errorf("error subscribing to trade stream for symbol %s", state.security.Symbol)
+	}
+
+	state.tradeWs = ws
+
+	go func(ws *bitstamp.Websocket) {
 		for ws.ReadMessage() {
 			state.wsChan <- ws.Msg
 		}
@@ -292,21 +239,17 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 
-	response := &messages.MarketDataSnapshot{
+	snapshot := &models.OBL2Snapshot{
+		Bids:      state.instrumentData.orderBook.GetBids(0),
+		Asks:      state.instrumentData.orderBook.GetAsks(0),
+		Timestamp: utils.MicroToTimestamp(state.instrumentData.lastUpdateTime),
+		SeqNum:    state.instrumentData.seqNum,
+	}
+	context.Respond(&messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-	}
-	if msg.Aggregation == messages.L2 {
-		snapshot := &models.OBL2Snapshot{
-			Bids:      state.instrumentData.orderBook.GetBids(0),
-			Asks:      state.instrumentData.orderBook.GetAsks(0),
-			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			SeqNum:    state.instrumentData.seqNum,
-		}
-		response.SnapshotL2 = snapshot
-	}
-
-	context.Respond(response)
+		SnapshotL2: snapshot,
+	})
 	return nil
 }
 
@@ -318,40 +261,66 @@ func (state *Listener) readSocket(context actor.Context) error {
 		case error:
 			return fmt.Errorf("socket error: %v", msg)
 
-		case binance.WSDepthData:
-			depthData := msg.Message.(binance.WSDepthData)
+		case bitstamp.OrderBookL2:
+			obData := msg.Message.(bitstamp.OrderBookL2)
 
-			// change event time
-			depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
-			err := state.onDepthData(context, depthData)
-			if err != nil {
-				state.logger.Info("error processing depth data for "+depthData.Symbol,
-					log.Error(err))
+			newOb := gorderbook.NewOrderBookL2(
+				state.instrumentData.tickPrecision,
+				state.instrumentData.lotPrecision,
+				1000)
+
+			bids, asks := obData.ToBidAsk()
+
+			newOb.Sync(bids, asks)
+
+			deltas := state.instrumentData.orderBook.Diff(newOb)
+
+			ts := uint64(msg.Time.UnixNano() / 1000)
+			obDelta := &models.OBL2Update{
+				Levels:    deltas,
+				Timestamp: utils.MicroToTimestamp(ts),
+				SeqNum:    state.instrumentData.seqNum + 1,
+				Trade:     false,
+			}
+			state.instrumentData.seqNum += 1
+
+			state.instrumentData.orderBook = newOb
+			state.instrumentData.lastUpdateTime = ts
+
+			if state.instrumentData.orderBook.Crossed() {
+				state.logger.Info("crossed order book")
 				// Stop the socket, we will restart instrument at the end
 				if err := state.obWs.Disconnect(); err != nil {
 					state.logger.Info("error disconnecting from socket", log.Error(err))
 				}
+				break
 			}
 
-		case binance.WSTradeData:
-			tradeData := msg.Message.(binance.WSTradeData)
-			var aggregateID uint64
-			if tradeData.MarketSell {
-				aggregateID = uint64(tradeData.SellerOrderID)
+			// Send OBData
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				UpdateL2: obDelta,
+			})
+
+		case bitstamp.WSTrade:
+			tradeData := msg.Message.(bitstamp.WSTrade)
+			tradeData.MicroTimestamp = uint64(msg.Time.UnixNano()) / 1000
+			ts := tradeData.MicroTimestamp / 1000
+
+			var aggID uint64
+			if tradeData.Type == 1 {
+				aggID = tradeData.SellOrderID
 			} else {
-				aggregateID = uint64(tradeData.BuyerOrderID)
+				aggID = tradeData.BuyOrderID
 			}
 
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-
-			if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
+			if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggID {
 				if state.instrumentData.lastAggTradeTs >= ts {
 					ts = state.instrumentData.lastAggTradeTs + 1
 				}
 				aggTrade := &models.AggregatedTrade{
-					Bid:         tradeData.MarketSell,
+					Bid:         tradeData.Type == 1,
 					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: aggregateID,
+					AggregateID: aggID,
 					Trades:      nil,
 				}
 				state.instrumentData.aggTrade = aggTrade
@@ -361,7 +330,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				state.stashedTrades.PushBack(aggTrade)
 				// start the timer on trade creation, it will publish the trade in 20 ms
 				go func(pid *actor.PID) {
-					time.Sleep(21 * time.Millisecond)
+					time.Sleep(20 * time.Millisecond)
 					context.Send(pid, &postAggTrade{})
 				}(context.Self())
 			}
@@ -370,8 +339,8 @@ func (state *Listener) readSocket(context actor.Context) error {
 				state.instrumentData.aggTrade.Trades,
 				models.Trade{
 					Price:    tradeData.Price,
-					Quantity: tradeData.Quantity,
-					ID:       uint64(tradeData.TradeID),
+					Quantity: tradeData.Amount,
+					ID:       tradeData.ID,
 				})
 		}
 
@@ -392,68 +361,15 @@ func (state *Listener) readSocket(context actor.Context) error {
 	}
 }
 
-func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDepthData) error {
-
-	symbol := depthData.Symbol
-
-	// Skip depth that are younger than OB
-	if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
-		return nil
-	}
-
-	// Check depth continuity
-	if state.instrumentData.lastUpdateID+1 != depthData.FirstUpdateID {
-		return fmt.Errorf("got wrong sequence ID for %s: %d, %d",
-			symbol, state.instrumentData.lastUpdateID, depthData.FirstUpdateID)
-	}
-
-	bids, asks, err := depthData.ToBidAsk()
-	if err != nil {
-		return fmt.Errorf("error converting depth data: %s ", err.Error())
-	}
-
-	obDelta := &models.OBL2Update{
-		Levels:    []gorderbook.OrderBookLevel{},
-		Timestamp: utils.MilliToTimestamp(depthData.EventTime),
-		SeqNum:    state.instrumentData.seqNum + 1,
-		Trade:     false,
-	}
-	state.instrumentData.seqNum += 1
-
-	for _, bid := range bids {
-		obDelta.Levels = append(
-			obDelta.Levels,
-			bid,
-		)
-		state.instrumentData.orderBook.UpdateOrderBookLevel(bid)
-	}
-
-	for _, ask := range asks {
-		obDelta.Levels = append(
-			obDelta.Levels,
-			ask,
-		)
-		state.instrumentData.orderBook.UpdateOrderBookLevel(ask)
-	}
-
-	if state.instrumentData.orderBook.Crossed() {
-		fmt.Println("CROSSED")
-		return fmt.Errorf("crossed order book")
-	}
-
-	state.instrumentData.lastUpdateID = depthData.FinalUpdateID
-	state.instrumentData.lastUpdateTime = depthData.EventTime
-	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-		UpdateL2: obDelta,
-	})
-
-	state.instrumentData.lastHBTime = time.Now()
-
-	return nil
-}
-
 func (state *Listener) checkSockets(context actor.Context) error {
-	// TODO ping or HB ?
+
+	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+		// "Ping" by resubscribing to the topic
+		_ = state.obWs.Subscribe(state.security.Symbol, bitstamp.WSOrderBookChannel)
+		_ = state.tradeWs.Subscribe(state.security.Symbol, bitstamp.WSLiveTradesChannel)
+		state.lastPingTime = time.Now()
+	}
+
 	if state.obWs.Err != nil || !state.obWs.Connected {
 		if state.obWs.Err != nil {
 			state.logger.Info("error on socket", log.Error(state.obWs.Err))
@@ -475,6 +391,15 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) postHeartBeat(context actor.Context) {
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		state.instrumentData.lastHBTime = time.Now()
+	}
+}
+
 func (state *Listener) postAggTrade(context actor.Context) {
 	nowMilli := uint64(time.Now().UnixNano() / 1000000)
 
@@ -492,14 +417,5 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		} else {
 			break
 		}
-	}
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
-		state.instrumentData.lastHBTime = time.Now()
 	}
 }

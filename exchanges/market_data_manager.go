@@ -92,6 +92,7 @@ func (state *MarketDataManager) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
+	state.subscribers = make(map[uint64]*actor.PID)
 	producer := NewInstrumentListenerProducer(state.security)
 	if producer == nil {
 		return fmt.Errorf("error getting instrument listener")
@@ -110,7 +111,8 @@ func (state *MarketDataManager) OnMarketDataRequest(context actor.Context) error
 	request := context.Message().(*messages.MarketDataRequest)
 
 	if request.Subscribe {
-		state.subscribers[request.RequestID] = context.Sender()
+		state.subscribers[request.RequestID] = request.Subscriber
+		context.Watch(request.Subscriber)
 	}
 
 	context.Forward(state.listener)

@@ -1,6 +1,7 @@
 package exchanges
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -105,12 +106,15 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
 		props := actor.PropsFromProducer(producer)
-		state.executors[exch.ID] = context.Spawn(props)
+		state.executors[exch.ID], _ = context.SpawnNamed(props, exch.Name+"_executor")
 	}
 
 	// Request securities for each one of them
 	var futures []*actor.Future
-	request := messages.SecurityListRequest{}
+	request := &messages.SecurityListRequest{
+		RequestID: 0,
+		Subscribe: true,
+	}
 	for _, pid := range state.executors {
 		fut := context.RequestFuture(pid, request, 20*time.Second)
 		futures = append(futures, fut)
@@ -126,7 +130,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if !ok {
 			return fmt.Errorf("was expecting GetSecuritiesResponse, got %s", reflect.TypeOf(res).String())
 		}
+		if response.Error != "" {
+			return errors.New(response.Error)
+		}
 		for _, s := range response.Securities {
+			if sec2, ok := state.securities[s.SecurityID]; ok {
+				return fmt.Errorf("got two securities with the same ID: %s %s", sec2.Symbol, s.Symbol)
+			}
 			state.securities[s.SecurityID] = s
 		}
 	}
@@ -139,6 +149,13 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
+	if request.Instrument == nil {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: request.RequestID,
+			Reason:    fmt.Sprintf("unknown security"),
+		})
+		return nil
+	}
 	security, ok := state.securities[request.Instrument.SecurityID]
 	if !ok {
 		context.Respond(&messages.MarketDataRequestReject{
@@ -171,8 +188,8 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		Securities: securities,
 	}
 	if request.Subscribe {
-		context.Watch(context.Sender())
-		state.slSubscribers[request.RequestID] = context.Sender()
+		context.Watch(request.Subscriber)
+		state.slSubscribers[request.RequestID] = request.Subscriber
 	}
 	context.Respond(response)
 
@@ -219,6 +236,12 @@ func (state *Executor) OnTerminated(context actor.Context) error {
 	for k, v := range state.slSubscribers {
 		if v.Id == msg.Who.Id {
 			delete(state.slSubscribers, k)
+		}
+	}
+
+	for k, v := range state.instruments {
+		if v.Id == msg.Who.Id {
+			delete(state.instruments, k)
 		}
 	}
 
