@@ -167,7 +167,8 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[request.Instrument.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security))
+		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security)).WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[request.Instrument.SecurityID] = pid
 		context.Forward(pid)
