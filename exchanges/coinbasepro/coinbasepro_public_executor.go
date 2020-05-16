@@ -93,7 +93,6 @@ func (state *CoinbaseProPublicExecutor) Clean(context actor.Context) error {
 }
 
 func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context) error {
-	fmt.Println("CB UDPATE SEC LIST")
 	request, weight, err := coinbasepro.GetProducts()
 	if err != nil {
 		return err
