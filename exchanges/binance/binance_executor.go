@@ -15,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
@@ -36,6 +37,7 @@ import (
 
 type Executor struct {
 	client               *http.Client
+	securities           []*models.Security
 	secondOrderRateLimit *exchanges.RateLimit
 	dayOrderRateLimit    *exchanges.RateLimit
 	globalRateLimit      *exchanges.RateLimit
@@ -121,16 +123,16 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Update rate limit with weight from the current exchange info fetch
 	state.globalRateLimit.Request(weight)
-	return nil
+
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
 	request, weight, err := binance.GetExchangeInfo()
 	if err != nil {
 		return err
@@ -142,101 +144,99 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	}
 
 	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
-		}
-		var exchangeInfo binance.ExchangeInfo
-		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
-		if exchangeInfo.Code != 0 {
-			err = fmt.Errorf(
-				"binance api error: %d %s",
-				exchangeInfo.Code,
-				exchangeInfo.Msg)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
+	}
+	var exchangeInfo binance.ExchangeInfo
+	err = json.Unmarshal(response, &exchangeInfo)
+	if err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
+	if exchangeInfo.Code != 0 {
+		err = fmt.Errorf(
+			"binance api error: %d %s",
+			exchangeInfo.Code,
+			exchangeInfo.Msg)
+		return err
+	}
 
-		var securities []*models.Security
-		for _, symbol := range exchangeInfo.Symbols {
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
-			if !ok {
-				continue
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
-			if !ok {
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = symbol.Symbol
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = symbol.Status == "TRADING"
-			security.Exchange = &constants.BINANCE
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			for _, filter := range symbol.Filters {
-				if filter.FilterType == "PRICE_FILTER" {
-					security.MinPriceIncrement = filter.TickSize
-				} else if filter.FilterType == "LOT_SIZE" {
-					security.RoundLot = filter.StepSize
-				}
-			}
-			securities = append(securities, &security)
+	var securities []*models.Security
+	for _, symbol := range exchangeInfo.Symbols {
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
+		if !ok {
+			continue
 		}
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
+		if !ok {
+			continue
+		}
+		security := models.Security{}
+		security.Symbol = symbol.Symbol
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Enabled = symbol.Status == "TRADING"
+		security.Exchange = &constants.BINANCE
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		for _, filter := range symbol.Filters {
+			if filter.FilterType == "PRICE_FILTER" {
+				security.MinPriceIncrement = filter.TickSize
+			} else if filter.FilterType == "LOT_SIZE" {
+				security.RoundLot = filter.StepSize
+			}
+		}
+		securities = append(securities, &security)
+	}
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	msg := context.Message().(*messages.SecurityListRequest)
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobi"
+	"io/ioutil"
 	"math"
 	"net/http"
 	"reflect"
@@ -23,6 +24,7 @@ import (
 
 type Executor struct {
 	client      *http.Client
+	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -65,16 +67,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	return nil
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := huobi.GetSymbols()
 	if err != nil {
 		return err
@@ -86,110 +86,111 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	}
 	// TODO Rate limit
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
+	}
+
+	type Data struct {
+		Status string         `json:"status"`
+		Data   []huobi.Symbol `json:"data"`
+	}
+	var data Data
+	err = json.Unmarshal(response, &data)
+	if err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
+	if data.Status != "ok" {
+		err = fmt.Errorf(
+			"got wrong status: %s",
+			data.Status)
+		return err
+	}
+
+	var securities []*models.Security
+	for _, symbol := range data.Data {
+		baseStr := strings.ToUpper(symbol.BaseCurrency)
+		if sym, ok := huobi.HUOBI_SYMBOL_TO_GLOBAL_SYMBOL[baseStr]; ok {
+			baseStr = sym
 		}
-		type Data struct {
-			Status string         `json:"status"`
-			Data   []huobi.Symbol `json:"data"`
-		}
-		var data Data
-		err = json.Unmarshal(queryResponse.Response, &data)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
-		if data.Status != "ok" {
-			err = fmt.Errorf(
-				"got wrong status: %s",
-				data.Status)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+		quoteStr := strings.ToUpper(symbol.QuoteCurrency)
+		if sym, ok := huobi.HUOBI_SYMBOL_TO_GLOBAL_SYMBOL[quoteStr]; ok {
+			quoteStr = sym
 		}
 
-		var securities []*models.Security
-		for _, symbol := range data.Data {
-			baseStr := strings.ToUpper(symbol.BaseCurrency)
-			if sym, ok := huobi.HUOBI_SYMBOL_TO_GLOBAL_SYMBOL[baseStr]; ok {
-				baseStr = sym
-			}
-			quoteStr := strings.ToUpper(symbol.QuoteCurrency)
-			if sym, ok := huobi.HUOBI_SYMBOL_TO_GLOBAL_SYMBOL[quoteStr]; ok {
-				quoteStr = sym
-			}
-
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
-			if !ok {
-				//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
-				continue
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
-			if !ok {
-				//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = symbol.Symbol
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = symbol.State == "online"
-			security.Exchange = &constants.HUOBI
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.MinPriceIncrement = 1. / math.Pow10(int(symbol.PricePrecision))
-			security.RoundLot = 1. / math.Pow10(int(symbol.AmountPrecision))
-			securities = append(securities, &security)
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
+		if !ok {
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
+			continue
 		}
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
+		if !ok {
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
+			continue
+		}
+		security := models.Security{}
+		security.Symbol = symbol.Symbol
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Enabled = symbol.State == "online"
+		security.Exchange = &constants.HUOBI
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.MinPriceIncrement = 1. / math.Pow10(int(symbol.PricePrecision))
+		security.RoundLot = 1. / math.Pow10(int(symbol.AmountPrecision))
+		securities = append(securities, &security)
+	}
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	// Get http request and the expected response
+	msg := context.Message().(*messages.SecurityListRequest)
+
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

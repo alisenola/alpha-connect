@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/gemini"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -22,6 +23,7 @@ import (
 
 type Executor struct {
 	client      *http.Client
+	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -64,16 +66,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	return nil
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := gemini.GetSymbols()
 	if err != nil {
 		return err
@@ -83,102 +83,104 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
 		return nil
 	}
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	// TODO Rate limit
-
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
+	}
+	var symbols []string
+	err = json.Unmarshal(response, &symbols)
+	if err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
+
+	var securities []*models.Security
+	for _, symbol := range symbols {
+		baseStr := strings.ToUpper(symbol[:3])
+		quoteStr := strings.ToUpper(symbol[3:])
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
+		if !ok {
+			state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
+			continue
 		}
-		var symbols []string
-		err = json.Unmarshal(queryResponse.Response, &symbols)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
+		if !ok {
+			state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
+			continue
+		}
+		security := models.Security{}
+		security.Symbol = symbol
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Enabled = true
+		security.Exchange = &constants.GEMINI
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		if tickPrecision, ok := gemini.SYMBOL_TO_TICK_PRECISION[symbol]; ok {
+			security.MinPriceIncrement = 1. / float64(tickPrecision)
+		} else {
+			state.logger.Info(fmt.Sprintf("unknown tick precision for %s", symbol))
+			continue
+		}
+		if lotPrecision, ok := gemini.SYMBOL_TO_LOT_PRECISION[symbol]; ok {
+			security.RoundLot = 1. / float64(lotPrecision)
+		} else {
+			state.logger.Info(fmt.Sprintf("unknown lot precision for %s", symbol))
+			continue
 		}
 
-		var securities []*models.Security
-		for _, symbol := range symbols {
-			baseStr := strings.ToUpper(symbol[:3])
-			quoteStr := strings.ToUpper(symbol[3:])
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
-			if !ok {
-				state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
-				continue
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
-			if !ok {
-				state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = symbol
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = true
-			security.Exchange = &constants.GEMINI
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			if tickPrecision, ok := gemini.SYMBOL_TO_TICK_PRECISION[symbol]; ok {
-				security.MinPriceIncrement = 1. / float64(tickPrecision)
-			} else {
-				state.logger.Info(fmt.Sprintf("unknown tick precision for %s", symbol))
-				continue
-			}
-			if lotPrecision, ok := gemini.SYMBOL_TO_LOT_PRECISION[symbol]; ok {
-				security.RoundLot = 1. / float64(lotPrecision)
-			} else {
-				state.logger.Info(fmt.Sprintf("unknown lot precision for %s", symbol))
-				continue
-			}
+		securities = append(securities, &security)
+	}
+	state.securities = securities
 
-			securities = append(securities, &security)
-		}
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	// Get http request and the expected response
+	msg := context.Message().(*messages.SecurityListRequest)
+
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

@@ -4,12 +4,16 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alphac/models/messages"
+	"time"
 )
+
+type updateSecurityList struct{}
 
 type ExchangeExecutor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
+	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
@@ -23,6 +27,10 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 			panic(err)
 		}
 		state.GetLogger().Info("actor started")
+		go func(pid *actor.PID) {
+			time.Sleep(time.Minute)
+			context.Send(pid, &updateSecurityList{})
+		}(context.Self())
 
 	case *actor.Stopping:
 		if err := state.Clean(context); err != nil {
@@ -52,5 +60,14 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 			state.GetLogger().Error("error processing MarketDataRequest", log.Error(err))
 			panic(err)
 		}
+
+	case *updateSecurityList:
+		if err := state.UpdateSecurityList(context); err != nil {
+			state.GetLogger().Error("error updating security list", log.Error(err))
+		}
+		go func(pid *actor.PID) {
+			time.Sleep(time.Minute)
+			context.Send(pid, &updateSecurityList{})
+		}(context.Self())
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -23,6 +24,7 @@ import (
 
 type Executor struct {
 	client      *http.Client
+	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -65,155 +67,152 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunner = context.Spawn(props)
 
 	// TODO rate limitting
-	return nil
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	request, _, err := cryptofacilities.GetInstruments()
 	if err != nil {
 		return err
 	}
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
+	}
+
+	var instrumentResponse cryptofacilities.InstrumentResponse
+	err = json.Unmarshal(response, &instrumentResponse)
+	if err != nil {
+		err = fmt.Errorf("error decoding query response: %v", err)
+		return err
+	}
+	if instrumentResponse.Result != "success" {
+		err = fmt.Errorf("error getting instruments: %s", instrumentResponse.Error)
+		return err
+	}
+
+	var securities []*models.Security
+	for _, instrument := range instrumentResponse.Instruments {
+		if !instrument.Tradeable {
+			continue
+		}
+		underlying := strings.ToUpper(strings.Split(instrument.Underlying, "_")[1])
+		baseSymbol := underlying[:3]
+		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
+			baseSymbol = sym
+		}
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseSymbol]
+		if !ok {
+			continue
 		}
 
-		var instrumentResponse cryptofacilities.InstrumentResponse
-		err = json.Unmarshal(queryResponse.Response, &instrumentResponse)
-		if err != nil {
-			err = fmt.Errorf("error decoding query response: %v", err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+		quoteSymbol := underlying[3:]
+		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
+			quoteSymbol = sym
 		}
-		if instrumentResponse.Result != "success" {
-			err = fmt.Errorf("error getting instruments: %s", instrumentResponse.Error)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteSymbol]
+		if !ok {
+			continue
 		}
-
-		var securities []*models.Security
-		for _, instrument := range instrumentResponse.Instruments {
-			if !instrument.Tradeable {
+		security := models.Security{}
+		security.Symbol = instrument.Symbol
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Enabled = instrument.Tradeable
+		security.Exchange = &constants.CRYPTOFACILITIES
+		splits := strings.Split(instrument.Symbol, "_")
+		switch splits[0] {
+		case "pv":
+			// Perpetual vanilla
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+			security.IsInverse = false
+		case "pi":
+			// Perpetual inverse
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+			security.IsInverse = true
+		case "fv":
+			// Future vanilla
+			security.SecurityType = enum.SecurityType_CRYPTO_FUT
+			security.IsInverse = false
+			year := time.Now().Format("2006")
+			date, err := time.Parse("20060102", year+splits[2][2:])
+			if err != nil {
 				continue
 			}
-			underlying := strings.ToUpper(strings.Split(instrument.Underlying, "_")[1])
-			baseSymbol := underlying[:3]
-			if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
-				baseSymbol = sym
-			}
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseSymbol]
-			if !ok {
+			security.MaturityDate, err = types.TimestampProto(date)
+			if err != nil {
 				continue
 			}
-
-			quoteSymbol := underlying[3:]
-			if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
-				quoteSymbol = sym
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteSymbol]
-			if !ok {
+		case "fi":
+			// Future inverse
+			security.SecurityType = enum.SecurityType_CRYPTO_FUT
+			security.IsInverse = true
+			year := time.Now().Format("2006")
+			date, err := time.Parse("20060102", year+splits[2][2:])
+			if err != nil {
 				continue
 			}
-			security := models.Security{}
-			security.Symbol = instrument.Symbol
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = instrument.Tradeable
-			security.Exchange = &constants.CRYPTOFACILITIES
-			splits := strings.Split(instrument.Symbol, "_")
-			switch splits[0] {
-			case "pv":
-				// Perpetual vanilla
-				security.SecurityType = enum.SecurityType_CRYPTO_PERP
-				security.IsInverse = false
-			case "pi":
-				// Perpetual inverse
-				security.SecurityType = enum.SecurityType_CRYPTO_PERP
-				security.IsInverse = true
-			case "fv":
-				// Future vanilla
-				security.SecurityType = enum.SecurityType_CRYPTO_FUT
-				security.IsInverse = false
-				year := time.Now().Format("2006")
-				date, err := time.Parse("20060102", year+splits[2][2:])
-				if err != nil {
-					continue
-				}
-				security.MaturityDate, err = types.TimestampProto(date)
-				if err != nil {
-					continue
-				}
-			case "fi":
-				// Future inverse
-				security.SecurityType = enum.SecurityType_CRYPTO_FUT
-				security.IsInverse = true
-				year := time.Now().Format("2006")
-				date, err := time.Parse("20060102", year+splits[2][2:])
-				if err != nil {
-					continue
-				}
-				security.MaturityDate, err = types.TimestampProto(date)
-				if err != nil {
-					continue
-				}
+			security.MaturityDate, err = types.TimestampProto(date)
+			if err != nil {
+				continue
 			}
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.MinPriceIncrement = instrument.TickSize
-			security.RoundLot = float64(instrument.ContractSize)
-			securities = append(securities, &security)
 		}
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.MinPriceIncrement = instrument.TickSize
+		security.RoundLot = float64(instrument.ContractSize)
+		securities = append(securities, &security)
+	}
 
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	state.securities = securities
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	msg := context.Message().(*messages.SecurityListRequest)
+
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -37,6 +38,7 @@ import (
 
 type Executor struct {
 	client      *http.Client
+	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -79,16 +81,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	return nil
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := ftx.GetMarkets()
 	if err != nil {
 		return err
@@ -100,134 +100,134 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	}
 
 	state.rateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
-		}
-		type Res struct {
-			Success bool         `json:"success"`
-			Markets []ftx.Market `json:"result"`
-		}
-		var queryRes Res
-		err = json.Unmarshal(queryResponse.Response, &queryRes)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
-		if !queryRes.Success {
-			err = fmt.Errorf("ftx unsuccessful request")
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
+	}
+	type Res struct {
+		Success bool         `json:"success"`
+		Markets []ftx.Market `json:"result"`
+	}
+	var queryRes Res
+	err = json.Unmarshal(response, &queryRes)
+	if err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
+	if !queryRes.Success {
+		err = fmt.Errorf("ftx unsuccessful request")
+		return err
+	}
 
-		var securities []*models.Security
-		for _, market := range queryRes.Markets {
-			security := models.Security{}
-			security.Symbol = market.Name
-			security.Exchange = &constants.FTX
+	var securities []*models.Security
+	for _, market := range queryRes.Markets {
+		security := models.Security{}
+		security.Symbol = market.Name
+		security.Exchange = &constants.FTX
 
-			switch market.Type {
-			case "spot":
-				baseCurrency, ok := constants.SYMBOL_TO_ASSET[market.BaseCurrency]
-				if !ok {
-					//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
-					continue
-				}
-				quoteCurrency, ok := constants.SYMBOL_TO_ASSET[market.QuoteCurrency]
-				if !ok {
-					//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
-					continue
-				}
-				security.Underlying = &baseCurrency
-				security.QuoteCurrency = &quoteCurrency
-				security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-
-			case "future":
-				splits := strings.Split(market.Name, "-")
-				if len(splits) == 2 {
-					underlying, ok := constants.SYMBOL_TO_ASSET[market.Underlying]
-					if !ok {
-						fmt.Printf("unknown currency symbol %s \n", market.Underlying)
-						continue
-					}
-					security.Underlying = &underlying
-					security.QuoteCurrency = &constants.DOLLAR
-					if splits[1] == "PERP" {
-						security.SecurityType = enum.SecurityType_CRYPTO_PERP
-					} else {
-						year := time.Now().Format("2006")
-						date, err := time.Parse("20060102", year+splits[1])
-						if err != nil {
-							continue
-						}
-						security.SecurityType = enum.SecurityType_CRYPTO_FUT
-						security.MaturityDate, err = types.TimestampProto(date)
-						if err != nil {
-							continue
-						}
-					}
-				} else {
-					continue
-				}
-
-			default:
+		switch market.Type {
+		case "spot":
+			baseCurrency, ok := constants.SYMBOL_TO_ASSET[market.BaseCurrency]
+			if !ok {
+				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
 				continue
 			}
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.MinPriceIncrement = market.PriceIncrement
-			security.RoundLot = market.SizeIncrement
+			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[market.QuoteCurrency]
+			if !ok {
+				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
+				continue
+			}
+			security.Underlying = &baseCurrency
+			security.QuoteCurrency = &quoteCurrency
+			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 
-			securities = append(securities, &security)
+		case "future":
+			splits := strings.Split(market.Name, "-")
+			if len(splits) == 2 {
+				underlying, ok := constants.SYMBOL_TO_ASSET[market.Underlying]
+				if !ok {
+					fmt.Printf("unknown currency symbol %s \n", market.Underlying)
+					continue
+				}
+				security.Underlying = &underlying
+				security.QuoteCurrency = &constants.DOLLAR
+				if splits[1] == "PERP" {
+					security.SecurityType = enum.SecurityType_CRYPTO_PERP
+				} else {
+					year := time.Now().Format("2006")
+					date, err := time.Parse("20060102", year+splits[1])
+					if err != nil {
+						continue
+					}
+					security.SecurityType = enum.SecurityType_CRYPTO_FUT
+					security.MaturityDate, err = types.TimestampProto(date)
+					if err != nil {
+						continue
+					}
+				}
+			} else {
+				continue
+			}
+
+		default:
+			continue
 		}
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.MinPriceIncrement = market.PriceIncrement
+		security.RoundLot = market.SizeIncrement
+
+		securities = append(securities, &security)
+	}
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	// Get http request and the expected response
+	msg := context.Message().(*messages.SecurityListRequest)
+
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

@@ -78,10 +78,13 @@ func (state *Account) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	// Fetch positions
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
 	}
+	// Then fetch positions
+	// Then fetch orders
+	// Then reconcile with execution feed
+
 	context.Send(context.Self(), &readSocket{})
 
 	return nil

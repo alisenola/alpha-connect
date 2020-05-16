@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -34,6 +35,7 @@ import (
 // process api request
 type Executor struct {
 	client      *http.Client
+	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -75,118 +77,119 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	return nil
+	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	request, _, err := bitfinex.GetSymbolsDetails()
 	if err != nil {
 		return err
 	}
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
+	}
+	var symbolDetails []bitfinex.SymbolDetail
+	err = json.Unmarshal(response, &symbolDetails)
+	if err != nil {
+		err = fmt.Errorf("error decoding query response: %v", err)
+		return err
+	}
+
+	var securities []*models.Security
+	for _, symbol := range symbolDetails {
+		if len(symbol.Pair) != 6 {
+			//state.logger.Warning(fmt.Sprintf("unknown symbol type: %s", symbol.Pair))
+			continue
 		}
-
-		var symbolDetails []bitfinex.SymbolDetail
-		err = json.Unmarshal(queryResponse.Response, &symbolDetails)
-		if err != nil {
-			err = fmt.Errorf("error decoding query response: %v", err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+		symbolStr := strings.ToUpper(symbol.Pair[:3])
+		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+			symbolStr = sym
 		}
-
-		var securities []*models.Security
-		for _, symbol := range symbolDetails {
-			if len(symbol.Pair) != 6 {
-				//state.logger.Warning(fmt.Sprintf("unknown symbol type: %s", symbol.Pair))
-				continue
-			}
-			symbolStr := strings.ToUpper(symbol.Pair[:3])
-			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
-				symbolStr = sym
-			}
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
-			if !ok {
-				continue
-			}
-			symbolStr = strings.ToUpper(symbol.Pair[3:])
-			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
-				symbolStr = sym
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
-			if !ok {
-				continue
-			}
-
-			pair := xchangerModels.Pair{
-				Base:  &baseCurrency,
-				Quote: &quoteCurrency,
-			}
-			security := models.Security{}
-			security.Symbol = symbol.Pair
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Exchange = &constants.BITFINEX
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.RoundLot = 1. / 100000000.
-			tickPrecision, ok := bitfinex.TickPrecisions[pair.String()]
-			if !ok {
-				//state.logger.Warning(fmt.Sprintf("TickPrecisions not defined for %s", instrument.DefaultFormat()))
-				continue
-			}
-			security.MinPriceIncrement = 1. / float64(tickPrecision)
-			securities = append(securities, &security)
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+		if !ok {
+			continue
+		}
+		symbolStr = strings.ToUpper(symbol.Pair[3:])
+		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+			symbolStr = sym
+		}
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+		if !ok {
+			continue
 		}
 
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+		pair := xchangerModels.Pair{
+			Base:  &baseCurrency,
+			Quote: &quoteCurrency,
+		}
+		security := models.Security{}
+		security.Symbol = symbol.Pair
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Exchange = &constants.BITFINEX
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.RoundLot = 1. / 100000000.
+		tickPrecision, ok := bitfinex.TickPrecisions[pair.String()]
+		if !ok {
+			//state.logger.Warning(fmt.Sprintf("TickPrecisions not defined for %s", instrument.DefaultFormat()))
+			continue
+		}
+		security.MinPriceIncrement = 1. / float64(tickPrecision)
+		securities = append(securities, &security)
+	}
+
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnSecurityListRequest(context actor.Context) error {
+	msg := context.Message().(*messages.SecurityListRequest)
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }

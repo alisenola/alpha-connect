@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alphac/enum"
+	_interface "gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
@@ -13,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/coinbasepro"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
@@ -30,6 +32,7 @@ import (
 // process api request
 type CoinbaseProPublicExecutor struct {
 	client           *http.Client
+	securities       []*models.Security
 	rateLimit        *exchanges.RateLimit
 	orderBookL2Cache *utils.TTLMap
 	orderBookL3Cache *utils.TTLMap
@@ -40,6 +43,7 @@ type CoinbaseProPublicExecutor struct {
 func NewCoinbaseProPublicExecutor() actor.Actor {
 	return &CoinbaseProPublicExecutor{
 		client:           nil,
+		securities:       nil,
 		rateLimit:        nil,
 		orderBookL2Cache: nil,
 		orderBookL3Cache: nil,
@@ -49,43 +53,7 @@ func NewCoinbaseProPublicExecutor() actor.Actor {
 }
 
 func (state *CoinbaseProPublicExecutor) Receive(context actor.Context) {
-	switch context.Message().(type) {
-	case *actor.Started:
-		if err := state.Initialize(context); err != nil {
-			state.GetLogger().Error("error initializing", log.Error(err))
-			panic(err)
-		}
-		state.GetLogger().Info("actor started")
-
-	case *actor.Stopping:
-		if err := state.Clean(context); err != nil {
-			state.GetLogger().Error("error stopping", log.Error(err))
-			panic(err)
-		}
-		state.GetLogger().Info("actor stopping")
-
-	case *actor.Stopped:
-		state.GetLogger().Info("actor stopped")
-
-	case *actor.Restarting:
-		if err := state.Clean(context); err != nil {
-			state.GetLogger().Error("error restarting", log.Error(err))
-			// Attention, no panic in restarting or infinite loop
-		}
-		state.GetLogger().Info("actor restarting")
-
-	case *messages.SecurityListRequest:
-		if err := state.OnSecurityListRequest(context); err != nil {
-			state.GetLogger().Error("error processing OnSecurityListRequest", log.Error(err))
-			panic(err)
-		}
-
-	case *messages.MarketDataRequest:
-		if err := state.OnMarketDataRequest(context); err != nil {
-			state.GetLogger().Error("error processing OnMarketDataRequest", log.Error(err))
-			panic(err)
-		}
-	}
+	_interface.ExchangeExecutorReceive(state, context)
 }
 
 func (state *CoinbaseProPublicExecutor) GetLogger() *log.Logger {
@@ -116,16 +84,15 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 	// 5 seconds cache for orderbooks
 	state.orderBookL2Cache = utils.NewTTLMap(5)
 	state.orderBookL3Cache = utils.NewTTLMap(5)
-	return nil
+
+	return state.UpdateSecurityList(context)
 }
 
 func (state *CoinbaseProPublicExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
+func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := coinbasepro.GetProducts()
 	if err != nil {
 		return err
@@ -136,85 +103,89 @@ func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Cont
 	}
 
 	state.rateLimit.Request(weight)
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		}
+	}
+	var products []coinbasepro.Product
+	err = json.Unmarshal(response, &products)
+	if err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		var securities []*models.Security
-		if err != nil {
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
+	var securities []*models.Security
+	for _, product := range products {
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[product.BaseCurrency]
+		if !ok {
+			continue
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&messages.SecurityList{
-					RequestID:  msg.RequestID,
-					ResponseID: uint64(time.Now().UnixNano()),
-					Error:      err.Error(),
-					Securities: nil})
-			}
-			return
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[product.QuoteCurrency]
+		if !ok {
+			continue
 		}
-		var products []coinbasepro.Product
-		err = json.Unmarshal(queryResponse.Response, &products)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			context.Respond(&messages.SecurityList{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				Error:      err.Error(),
-				Securities: nil})
-			return
-		}
+		security := models.Security{}
+		security.Symbol = product.ID
+		security.Underlying = &baseCurrency
+		security.QuoteCurrency = &quoteCurrency
+		security.Enabled = true
+		security.Exchange = &constants.COINBASEPRO
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.MinPriceIncrement = product.QuoteIncrement
+		security.RoundLot = 1. / 100000000.
+		securities = append(securities, &security)
+	}
 
-		for _, product := range products {
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[product.BaseCurrency]
-			if !ok {
-				continue
-			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[product.QuoteCurrency]
-			if !ok {
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = product.ID
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
-			security.Enabled = true
-			security.Exchange = &constants.COINBASEPRO
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.MinPriceIncrement = product.QuoteIncrement
-			security.RoundLot = 1. / 100000000.
-			securities = append(securities, &security)
-		}
-		context.Respond(&messages.SecurityList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "",
-			Securities: securities})
-	})
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
+
+	return nil
+}
+
+func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Context) error {
+	// Get http request and the expected response
+	msg := context.Message().(*messages.SecurityListRequest)
+	context.Respond(&messages.SecurityList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Securities: state.securities})
 
 	return nil
 }
