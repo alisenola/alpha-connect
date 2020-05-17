@@ -4,30 +4,30 @@ package models;
 import "google/protobuf/any.proto";
 
 enum Side {
-    buy = 0;
-    sell = 1;
+    Buy = 0;
+    Sell = 1;
 }
 
 enum OrderStatus {
-    new = 0;
-    partially_filled = 1;
-    filled = 2;
-    done = 3;
-    canceled = 4;
-    replaced = 5;
-    pending_cancel = 6;
-    stopped = 7;
-    rejected = 8;
-    suspended = 9;
-    pending_new = 10;
-    calculated = 11;
-    expired = 12;
-    pending_replace = 13;
+    New = 0;
+    PartiallyFilled = 1;
+    Filled = 2;
+    Done = 3;
+    Canceled = 4;
+    Replaced = 5;
+    PendingCancel = 6;
+    Stopped = 7;
+    Rejected = 8;
+    Suspended = 9;
+    PendingNew = 10;
+    Calculated = 11;
+    Expired = 12;
+    PendingReplace = 13;
 }
 
 enum OrderType {
-    market = 0;
-    limit = 1;
-    stop = 2;
-    stop_limit = 3;
+    Market = 0;
+    Limit = 1;
+    Stop = 2;
+    StopLimit = 3;
 }
