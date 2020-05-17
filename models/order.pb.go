@@ -7,10 +7,8 @@ import (
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
 	_ "github.com/gogo/protobuf/types"
-	io "io"
 	math "math"
-	reflect "reflect"
-	strings "strings"
+	strconv "strconv"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -24,436 +22,163 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type Order struct {
-	InternalID string `protobuf:"bytes,1,opt,name=internalID,proto3" json:"internalID,omitempty"`
-	ExternalID string `protobuf:"bytes,2,opt,name=externalID,proto3" json:"externalID,omitempty"`
+type Side int32
+
+const (
+	buy  Side = 0
+	sell Side = 1
+)
+
+var Side_name = map[int32]string{
+	0: "buy",
+	1: "sell",
 }
 
-func (m *Order) Reset()      { *m = Order{} }
-func (*Order) ProtoMessage() {}
-func (*Order) Descriptor() ([]byte, []int) {
+var Side_value = map[string]int32{
+	"buy":  0,
+	"sell": 1,
+}
+
+func (Side) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_cd01338c35d87077, []int{0}
 }
-func (m *Order) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Order) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Order.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Order) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Order.Merge(m, src)
-}
-func (m *Order) XXX_Size() int {
-	return m.Size()
-}
-func (m *Order) XXX_DiscardUnknown() {
-	xxx_messageInfo_Order.DiscardUnknown(m)
+
+type OrderStatus int32
+
+const (
+	new              OrderStatus = 0
+	partially_filled OrderStatus = 1
+	filled           OrderStatus = 2
+	done             OrderStatus = 3
+	canceled         OrderStatus = 4
+	replaced         OrderStatus = 5
+	pending_cancel   OrderStatus = 6
+	stopped          OrderStatus = 7
+	rejected         OrderStatus = 8
+	suspended        OrderStatus = 9
+	pending_new      OrderStatus = 10
+	calculated       OrderStatus = 11
+	expired          OrderStatus = 12
+	pending_replace  OrderStatus = 13
+)
+
+var OrderStatus_name = map[int32]string{
+	0:  "new",
+	1:  "partially_filled",
+	2:  "filled",
+	3:  "done",
+	4:  "canceled",
+	5:  "replaced",
+	6:  "pending_cancel",
+	7:  "stopped",
+	8:  "rejected",
+	9:  "suspended",
+	10: "pending_new",
+	11: "calculated",
+	12: "expired",
+	13: "pending_replace",
 }
 
-var xxx_messageInfo_Order proto.InternalMessageInfo
-
-func (m *Order) GetInternalID() string {
-	if m != nil {
-		return m.InternalID
-	}
-	return ""
+var OrderStatus_value = map[string]int32{
+	"new":              0,
+	"partially_filled": 1,
+	"filled":           2,
+	"done":             3,
+	"canceled":         4,
+	"replaced":         5,
+	"pending_cancel":   6,
+	"stopped":          7,
+	"rejected":         8,
+	"suspended":        9,
+	"pending_new":      10,
+	"calculated":       11,
+	"expired":          12,
+	"pending_replace":  13,
 }
 
-func (m *Order) GetExternalID() string {
-	if m != nil {
-		return m.ExternalID
-	}
-	return ""
+func (OrderStatus) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_cd01338c35d87077, []int{1}
+}
+
+type OrderType int32
+
+const (
+	market     OrderType = 0
+	limit      OrderType = 1
+	stop       OrderType = 2
+	stop_limit OrderType = 3
+)
+
+var OrderType_name = map[int32]string{
+	0: "market",
+	1: "limit",
+	2: "stop",
+	3: "stop_limit",
+}
+
+var OrderType_value = map[string]int32{
+	"market":     0,
+	"limit":      1,
+	"stop":       2,
+	"stop_limit": 3,
+}
+
+func (OrderType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_cd01338c35d87077, []int{2}
 }
 
 func init() {
-	proto.RegisterType((*Order)(nil), "models.Order")
+	proto.RegisterEnum("models.Side", Side_name, Side_value)
+	proto.RegisterEnum("models.OrderStatus", OrderStatus_name, OrderStatus_value)
+	proto.RegisterEnum("models.OrderType", OrderType_name, OrderType_value)
 }
 
 func init() { proto.RegisterFile("order.proto", fileDescriptor_cd01338c35d87077) }
 
 var fileDescriptor_cd01338c35d87077 = []byte{
-	// 168 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xce, 0x2f, 0x4a, 0x49,
-	0x2d, 0xd2, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0xcb, 0xcd, 0x4f, 0x49, 0xcd, 0x29, 0x96,
-	0x92, 0x4c, 0xcf, 0xcf, 0x4f, 0xcf, 0x49, 0xd5, 0x07, 0x8b, 0x26, 0x95, 0xa6, 0xe9, 0x27, 0xe6,
-	0x55, 0x42, 0x94, 0x28, 0xb9, 0x73, 0xb1, 0xfa, 0x83, 0x74, 0x08, 0xc9, 0x71, 0x71, 0x65, 0xe6,
-	0x95, 0xa4, 0x16, 0xe5, 0x25, 0xe6, 0x78, 0xba, 0x48, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x06, 0x21,
-	0x89, 0x80, 0xe4, 0x53, 0x2b, 0xe0, 0xf2, 0x4c, 0x10, 0x79, 0x84, 0x88, 0x93, 0xc9, 0x85, 0x87,
-	0x72, 0x0c, 0x37, 0x1e, 0xca, 0x31, 0x7c, 0x78, 0x28, 0xc7, 0xd8, 0xf0, 0x48, 0x8e, 0x71, 0xc5,
-	0x23, 0x39, 0xc6, 0x13, 0x8f, 0xe4, 0x18, 0x2f, 0x3c, 0x92, 0x63, 0x7c, 0xf0, 0x48, 0x8e, 0xf1,
-	0xc5, 0x23, 0x39, 0x86, 0x0f, 0x8f, 0xe4, 0x18, 0x27, 0x3c, 0x96, 0x63, 0xb8, 0xf0, 0x58, 0x8e,
-	0xe1, 0xc6, 0x63, 0x39, 0x86, 0x24, 0x36, 0xb0, 0x2b, 0x8c, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff,
-	0xe8, 0x1b, 0xce, 0xe0, 0xb7, 0x00, 0x00, 0x00,
+	// 342 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x34, 0x90, 0x3b, 0x72, 0xdb, 0x30,
+	0x10, 0x86, 0x01, 0x3d, 0x28, 0x71, 0xa9, 0xc7, 0x0e, 0x92, 0x46, 0x29, 0x70, 0x00, 0x15, 0x51,
+	0x91, 0x94, 0xa9, 0x72, 0x81, 0x14, 0x4a, 0xaf, 0x81, 0x88, 0x95, 0x86, 0x09, 0x44, 0x60, 0x48,
+	0x70, 0x6c, 0x76, 0x3e, 0x82, 0x8f, 0xe1, 0xa3, 0xb8, 0x54, 0xa9, 0xce, 0x16, 0xd5, 0xb8, 0xd4,
+	0x11, 0x3c, 0x20, 0xa5, 0x6e, 0xb1, 0xf8, 0xf6, 0x9b, 0x7f, 0x17, 0x12, 0x5b, 0x68, 0x2a, 0xbe,
+	0xbb, 0xc2, 0x7a, 0x2b, 0xa2, 0x83, 0xd5, 0x64, 0xca, 0x6f, 0x8b, 0xbd, 0xb5, 0x7b, 0x43, 0xab,
+	0xb6, 0xbb, 0xad, 0x76, 0x2b, 0x95, 0xd7, 0x1d, 0xb2, 0x5c, 0xc0, 0x60, 0x9d, 0x69, 0x12, 0x23,
+	0xe8, 0x6f, 0xab, 0x1a, 0x99, 0x18, 0xc3, 0xa0, 0x24, 0x63, 0x90, 0x2f, 0xdf, 0x38, 0x24, 0x7f,
+	0x82, 0x6d, 0xed, 0x95, 0xaf, 0xca, 0x80, 0xe4, 0xf4, 0x80, 0x4c, 0x7c, 0x05, 0x74, 0xaa, 0xf0,
+	0x99, 0x32, 0xa6, 0xde, 0xec, 0x32, 0x63, 0x48, 0x23, 0x17, 0x00, 0xd1, 0xad, 0xee, 0x05, 0x89,
+	0xb6, 0x39, 0x61, 0x5f, 0x4c, 0x60, 0x9c, 0xaa, 0x3c, 0xa5, 0xd0, 0x1f, 0x84, 0x57, 0x41, 0xce,
+	0xa8, 0x94, 0x34, 0x0e, 0x85, 0x80, 0x99, 0xa3, 0x5c, 0x67, 0xf9, 0x7e, 0xd3, 0x31, 0x18, 0x89,
+	0x04, 0x46, 0xa5, 0xb7, 0xce, 0x91, 0xc6, 0x51, 0x87, 0xff, 0xa3, 0xd4, 0x93, 0xc6, 0xb1, 0x98,
+	0x42, 0x5c, 0x56, 0x65, 0x98, 0x20, 0x8d, 0xb1, 0x98, 0x43, 0x72, 0x9f, 0x0e, 0xb1, 0x40, 0xcc,
+	0x00, 0x52, 0x65, 0xd2, 0xca, 0xa8, 0xc0, 0x27, 0x41, 0x45, 0x8f, 0x2e, 0x2b, 0x48, 0xe3, 0x44,
+	0x7c, 0x81, 0xf9, 0x9d, 0xbe, 0x25, 0xc0, 0xe9, 0xf2, 0x17, 0xc4, 0xed, 0x82, 0x7f, 0x6b, 0x47,
+	0x21, 0xff, 0x41, 0x15, 0xff, 0xc9, 0x23, 0x13, 0x31, 0x0c, 0x4d, 0x76, 0xc8, 0x3c, 0xf2, 0xf6,
+	0x1e, 0xde, 0x3a, 0xec, 0x05, 0x7f, 0xa8, 0x36, 0xdd, 0x4f, 0xff, 0xf7, 0xcf, 0xe3, 0x59, 0xb2,
+	0xd3, 0x59, 0xb2, 0xeb, 0x59, 0xf2, 0xa7, 0x46, 0xf2, 0x97, 0x46, 0xf2, 0xd7, 0x46, 0xf2, 0x63,
+	0x23, 0xf9, 0x7b, 0x23, 0xf9, 0x47, 0x23, 0xd9, 0xb5, 0x91, 0xfc, 0xf9, 0x22, 0xd9, 0xf1, 0x22,
+	0xd9, 0xe9, 0x22, 0xd9, 0x36, 0x6a, 0xef, 0xfe, 0xe3, 0x33, 0x00, 0x00, 0xff, 0xff, 0xc0, 0x73,
+	0x3a, 0x12, 0xa9, 0x01, 0x00, 0x00,
 }
 
-func (this *Order) Equal(that interface{}) bool {
-	if that == nil {
-		return this == nil
+func (x Side) String() string {
+	s, ok := Side_name[int32(x)]
+	if ok {
+		return s
 	}
-
-	that1, ok := that.(*Order)
-	if !ok {
-		that2, ok := that.(Order)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		return this == nil
-	} else if this == nil {
-		return false
-	}
-	if this.InternalID != that1.InternalID {
-		return false
-	}
-	if this.ExternalID != that1.ExternalID {
-		return false
-	}
-	return true
+	return strconv.Itoa(int(x))
 }
-func (this *Order) GoString() string {
-	if this == nil {
-		return "nil"
+func (x OrderStatus) String() string {
+	s, ok := OrderStatus_name[int32(x)]
+	if ok {
+		return s
 	}
-	s := make([]string, 0, 6)
-	s = append(s, "&models.Order{")
-	s = append(s, "InternalID: "+fmt.Sprintf("%#v", this.InternalID)+",\n")
-	s = append(s, "ExternalID: "+fmt.Sprintf("%#v", this.ExternalID)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
+	return strconv.Itoa(int(x))
 }
-func valueToGoStringOrder(v interface{}, typ string) string {
-	rv := reflect.ValueOf(v)
-	if rv.IsNil() {
-		return "nil"
+func (x OrderType) String() string {
+	s, ok := OrderType_name[int32(x)]
+	if ok {
+		return s
 	}
-	pv := reflect.Indirect(rv).Interface()
-	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
+	return strconv.Itoa(int(x))
 }
-func (m *Order) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Order) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.InternalID) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintOrder(dAtA, i, uint64(len(m.InternalID)))
-		i += copy(dAtA[i:], m.InternalID)
-	}
-	if len(m.ExternalID) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintOrder(dAtA, i, uint64(len(m.ExternalID)))
-		i += copy(dAtA[i:], m.ExternalID)
-	}
-	return i, nil
-}
-
-func encodeVarintOrder(dAtA []byte, offset int, v uint64) int {
-	for v >= 1<<7 {
-		dAtA[offset] = uint8(v&0x7f | 0x80)
-		v >>= 7
-		offset++
-	}
-	dAtA[offset] = uint8(v)
-	return offset + 1
-}
-func (m *Order) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.InternalID)
-	if l > 0 {
-		n += 1 + l + sovOrder(uint64(l))
-	}
-	l = len(m.ExternalID)
-	if l > 0 {
-		n += 1 + l + sovOrder(uint64(l))
-	}
-	return n
-}
-
-func sovOrder(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
-}
-func sozOrder(x uint64) (n int) {
-	return sovOrder(uint64((x << 1) ^ uint64((int64(x) >> 63))))
-}
-func (this *Order) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&Order{`,
-		`InternalID:` + fmt.Sprintf("%v", this.InternalID) + `,`,
-		`ExternalID:` + fmt.Sprintf("%v", this.ExternalID) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func valueToStringOrder(v interface{}) string {
-	rv := reflect.ValueOf(v)
-	if rv.IsNil() {
-		return "nil"
-	}
-	pv := reflect.Indirect(rv).Interface()
-	return fmt.Sprintf("*%v", pv)
-}
-func (m *Order) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowOrder
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Order: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Order: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field InternalID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowOrder
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthOrder
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthOrder
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.InternalID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExternalID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowOrder
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthOrder
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthOrder
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ExternalID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipOrder(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthOrder
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthOrder
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func skipOrder(dAtA []byte) (n int, err error) {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return 0, ErrIntOverflowOrder
-			}
-			if iNdEx >= l {
-				return 0, io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		wireType := int(wire & 0x7)
-		switch wireType {
-		case 0:
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return 0, ErrIntOverflowOrder
-				}
-				if iNdEx >= l {
-					return 0, io.ErrUnexpectedEOF
-				}
-				iNdEx++
-				if dAtA[iNdEx-1] < 0x80 {
-					break
-				}
-			}
-			return iNdEx, nil
-		case 1:
-			iNdEx += 8
-			return iNdEx, nil
-		case 2:
-			var length int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return 0, ErrIntOverflowOrder
-				}
-				if iNdEx >= l {
-					return 0, io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				length |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if length < 0 {
-				return 0, ErrInvalidLengthOrder
-			}
-			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthOrder
-			}
-			return iNdEx, nil
-		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowOrder
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipOrder(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthOrder
-				}
-			}
-			return iNdEx, nil
-		case 4:
-			return iNdEx, nil
-		case 5:
-			iNdEx += 4
-			return iNdEx, nil
-		default:
-			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
-		}
-	}
-	panic("unreachable")
-}
-
-var (
-	ErrInvalidLengthOrder = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowOrder   = fmt.Errorf("proto: integer overflow")
-)

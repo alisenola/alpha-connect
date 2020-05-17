@@ -3,29 +3,22 @@ package messages;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 import "gitlab.com/alphaticks/gorderbook/protos.proto";
+
 import "gitlab.com/alphaticks/alphac/models/market_data.proto";
 import "gitlab.com/alphaticks/alphac/models/security.proto";
+import "gitlab.com/alphaticks/alphac/models/order.proto";
+
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
-
-message Instrument {
-    uint64 securityID = 1;
-    models.Exchange exchange = 2;
-    string symbol = 3;
-}
-
-enum OrderBookAggregation {
-    L2 = 0;
-    L3 = 1;
-}
 
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
-    Instrument instrument = 3;
+    models.Instrument instrument = 3;
     actor.PID subscriber = 4;
-    OrderBookAggregation aggregation = 5;
+    models.OrderBookAggregation aggregation = 5;
 }
 
 message MarketDataRequestReject {
@@ -60,4 +53,37 @@ message SecurityList {
     uint64 responseID = 2;
     string error = 3;
     repeated models.Security securities = 4;
+}
+
+enum ExecutionType {
+    new = 0;
+    fill = 1;
+    done = 2;
+    canceled = 3;
+    replaced = 4;
+    pending_cancel = 5;
+    stopped = 6;
+    rejected = 7;
+    suspended = 8;
+    pending_new = 9;
+    calculated = 10;
+    expired = 11;
+    pending_replace = 12;
+    trade = 13;
+    order_status = 14;
+    settlement = 15;
+}
+
+message ExecutionReport {
+    string orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    string executionID = 3;
+    ExecutionType execution_type = 4;
+    models.OrderStatus order_status = 5;
+    models.Instrument instrument = 6;
+    models.Side side = 7;
+    double leaves_quantity = 8;
+    double cum_quantity = 9;
+    google.protobuf.Timestamp transaction_time = 10;
+    google.protobuf.StringValue tradeID = 11;
 }

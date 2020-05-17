@@ -126,8 +126,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.executorManager = actor.NewLocalPID("exchange_executor_manager")
 	state.wsChan = make(chan *bitmex.WebsocketMessage, 10000)
 
-	context.Send(context.Self(), &readSocket{})
-
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
 		seqNum:         0,
@@ -143,6 +141,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
+
+	context.Send(context.Self(), &readSocket{})
 
 	return nil
 }

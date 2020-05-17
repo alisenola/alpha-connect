@@ -3,7 +3,31 @@ package models;
 
 import "google/protobuf/any.proto";
 
-message Order {
-    string internalID = 1;
-    string externalID = 2;
+enum Side {
+    buy = 0;
+    sell = 1;
+}
+
+enum OrderStatus {
+    new = 0;
+    partially_filled = 1;
+    filled = 2;
+    done = 3;
+    canceled = 4;
+    replaced = 5;
+    pending_cancel = 6;
+    stopped = 7;
+    rejected = 8;
+    suspended = 9;
+    pending_new = 10;
+    calculated = 11;
+    expired = 12;
+    pending_replace = 13;
+}
+
+enum OrderType {
+    market = 0;
+    limit = 1;
+    stop = 2;
+    stop_limit = 3;
 }

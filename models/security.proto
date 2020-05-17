@@ -5,6 +5,12 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/timestamp.proto";
 
+message Instrument {
+    uint64 securityID = 1;
+    models.Exchange exchange = 2;
+    string symbol = 3;
+}
+
 message Security {
     uint64 securityID = 1;
     string securityType = 2;

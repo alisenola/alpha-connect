@@ -5,6 +5,11 @@ import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "gitlab.com/alphaticks/gorderbook/protos.proto";
 
+enum OrderBookAggregation {
+    L2 = 0;
+    L3 = 1;
+}
+
 message OBL2Update {
     repeated gorderbook.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 2;
