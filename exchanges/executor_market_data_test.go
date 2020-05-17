@@ -3,6 +3,7 @@ package exchanges
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
@@ -76,12 +77,12 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 		RequestID:  0,
 		Subscribe:  true,
 		Subscriber: context.Self(),
-		Instrument: &messages.Instrument{
-			SecurityID: state.security.SecurityID,
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
 			Exchange:   state.security.Exchange,
-			Symbol:     state.security.Symbol,
+			Symbol:     &types.StringValue{Value: state.security.Symbol},
 		},
-		Aggregation: messages.L2,
+		Aggregation: models.L2,
 	}, 10*time.Second).Result()
 	if err != nil {
 		return err

@@ -1,0 +1,86 @@
+syntax = "proto3";
+package models;
+
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Side {
+    Buy = 0;
+    Sell = 1;
+}
+
+enum OrderStatus {
+    New = 0;
+    PartiallyFilled = 1;
+    Filled = 2;
+    Done = 3;
+    Canceled = 4;
+    Replaced = 5;
+    PendingCancel = 6;
+    Stopped = 7;
+    Rejected = 8;
+    Suspended = 9;
+    PendingNew = 10;
+    Calculated = 11;
+    Expired = 12;
+    PendingReplace = 13;
+}
+
+enum OrderType {
+    Market = 0;
+    Limit = 1;
+    Stop = 2;
+    StopLimit = 3;
+    LimitIfTouched = 4;
+    MarketIfTouched = 5;
+}
+
+enum TimeInForce {
+    Session = 0;
+    GoodTillCancel = 1;
+    AtTheOpening = 2;
+    ImmediateOrCancel = 3;
+    FillOrKill = 4;
+}
+
+message Instrument {
+    google.protobuf.UInt64Value securityID = 1;
+    models.Exchange exchange = 2;
+    google.protobuf.StringValue symbol = 3;
+}
+
+message Security {
+    uint64 securityID = 1;
+    string securityType = 2;
+    models.Exchange exchange = 3;
+    string symbol = 4;
+    double min_price_increment = 5;
+    double round_lot = 6;
+    models.Asset underlying = 7;
+    models.Asset quote_currency = 8;
+    bool enabled = 9;
+    bool is_inverse = 10;
+    google.protobuf.DoubleValue maker_fee = 11;
+    google.protobuf.DoubleValue taker_fee = 12;
+    google.protobuf.DoubleValue multiplier = 13;
+    google.protobuf.Timestamp maturity_date = 14;
+}
+
+message Order {
+    string orderID = 1;
+    string client_orderID = 2;
+    Instrument instrument = 3;
+    OrderStatus order_status = 4;
+    OrderType order_type = 5;
+    Side side = 6;
+    TimeInForce time_in_force = 7;
+    double leaves_quantity = 8;
+    double cum_quantity = 9;
+}
+
+message Position {
+    string accountID = 1;
+    Instrument instrument = 2;
+    double quantity = 3;
+}

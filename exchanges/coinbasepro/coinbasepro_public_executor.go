@@ -32,7 +32,7 @@ import (
 // process api request
 type CoinbaseProPublicExecutor struct {
 	client           *http.Client
-	securities       []*models.Security
+	securities       map[uint64]*models.Security
 	rateLimit        *exchanges.RateLimit
 	orderBookL2Cache *utils.TTLMap
 	orderBookL3Cache *utils.TTLMap
@@ -168,12 +168,15 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 		securities = append(securities, &security)
 	}
 
-	state.securities = securities
+	state.securities = make(map[uint64]*models.Security)
+	for _, s := range securities {
+		state.securities[s.SecurityID] = s
+	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Error:      "",
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }
@@ -181,11 +184,17 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
+	securities := make([]*models.Security, len(state.securities))
+	i := 0
+	for _, v := range state.securities {
+		securities[i] = v
+		i += 1
+	}
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Error:      "",
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }
@@ -196,8 +205,34 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 		context.Respond(&messages.MarketDataRequestReject{
 			RequestID: msg.RequestID,
 			Reason:    "market data subscription not supported on executor"})
+		return nil
 	}
-	symbol := msg.Instrument.Symbol
+	if msg.Instrument == nil {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "instrument missing"})
+		return nil
+	}
+	var symbol = ""
+	if msg.Instrument.Symbol != nil {
+		symbol = msg.Instrument.Symbol.Value
+	} else if msg.Instrument.SecurityID != nil {
+		sec, ok := state.securities[msg.Instrument.SecurityID.Value]
+		if !ok {
+			context.Respond(&messages.MarketDataRequestReject{
+				RequestID: msg.RequestID,
+				Reason:    "unknown security"})
+			return nil
+		}
+		symbol = sec.Symbol
+	}
+	if symbol == "" {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "unable to identify security"})
+		return nil
+	}
+
 	if msg.Aggregation == models.L2 {
 		var snapshot *models.OBL2Snapshot
 

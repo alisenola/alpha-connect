@@ -1,0 +1,9 @@
+syntax = "proto3";
+package models;
+
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+
+message Account {
+    string accountID = 1;
+    models.APICredentials credentials = 2;
+}

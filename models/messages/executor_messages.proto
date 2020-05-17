@@ -1,17 +1,19 @@
 syntax = "proto3";
 package messages;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "gitlab.com/alphaticks/gorderbook/protos.proto";
 
 import "gitlab.com/alphaticks/alphac/models/market_data.proto";
-import "gitlab.com/alphaticks/alphac/models/security.proto";
-import "gitlab.com/alphaticks/alphac/models/order.proto";
+import "gitlab.com/alphaticks/alphac/models/security_data.proto";
+import "gitlab.com/alphaticks/alphac/models/account.proto";
 
-import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
+
+message BusinessRequestReject {
+    uint64 requestID = 1;
+    string reason = 2;
+}
 
 message MarketDataRequest {
     uint64 requestID = 1;
@@ -74,6 +76,15 @@ enum ExecutionType {
     Settlement = 15;
 }
 
+enum OrderRejectionReason {
+    UnknownSymbol = 0;
+    UnsupportedOrderCharacteristic = 1;
+    IncorrectQuantity = 2;
+    ExchangeClosed = 3;
+    DuplicateOrder = 4;
+    Other = 5;
+}
+
 message ExecutionReport {
     string orderID = 1;
     google.protobuf.StringValue client_orderID = 2;
@@ -86,4 +97,20 @@ message ExecutionReport {
     double cum_quantity = 9;
     google.protobuf.Timestamp transaction_time = 10;
     google.protobuf.StringValue tradeID = 11;
+    OrderRejectionReason order_rejection_reason = 12;
+}
+
+message OrderStatusRequest {
+    uint64 requestID = 1;
+    google.protobuf.StringValue orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+}
+
+message OrderList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    string error = 3;
+    repeated models.Order orders = 4;
 }
