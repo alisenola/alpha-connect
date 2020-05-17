@@ -178,12 +178,12 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		&messages.MarketDataRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
-			Instrument: &messages.Instrument{
+			Instrument: &models.Instrument{
 				SecurityID: state.security.SecurityID,
 				Exchange:   state.security.Exchange,
 				Symbol:     state.security.Symbol,
 			},
-			Aggregation: messages.L2,
+			Aggregation: models.L2,
 		},
 		20*time.Second)
 
@@ -296,7 +296,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 	}
-	if msg.Aggregation == messages.L2 {
+	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),

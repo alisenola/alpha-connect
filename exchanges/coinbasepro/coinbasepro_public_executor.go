@@ -198,7 +198,7 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 			Reason:    "market data subscription not supported on executor"})
 	}
 	symbol := msg.Instrument.Symbol
-	if msg.Aggregation == messages.L2 {
+	if msg.Aggregation == models.L2 {
 		var snapshot *models.OBL2Snapshot
 
 		// Check if we don't have it already cached

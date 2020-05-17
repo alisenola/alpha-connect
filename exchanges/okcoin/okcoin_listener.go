@@ -226,7 +226,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 	}
 
-	if msg.Aggregation == messages.L2 {
+	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),
