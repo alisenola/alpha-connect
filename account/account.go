@@ -1,4 +1,4 @@
-package exchanges
+package account
 
 import (
 	"fmt"
@@ -62,10 +62,10 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position)
 			return fmt.Errorf("got position for wrong account ID")
 		}
 		if p.Instrument == nil {
-			return fmt.Errorf("order with nil instrument")
+			return fmt.Errorf("position with nil instrument")
 		}
 		if p.Instrument.SecurityID == nil {
-			return fmt.Errorf("order with nil security ID")
+			return fmt.Errorf("position with nil security ID")
 		}
 		sec, ok := accnt.securities[p.Instrument.SecurityID.Value]
 		if !ok {
@@ -79,7 +79,14 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position)
 
 func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, error) {
 	if _, ok := accnt.orders[order.ClientOrderID]; ok {
-		return nil, fmt.Errorf("client order ID already exists")
+		return &messages.ExecutionReport{
+			ClientOrderID:        &types.StringValue{Value: order.ClientOrderID},
+			ExecutionID:          "", // TODO
+			ExecutionType:        messages.Rejected,
+			OrderStatus:          models.Rejected,
+			OrderRejectionReason: messages.DuplicateOrder,
+			TransactionTime:      types.TimestampNow(),
+		}, nil
 	}
 	if order.OrderStatus != models.PendingNew {
 		return nil, fmt.Errorf("new order must have a PendingNew order status")
@@ -120,6 +127,10 @@ func (accnt *Account) ConfirmNewOrder(clientID string) (*messages.ExecutionRepor
 	order, ok := accnt.orders[clientID]
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
+	}
+	if order.OrderStatus == models.New {
+		// Order alreay confirmed, nop
+		return nil, nil
 	}
 	order.OrderStatus = models.New
 	return &messages.ExecutionReport{
@@ -257,4 +268,33 @@ func (accnt *Account) ConfirmFill(clientID string, tradeID string, quantity floa
 		TransactionTime: types.TimestampNow(),
 		TradeID:         &types.StringValue{Value: tradeID},
 	}, nil
+}
+
+func (accnt *Account) GetPositions() []*models.Position {
+	var positions []*models.Position
+	for _, s := range accnt.securities {
+		if s.RawQuantity > 0 {
+			positions = append(positions,
+				&models.Position{
+					AccountID: accnt.ID,
+					Instrument: &models.Instrument{
+						SecurityID: &types.UInt64Value{Value: s.SecurityID},
+						Exchange:   s.Exchange,
+						Symbol:     &types.StringValue{Value: s.Symbol},
+					},
+					Quantity: float64(s.RawQuantity) / s.LotPrecision,
+				})
+		}
+	}
+
+	return positions
+}
+
+func (accnt *Account) GetOrders() []*models.Order {
+	var orders []*models.Order
+	for _, o := range accnt.orders {
+		orders = append(orders, o.Order)
+	}
+
+	return orders
 }

@@ -21,6 +21,15 @@ import (
 	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
+func NewAccountListenerProducer(account *models.Account) actor.Producer {
+	switch account.Exchange.ID {
+	case constants.BITMEX.ID:
+		return func() actor.Actor { return bitmex.NewAccountListener(account) }
+	default:
+		return nil
+	}
+}
+
 func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 	switch security.Exchange.ID {
 	case constants.BINANCE.ID:
@@ -54,9 +63,6 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
-
-
-
 		*/
 	default:
 		return nil
@@ -95,12 +101,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return okcoin.NewExecutor() }
 
 		/*
-
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }
-
-
-
 		*/
 	default:
 		return nil

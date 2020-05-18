@@ -1,40 +1,48 @@
 package bitmex
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/xchanger/exchanges"
+	"gitlab.com/alphaticks/alphac/account"
+	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
-	"gitlab.com/alphaticks/xchanger/exchanges/coinbasepro"
 	"reflect"
+	"sort"
+	"time"
 )
 
-type Account struct {
-	credentials     exchanges.APICredentials
+type AccountListener struct {
+	account         *account.Account
+	accountM        *models.Account
+	seqNum          uint64
+	bitmexExecutor  *actor.PID
 	ws              *bitmex.Websocket
-	wsChan          chan *coinbasepro.WebsocketMessage
 	executorManager *actor.PID
 	logger          *log.Logger
 }
 
-func NewAccountProducer(credentials exchanges.APICredentials) actor.Producer {
+func NewAccountListenerProducer(account *models.Account) actor.Producer {
 	return func() actor.Actor {
-		return NewAccount(credentials)
+		return NewAccountListener(account)
 	}
 }
 
-func NewAccount(credentials exchanges.APICredentials) actor.Actor {
-	return &Account{
-		credentials:     credentials,
+func NewAccountListener(account *models.Account) actor.Actor {
+	return &AccountListener{
+		account:         nil,
+		accountM:        account,
+		seqNum:          0,
 		ws:              nil,
-		wsChan:          nil,
 		executorManager: nil,
 		logger:          nil,
 	}
 }
 
-func (state *Account) Receive(context actor.Context) {
+func (state *AccountListener) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -60,15 +68,39 @@ func (state *Account) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *messages.PositionsRequest:
+		if err := state.OnPositionsRequest(context); err != nil {
+			state.logger.Error("error processing OnPositionListRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderStatusRequest:
+		if err := state.OnOrderStatusRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.NewOrderSingle:
+		if err := state.OnNewOrderSingle(context); err != nil {
+			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.ExecutionReport:
+		if err := state.OnExecutionReport(context); err != nil {
+			state.logger.Error("error processing OnExecutionReport", log.Error(err))
+			panic(err)
+		}
+
+	case *bitmex.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing onWebocketMessage", log.Error(err))
 			panic(err)
 		}
 	}
 }
 
-func (state *Account) Initialize(context actor.Context) error {
+func (state *AccountListener) Initialize(context actor.Context) error {
 	// When initialize is done, the account must be aware of all the settings / assets / portofilio
 	// so as to be able to answer to FIX messages
 
@@ -77,13 +109,73 @@ func (state *Account) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
+	state.bitmexExecutor = actor.NewLocalPID("executor/" + constants.BITMEX.Name + "_executor")
 
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
 	}
+	// Request securities
+	executor := actor.NewLocalPID("executor")
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting securities: %v", err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if securityList.Error != "" {
+		return fmt.Errorf("error getting securities: %s", securityList.Error)
+	}
+
+	// Instantiate account
+	state.account = account.NewAccount(state.accountM.AccountID, securityList.Securities)
+
 	// Then fetch positions
+	res, err = context.RequestFuture(state.bitmexExecutor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.accountM,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting orders from executor: %v", err)
+	}
+
+	positionList, ok := res.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if positionList.Error != "" {
+		return errors.New(positionList.Error)
+	}
+
 	// Then fetch orders
-	// Then reconcile with execution feed
+	res, err = context.RequestFuture(state.bitmexExecutor, &messages.OrderStatusRequest{
+		OrderID:       nil,
+		ClientOrderID: nil,
+		Instrument:    nil,
+		Account:       state.accountM,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting orders from executor: %v", err)
+	}
+
+	orderList, ok := res.(*messages.OrderList)
+	if !ok {
+		return fmt.Errorf("was expecting OrderList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if orderList.Error != "" {
+		return errors.New(orderList.Error)
+	}
+
+	// Sync account
+	if err := state.account.Sync(orderList.Orders, positionList.Positions); err != nil {
+		return fmt.Errorf("error syncing account: %v", err)
+	}
+	state.seqNum = 0
 
 	context.Send(context.Self(), &readSocket{})
 
@@ -91,7 +183,7 @@ func (state *Account) Initialize(context actor.Context) error {
 }
 
 // TODO
-func (state *Account) Clean(context actor.Context) error {
+func (state *AccountListener) Clean(context actor.Context) error {
 	if state.ws != nil {
 		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
@@ -101,24 +193,137 @@ func (state *Account) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Account) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+	positions := state.account.GetPositions()
+	context.Respond(&messages.PositionList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Positions:  positions,
+	})
+	return nil
+}
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderStatusRequest)
+	// TODO filtering
+	orders := state.account.GetOrders()
+	context.Respond(&messages.OrderList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Orders:     orders,
+	})
+	return nil
+}
 
-		case bitmex.WSExecutionData:
-			execData := msg.Message.(bitmex.WSExecutionData)
-			fmt.Println(execData)
+func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingle)
+	msg.Account = state.accountM
+	order := &models.Order{
+		OrderID:        "",
+		ClientOrderID:  msg.ClientOrderID,
+		Instrument:     msg.Instrument,
+		OrderStatus:    models.PendingNew,
+		OrderType:      msg.OrderType,
+		Side:           msg.OrderSide,
+		TimeInForce:    msg.TimeInForce,
+		LeavesQuantity: msg.Quantity,
+		CumQuantity:    0,
+	}
+	report, err := state.account.NewOrder(order)
+	if err != nil {
+		return err
+	}
+	if report != nil {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+		if report.ExecutionType == messages.PendingNew {
+			context.Request(state.bitmexExecutor, msg)
 		}
 	}
 
 	return nil
 }
 
-func (state *Account) subscribeAccount(context actor.Context) error {
+func (state *AccountListener) OnExecutionReport(context actor.Context) error {
+	// We can get execution report from the executers
+	report := context.Message().(*messages.ExecutionReport)
+	fmt.Println("GOT REPORT BACK ")
+	if report.ClientOrderID == nil {
+		return fmt.Errorf("report has no ClientOrderID")
+	}
+	if report.ExecutionType == messages.Rejected {
+		nReport, err := state.account.RejectNewOrder(report.ClientOrderID.Value, report.OrderRejectionReason)
+		if err != nil {
+			return fmt.Errorf("error rejecting order: %v", err)
+		}
+		if nReport != nil {
+			nReport.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), nReport)
+		}
+	} else if report.ExecutionType == messages.New {
+		nReport, err := state.account.ConfirmNewOrder(report.ClientOrderID.Value)
+		if err != nil {
+			return fmt.Errorf("error confirming new order: %v", err)
+		}
+		if nReport != nil {
+			nReport.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), nReport)
+		}
+	}
+	return nil
+}
+
+func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*bitmex.WebsocketMessage)
+	switch msg.Message.(type) {
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
+
+	case bitmex.WSExecutionData:
+		execData := msg.Message.(bitmex.WSExecutionData)
+		if err := state.onWSExecutionData(context, execData); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountListener) onWSExecutionData(context actor.Context, executionData bitmex.WSExecutionData) error {
+	// Sort data by event time
+	sort.Slice(executionData.Data, func(i, j int) bool {
+		return executionData.Data[i].TransactTime.Before(executionData.Data[j].TransactTime)
+	})
+	for _, data := range executionData.Data {
+		switch data.ExecType {
+		case "New":
+			// New order
+			fmt.Println("GOT ORDER EWWS")
+			if data.ClOrdID == nil {
+				return fmt.Errorf("got an order with nil ClOrdID")
+			}
+			report, err := state.account.ConfirmNewOrder(*data.ClOrdID)
+			if err != nil {
+				return fmt.Errorf("error confirming new order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if state.ws != nil {
 		_ = state.ws.Disconnect()
 	}
@@ -128,7 +333,7 @@ func (state *Account) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error connecting to bitmex websocket: %v", err)
 	}
 
-	if err := ws.Auth(&state.credentials); err != nil {
+	if err := ws.Auth(state.accountM.Credentials); err != nil {
 		return fmt.Errorf("error sending auth request: %v", err)
 	}
 
@@ -162,7 +367,16 @@ func (state *Account) subscribeAccount(context actor.Context) error {
 		}
 		return fmt.Errorf("error casting message to WSSubscribeResponse")
 	}
-	fmt.Println(subResponse.Success)
+	if !subResponse.Success {
+		return fmt.Errorf("subscription unsucessful")
+	}
+
+	go func(ws *bitmex.Websocket, pid *actor.PID) {
+		for ws.ReadMessage() {
+			actor.EmptyRootContext.Send(pid, ws.Msg)
+		}
+	}(ws, context.Self())
+	state.ws = ws
 
 	return nil
 }

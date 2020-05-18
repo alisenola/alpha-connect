@@ -220,3 +220,15 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
+
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
+	return nil
+}

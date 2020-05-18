@@ -35,6 +35,7 @@ import (
 type Executor struct {
 	client      *http.Client
 	securities  map[uint64]*models.Security
+	symbolToSec map[string]*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -44,6 +45,7 @@ func NewExecutor() actor.Actor {
 	return &Executor{
 		client:      nil,
 		securities:  nil,
+		symbolToSec: nil,
 		rateLimit:   nil,
 		queryRunner: nil,
 		logger:      nil,
@@ -188,8 +190,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	}
 	state.securities = make(map[uint64]*models.Security)
+	state.symbolToSec = make(map[string]*models.Security)
 	for _, s := range securities {
 		state.securities[s.SecurityID] = s
+		state.symbolToSec[s.Symbol] = s
 	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
@@ -302,13 +306,18 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		}
 
 		for _, o := range orders {
+			sec, ok := state.symbolToSec[o.Symbol]
+			if !ok {
+				orderList.Error = "got order for unknown security"
+				context.Respond(orderList)
+				return
+			}
 			ord := models.Order{
 				OrderID: o.OrderID,
 				Instrument: &models.Instrument{
-					Exchange: &constants.BITMEX,
-					Symbol: &types.StringValue{
-						Value: o.Symbol,
-					},
+					Exchange:   &constants.BITMEX,
+					Symbol:     &types.StringValue{Value: o.Symbol},
+					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
 				LeavesQuantity: 0,
 				CumQuantity:    0,
@@ -321,11 +330,17 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			switch o.OrdStatus {
 			case "New":
 				ord.OrderStatus = models.New
+			case "Canceled":
+				ord.OrderStatus = models.Canceled
 			default:
 				fmt.Println("UNKNWOEN ORDER STATUS", o.OrdStatus)
 			}
 
 			switch bitmex.OrderType(o.OrdType) {
+			case bitmex.LIMIT:
+				ord.OrderType = models.Limit
+			case bitmex.MARKET:
+				ord.OrderType = models.Market
 			case bitmex.STOP:
 				ord.OrderType = models.Stop
 			case bitmex.STOP_LIMIT:
@@ -362,7 +377,236 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 			orderList.Orders = append(orderList.Orders, &ord)
 		}
+		context.Respond(orderList)
 	})
 
+	return nil
+}
+
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+
+	positionList := &messages.PositionList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Error:      "",
+		Positions:  nil,
+	}
+
+	params := bitmex.NewGetPositionParams()
+	filters := make(map[string]interface{})
+
+	if msg.Instrument != nil {
+		if msg.Instrument.Symbol != nil {
+			filters["symbol"] = msg.Instrument.Symbol.Value
+		} else if msg.Instrument.SecurityID != nil {
+			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
+			if !ok {
+				positionList.Error = "unknown security"
+				context.Respond(positionList)
+				return nil
+			}
+			filters["symbol"] = sec.Symbol
+		}
+	}
+	if len(filters) > 0 {
+		params.SetFilters(filters)
+	}
+
+	request, weight, err := bitmex.GetPosition(msg.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			positionList.Error = err.Error()
+			context.Respond(positionList)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"http client error: %d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				positionList.Error = err.Error()
+				context.Respond(positionList)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"http server error: %d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				positionList.Error = err.Error()
+				context.Respond(positionList)
+			}
+			return
+		}
+
+		var positions []bitmex.Position
+		err = json.Unmarshal(queryResponse.Response, &positions)
+		if err != nil {
+			positionList.Error = err.Error()
+			context.Respond(positionList)
+			return
+		}
+		for _, p := range positions {
+			sec, ok := state.symbolToSec[p.Symbol]
+			if !ok {
+				positionList.Error = "got order for unknown security"
+				context.Respond(positionList)
+				return
+			}
+			pos := &models.Position{
+				AccountID: msg.Account.AccountID,
+				Instrument: &models.Instrument{
+					Exchange:   &constants.BITMEX,
+					Symbol:     &types.StringValue{Value: p.Symbol},
+					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+				},
+				Quantity: float64(p.CurrentQty),
+			}
+			positionList.Positions = append(positionList.Positions, pos)
+		}
+		context.Respond(positionList)
+	})
+
+	return nil
+}
+
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingle)
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		fmt.Println("REJECT")
+		context.Respond(&messages.ExecutionReport{
+			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
+			ExecutionID:          "", // TODO
+			ExecutionType:        messages.Rejected,
+			OrderStatus:          models.Rejected,
+			OrderRejectionReason: messages.UnknownSymbol,
+		})
+		return nil
+	}
+	params := bitmex.NewPostOrderRequest(msg.Instrument.Symbol.Value)
+
+	params.SetOrderQty(msg.Quantity)
+	params.SetClOrdID(msg.ClientOrderID)
+
+	switch msg.OrderSide {
+	case models.Buy:
+		params.SetSide(bitmex.BUY_ORDER_SIDE)
+	case models.Sell:
+		params.SetSide(bitmex.SELL_ORDER_SIDE)
+	default:
+		params.SetSide(bitmex.BUY_ORDER_SIDE)
+	}
+
+	switch msg.OrderType {
+	case models.Limit:
+		params.SetOrderType(bitmex.LIMIT)
+	case models.Market:
+		params.SetOrderType(bitmex.MARKET)
+	case models.Stop:
+		params.SetOrderType(bitmex.STOP)
+	case models.StopLimit:
+		params.SetOrderType(bitmex.STOP_LIMIT)
+	case models.LimitIfTouched:
+		params.SetOrderType(bitmex.LIMIT_IF_TOUCHED)
+	case models.MarketIfTouched:
+		params.SetOrderType(bitmex.MARKET_IF_TOUCHED)
+	default:
+		params.SetOrderType(bitmex.LIMIT)
+	}
+
+	switch msg.TimeInForce {
+	case models.Session:
+		params.SetTimeInForce(bitmex.TIF_DAY)
+	case models.GoodTillCancel:
+		params.SetTimeInForce(bitmex.GOOD_TILL_CANCEL)
+	case models.ImmediateOrCancel:
+		params.SetTimeInForce(bitmex.IMMEDIATE_OR_CANCEL)
+	case models.FillOrKill:
+		params.SetTimeInForce(bitmex.FILL_OR_KILL)
+	default:
+		context.Respond(&messages.ExecutionReport{
+			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
+			ExecutionID:          "", // TODO
+			ExecutionType:        messages.Rejected,
+			OrderStatus:          models.Rejected,
+			OrderRejectionReason: messages.UnsupportedOrderCharacteristic,
+		})
+		return nil
+	}
+
+	if msg.Price != nil {
+		params.SetPrice(msg.Price.Value)
+	}
+
+	request, weight, err := bitmex.PostOrder(msg.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	executionReport := &messages.ExecutionReport{
+		ClientOrderID: &types.StringValue{Value: msg.ClientOrderID},
+		ExecutionID:   "", // TODO
+	}
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			executionReport.ExecutionType = messages.Rejected
+			executionReport.OrderStatus = models.Rejected
+			executionReport.OrderRejectionReason = messages.Other
+			context.Respond(executionReport)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				executionReport.ExecutionType = messages.Rejected
+				executionReport.OrderStatus = models.Rejected
+				executionReport.OrderRejectionReason = messages.Other
+				context.Respond(executionReport)
+			} else if queryResponse.StatusCode >= 500 {
+				executionReport.ExecutionType = messages.Rejected
+				executionReport.OrderStatus = models.Rejected
+				executionReport.OrderRejectionReason = messages.Other
+				context.Respond(executionReport)
+			}
+			return
+		}
+		var order bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &order)
+		if err != nil {
+			executionReport.ExecutionType = messages.Rejected
+			executionReport.OrderStatus = models.Rejected
+			executionReport.OrderRejectionReason = messages.Other
+			context.Respond(executionReport)
+			return
+		}
+		executionReport.ExecutionType = messages.New
+		executionReport.OrderID = order.OrderID
+		executionReport.ClientOrderID = &types.StringValue{Value: msg.ClientOrderID}
+		executionReport.OrderStatus = models.New
+		executionReport.Instrument = msg.Instrument
+		executionReport.CumQuantity = float64(order.CumQty)
+		executionReport.LeavesQuantity = float64(order.LeavesQty)
+		executionReport.Side = msg.OrderSide
+		executionReport.TransactionTime, _ = types.TimestampProto(order.TransactTime)
+		context.Respond(executionReport)
+	})
 	return nil
 }

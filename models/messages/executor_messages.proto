@@ -18,8 +18,8 @@ message BusinessRequestReject {
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
-    models.Instrument instrument = 3;
-    actor.PID subscriber = 4;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
     models.OrderBookAggregation aggregation = 5;
 }
 
@@ -82,30 +82,34 @@ enum OrderRejectionReason {
     IncorrectQuantity = 2;
     ExchangeClosed = 3;
     DuplicateOrder = 4;
-    Other = 5;
+    InvalidAccount = 5;
+    Other = 6;
 }
 
 message ExecutionReport {
-    string orderID = 1;
-    google.protobuf.StringValue client_orderID = 2;
-    string executionID = 3;
-    ExecutionType execution_type = 4;
-    models.OrderStatus order_status = 5;
-    models.Instrument instrument = 6;
-    models.Side side = 7;
-    double leaves_quantity = 8;
-    double cum_quantity = 9;
-    google.protobuf.Timestamp transaction_time = 10;
-    google.protobuf.StringValue tradeID = 11;
-    OrderRejectionReason order_rejection_reason = 12;
+    uint64 seq_num = 1;
+    string orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    string executionID = 4;
+    ExecutionType execution_type = 5;
+    models.OrderStatus order_status = 6;
+    models.Instrument instrument = 7;
+    models.Side side = 8;
+    double leaves_quantity = 9;
+    double cum_quantity = 10;
+    google.protobuf.Timestamp transaction_time = 11;
+    google.protobuf.StringValue tradeID = 12;
+    OrderRejectionReason order_rejection_reason = 13;
 }
 
 message OrderStatusRequest {
     uint64 requestID = 1;
-    google.protobuf.StringValue orderID = 2;
-    google.protobuf.StringValue client_orderID = 3;
-    models.Instrument instrument = 4;
-    models.Account account = 5;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    google.protobuf.StringValue orderID = 4;
+    google.protobuf.StringValue client_orderID = 5;
+    models.Instrument instrument = 6;
+    models.Account account = 7;
 }
 
 message OrderList {
@@ -113,4 +117,32 @@ message OrderList {
     uint64 responseID = 2;
     string error = 3;
     repeated models.Order orders = 4;
+}
+
+message PositionsRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+}
+
+message PositionList {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    uint64 responseID = 4;
+    string error = 5;
+    repeated models.Position positions = 6;
+}
+
+message NewOrderSingle {
+    string client_orderID = 1;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+    models.OrderType order_type = 4;
+    models.Side order_side = 5;
+    models.TimeInForce time_in_force = 6;
+    double quantity = 7;
+    google.protobuf.DoubleValue price = 8;
 }

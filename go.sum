@@ -1230,6 +1230,12 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200517131306-518c008dd704 h1:0rGC4MF/i6V
 gitlab.com/alphaticks/xchanger v0.0.0-20200517131306-518c008dd704/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200517140550-67abb6b79e7a h1:W86SBJI71bvcgJFKszRV0zVy8rEcXNqLLBd3Srk/xGw=
 gitlab.com/alphaticks/xchanger v0.0.0-20200517140550-67abb6b79e7a/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518094911-bb4f3fbe0f71 h1:BhBY3aYL26teQBtcIHx2xtRBOhv3N9mPkfkB9eHhZlY=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518094911-bb4f3fbe0f71/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518100503-a628ee0f50f1 h1:2tgeqnbjqMeLYLx10S+rVijggV+Vaa7lZsAs0HBHxHs=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518100503-a628ee0f50f1/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518130329-39ca31b3edb6 h1:YhbIGKSwLGQZooGJM34CabGQwJxfiwHu98ixLz40agc=
+gitlab.com/alphaticks/xchanger v0.0.0-20200518130329-39ca31b3edb6/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200330122509-3e19a6a55d22/go.mod h1:JKx9FbhKUtIXoK6KICP2sCm4rbxjpGzPCv6RnfM9WCg=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200313084212-78eb76e8dea2/go.mod h1:AQT5SCHwRJdk0nUa8TCdlP3oCRg7kPs0y0RXuPbCSFY=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=

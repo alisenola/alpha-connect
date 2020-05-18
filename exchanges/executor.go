@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -16,23 +17,27 @@ import (
 // He is the main part of the whole software..
 //
 type Executor struct {
-	exchanges     []*xchangerModels.Exchange
-	executors     map[uint32]*actor.PID       // A map from exchange ID to executor
-	securities    map[uint64]*models.Security // A map from security ID to security
-	instruments   map[uint64]*actor.PID       // A map from security ID to instrument listener
-	slSubscribers map[uint64]*actor.PID       // Map from request ID to security list subscribers
-	logger        *log.Logger
+	exchanges       []*xchangerModels.Exchange
+	accounts        []*models.Account
+	accountManagers map[string]*actor.PID
+	executors       map[uint32]*actor.PID       // A map from exchange ID to executor
+	securities      map[uint64]*models.Security // A map from security ID to security
+	instruments     map[uint64]*actor.PID       // A map from security ID to instrument listener
+	slSubscribers   map[uint64]*actor.PID       // A map from request ID to security list subscribers
+	execSubscribers map[uint64]*actor.PID       // A map from request ID to execution report subscribers
+	logger          *log.Logger
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*models.Account) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges)
+		return NewExecutor(exchanges, accounts)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*models.Account) actor.Actor {
 	return &Executor{
 		exchanges: exchanges,
+		accounts:  accounts,
 		logger:    nil,
 	}
 }
@@ -81,6 +86,24 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.PositionsRequest:
+		if err := state.OnPositionsRequest(context); err != nil {
+			state.logger.Error("error processing OnPositionRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderStatusRequest:
+		if err := state.OnOrderStatusRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderStatusRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.NewOrderSingle:
+		if err := state.OnNewOrderSingle(context); err != nil {
+			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+			panic(err)
+		}
+
 	case *actor.Terminated:
 		if err := state.OnTerminated(context); err != nil {
 			state.logger.Error("error processing OnTerminated", log.Error(err))
@@ -107,6 +130,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		props := actor.PropsFromProducer(producer)
 		state.executors[exch.ID], _ = context.SpawnNamed(props, exch.Name+"_executor")
+	}
+
+	// Spawn all account listeners
+	state.accountManagers = make(map[string]*actor.PID)
+	for _, account := range state.accounts {
+		producer := NewAccountManagerProducer(account)
+		if producer == nil {
+			return fmt.Errorf("unknown exchange %s", account.Exchange.Name)
+		}
+		props := actor.PropsFromProducer(producer).WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		state.accountManagers[account.AccountID] = context.Spawn(props)
 	}
 
 	// Request securities for each one of them
@@ -149,14 +184,15 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
-	if request.Instrument == nil {
+	if request.Instrument == nil || request.Instrument.SecurityID == nil {
 		context.Respond(&messages.MarketDataRequestReject{
 			RequestID: request.RequestID,
 			Reason:    fmt.Sprintf("unknown security"),
 		})
 		return nil
 	}
-	security, ok := state.securities[request.Instrument.SecurityID]
+	securityID := request.Instrument.SecurityID.Value
+	security, ok := state.securities[securityID]
 	if !ok {
 		context.Respond(&messages.MarketDataRequestReject{
 			RequestID: request.RequestID,
@@ -164,13 +200,13 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	if pid, ok := state.instruments[request.Instrument.SecurityID]; ok {
+	if pid, ok := state.instruments[securityID]; ok {
 		context.Forward(pid)
 	} else {
 		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security)).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
 		pid := context.Spawn(props)
-		state.instruments[request.Instrument.SecurityID] = pid
+		state.instruments[securityID] = pid
 		context.Forward(pid)
 	}
 
@@ -228,6 +264,78 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 		context.Send(v, securityList)
 	}
 
+	return nil
+}
+
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.PositionList{
+			RequestID:  msg.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Error:      "no account specified",
+			Positions:  nil,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.PositionList{
+			RequestID:  msg.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Error:      "unknown account",
+			Positions:  nil,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderStatusRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.OrderList{
+			RequestID:  msg.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Error:      "no account specified",
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.OrderList{
+			RequestID:  msg.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Error:      "unknown account",
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingle)
+	if msg.Account == nil {
+		context.Respond(&messages.ExecutionReport{
+			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
+			ExecutionID:          "", // TODO
+			ExecutionType:        messages.Rejected,
+			OrderRejectionReason: messages.InvalidAccount,
+		})
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.ExecutionReport{
+			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
+			ExecutionID:          "", // TODO
+			ExecutionType:        messages.Rejected,
+			OrderRejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
 	return nil
 }
 

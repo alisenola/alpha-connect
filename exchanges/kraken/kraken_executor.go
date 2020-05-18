@@ -192,8 +192,18 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.MarketDataRequest)
+	if msg.Subscribe {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "market data subscription not supported on executor"})
+	}
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "symbol needed"})
+	}
 	// Get http request and the expected response
-	symbol := msg.Instrument.Symbol
+	symbol := msg.Instrument.Symbol.Value
 	request, weight, err := kraken.GetOrderBook(symbol)
 	if err != nil {
 		return err
@@ -276,22 +286,14 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetOpenOrdersRequest(context actor.Context) error {
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OpenOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseAllOrdersRequest(context actor.Context) error {
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
 	return nil
 }

@@ -241,7 +241,12 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			RequestID: msg.RequestID,
 			Reason:    "market data subscription not supported on executor"})
 	}
-	symbol := msg.Instrument.Symbol
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "symbol needed"})
+	}
+	symbol := msg.Instrument.Symbol.Value
 	// Get http request and the expected response
 	request, weight, err := fbinance.GetOrderBook(symbol, 1000)
 	if err != nil {
@@ -324,22 +329,14 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) GetOpenOrdersRequest(context actor.Context) error {
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OpenOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseOrdersRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) CloseAllOrdersRequest(context actor.Context) error {
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
 	return nil
 }

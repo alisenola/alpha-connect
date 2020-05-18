@@ -62,3 +62,15 @@ func (state *CoinbaseProFixExecutor) OnMarketDataRequest(context actor.Context) 
 func (state *CoinbaseProFixExecutor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
+
+func (state *CoinbaseProFixExecutor) OnOrderStatusRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *CoinbaseProFixExecutor) OnPositionsRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *CoinbaseProFixExecutor) OnNewOrderSingle(context actor.Context) error {
+	return nil
+}

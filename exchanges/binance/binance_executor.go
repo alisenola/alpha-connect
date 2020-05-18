@@ -249,7 +249,12 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			RequestID: msg.RequestID,
 			Reason:    "market data subscription not supported on executor"})
 	}
-	symbol := msg.Instrument.Symbol
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		context.Respond(&messages.MarketDataRequestReject{
+			RequestID: msg.RequestID,
+			Reason:    "symbol needed"})
+	}
+	symbol := msg.Instrument.Symbol.Value
 	// Get http request and the expected response
 	request, weight, err := binance.GetOrderBook(symbol, 1000)
 	if err != nil {
@@ -329,5 +334,17 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			SnapshotL2: snapshot})
 	})
 
+	return nil
+}
+
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnNewOrderSingle(context actor.Context) error {
 	return nil
 }
