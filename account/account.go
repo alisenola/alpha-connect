@@ -281,7 +281,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, quantity float64) (
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Fill,
+		ExecutionType:   messages.Trade,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,

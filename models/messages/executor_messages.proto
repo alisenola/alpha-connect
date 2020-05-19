@@ -59,21 +59,20 @@ message SecurityList {
 
 enum ExecutionType {
     New = 0;
-    Fill = 1;
-    Done = 2;
-    Canceled = 3;
-    Replaced = 4;
-    PendingCancel = 5;
-    Stopped = 6;
-    Rejected = 7;
-    Suspended = 8;
-    PendingNew = 9;
-    Calculated = 10;
-    Expired = 11;
-    PendingReplace = 12;
-    Trade = 13;
-    OrderStatus = 14;
-    Settlement = 15;
+    Done = 1;
+    Canceled = 2;
+    Replaced = 3;
+    PendingCancel = 4;
+    Stopped = 5;
+    Rejected = 6;
+    Suspended = 7;
+    PendingNew = 8;
+    Calculated = 9;
+    Expired = 10;
+    PendingReplace = 11;
+    Trade = 12;
+    OrderStatus = 13;
+    Settlement = 14;
 }
 
 enum RejectionReason {
@@ -155,6 +154,10 @@ message NewOrderSingleResponse {
     bool success = 2;
     string orderID = 3;
     RejectionReason rejection_reason = 4;
+}
+
+message NewBulkOrderRequest {
+
 }
 
 message OrderCancelRequest {
