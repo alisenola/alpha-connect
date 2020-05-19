@@ -15,7 +15,8 @@ type ExchangeExecutor interface {
 	OnMarketDataRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
-	OnNewOrderSingle(context actor.Context) error
+	OnNewOrderSingleRequest(context actor.Context) error
+	OnOrderCancelRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -76,9 +77,15 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.NewOrderSingle:
-		if err := state.OnNewOrderSingle(context); err != nil {
+	case *messages.NewOrderSingleRequest:
+		if err := state.OnNewOrderSingleRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnNewSingleOrder", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderCancelRequest:
+		if err := state.OnOrderCancelRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnOrderCancelRequest", log.Error(err))
 			panic(err)
 		}
 

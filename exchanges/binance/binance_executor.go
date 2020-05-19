@@ -345,6 +345,10 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnNewOrderSingle(context actor.Context) error {
+func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	return nil
 }

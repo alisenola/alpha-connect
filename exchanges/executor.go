@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -98,9 +97,15 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.NewOrderSingle:
-		if err := state.OnNewOrderSingle(context); err != nil {
+	case *messages.NewOrderSingleRequest:
+		if err := state.OnNewOrderSingleRequest(context); err != nil {
 			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderCancelRequest:
+		if err := state.OnOrderCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -315,23 +320,44 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnNewOrderSingle(context actor.Context) error {
-	msg := context.Message().(*messages.NewOrderSingle)
+func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingleRequest)
 	if msg.Account == nil {
-		context.Respond(&messages.ExecutionReport{
-			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
-			ExecutionID:          "", // TODO
-			ExecutionType:        messages.Rejected,
-			OrderRejectionReason: messages.InvalidAccount,
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderCancelRequest)
+	if msg.Account == nil || msg.Instrument == nil || msg.Instrument.Symbol == nil || (msg.ClientOrderID == nil && msg.OrderID == nil) {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownOrder,
 		})
 	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
-		context.Respond(&messages.ExecutionReport{
-			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
-			ExecutionID:          "", // TODO
-			ExecutionType:        messages.Rejected,
-			OrderRejectionReason: messages.InvalidAccount,
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownOrder,
 		})
 		return nil
 	}

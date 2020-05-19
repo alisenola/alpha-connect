@@ -44,8 +44,9 @@ func (state *AccountChecker) Receive(context actor.Context) {
 		}
 
 	case *messages.ExecutionReport:
-		fmt.Println("GOT EXEC REPORT", time.Now())
-		fmt.Println(context.Message())
+		if err := state.OnExecutionReport(context); err != nil {
+			state.err = err
+		}
 
 	case *GetStat:
 		context.Respond(&GetStat{
@@ -74,9 +75,8 @@ func (state *AccountChecker) Initialize(context actor.Context) error {
 		return fmt.Errorf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res))
 	}
 	// Place limit buy for 1 contract
-	fmt.Println("PLACING LIMIT BUY")
-	context.Send(executor, &messages.NewOrderSingle{
-		ClientOrderID: "ord1",
+	res, err = context.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		ClientOrderID: "ord23",
 		Instrument: &models.Instrument{
 			Exchange:   state.security.Exchange,
 			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
@@ -88,8 +88,48 @@ func (state *AccountChecker) Initialize(context actor.Context) error {
 		TimeInForce: models.Session,
 		Quantity:    1.,
 		Price:       &types.DoubleValue{Value: 100.},
-	})
+	}, 10*time.Second).Result()
+	if err != nil {
+		return err
+	}
+	response := res.(*messages.NewOrderSingleResponse)
+	if !response.Success {
+		return fmt.Errorf("error creating new order: %s", response.RejectionReason.String())
+	}
 
+	return nil
+}
+
+func (state *AccountChecker) OnExecutionReport(context actor.Context) error {
+	report := context.Message().(*messages.ExecutionReport)
+	fmt.Println(report)
+	switch report.ExecutionType {
+	case messages.New:
+		fmt.Println("CANCEL ORDER")
+		res, err := context.RequestFuture(executor, &messages.OrderCancelRequest{
+			OrderID: &types.StringValue{Value: report.OrderID},
+			Instrument: &models.Instrument{
+				Exchange:   state.security.Exchange,
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			Account: state.account,
+		}, 5*time.Second).Result()
+		if err != nil {
+			return err
+		}
+		response := res.(*messages.OrderCancelResponse)
+		if !response.Success {
+			return fmt.Errorf("cancel unsucessful")
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountChecker) OnOrderCancelReject(context actor.Context) error {
+	msg := context.Message().(*messages.OrderCancelResponse)
+	fmt.Println(msg)
 	return nil
 }
 

@@ -22,14 +22,16 @@ type Order struct {
 
 type Account struct {
 	ID         string
-	orders     map[string]*Order
+	ordersID   map[string]*Order
+	ordersClID map[string]*Order
 	securities map[uint64]*Security
 }
 
 func NewAccount(ID string, securities []*models.Security) *Account {
 	accnt := &Account{
 		ID:         ID,
-		orders:     make(map[string]*Order),
+		ordersID:   make(map[string]*Order),
+		ordersClID: make(map[string]*Order),
 		securities: make(map[uint64]*Security),
 	}
 	for _, s := range securities {
@@ -47,10 +49,12 @@ func NewAccount(ID string, securities []*models.Security) *Account {
 func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position) error {
 
 	for _, o := range orders {
-		accnt.orders[o.ClientOrderID] = &Order{
+		ord := &Order{
 			Order:          o,
 			previousStatus: o.OrderStatus,
 		}
+		accnt.ordersID[o.OrderID] = ord
+		accnt.ordersClID[o.ClientOrderID] = ord
 	}
 
 	// Reset securities
@@ -77,35 +81,30 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position)
 	return nil
 }
 
-func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, error) {
-	if _, ok := accnt.orders[order.ClientOrderID]; ok {
-		return &messages.ExecutionReport{
-			ClientOrderID:        &types.StringValue{Value: order.ClientOrderID},
-			ExecutionID:          "", // TODO
-			ExecutionType:        messages.Rejected,
-			OrderStatus:          models.Rejected,
-			OrderRejectionReason: messages.DuplicateOrder,
-			TransactionTime:      types.TimestampNow(),
-		}, nil
+func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, *messages.RejectionReason) {
+	if _, ok := accnt.ordersClID[order.ClientOrderID]; ok {
+		res := messages.DuplicateOrder
+		return nil, &res
 	}
 	if order.OrderStatus != models.PendingNew {
-		return nil, fmt.Errorf("new order must have a PendingNew order status")
+		res := messages.Other
+		return nil, &res
 	}
-	if order.Instrument == nil {
-		return nil, fmt.Errorf("order has no instrument")
-	}
-	if order.Instrument.SecurityID == nil {
-		return nil, fmt.Errorf("order has no security ID, ref from symbol not supported")
+	if order.Instrument == nil || order.Instrument.SecurityID == nil {
+		res := messages.UnknownSymbol
+		return nil, &res
 	}
 	sec, ok := accnt.securities[order.Instrument.SecurityID.Value]
 	if !ok {
-		return nil, fmt.Errorf("unknown security %d", order.Instrument.SecurityID.Value)
+		res := messages.UnknownSymbol
+		return nil, &res
 	}
 	rawCumQty := int64(order.CumQuantity * sec.LotPrecision)
 	if rawCumQty > 0 {
-		return nil, fmt.Errorf("new order must have zero CumQuantity")
+		res := messages.IncorrectQuantity
+		return nil, &res
 	}
-	accnt.orders[order.ClientOrderID] = &Order{
+	accnt.ordersClID[order.ClientOrderID] = &Order{
 		Order:          order,
 		previousStatus: order.OrderStatus,
 	}
@@ -116,23 +115,24 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		ExecutionType:   messages.PendingNew,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 	}, nil
 }
 
-func (accnt *Account) ConfirmNewOrder(clientID string) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
+func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.ExecutionReport, error) {
+	order, ok := accnt.ordersClID[clientID]
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
 	}
-	if order.OrderStatus == models.New {
-		// Order alreay confirmed, nop
+	if order.OrderStatus != models.PendingNew {
+		// Order already confirmed, nop
 		return nil, nil
 	}
+	order.OrderID = ID
 	order.OrderStatus = models.New
+	accnt.ordersID[ID] = order
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
@@ -140,41 +140,49 @@ func (accnt *Account) ConfirmNewOrder(clientID string) (*messages.ExecutionRepor
 		ExecutionType:   messages.New,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 	}, nil
 }
 
-func (accnt *Account) RejectNewOrder(clientID string, reason messages.OrderRejectionReason) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
+func (accnt *Account) RejectNewOrder(clientID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
+	order, ok := accnt.ordersClID[clientID]
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
 	}
 	order.OrderStatus = models.Rejected
-	delete(accnt.orders, clientID)
+	delete(accnt.ordersClID, clientID)
 
 	return &messages.ExecutionReport{
-		OrderID:              order.OrderID,
-		ClientOrderID:        &types.StringValue{Value: order.ClientOrderID},
-		ExecutionID:          "", // TODO
-		ExecutionType:        messages.Rejected,
-		OrderStatus:          models.Rejected,
-		Instrument:           order.Instrument,
-		Side:                 order.Side,
-		LeavesQuantity:       order.LeavesQuantity,
-		CumQuantity:          order.CumQuantity,
-		TransactionTime:      types.TimestampNow(),
-		OrderRejectionReason: reason,
+		OrderID:         order.OrderID,
+		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.Rejected,
+		OrderStatus:     models.Rejected,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: types.TimestampNow(),
+		RejectionReason: reason,
 	}, nil
 }
 
-func (accnt *Account) CancelOrder(clientID string) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
-	if !ok {
-		return nil, fmt.Errorf("unknown order %s", clientID)
+func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messages.RejectionReason) {
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
 	}
+	if order == nil {
+		res := messages.UnknownOrder
+		return nil, &res
+	}
+	if order.OrderStatus == models.PendingCancel {
+		res := messages.CancelAlreadyPending
+		return nil, &res
+	}
+
 	// Save current order status in case cancel gets rejected
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.PendingCancel
@@ -186,18 +194,25 @@ func (accnt *Account) CancelOrder(clientID string) (*messages.ExecutionReport, e
 		ExecutionType:   messages.PendingCancel,
 		OrderStatus:     models.PendingCancel,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 	}, nil
 }
 
-func (accnt *Account) ConfirmCancelOrder(clientID string) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
-	if !ok {
-		return nil, fmt.Errorf("unknown order %s", clientID)
+func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, error) {
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
 	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	if order.OrderStatus != models.PendingCancel {
+		return nil, nil
+	}
+
 	order.OrderStatus = models.Canceled
 
 	return &messages.ExecutionReport{
@@ -207,17 +222,20 @@ func (accnt *Account) ConfirmCancelOrder(clientID string) (*messages.ExecutionRe
 		ExecutionType:   messages.Canceled,
 		OrderStatus:     models.Canceled,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 	}, nil
 }
 
-func (accnt *Account) RejectCancelOrder(clientID string) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
-	if !ok {
-		return nil, fmt.Errorf("unknown order %s", clientID)
+func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
 	}
 	order.OrderStatus = order.previousStatus
 
@@ -225,20 +243,24 @@ func (accnt *Account) RejectCancelOrder(clientID string) (*messages.ExecutionRep
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Canceled,
+		ExecutionType:   messages.Rejected,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
+		RejectionReason: reason,
 	}, nil
 }
 
-func (accnt *Account) ConfirmFill(clientID string, tradeID string, quantity float64) (*messages.ExecutionReport, error) {
-	order, ok := accnt.orders[clientID]
-	if !ok {
-		return nil, fmt.Errorf("unknown order %s", clientID)
+func (accnt *Account) ConfirmFill(ID string, tradeID string, quantity float64) (*messages.ExecutionReport, error) {
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
 	}
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	rawFillQuantity := int64(quantity * sec.LotPrecision)
@@ -262,7 +284,6 @@ func (accnt *Account) ConfirmFill(clientID string, tradeID string, quantity floa
 		ExecutionType:   messages.Fill,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
-		Side:            order.Side,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
@@ -292,7 +313,7 @@ func (accnt *Account) GetPositions() []*models.Position {
 
 func (accnt *Account) GetOrders() []*models.Order {
 	var orders []*models.Order
-	for _, o := range accnt.orders {
+	for _, o := range accnt.ordersClID {
 		orders = append(orders, o.Order)
 	}
 

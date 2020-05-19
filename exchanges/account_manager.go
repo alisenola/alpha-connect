@@ -71,9 +71,16 @@ func (state *AccountManager) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.NewOrderSingle:
-		if err := state.OnNewOrderSingle(context); err != nil {
-			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+	case *messages.NewOrderSingleRequest:
+		if err := state.OnNewOrderSingleRequest(context); err != nil {
+			state.logger.Error("error processing OnNewOrderSingleRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderCancelRequest:
+		if err := state.OnOrderCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
 		}
 
 	case *messages.ExecutionReport:
@@ -139,14 +146,17 @@ func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *AccountManager) OnNewOrderSingle(context actor.Context) error {
-	fmt.Println("FORWARDING NEW ORDER SINGLE")
+func (state *AccountManager) OnNewOrderSingleRequest(context actor.Context) error {
+	context.Forward(state.listener)
+	return nil
+}
+
+func (state *AccountManager) OnOrderCancelRequest(context actor.Context) error {
 	context.Forward(state.listener)
 	return nil
 }
 
 func (state *AccountManager) OnExecutionReport(context actor.Context) error {
-	fmt.Println("GOT EXEC REPORT, FORWARDING")
 	report := context.Message().(*messages.ExecutionReport)
 	for _, v := range state.execSubscribers {
 		context.Send(v, report)

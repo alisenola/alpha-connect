@@ -71,6 +71,10 @@ func (state *CoinbaseProFixExecutor) OnPositionsRequest(context actor.Context) e
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnNewOrderSingle(context actor.Context) error {
+func (state *CoinbaseProFixExecutor) OnNewOrderSingleRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *CoinbaseProFixExecutor) OnOrderCancelRequest(context actor.Context) error {
 	return nil
 }

@@ -482,16 +482,13 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnNewOrderSingle(context actor.Context) error {
-	msg := context.Message().(*messages.NewOrderSingle)
+func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingleRequest)
 	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		fmt.Println("REJECT")
-		context.Respond(&messages.ExecutionReport{
-			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
-			ExecutionID:          "", // TODO
-			ExecutionType:        messages.Rejected,
-			OrderStatus:          models.Rejected,
-			OrderRejectionReason: messages.UnknownSymbol,
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSymbol,
 		})
 		return nil
 	}
@@ -536,12 +533,10 @@ func (state *Executor) OnNewOrderSingle(context actor.Context) error {
 	case models.FillOrKill:
 		params.SetTimeInForce(bitmex.FILL_OR_KILL)
 	default:
-		context.Respond(&messages.ExecutionReport{
-			ClientOrderID:        &types.StringValue{Value: msg.ClientOrderID},
-			ExecutionID:          "", // TODO
-			ExecutionType:        messages.Rejected,
-			OrderStatus:          models.Rejected,
-			OrderRejectionReason: messages.UnsupportedOrderCharacteristic,
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnsupportedOrderCharacteristic,
 		})
 		return nil
 	}
@@ -561,52 +556,113 @@ func (state *Executor) OnNewOrderSingle(context actor.Context) error {
 
 	state.rateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-	executionReport := &messages.ExecutionReport{
-		ClientOrderID: &types.StringValue{Value: msg.ClientOrderID},
-		ExecutionID:   "", // TODO
-	}
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			executionReport.ExecutionType = messages.Rejected
-			executionReport.OrderStatus = models.Rejected
-			executionReport.OrderRejectionReason = messages.Other
-			context.Respond(executionReport)
+			context.Respond(&messages.NewOrderSingleResponse{
+				RequestID:       msg.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				executionReport.ExecutionType = messages.Rejected
-				executionReport.OrderStatus = models.Rejected
-				executionReport.OrderRejectionReason = messages.Other
-				context.Respond(executionReport)
+				context.Respond(&messages.NewOrderSingleResponse{
+					RequestID:       msg.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
 			} else if queryResponse.StatusCode >= 500 {
-				executionReport.ExecutionType = messages.Rejected
-				executionReport.OrderStatus = models.Rejected
-				executionReport.OrderRejectionReason = messages.Other
-				context.Respond(executionReport)
+				context.Respond(&messages.NewOrderSingleResponse{
+					RequestID:       msg.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
 			}
 			return
 		}
 		var order bitmex.Order
 		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
-			executionReport.ExecutionType = messages.Rejected
-			executionReport.OrderStatus = models.Rejected
-			executionReport.OrderRejectionReason = messages.Other
-			context.Respond(executionReport)
+			context.Respond(&messages.NewOrderSingleResponse{
+				RequestID:       msg.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
 			return
 		}
-		executionReport.ExecutionType = messages.New
-		executionReport.OrderID = order.OrderID
-		executionReport.ClientOrderID = &types.StringValue{Value: msg.ClientOrderID}
-		executionReport.OrderStatus = models.New
-		executionReport.Instrument = msg.Instrument
-		executionReport.CumQuantity = float64(order.CumQty)
-		executionReport.LeavesQuantity = float64(order.LeavesQty)
-		executionReport.Side = msg.OrderSide
-		executionReport.TransactionTime, _ = types.TimestampProto(order.TransactTime)
-		context.Respond(executionReport)
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID: msg.RequestID,
+			Success:   true,
+			OrderID:   order.OrderID,
+		})
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderCancelRequest)
+
+	params := bitmex.NewCancelOrderRequest()
+	if req.OrderID != nil {
+		params.SetOrderID(req.OrderID.Value)
+	} else if req.ClientOrderID != nil {
+		params.SetClOrdID(req.ClientOrderID.Value)
+	}
+
+	request, weight, err := bitmex.CancelOrder(req.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			context.Respond(&messages.OrderCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				context.Respond(&messages.OrderCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			} else if queryResponse.StatusCode >= 500 {
+				context.Respond(&messages.OrderCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			}
+			return
+		}
+		var orders []bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &orders)
+		if err != nil {
+			context.Respond(&messages.OrderCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       req.RequestID,
+			Success:         true,
+			RejectionReason: messages.Other,
+		})
 	})
 	return nil
 }

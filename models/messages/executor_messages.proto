@@ -76,14 +76,17 @@ enum ExecutionType {
     Settlement = 15;
 }
 
-enum OrderRejectionReason {
+enum RejectionReason {
     UnknownSymbol = 0;
     UnsupportedOrderCharacteristic = 1;
     IncorrectQuantity = 2;
     ExchangeClosed = 3;
     DuplicateOrder = 4;
     InvalidAccount = 5;
-    Other = 6;
+    TooLateToCancel = 6;
+    UnknownOrder = 7;
+    CancelAlreadyPending = 8;
+    Other = 9;
 }
 
 message ExecutionReport {
@@ -94,12 +97,11 @@ message ExecutionReport {
     ExecutionType execution_type = 5;
     models.OrderStatus order_status = 6;
     models.Instrument instrument = 7;
-    models.Side side = 8;
     double leaves_quantity = 9;
     double cum_quantity = 10;
     google.protobuf.Timestamp transaction_time = 11;
     google.protobuf.StringValue tradeID = 12;
-    OrderRejectionReason order_rejection_reason = 13;
+    RejectionReason rejection_reason = 13;
 }
 
 message OrderStatusRequest {
@@ -136,13 +138,35 @@ message PositionList {
     repeated models.Position positions = 6;
 }
 
-message NewOrderSingle {
-    string client_orderID = 1;
-    models.Instrument instrument = 2;
-    models.Account account = 3;
-    models.OrderType order_type = 4;
-    models.Side order_side = 5;
-    models.TimeInForce time_in_force = 6;
-    double quantity = 7;
-    google.protobuf.DoubleValue price = 8;
+message NewOrderSingleRequest {
+    uint64 requestID = 1;
+    string client_orderID = 2;
+    models.Instrument instrument = 3;
+    models.Account account = 4;
+    models.OrderType order_type = 5;
+    models.Side order_side = 6;
+    models.TimeInForce time_in_force = 7;
+    double quantity = 8;
+    google.protobuf.DoubleValue price = 9;
+}
+
+message NewOrderSingleResponse {
+    uint64 requestID = 1;
+    bool success = 2;
+    string orderID = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message OrderCancelRequest {
+    uint64 requestID = 1;
+    google.protobuf.StringValue orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+}
+
+message OrderCancelResponse {
+    uint64 requestID = 1;
+    bool success = 2;
+    RejectionReason rejection_reason = 3;
 }
