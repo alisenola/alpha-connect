@@ -332,6 +332,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				ord.OrderStatus = models.New
 			case "Canceled":
 				ord.OrderStatus = models.Canceled
+			case "Filled":
+				ord.OrderStatus = models.Filled
 			default:
 				fmt.Println("UNKNWOEN ORDER STATUS", o.OrdStatus)
 			}
