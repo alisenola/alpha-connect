@@ -195,9 +195,11 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 
 	// Now delete
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
-		RequestID:  0,
-		Account:    testAccount,
-		Instrument: instrument1,
+		RequestID: 0,
+		Account:   testAccount,
+		Filter: &messages.OrderFilter{
+			Instrument: instrument1,
+		},
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -319,9 +321,11 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 
 	// Delete orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
-		RequestID:  0,
-		Account:    testAccount,
-		Instrument: instrument1,
+		RequestID: 0,
+		Account:   testAccount,
+		Filter: &messages.OrderFilter{
+			Instrument: instrument1,
+		},
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -541,9 +545,11 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 
 	// Delete orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
-		RequestID:  0,
-		Account:    testAccount,
-		Instrument: instrument1,
+		RequestID: 0,
+		Account:   testAccount,
+		Filter: &messages.OrderFilter{
+			Instrument: instrument1,
+		},
 	}, 10*time.Second).Result()
 
 	if err != nil {

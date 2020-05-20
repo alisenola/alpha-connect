@@ -467,7 +467,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 
 func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
-	orders := state.account.GetOpenOrders(req.Instrument, nil)
+	orders := state.account.GetOrders(req.Filter)
 	if len(orders) == 0 {
 		context.Respond(&messages.OrderMassCancelResponse{
 			RequestID: req.RequestID,
@@ -477,6 +477,9 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	}
 	var reports []*messages.ExecutionReport
 	for _, o := range orders {
+		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
+			continue
+		}
 		report, res := state.account.CancelOrder(o.ClientOrderID)
 		if res != nil {
 			// Reject all cancel order up until now

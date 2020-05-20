@@ -794,29 +794,35 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
 
+	filters := make(map[string]interface{})
 	params := bitmex.NewCancelAllOrdersRequest()
-	if req.Instrument != nil {
-		if req.Instrument.Symbol != nil {
-			if _, ok := state.symbolToSec[req.Instrument.Symbol.Value]; !ok {
-				context.Respond(&messages.OrderMassCancelResponse{
-					RequestID:       req.RequestID,
-					Success:         false,
-					RejectionReason: messages.UnknownSymbol,
-				})
-				return nil
+	if req.Filter != nil {
+		if req.Filter.Instrument != nil {
+			if req.Filter.Instrument.Symbol != nil {
+				if _, ok := state.symbolToSec[req.Filter.Instrument.Symbol.Value]; !ok {
+					context.Respond(&messages.OrderMassCancelResponse{
+						RequestID:       req.RequestID,
+						Success:         false,
+						RejectionReason: messages.UnknownSymbol,
+					})
+					return nil
+				}
+				params.SetSymbol(req.Filter.Instrument.Symbol.Value)
+			} else if req.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					context.Respond(&messages.OrderMassCancelResponse{
+						RequestID:       req.RequestID,
+						Success:         false,
+						RejectionReason: messages.UnknownSymbol,
+					})
+					return nil
+				}
+				params.SetSymbol(sec.Symbol)
 			}
-			params.SetSymbol(req.Instrument.Symbol.Value)
-		} else if req.Instrument.SecurityID != nil {
-			sec, ok := state.securities[req.Instrument.SecurityID.Value]
-			if !ok {
-				context.Respond(&messages.OrderMassCancelResponse{
-					RequestID:       req.RequestID,
-					Success:         false,
-					RejectionReason: messages.UnknownSymbol,
-				})
-				return nil
-			}
-			params.SetSymbol(sec.Symbol)
+		}
+		if req.Filter.Side != nil {
+			filters["side"] = req.Filter.Side.Value.String()
 		}
 	}
 

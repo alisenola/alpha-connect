@@ -209,8 +209,8 @@ message OrderCancelResponse {
 
 message OrderMassCancelRequest {
     uint64 requestID = 1;
-    models.Instrument instrument = 2;
-    models.Account account = 3;
+    models.Account account = 2;
+    OrderFilter filter = 3;
 }
 
 message OrderMassCancelResponse {
