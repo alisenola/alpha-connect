@@ -46,7 +46,9 @@ func NewAccount(ID string, securities []*models.Security) *Account {
 	return accnt
 }
 
-func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position) error {
+func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position, balances []*models.Balance) error {
+
+	// TODO balance
 
 	for _, o := range orders {
 		ord := &Order{
@@ -224,22 +226,6 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 			continue
 		}
 		orders = append(orders, o.Order)
-	}
-
-	return orders
-}
-
-func (accnt *Account) GetOpenOrders(instrument *models.Instrument, side *models.Side) []*models.Order {
-	var orders []*models.Order
-	for _, o := range accnt.ordersClID {
-		if (instrument != nil && o.Instrument.SecurityID.Value != instrument.SecurityID.Value) ||
-			(side != nil && o.Side != (*side)) {
-			// pass
-		} else {
-			if o.OrderStatus == models.New || o.OrderStatus == models.PartiallyFilled {
-				orders = append(orders, o.Order)
-			}
-		}
 	}
 
 	return orders

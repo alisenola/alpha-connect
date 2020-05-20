@@ -84,3 +84,9 @@ message Position {
     Instrument instrument = 2;
     double quantity = 3;
 }
+
+message Balance {
+    string accountID = 1;
+    models.Asset asset = 2;
+    double quantity = 3;
+}
