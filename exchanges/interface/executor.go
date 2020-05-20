@@ -16,7 +16,9 @@ type ExchangeExecutor interface {
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
 	OnNewOrderSingleRequest(context actor.Context) error
+	OnNewOrderBulkRequest(context actor.Context) error
 	OnOrderCancelRequest(context actor.Context) error
+	OnOrderMassCancelRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -79,13 +81,25 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 
 	case *messages.NewOrderSingleRequest:
 		if err := state.OnNewOrderSingleRequest(context); err != nil {
-			state.GetLogger().Error("error processing OnNewSingleOrder", log.Error(err))
+			state.GetLogger().Error("error processing OnNewSingleOrderRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.NewOrderBulkRequest:
+		if err := state.OnNewOrderBulkRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnNewOrderBulkRequest", log.Error(err))
 			panic(err)
 		}
 
 	case *messages.OrderCancelRequest:
 		if err := state.OnOrderCancelRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderMassCancelRequest:
+		if err := state.OnOrderMassCancelRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnOrderMassCancelRequest", log.Error(err))
 			panic(err)
 		}
 

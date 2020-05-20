@@ -176,7 +176,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.MinPriceIncrement = activeInstrument.TickSize
 			security.RoundLot = float64(activeInstrument.LotSize)
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-
 			securities = append(securities, &security)
 
 		default:
@@ -228,34 +227,33 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	msg := context.Message().(*messages.OrderStatusRequest)
 
-	orderList := &messages.OrderList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
-		Orders:     nil,
-	}
-
+	filters := make(map[string]interface{})
 	params := bitmex.NewGetOrderParams()
-	if msg.Instrument != nil {
-		if msg.Instrument.Symbol != nil {
-			params.SetSymbol(msg.Instrument.Symbol.Value)
-		} else if msg.Instrument.SecurityID != nil {
-			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
-			if !ok {
-				orderList.Error = "unknown security"
-				context.Respond(orderList)
-				return nil
+	if msg.Filter != nil {
+		if msg.Filter.Instrument != nil {
+			if msg.Filter.Instrument.Symbol != nil {
+				params.SetSymbol(msg.Filter.Instrument.Symbol.Value)
+			} else if msg.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					context.Respond(&messages.OrderList{
+						RequestID:       msg.RequestID,
+						Success:         false,
+						RejectionReason: messages.UnknownSecurityID,
+					})
+					return nil
+				}
+				params.SetSymbol(sec.Symbol)
 			}
-			params.SetSymbol(sec.Symbol)
+		}
+		if msg.Filter.OrderID != nil {
+			filters["orderID"] = msg.Filter.OrderID.Value
+		}
+		if msg.Filter.ClientOrderID != nil {
+			filters["clOrdID"] = msg.Filter.ClientOrderID.Value
 		}
 	}
-	filters := make(map[string]interface{})
-	if msg.OrderID != nil {
-		filters["orderID"] = msg.OrderID.Value
-	}
-	if msg.ClientOrderID != nil {
-		filters["clOrdID"] = msg.ClientOrderID.Value
-	}
+
 	if len(filters) > 0 {
 		params.SetFilters(filters)
 	}
@@ -274,42 +272,63 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			orderList.Error = err.Error()
-			context.Respond(orderList)
+			context.Respond(&messages.OrderList{
+				RequestID:       msg.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				orderList.Error = err.Error()
-				context.Respond(orderList)
+				/*
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+				*/
+				context.Respond(&messages.OrderList{
+					RequestID:       msg.RequestID,
+					Success:         false,
+					RejectionReason: messages.ExchangeAPIError,
+				})
 			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				orderList.Error = err.Error()
-				context.Respond(orderList)
+				/*
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+
+				*/
+				context.Respond(&messages.OrderList{
+					RequestID:       msg.RequestID,
+					Success:         false,
+					RejectionReason: messages.ExchangeAPIError,
+				})
 			}
 			return
 		}
 		var orders []bitmex.Order
 		err = json.Unmarshal(queryResponse.Response, &orders)
 		if err != nil {
-			orderList.Error = err.Error()
-			context.Respond(orderList)
+			context.Respond(&messages.OrderList{
+				RequestID:       msg.RequestID,
+				Success:         false,
+				RejectionReason: messages.ExchangeAPIError,
+			})
 			return
 		}
 
+		var morders []*models.Order
 		for _, o := range orders {
 			sec, ok := state.symbolToSec[o.Symbol]
 			if !ok {
-				orderList.Error = "got order for unknown security"
-				context.Respond(orderList)
+				context.Respond(&messages.OrderList{
+					RequestID:       msg.RequestID,
+					Success:         false,
+					RejectionReason: messages.ExchangeAPIError,
+				})
 				return
 			}
 			ord := models.Order{
@@ -377,9 +396,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				fmt.Println("UNKNOWN TOF", o.TimeInForce)
 			}
 
-			orderList.Orders = append(orderList.Orders, &ord)
+			morders = append(morders, &ord)
 		}
-		context.Respond(orderList)
+		context.Respond(&messages.OrderList{
+			RequestID: msg.RequestID,
+			Success:   true,
+			Orders:    morders,
+		})
 	})
 
 	return nil
@@ -484,70 +507,72 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
+func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
+	request := bitmex.NewPostOrderRequest(order.Instrument.Symbol.Value)
+
+	request.SetOrderQty(order.Quantity)
+	request.SetClOrdID(order.ClientOrderID)
+
+	switch order.OrderSide {
+	case models.Buy:
+		request.SetSide(bitmex.BUY_ORDER_SIDE)
+	case models.Sell:
+		request.SetSide(bitmex.SELL_ORDER_SIDE)
+	default:
+		request.SetSide(bitmex.BUY_ORDER_SIDE)
+	}
+
+	switch order.OrderType {
+	case models.Limit:
+		request.SetOrderType(bitmex.LIMIT)
+	case models.Market:
+		request.SetOrderType(bitmex.MARKET)
+	case models.Stop:
+		request.SetOrderType(bitmex.STOP)
+	case models.StopLimit:
+		request.SetOrderType(bitmex.STOP_LIMIT)
+	case models.LimitIfTouched:
+		request.SetOrderType(bitmex.LIMIT_IF_TOUCHED)
+	case models.MarketIfTouched:
+		request.SetOrderType(bitmex.MARKET_IF_TOUCHED)
+	default:
+		request.SetOrderType(bitmex.LIMIT)
+	}
+
+	switch order.TimeInForce {
+	case models.Session:
+		request.SetTimeInForce(bitmex.TIF_DAY)
+	case models.GoodTillCancel:
+		request.SetTimeInForce(bitmex.GOOD_TILL_CANCEL)
+	case models.ImmediateOrCancel:
+		request.SetTimeInForce(bitmex.IMMEDIATE_OR_CANCEL)
+	case models.FillOrKill:
+		request.SetTimeInForce(bitmex.FILL_OR_KILL)
+	default:
+		request.SetTimeInForce(bitmex.TIF_DAY)
+	}
+
+	if order.Price != nil {
+		request.SetPrice(order.Price.Value)
+	}
+
+	return request
+}
+
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
-	msg := context.Message().(*messages.NewOrderSingleRequest)
-	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+	req := context.Message().(*messages.NewOrderSingleRequest)
+	if req.Order.Instrument == nil || req.Order.Instrument.Symbol == nil {
 		context.Respond(&messages.NewOrderSingleResponse{
-			RequestID:       msg.RequestID,
+			RequestID:       req.RequestID,
 			Success:         false,
 			RejectionReason: messages.UnknownSymbol,
 		})
 		return nil
 	}
-	params := bitmex.NewPostOrderRequest(msg.Instrument.Symbol.Value)
 
-	params.SetOrderQty(msg.Quantity)
-	params.SetClOrdID(msg.ClientOrderID)
+	params := buildPostOrderRequest(req.Order)
 
-	switch msg.OrderSide {
-	case models.Buy:
-		params.SetSide(bitmex.BUY_ORDER_SIDE)
-	case models.Sell:
-		params.SetSide(bitmex.SELL_ORDER_SIDE)
-	default:
-		params.SetSide(bitmex.BUY_ORDER_SIDE)
-	}
-
-	switch msg.OrderType {
-	case models.Limit:
-		params.SetOrderType(bitmex.LIMIT)
-	case models.Market:
-		params.SetOrderType(bitmex.MARKET)
-	case models.Stop:
-		params.SetOrderType(bitmex.STOP)
-	case models.StopLimit:
-		params.SetOrderType(bitmex.STOP_LIMIT)
-	case models.LimitIfTouched:
-		params.SetOrderType(bitmex.LIMIT_IF_TOUCHED)
-	case models.MarketIfTouched:
-		params.SetOrderType(bitmex.MARKET_IF_TOUCHED)
-	default:
-		params.SetOrderType(bitmex.LIMIT)
-	}
-
-	switch msg.TimeInForce {
-	case models.Session:
-		params.SetTimeInForce(bitmex.TIF_DAY)
-	case models.GoodTillCancel:
-		params.SetTimeInForce(bitmex.GOOD_TILL_CANCEL)
-	case models.ImmediateOrCancel:
-		params.SetTimeInForce(bitmex.IMMEDIATE_OR_CANCEL)
-	case models.FillOrKill:
-		params.SetTimeInForce(bitmex.FILL_OR_KILL)
-	default:
-		context.Respond(&messages.NewOrderSingleResponse{
-			RequestID:       msg.RequestID,
-			Success:         false,
-			RejectionReason: messages.UnsupportedOrderCharacteristic,
-		})
-		return nil
-	}
-
-	if msg.Price != nil {
-		params.SetPrice(msg.Price.Value)
-	}
-
-	request, weight, err := bitmex.PostOrder(msg.Account.Credentials, params)
+	request, weight, err := bitmex.PostOrder(req.Account.Credentials, params)
 	if err != nil {
 		return err
 	}
@@ -561,7 +586,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			context.Respond(&messages.NewOrderSingleResponse{
-				RequestID:       msg.RequestID,
+				RequestID:       req.RequestID,
 				Success:         false,
 				RejectionReason: messages.Other,
 			})
@@ -571,13 +596,13 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
 				context.Respond(&messages.NewOrderSingleResponse{
-					RequestID:       msg.RequestID,
+					RequestID:       req.RequestID,
 					Success:         false,
 					RejectionReason: messages.Other,
 				})
 			} else if queryResponse.StatusCode >= 500 {
 				context.Respond(&messages.NewOrderSingleResponse{
-					RequestID:       msg.RequestID,
+					RequestID:       req.RequestID,
 					Success:         false,
 					RejectionReason: messages.Other,
 				})
@@ -588,16 +613,113 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
 			context.Respond(&messages.NewOrderSingleResponse{
-				RequestID:       msg.RequestID,
+				RequestID:       req.RequestID,
 				Success:         false,
 				RejectionReason: messages.Other,
 			})
 			return
 		}
 		context.Respond(&messages.NewOrderSingleResponse{
-			RequestID: msg.RequestID,
+			RequestID: req.RequestID,
 			Success:   true,
 			OrderID:   order.OrderID,
+		})
+	})
+	return nil
+}
+
+func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
+	// Launch futures, and await on each of them
+	req := context.Message().(*messages.NewOrderBulkRequest)
+	if len(req.Orders) == 0 {
+		return nil
+	}
+
+	var params []bitmex.PostOrderRequest
+	// Validation
+	symbol := ""
+	if req.Orders[0].Instrument != nil && req.Orders[0].Instrument.Symbol != nil {
+		symbol = req.Orders[0].Instrument.Symbol.Value
+	}
+	for _, order := range req.Orders {
+		if order.Instrument == nil || order.Instrument.Symbol == nil {
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.UnknownSymbol,
+			})
+			return nil
+		} else if symbol != order.Instrument.Symbol.Value {
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.DifferentSymbols,
+			})
+			return nil
+		}
+		params = append(params, buildPostOrderRequest(order))
+	}
+
+	request, weight, err := bitmex.PostBulkOrder(req.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				context.Respond(&messages.NewOrderBulkResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			} else if queryResponse.StatusCode >= 500 {
+				context.Respond(&messages.NewOrderBulkResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			}
+			return
+		}
+		var orders []bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &orders)
+		if err != nil {
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		var orderIDs []string
+		for _, reqOrder := range req.Orders {
+			for _, order := range orders {
+				if order.ClOrdID != nil && reqOrder.ClientOrderID == *order.ClOrdID {
+					orderIDs = append(orderIDs, order.OrderID)
+					break
+				}
+			}
+		}
+		context.Respond(&messages.NewOrderBulkResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+			OrderIDs:  orderIDs,
 		})
 	})
 	return nil
@@ -661,6 +783,91 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       req.RequestID,
+			Success:         true,
+			RejectionReason: messages.Other,
+		})
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+
+	params := bitmex.NewCancelAllOrdersRequest()
+	if req.Instrument != nil {
+		if req.Instrument.Symbol != nil {
+			if _, ok := state.symbolToSec[req.Instrument.Symbol.Value]; !ok {
+				context.Respond(&messages.OrderMassCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.UnknownSymbol,
+				})
+				return nil
+			}
+			params.SetSymbol(req.Instrument.Symbol.Value)
+		} else if req.Instrument.SecurityID != nil {
+			sec, ok := state.securities[req.Instrument.SecurityID.Value]
+			if !ok {
+				context.Respond(&messages.OrderMassCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.UnknownSymbol,
+				})
+				return nil
+			}
+			params.SetSymbol(sec.Symbol)
+		}
+	}
+
+	request, weight, err := bitmex.CancelAllOrders(req.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				context.Respond(&messages.OrderMassCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			} else if queryResponse.StatusCode >= 500 {
+				context.Respond(&messages.OrderMassCancelResponse{
+					RequestID:       req.RequestID,
+					Success:         false,
+					RejectionReason: messages.Other,
+				})
+			}
+			return
+		}
+		var orders []bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &orders)
+		if err != nil {
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		context.Respond(&messages.OrderMassCancelResponse{
 			RequestID:       req.RequestID,
 			Success:         true,
 			RejectionReason: messages.Other,

@@ -99,6 +99,11 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		res := messages.UnknownSymbol
 		return nil, &res
 	}
+	rawLeavesQuantity := sec.LotPrecision * order.LeavesQuantity
+	if math.Abs(rawLeavesQuantity-math.Round(rawLeavesQuantity)) > 0.00001 {
+		res := messages.IncorrectQuantity
+		return nil, &res
+	}
 	rawCumQty := int64(order.CumQuantity * sec.LotPrecision)
 	if rawCumQty > 0 {
 		res := messages.IncorrectQuantity
@@ -200,6 +205,46 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 	}, nil
 }
 
+func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
+	var orders []*models.Order
+	for _, o := range accnt.ordersClID {
+		if filter != nil && filter.Instrument != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
+			continue
+		}
+		if filter != nil && filter.Side != nil && o.Side != filter.Side.Value {
+			continue
+		}
+		if filter != nil && filter.OrderID != nil && o.OrderID != filter.OrderID.Value {
+			continue
+		}
+		if filter != nil && filter.ClientOrderID != nil && o.ClientOrderID != filter.ClientOrderID.Value {
+			continue
+		}
+		if filter != nil && filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
+			continue
+		}
+		orders = append(orders, o.Order)
+	}
+
+	return orders
+}
+
+func (accnt *Account) GetOpenOrders(instrument *models.Instrument, side *models.Side) []*models.Order {
+	var orders []*models.Order
+	for _, o := range accnt.ordersClID {
+		if (instrument != nil && o.Instrument.SecurityID.Value != instrument.SecurityID.Value) ||
+			(side != nil && o.Side != (*side)) {
+			// pass
+		} else {
+			if o.OrderStatus == models.New || o.OrderStatus == models.PartiallyFilled {
+				orders = append(orders, o.Order)
+			}
+		}
+	}
+
+	return orders
+}
+
 func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, error) {
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
@@ -209,11 +254,15 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	if order.OrderStatus != models.PendingCancel {
+	if order.OrderStatus == models.Canceled {
 		return nil, nil
+	}
+	if order.OrderStatus != models.PendingCancel {
+		return nil, fmt.Errorf("error not pending cancel")
 	}
 
 	order.OrderStatus = models.Canceled
+	order.LeavesQuantity = 0.
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -253,7 +302,7 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	}, nil
 }
 
-func (accnt *Account) ConfirmFill(ID string, tradeID string, quantity float64) (*messages.ExecutionReport, error) {
+func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity float64) (*messages.ExecutionReport, error) {
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
 	if order == nil {
@@ -288,6 +337,8 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, quantity float64) (
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 		TradeID:         &types.StringValue{Value: tradeID},
+		FillPrice:       &types.DoubleValue{Value: price},
+		FillQuantity:    &types.DoubleValue{Value: quantity},
 	}, nil
 }
 
@@ -309,13 +360,4 @@ func (accnt *Account) GetPositions() []*models.Position {
 	}
 
 	return positions
-}
-
-func (accnt *Account) GetOrders() []*models.Order {
-	var orders []*models.Order
-	for _, o := range accnt.ordersClID {
-		orders = append(orders, o.Order)
-	}
-
-	return orders
 }

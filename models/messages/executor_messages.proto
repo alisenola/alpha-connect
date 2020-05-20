@@ -76,16 +76,20 @@ enum ExecutionType {
 }
 
 enum RejectionReason {
-    UnknownSymbol = 0;
-    UnsupportedOrderCharacteristic = 1;
-    IncorrectQuantity = 2;
-    ExchangeClosed = 3;
-    DuplicateOrder = 4;
-    InvalidAccount = 5;
-    TooLateToCancel = 6;
-    UnknownOrder = 7;
-    CancelAlreadyPending = 8;
-    Other = 9;
+    Other = 0;
+    UnknownSymbol = 1;
+    UnknownSecurityID = 2;
+    UnsupportedOrderCharacteristic = 3;
+    IncorrectQuantity = 4;
+    ExchangeClosed = 5;
+    DuplicateOrder = 6;
+    InvalidAccount = 7;
+    TooLateToCancel = 8;
+    UnknownOrder = 9;
+    CancelAlreadyPending = 10;
+    DifferentSymbols = 11;
+    InvalidRequest = 12;
+    ExchangeAPIError = 13;
 }
 
 message ExecutionReport {
@@ -100,24 +104,40 @@ message ExecutionReport {
     double cum_quantity = 10;
     google.protobuf.Timestamp transaction_time = 11;
     google.protobuf.StringValue tradeID = 12;
-    RejectionReason rejection_reason = 13;
+    google.protobuf.DoubleValue fill_price = 13;
+    google.protobuf.DoubleValue fill_quantity = 14;
+    RejectionReason rejection_reason = 15;
+}
+
+message SideValue {
+    models.Side value = 1;
+}
+
+message OrderStatusValue {
+    models.OrderStatus value = 1;
+}
+
+message OrderFilter {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    models.Instrument instrument = 3;
+    SideValue side = 4;
+    OrderStatusValue order_status = 5;
 }
 
 message OrderStatusRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
     actor.PID subscriber = 3;
-    google.protobuf.StringValue orderID = 4;
-    google.protobuf.StringValue client_orderID = 5;
-    models.Instrument instrument = 6;
-    models.Account account = 7;
+    models.Account account = 4;
+    OrderFilter filter = 5;
 }
 
 message OrderList {
     uint64 requestID = 1;
-    uint64 responseID = 2;
-    string error = 3;
-    repeated models.Order orders = 4;
+    bool success = 2;
+    repeated models.Order orders = 3;
+    RejectionReason rejection_reason = 4;
 }
 
 message PositionsRequest {
@@ -137,16 +157,20 @@ message PositionList {
     repeated models.Position positions = 6;
 }
 
-message NewOrderSingleRequest {
-    uint64 requestID = 1;
-    string client_orderID = 2;
-    models.Instrument instrument = 3;
-    models.Account account = 4;
+message NewOrder {
+    string client_orderID = 1;
+    models.Instrument instrument = 2;
     models.OrderType order_type = 5;
     models.Side order_side = 6;
     models.TimeInForce time_in_force = 7;
     double quantity = 8;
     google.protobuf.DoubleValue price = 9;
+}
+
+message NewOrderSingleRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    NewOrder order = 3;
 }
 
 message NewOrderSingleResponse {
@@ -156,8 +180,17 @@ message NewOrderSingleResponse {
     RejectionReason rejection_reason = 4;
 }
 
-message NewBulkOrderRequest {
+message NewOrderBulkRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    repeated NewOrder orders = 3;
+}
 
+message NewOrderBulkResponse {
+    uint64 requestID = 1;
+    bool success = 2;
+    repeated string orderIDs = 3;
+    RejectionReason rejection_reason = 4;
 }
 
 message OrderCancelRequest {
@@ -169,6 +202,18 @@ message OrderCancelRequest {
 }
 
 message OrderCancelResponse {
+    uint64 requestID = 1;
+    bool success = 2;
+    RejectionReason rejection_reason = 3;
+}
+
+message OrderMassCancelRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+}
+
+message OrderMassCancelResponse {
     uint64 requestID = 1;
     bool success = 2;
     RejectionReason rejection_reason = 3;

@@ -201,6 +201,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

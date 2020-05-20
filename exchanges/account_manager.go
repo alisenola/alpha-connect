@@ -71,17 +71,12 @@ func (state *AccountManager) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.NewOrderSingleRequest:
-		if err := state.OnNewOrderSingleRequest(context); err != nil {
-			state.logger.Error("error processing OnNewOrderSingleRequest", log.Error(err))
-			panic(err)
-		}
+	case *messages.NewOrderSingleRequest,
+		*messages.NewOrderBulkRequest,
+		*messages.OrderCancelRequest,
+		*messages.OrderMassCancelRequest:
 
-	case *messages.OrderCancelRequest:
-		if err := state.OnOrderCancelRequest(context); err != nil {
-			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
-			panic(err)
-		}
+		context.Forward(state.listener)
 
 	case *messages.ExecutionReport:
 		if err := state.OnExecutionReport(context); err != nil {
@@ -143,16 +138,6 @@ func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 
 	context.Forward(state.listener)
 
-	return nil
-}
-
-func (state *AccountManager) OnNewOrderSingleRequest(context actor.Context) error {
-	context.Forward(state.listener)
-	return nil
-}
-
-func (state *AccountManager) OnOrderCancelRequest(context actor.Context) error {
-	context.Forward(state.listener)
 	return nil
 }
 

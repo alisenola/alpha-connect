@@ -1,6 +1,7 @@
 package bitmex
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -86,9 +87,21 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.NewOrderBulkRequest:
+		if err := state.OnNewOrderBulkRequest(context); err != nil {
+			state.logger.Error("error processing NewOrderBulkRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderCancelRequest:
 		if err := state.OnOrderCancelRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderMassCancelRequest:
+		if err := state.OnOrderMassCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderMassCancelRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -112,7 +125,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.bitmexExecutor = actor.NewLocalPID("executor/" + constants.BITMEX.Name + "_executor")
 
 	if err := state.subscribeAccount(context); err != nil {
-		return fmt.Errorf("error subscribing to order book: %v", err)
+		return fmt.Errorf("error subscribing to account: %v", err)
 	}
 	// Request securities
 	executor := actor.NewLocalPID("executor")
@@ -152,10 +165,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	// Then fetch orders
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.OrderStatusRequest{
-		OrderID:       nil,
-		ClientOrderID: nil,
-		Instrument:    nil,
-		Account:       state.accountM,
+		Account: state.accountM,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -167,8 +177,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("was expecting OrderList, got %s", reflect.TypeOf(res).String())
 	}
 
-	if orderList.Error != "" {
-		return errors.New(orderList.Error)
+	if !orderList.Success {
+		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
 	// Sync account
@@ -206,14 +216,12 @@ func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 }
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
-	msg := context.Message().(*messages.OrderStatusRequest)
-	// TODO filtering
-	orders := state.account.GetOrders()
+	req := context.Message().(*messages.OrderStatusRequest)
+	orders := state.account.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
-		Orders:     orders,
+		RequestID: req.RequestID,
+		Success:   true,
+		Orders:    orders,
 	})
 	return nil
 }
@@ -221,15 +229,16 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	req.Account = state.accountM
+	// Check order quantity
 	order := &models.Order{
 		OrderID:        "",
-		ClientOrderID:  req.ClientOrderID,
-		Instrument:     req.Instrument,
+		ClientOrderID:  req.Order.ClientOrderID,
+		Instrument:     req.Order.Instrument,
 		OrderStatus:    models.PendingNew,
-		OrderType:      req.OrderType,
-		Side:           req.OrderSide,
-		TimeInForce:    req.TimeInForce,
-		LeavesQuantity: req.Quantity,
+		OrderType:      req.Order.OrderType,
+		Side:           req.Order.OrderSide,
+		TimeInForce:    req.Order.TimeInForce,
+		LeavesQuantity: req.Order.Quantity,
 		CumQuantity:    0,
 	}
 	report, res := state.account.NewOrder(order)
@@ -286,6 +295,104 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 		}
 	}
 
+	return nil
+}
+
+func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error {
+	req := context.Message().(*messages.NewOrderBulkRequest)
+	req.Account = state.accountM
+	reports := make([]*messages.ExecutionReport, 0, len(req.Orders))
+	for _, reqOrder := range req.Orders {
+		order := &models.Order{
+			OrderID:        "",
+			ClientOrderID:  reqOrder.ClientOrderID,
+			Instrument:     reqOrder.Instrument,
+			OrderStatus:    models.PendingNew,
+			OrderType:      reqOrder.OrderType,
+			Side:           reqOrder.OrderSide,
+			TimeInForce:    reqOrder.TimeInForce,
+			LeavesQuantity: reqOrder.Quantity,
+			CumQuantity:    0,
+		}
+		report, res := state.account.NewOrder(order)
+		if res != nil {
+			// Cancel all new order up until now
+			for _, r := range reports {
+				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					return err
+				}
+			}
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+			return nil
+		}
+		if report != nil {
+			reports = append(reports, report)
+		}
+	}
+
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+	fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			for _, r := range reports {
+				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+			context.Respond(&messages.NewOrderBulkResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		response := res.(*messages.NewOrderBulkResponse)
+		context.Respond(response)
+		if response.Success {
+			fmt.Println(len(response.OrderIDs), len(reports))
+			for i, r := range reports {
+				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				if err != nil {
+					panic(err)
+				}
+
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		} else {
+			for _, r := range reports {
+				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		}
+	})
 	return nil
 }
 
@@ -358,6 +465,97 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	return nil
 }
 
+func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	orders := state.account.GetOpenOrders(req.Instrument, nil)
+	if len(orders) == 0 {
+		context.Respond(&messages.OrderMassCancelResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		return nil
+	}
+	var reports []*messages.ExecutionReport
+	for _, o := range orders {
+		report, res := state.account.CancelOrder(o.ClientOrderID)
+		if res != nil {
+			// Reject all cancel order up until now
+			for _, r := range reports {
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					return err
+				}
+			}
+
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+		} else if report != nil {
+			reports = append(reports, report)
+		}
+	}
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+	fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			for _, r := range reports {
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+			context.Respond(&messages.OrderCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+
+			return
+		}
+		response := res.(*messages.OrderMassCancelResponse)
+		context.Respond(response)
+
+		if response.Success {
+			for _, r := range reports {
+				report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		} else {
+			for _, r := range reports {
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		}
+	})
+
+	return nil
+}
+
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*bitmex.WebsocketMessage)
 	switch msg.Message.(type) {
@@ -380,6 +578,8 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 		return executionData.Data[i].TransactTime.Before(executionData.Data[j].TransactTime)
 	})
 	for _, data := range executionData.Data {
+		d, _ := json.Marshal(data)
+		fmt.Println(string(d))
 		switch data.ExecType {
 		case "New":
 			// New order
@@ -399,6 +599,17 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			report, err := state.account.ConfirmCancelOrder(*data.ClOrdID)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
+		case "Trade":
+			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty))
+			if err != nil {
+				return fmt.Errorf("error confirming fill: %v", err)
 			}
 			if report != nil {
 				report.SeqNum = state.seqNum + 1

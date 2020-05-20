@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
+	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -14,25 +15,32 @@ import (
 	"time"
 )
 
-type AccountChecker struct {
-	account  *models.Account
-	security *models.Security
-	seqNum   uint64
-	err      error
+type GetAccntCheckerStats struct {
+	Error   error
+	Reports []*messages.ExecutionReport
 }
 
-func NewAccountCheckerProducer(account *models.Account, security *models.Security) actor.Producer {
+type AccountChecker struct {
+	account    *models.Account
+	instrument *models.Instrument
+	seqNum     uint64
+	err        error
+	reports    []*messages.ExecutionReport
+}
+
+func NewAccountCheckerProducer(account *models.Account, instrument *models.Instrument) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountChecker(account, security)
+		return NewAccountChecker(account, instrument)
 	}
 }
 
-func NewAccountChecker(account *models.Account, security *models.Security) actor.Actor {
+func NewAccountChecker(account *models.Account, instrument *models.Instrument) actor.Actor {
 	return &AccountChecker{
-		account:  account,
-		security: security,
-		seqNum:   0,
-		err:      nil,
+		account:    account,
+		instrument: instrument,
+		seqNum:     0,
+		err:        nil,
+		reports:    nil,
 	}
 }
 
@@ -48,11 +56,10 @@ func (state *AccountChecker) Receive(context actor.Context) {
 			state.err = err
 		}
 
-	case *GetStat:
-		context.Respond(&GetStat{
-			Error:     state.err,
-			Trades:    0,
-			OBUpdates: 0,
+	case *GetAccntCheckerStats:
+		context.Respond(&GetAccntCheckerStats{
+			Error:   state.err,
+			Reports: state.reports,
 		})
 	}
 }
@@ -64,7 +71,6 @@ func (state *AccountChecker) Initialize(context actor.Context) error {
 		RequestID:  0,
 		Subscribe:  true,
 		Subscriber: context.Self(),
-		Instrument: nil,
 		Account:    state.account,
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -76,25 +82,56 @@ func (state *AccountChecker) Initialize(context actor.Context) error {
 	}
 	// Place limit buy for 1 contract
 	res, err = context.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		ClientOrderID: "ord23",
-		Instrument: &models.Instrument{
-			Exchange:   state.security.Exchange,
-			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
-			Symbol:     &types.StringValue{Value: state.security.Symbol},
+		Account: state.account,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    state.instrument,
+			OrderType:     models.Limit,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+			Price:         &types.DoubleValue{Value: 100.},
 		},
-		Account:     state.account,
-		OrderType:   models.Limit,
-		OrderSide:   models.Buy,
-		TimeInForce: models.Session,
-		Quantity:    1.,
-		Price:       &types.DoubleValue{Value: 100.},
 	}, 10*time.Second).Result()
 	if err != nil {
 		return err
 	}
-	response := res.(*messages.NewOrderSingleResponse)
-	if !response.Success {
-		return fmt.Errorf("error creating new order: %s", response.RejectionReason.String())
+	newOrderResponse := res.(*messages.NewOrderSingleResponse)
+	if !newOrderResponse.Success {
+		return fmt.Errorf("error creating new order: %s", newOrderResponse.RejectionReason.String())
+	}
+
+	res, err = context.RequestFuture(executor, &messages.OrderCancelRequest{
+		OrderID:    &types.StringValue{Value: newOrderResponse.OrderID},
+		Instrument: state.instrument,
+		Account:    state.account,
+	}, 5*time.Second).Result()
+	if err != nil {
+		return err
+	}
+	cancelResponse := res.(*messages.OrderCancelResponse)
+	if !cancelResponse.Success {
+		return fmt.Errorf("cancel unsucessful %s", cancelResponse.RejectionReason.String())
+	}
+
+	// Market buy 1 contract
+	res, err = context.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: state.account,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    state.instrument,
+			OrderType:     models.Market,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		return err
+	}
+	newOrderResponse = res.(*messages.NewOrderSingleResponse)
+	if !newOrderResponse.Success {
+		return fmt.Errorf("error creating new order: %s", newOrderResponse.RejectionReason.String())
 	}
 
 	return nil
@@ -102,34 +139,7 @@ func (state *AccountChecker) Initialize(context actor.Context) error {
 
 func (state *AccountChecker) OnExecutionReport(context actor.Context) error {
 	report := context.Message().(*messages.ExecutionReport)
-	fmt.Println(report)
-	switch report.ExecutionType {
-	case messages.New:
-		fmt.Println("CANCEL ORDER")
-		res, err := context.RequestFuture(executor, &messages.OrderCancelRequest{
-			OrderID: &types.StringValue{Value: report.OrderID},
-			Instrument: &models.Instrument{
-				Exchange:   state.security.Exchange,
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
-			},
-			Account: state.account,
-		}, 5*time.Second).Result()
-		if err != nil {
-			return err
-		}
-		response := res.(*messages.OrderCancelResponse)
-		if !response.Success {
-			return fmt.Errorf("cancel unsucessful")
-		}
-	}
-
-	return nil
-}
-
-func (state *AccountChecker) OnOrderCancelReject(context actor.Context) error {
-	msg := context.Message().(*messages.OrderCancelResponse)
-	fmt.Println(msg)
+	state.reports = append(state.reports, report)
 	return nil
 }
 
@@ -154,54 +164,56 @@ func TestBitmexAccount(t *testing.T) {
 		},
 	}
 
+	instrument := &models.Instrument{
+		SecurityID: &types.UInt64Value{Value: 5391998915988476130},
+		Exchange:   &constants.BITMEX,
+		Symbol:     &types.StringValue{Value: "XBTUSD"},
+	}
+
 	exchanges := []*xchangerModels.Exchange{&constants.BITMEX}
 	accounts := []*models.Account{account}
-	securityID := []uint64{
-		5391998915988476130, //XBTUSD
-	}
-	testedSecurities := make(map[uint64]*models.Security)
 	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, accounts)), "executor")
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	securityList, ok := res.(*messages.SecurityList)
-	if !ok {
-		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
-	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
-	}
-
-	for _, s := range securityList.Securities {
-		tested := false
-		for _, secID := range securityID {
-			if secID == s.SecurityID {
-				tested = true
-				break
-			}
-		}
-		if tested {
-			testedSecurities[s.SecurityID] = s
-		}
-	}
-
-	// Test
-	sec, ok := testedSecurities[5391998915988476130]
-	if !ok {
-		t.Fatalf("XBTUSD not found")
-	}
-
-	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(account, sec)))
+	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(account, instrument)))
 	time.Sleep(5 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(accntChecker, &GetStat{}, 10*time.Second).Result()
+	res, err := actor.EmptyRootContext.RequestFuture(accntChecker, &GetAccntCheckerStats{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	stats := res.(*GetStat)
+	stats := res.(*GetAccntCheckerStats)
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
 	}
-	fmt.Println(res)
+	/*
+		if len(stats.Reports) != 4 {
+			t.Fatalf("was expecting 4 reports, got %d", len(stats.Reports))
+		}
+
+	*/
+	if stats.Reports[0].ExecutionType != messages.PendingNew {
+		t.Fatalf("was expecting PendingNew, got %s", stats.Reports[0].ExecutionType.String())
+	}
+	if stats.Reports[1].ExecutionType != messages.New {
+		t.Fatalf("was expecting New, got %s", stats.Reports[1].ExecutionType.String())
+	}
+	if stats.Reports[2].ExecutionType != messages.PendingCancel {
+		t.Fatalf("was expecting PendingCancel, got %s", stats.Reports[2].ExecutionType.String())
+	}
+	if stats.Reports[3].ExecutionType != messages.Canceled {
+		t.Fatalf("was expecting Canceled, got %s", stats.Reports[3].ExecutionType.String())
+	}
+	if stats.Reports[4].ExecutionType != messages.PendingNew {
+		t.Fatalf("was expecting PendingNew, got %s", stats.Reports[4].ExecutionType.String())
+	}
+	if stats.Reports[5].ExecutionType != messages.New {
+		t.Fatalf("was expecting New, got %s", stats.Reports[5].ExecutionType.String())
+	}
+	if stats.Reports[6].ExecutionType != messages.Trade {
+		t.Fatalf("was expecting Trade, got %s", stats.Reports[6].ExecutionType.String())
+	}
+	if stats.Reports[6].OrderStatus != models.Filled {
+		t.Fatalf("was expecting Filled, got %s", stats.Reports[6].ExecutionType.String())
+	}
+	fmt.Println(stats.Reports[6].FillPrice, stats.Reports[6].FillQuantity)
+	fmt.Println(stats.Reports)
 }

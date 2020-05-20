@@ -103,9 +103,21 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.NewOrderBulkRequest:
+		if err := state.OnNewOrderBulkRequest(context); err != nil {
+			state.logger.Error("error processing OnNewOrderBulk", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderCancelRequest:
 		if err := state.OnOrderCancelRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderMassCancelRequest:
+		if err := state.OnOrderMassCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderMassCancelRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -301,18 +313,18 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	msg := context.Message().(*messages.OrderStatusRequest)
 	if msg.Account == nil {
 		context.Respond(&messages.OrderList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "no account specified",
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
 		})
 		return nil
 	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
 		context.Respond(&messages.OrderList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "unknown account",
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
 		})
 		return nil
 	}
@@ -330,12 +342,51 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		})
 		return nil
 	}
+	if msg.Order == nil {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidRequest,
+		})
+		return nil
+	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
 			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderBulkRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.NewOrderBulkResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.NewOrderBulkResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	if len(msg.Orders) == 0 {
+		context.Respond(&messages.NewOrderBulkResponse{
+			RequestID: msg.RequestID,
+			Success:   true,
+			OrderIDs:  nil,
 		})
 		return nil
 	}
@@ -358,6 +409,28 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			Success:         false,
 			RejectionReason: messages.UnknownOrder,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderMassCancelRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
 		})
 		return nil
 	}
