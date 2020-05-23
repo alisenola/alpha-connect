@@ -83,6 +83,8 @@ message Position {
     string accountID = 1;
     Instrument instrument = 2;
     double quantity = 3;
+    bool cross = 4;
+    double cost = 5;
 }
 
 message Balance {

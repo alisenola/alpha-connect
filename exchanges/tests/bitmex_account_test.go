@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
@@ -37,6 +38,7 @@ var testAccount = &models.Account{
 }
 
 var executor *actor.PID
+var bitmexExecutor = actor.NewLocalPID("executor/bitmex_executor")
 
 func TestMain(m *testing.M) {
 	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer([]*xchangerModels.Exchange{&constants.BITMEX}, []*models.Account{testAccount})), "executor")
@@ -562,4 +564,90 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	if !mcResponse.Success {
 		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
+}
+
+func TestAccountListener_OnGetPositions(t *testing.T) {
+	/*
+		// Market buy 1 contract
+		res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+			Account: testAccount,
+			Order: &messages.NewOrder{
+				ClientOrderID: uuid.NewV1().String(),
+				Instrument:    instrument1,
+				OrderType:     models.Market,
+				OrderSide:     models.Sell,
+				TimeInForce:   models.Session,
+				Quantity:      1.,
+			},
+		}, 10*time.Second).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newOrderResponse := res.(*messages.NewOrderSingleResponse)
+		if !newOrderResponse.Success {
+			t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
+		}
+
+	*/
+
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
+		RequestID:  0,
+		Account:    nil,
+		Instrument: nil,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok := res.(*messages.PositionList)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if response.Success {
+		t.Fatalf("was expecting unsucessful request")
+	}
+	if response.RejectionReason != messages.InvalidAccount {
+		t.Fatalf("was expecting %s got %s", messages.InvalidAccount.String(), response.RejectionReason.String())
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Request the same from bitmex directly
+
+	res, err = actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
+		RequestID:  0,
+		Account:    testAccount,
+		Instrument: nil,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok = res.(*messages.PositionList)
+	if !ok {
+		t.Fatalf("was expecting *messages.PositionList, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
+	}
+	fmt.Println(response.Positions)
+
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
+		RequestID:  0,
+		Account:    testAccount,
+		Instrument: nil,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok = res.(*messages.PositionList)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
+	}
+	fmt.Println(response.Positions)
 }

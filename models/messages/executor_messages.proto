@@ -4,6 +4,8 @@ package messages;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+
 import "gitlab.com/alphaticks/alphac/models/market_data.proto";
 import "gitlab.com/alphaticks/alphac/models/security_data.proto";
 import "gitlab.com/alphaticks/alphac/models/account.proto";
@@ -150,11 +152,26 @@ message PositionsRequest {
 
 message PositionList {
     uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Position positions = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message BalancesRequest {
+    uint64 requestID = 1;
     bool subscribe = 2;
     actor.PID subscriber = 3;
-    uint64 responseID = 4;
-    string error = 5;
-    repeated models.Position positions = 6;
+    models.Asset asset = 4;
+    models.Account account = 5;
+}
+
+message BalanceList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Balance balances = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message NewOrder {

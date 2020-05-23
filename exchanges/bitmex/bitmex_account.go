@@ -2,7 +2,6 @@ package bitmex
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -142,7 +141,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 
 	// Instantiate account
-	state.account = account.NewAccount(state.accountM.AccountID, securityList.Securities)
+	state.account = account.NewAccount(state.accountM.AccountID, securityList.Securities, &constants.BITCOIN, 1./0.00000001)
 
 	// Then fetch positions
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.PositionsRequest{
@@ -159,8 +158,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
 	}
 
-	if positionList.Error != "" {
-		return errors.New(positionList.Error)
+	if !positionList.Success {
+		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 
 	// Then fetch orders
@@ -181,10 +180,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
+	// TODO balances btc
 	// Sync account
-	if err := state.account.Sync(orderList.Orders, positionList.Positions); err != nil {
+	if err := state.account.Sync(orderList.Orders, positionList.Positions, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
+
 	state.seqNum = 0
 
 	context.Send(context.Self(), &readSocket{})
@@ -205,11 +206,12 @@ func (state *AccountListener) Clean(context actor.Context) error {
 
 func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.PositionsRequest)
+	// TODO FILTER
 	positions := state.account.GetPositions()
 	context.Respond(&messages.PositionList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Positions:  positions,
 	})
 	return nil
@@ -610,7 +612,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Trade":
-			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty))
+			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty), true)
 			if err != nil {
 				return fmt.Errorf("error confirming fill: %v", err)
 			}

@@ -288,20 +288,22 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.PositionsRequest)
 	if msg.Account == nil {
 		context.Respond(&messages.PositionList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "no account specified",
-			Positions:  nil,
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+			Positions:       nil,
 		})
 		return nil
 	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
 		context.Respond(&messages.PositionList{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Error:      "unknown account",
-			Positions:  nil,
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+			Positions:       nil,
 		})
 		return nil
 	}

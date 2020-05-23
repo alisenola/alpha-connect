@@ -175,6 +175,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.MinPriceIncrement = activeInstrument.TickSize
 			security.RoundLot = float64(activeInstrument.LotSize)
+			security.Multiplier = &types.DoubleValue{Value: float64(activeInstrument.Multiplier) * 0.00000001}
+			security.MakerFee = &types.DoubleValue{Value: activeInstrument.MakerFee}
+			security.TakerFee = &types.DoubleValue{Value: activeInstrument.TakerFee}
+			security.IsInverse = activeInstrument.IsInverse
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 			securities = append(securities, &security)
 
@@ -199,7 +203,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Error:      "",
 		Securities: securities})
-
 	return nil
 }
 
@@ -414,7 +417,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	positionList := &messages.PositionList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Positions:  nil,
 	}
 
@@ -427,7 +430,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		} else if msg.Instrument.SecurityID != nil {
 			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
 			if !ok {
-				positionList.Error = "unknown security"
+				positionList.Success = false
+				positionList.RejectionReason = messages.UnknownSecurityID
 				context.Respond(positionList)
 				return nil
 			}
@@ -452,44 +456,57 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			positionList.Error = err.Error()
+			positionList.Success = false
+			positionList.RejectionReason = messages.Other
 			context.Respond(positionList)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				positionList.Error = err.Error()
+				/*
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+				*/
+				positionList.Success = false
+				positionList.RejectionReason = messages.Other
 				context.Respond(positionList)
 			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				positionList.Error = err.Error()
+				/*
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+				*/
+				positionList.Success = false
+				positionList.RejectionReason = messages.Other
 				context.Respond(positionList)
 			}
 			return
 		}
-
 		var positions []bitmex.Position
 		err = json.Unmarshal(queryResponse.Response, &positions)
 		if err != nil {
-			positionList.Error = err.Error()
+			positionList.Success = false
+			positionList.RejectionReason = messages.Other
 			context.Respond(positionList)
 			return
 		}
 		for _, p := range positions {
+			if p.CurrentQty == 0 {
+				continue
+			}
 			sec, ok := state.symbolToSec[p.Symbol]
 			if !ok {
-				positionList.Error = "got order for unknown security"
+				positionList.Success = false
+				positionList.RejectionReason = messages.Other
 				context.Respond(positionList)
 				return
 			}
+			quantity := float64(p.CurrentQty)
+			cost := float64(p.UnrealisedCost) * 0.00000001
 			pos := &models.Position{
 				AccountID: msg.Account.AccountID,
 				Instrument: &models.Instrument{
@@ -497,7 +514,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					Symbol:     &types.StringValue{Value: p.Symbol},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
-				Quantity: float64(p.CurrentQty),
+				Quantity: quantity,
+				Cost:     cost,
+				Cross:    p.CrossMargin,
 			}
 			positionList.Positions = append(positionList.Positions, pos)
 		}
