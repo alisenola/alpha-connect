@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/models"
@@ -216,9 +215,10 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.marginPrecision) / accnt.marginPrecision
 	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.marginPrecision) / accnt.marginPrecision
 
-	expectedMarginChange := ((1./200. - 1./210.) * 2. * 1.) + fee1 + fee2
-	fmt.Println(accnt.GetMargin(), expectedMarginChange)
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00001 {
+	cost1 := (math.Round(1./200.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	cost2 := (math.Round(1./210.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
+	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
 		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
 	}
 
@@ -238,6 +238,6 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	}
 
 	if math.Abs(accnt.GetMargin()-2*expectedMarginChange) > 0.00000001 {
-		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin())
 	}
 }
