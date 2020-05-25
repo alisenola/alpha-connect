@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
@@ -11,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"math"
 	"os"
 	"reflect"
 	"testing"
@@ -566,35 +566,82 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnGetPositions(t *testing.T) {
-	/*
-		// Market buy 1 contract
-		res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-			Account: testAccount,
-			Order: &messages.NewOrder{
-				ClientOrderID: uuid.NewV1().String(),
-				Instrument:    instrument1,
-				OrderType:     models.Market,
-				OrderSide:     models.Sell,
-				TimeInForce:   models.Session,
-				Quantity:      1.,
-			},
-		}, 10*time.Second).Result()
-		if err != nil {
-			t.Fatal(err)
-		}
+func TestAccountListener_OnBalancesRequest(t *testing.T) {
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
+		RequestID: 0,
+		Account:   testAccount,
+	}, 10*time.Second).Result()
 
-		newOrderResponse := res.(*messages.NewOrderSingleResponse)
-		if !newOrderResponse.Success {
-			t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
-		}
+	if err != nil {
+		t.Fatal(err)
+	}
+	balanceResponse, ok := res.(*messages.BalanceList)
+	if !ok {
+		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+	if !balanceResponse.Success {
+		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
+	}
+	if len(balanceResponse.Balances) != 1 {
+		t.Fatalf("was expecting one balance, got %d", len(balanceResponse.Balances))
+	}
+}
 
-	*/
+func checkBalances(t *testing.T) {
+	// Now check balance
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
+		RequestID: 0,
+		Account:   testAccount,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	balanceResponse, ok := res.(*messages.BalanceList)
+	if !ok {
+		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+	if !balanceResponse.Success {
+		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
+	}
+	if len(balanceResponse.Balances) != 1 {
+		t.Fatalf("was expecting one balance, got %d", len(balanceResponse.Balances))
+	}
+	bal1 := balanceResponse.Balances[0]
+
+	res, err = actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.BalancesRequest{
+		RequestID: 0,
+		Account:   testAccount,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	balanceResponse, ok = res.(*messages.BalanceList)
+	if !ok {
+		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+	if !balanceResponse.Success {
+		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
+	}
+	if len(balanceResponse.Balances) != 1 {
+		t.Fatalf("was expecting one balance, got %d", len(balanceResponse.Balances))
+	}
+	bal2 := balanceResponse.Balances[0]
+
+	if math.Abs(bal1.Quantity-bal2.Quantity) > 0.00001 {
+		t.Fatalf("different balance %f:%f", bal1.Quantity, bal2.Quantity)
+	}
+}
+
+func checkPositions(t *testing.T, instrument *models.Instrument) {
+	// Request the same from bitmex directly
+
+	res, err := actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    nil,
-		Instrument: nil,
+		Account:    testAccount,
+		Instrument: instrument,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -602,52 +649,189 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 	}
 	response, ok := res.(*messages.PositionList)
 	if !ok {
+		t.Fatalf("was expecting *messages.PositionList, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
+	}
+
+	pos1 := response.Positions
+
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
+		RequestID:  0,
+		Account:    testAccount,
+		Instrument: instrument,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok = res.(*messages.PositionList)
+	if !ok {
 		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
 	}
-	if response.Success {
-		t.Fatalf("was expecting unsucessful request")
+	if !response.Success {
+		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
-	if response.RejectionReason != messages.InvalidAccount {
-		t.Fatalf("was expecting %s got %s", messages.InvalidAccount.String(), response.RejectionReason.String())
+	pos2 := response.Positions
+
+	if len(pos1) != len(pos2) {
+		t.Fatalf("got different number of positions: %d %d", len(pos1), len(pos2))
+	}
+
+	for i := range pos1 {
+		p1 := pos1[i]
+		p2 := pos2[i]
+		// Compare the two
+		if math.Abs(p1.Cost-p2.Cost) > 0.000001 {
+			t.Fatalf("different cost %f:%f", p1.Cost, p2.Cost)
+		}
+		if math.Abs(p1.Quantity-p2.Quantity) > 0.00001 {
+			t.Fatalf("different quantity %f:%f", p1.Quantity, p2.Quantity)
+		}
+	}
+}
+
+func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
+
+	// Market buy 2 contracts
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument1,
+			OrderType:     models.Market,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.Session,
+			Quantity:      2.,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newOrderResponse := res.(*messages.NewOrderSingleResponse)
+	if !newOrderResponse.Success {
+		t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
+	}
+
+	time.Sleep(1 * time.Second)
+
+	checkPositions(t, instrument1)
+	checkBalances(t)
+
+	// Market sell 1 contract
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument1,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	checkPositions(t, instrument1)
+	checkBalances(t)
+
+	// Close position
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument1,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	time.Sleep(1 * time.Second)
 
 	// Request the same from bitmex directly
 
-	res, err = actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    testAccount,
-		Instrument: nil,
-	}, 10*time.Second).Result()
+	checkPositions(t, instrument1)
+	checkBalances(t)
+}
 
+func TestAccountListener_OnGetPositions(t *testing.T) {
+
+	// Market buy 1 contract
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument2,
+			OrderType:     models.Market,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.Session,
+			Quantity:      2.,
+		},
+	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, ok = res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.PositionList, got %s", reflect.TypeOf(res).String())
-	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-	fmt.Println(response.Positions)
 
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    testAccount,
-		Instrument: nil,
+	newOrderResponse := res.(*messages.NewOrderSingleResponse)
+	if !newOrderResponse.Success {
+		t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
+	}
+
+	time.Sleep(1 * time.Second)
+
+	checkPositions(t, instrument2)
+	checkBalances(t)
+
+	// Market sell 1 contract
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument2,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+		},
 	}, 10*time.Second).Result()
-
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, ok = res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
+
+	time.Sleep(1 * time.Second)
+
+	checkPositions(t, instrument2)
+	checkBalances(t)
+
+	// Close position
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: testAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument2,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      1.,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-	fmt.Println(response.Positions)
+
+	time.Sleep(1 * time.Second)
+
+	checkPositions(t, instrument2)
+	checkBalances(t)
 }

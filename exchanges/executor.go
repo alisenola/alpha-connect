@@ -91,6 +91,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.BalancesRequest:
+		if err := state.OnBalancesRequest(context); err != nil {
+			state.logger.Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderStatusRequest:
 		if err := state.OnOrderStatusRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderStatusRequest", log.Error(err))
@@ -304,6 +310,33 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			Success:         false,
 			RejectionReason: messages.InvalidAccount,
 			Positions:       nil,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.BalanceList{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+			Balances:        nil,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.BalanceList{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+			Balances:        nil,
 		})
 		return nil
 	}

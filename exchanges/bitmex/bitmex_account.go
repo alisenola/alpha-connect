@@ -74,6 +74,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.BalancesRequest:
+		if err := state.OnBalancesRequest(context); err != nil {
+			state.logger.Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderStatusRequest:
 		if err := state.OnOrderStatusRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
@@ -143,6 +149,28 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	// Instantiate account
 	state.account = account.NewAccount(state.accountM.AccountID, securityList.Securities, &constants.BITCOIN, 1./0.00000001)
 
+	// Then fetch balances
+	res, err = context.RequestFuture(state.bitmexExecutor, &messages.BalancesRequest{
+		Account: state.accountM,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting balances from executor: %v", err)
+	}
+
+	balanceList, ok := res.(*messages.BalanceList)
+	if !ok {
+		return fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !balanceList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	}
+
+	if len(balanceList.Balances) != 1 {
+		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+	}
+
 	// Then fetch positions
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -150,7 +178,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}, 10*time.Second).Result()
 
 	if err != nil {
-		return fmt.Errorf("error getting orders from executor: %v", err)
+		return fmt.Errorf("error getting positions from executor: %v", err)
 	}
 
 	positionList, ok := res.(*messages.PositionList)
@@ -180,9 +208,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
-	// TODO balances btc
+	btcMargin := balanceList.Balances[0].Quantity
 	// Sync account
-	if err := state.account.Sync(orderList.Orders, positionList.Positions, nil); err != nil {
+	if err := state.account.Sync(orderList.Orders, positionList.Positions, nil, btcMargin); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -213,6 +241,20 @@ func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Positions:  positions,
+	})
+	return nil
+}
+
+func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+	// TODO FILTER
+	state.account.Settle()
+	balances := state.account.GetBalances()
+	context.Respond(&messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Balances:   balances,
 	})
 	return nil
 }

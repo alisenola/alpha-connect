@@ -494,6 +494,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			context.Respond(positionList)
 			return
 		}
+		fmt.Println(string(queryResponse.Response))
 		for _, p := range positions {
 			if p.CurrentQty == 0 {
 				continue
@@ -521,6 +522,80 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			positionList.Positions = append(positionList.Positions, pos)
 		}
 		context.Respond(positionList)
+	})
+
+	return nil
+}
+
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+
+	balanceList := &messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Balances:   nil,
+	}
+
+	request, weight, err := bitmex.GetMargin(msg.Account.Credentials, "XBt")
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			balanceList.Success = false
+			balanceList.RejectionReason = messages.Other
+			context.Respond(balanceList)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				/*
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+				*/
+				balanceList.Success = false
+				balanceList.RejectionReason = messages.Other
+				context.Respond(balanceList)
+			} else if queryResponse.StatusCode >= 500 {
+				/*
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+				*/
+				balanceList.Success = false
+				balanceList.RejectionReason = messages.Other
+				context.Respond(balanceList)
+			}
+			return
+		}
+		var margin bitmex.Margin
+		err = json.Unmarshal(queryResponse.Response, &margin)
+		if err != nil {
+			balanceList.Success = false
+			balanceList.RejectionReason = messages.Other
+			context.Respond(balanceList)
+			return
+		}
+		balanceList.Balances = append(balanceList.Balances, &models.Balance{
+			AccountID: msg.Account.AccountID,
+			Asset:     &constants.BITCOIN,
+			Quantity:  float64(margin.WalletBalance) * 0.00000001,
+		})
+
+		context.Respond(balanceList)
 	})
 
 	return nil

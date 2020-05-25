@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/models"
@@ -45,7 +46,7 @@ var BTCUSD_SEC = &models.Security{
 
 func TestAccount_ConfirmFill(t *testing.T) {
 	accnt := NewAccount("a", []*models.Security{ETHUSD_SEC}, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync(nil, nil, nil)
+	err := accnt.Sync(nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,6 +97,29 @@ func TestAccount_ConfirmFill(t *testing.T) {
 	_, err = accnt.ConfirmNewOrder("sell", "sell")
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	fee1 := math.Floor(0.00025*200*2*0.000001*accnt.marginPrecision) / accnt.marginPrecision
+	fee2 := math.Floor(0.00025*210*2*0.000001*accnt.marginPrecision) / accnt.marginPrecision
+	expectedMarginChange := ((210 - 200) * 2 * 0.000001) + fee1 + fee2
+
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.000000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
 	}
 
 	_, err = accnt.ConfirmFill("buy", "k1", 200., 2., false)
@@ -113,15 +137,15 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMarginChange := ((210 - 200) * 1 * 0.000001) + (0.00025 * 200 * 1 * 0.000001) + (0.00025 * 210 * 1 * 0.000001)
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00001 {
+	expectedMarginChange = expectedMarginChange + expectedMarginChange
+	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.000000001 {
 		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
 	}
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	accnt := NewAccount("a", []*models.Security{BTCUSD_SEC}, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync(nil, nil, nil)
+	err := accnt.Sync(nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +198,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = accnt.ConfirmFill("sell", "k1", 210., 1., false)
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 2., false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,8 +213,31 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMarginChange := ((1./200. - 1./210.) * 1. * 1.) + (0.00025 * (1. / 200.) * 1.) + (0.00025 * (1. / 210.) * 1.)
+	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+
+	expectedMarginChange := ((1./200. - 1./210.) * 2. * 1.) + fee1 + fee2
+	fmt.Println(accnt.GetMargin(), expectedMarginChange)
 	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if math.Abs(accnt.GetMargin()-2*expectedMarginChange) > 0.00000001 {
 		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
 	}
 }

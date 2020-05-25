@@ -15,6 +15,7 @@ import (
 type AccountManager struct {
 	execSubscribers map[uint64]*actor.PID
 	trdSubscribers  map[uint64]*actor.PID
+	blcSubscribers  map[uint64]*actor.PID
 	listener        *actor.PID
 	account         *models.Account
 	logger          *log.Logger
@@ -71,6 +72,12 @@ func (state *AccountManager) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.BalancesRequest:
+		if err := state.OnBalancesRequest(context); err != nil {
+			state.logger.Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.NewOrderSingleRequest,
 		*messages.NewOrderBulkRequest,
 		*messages.OrderCancelRequest,
@@ -101,6 +108,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 
 	state.trdSubscribers = make(map[uint64]*actor.PID)
 	state.execSubscribers = make(map[uint64]*actor.PID)
+	state.blcSubscribers = make(map[uint64]*actor.PID)
 	producer := NewAccountListenerProducer(state.account)
 	if producer == nil {
 		return fmt.Errorf("error getting account listener")
@@ -141,6 +149,19 @@ func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *AccountManager) OnBalancesRequest(context actor.Context) error {
+	request := context.Message().(*messages.BalancesRequest)
+
+	if request.Subscribe {
+		state.blcSubscribers[request.RequestID] = request.Subscriber
+		context.Watch(request.Subscriber)
+	}
+
+	context.Forward(state.listener)
+
+	return nil
+}
+
 func (state *AccountManager) OnExecutionReport(context actor.Context) error {
 	report := context.Message().(*messages.ExecutionReport)
 	for _, v := range state.execSubscribers {
@@ -162,6 +183,10 @@ func (state *AccountManager) OnTerminated(context actor.Context) error {
 			delete(state.execSubscribers, k)
 		}
 	}
-
+	for k, v := range state.blcSubscribers {
+		if v.Id == msg.Who.Id {
+			delete(state.blcSubscribers, k)
+		}
+	}
 	return nil
 }

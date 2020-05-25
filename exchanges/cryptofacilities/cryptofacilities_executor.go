@@ -229,6 +229,10 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }

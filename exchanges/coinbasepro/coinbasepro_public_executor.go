@@ -402,6 +402,10 @@ func (state *CoinbaseProPublicExecutor) OnPositionsRequest(context actor.Context
 	return nil
 }
 
+func (state *CoinbaseProPublicExecutor) OnBalancesRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *CoinbaseProPublicExecutor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }

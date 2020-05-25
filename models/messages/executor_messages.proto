@@ -94,6 +94,19 @@ enum RejectionReason {
     ExchangeAPIError = 13;
 }
 
+enum FeeType {
+    Regulatory = 0;
+    Tax = 1;
+    LocalCommission = 2;
+    ExchangeFees = 3;
+}
+
+enum FeeBasis {
+    Absolute = 0;
+    PerUnit = 1;
+    Percentage = 2;
+}
+
 message ExecutionReport {
     uint64 seq_num = 1;
     string orderID = 2;
@@ -108,7 +121,11 @@ message ExecutionReport {
     google.protobuf.StringValue tradeID = 12;
     google.protobuf.DoubleValue fill_price = 13;
     google.protobuf.DoubleValue fill_quantity = 14;
-    RejectionReason rejection_reason = 15;
+    google.protobuf.DoubleValue fee_amount = 15;
+    models.Asset fee_currency = 16;
+    FeeType fee_type = 17;
+    FeeBasis fee_basis = 18;
+    RejectionReason rejection_reason = 19;
 }
 
 message SideValue {

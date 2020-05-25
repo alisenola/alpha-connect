@@ -1,9 +1,32 @@
-package portfolio
+package modeling
 
 import (
 	"math"
 	"math/rand"
 )
+
+type PriceModel interface {
+	Update(feedID uint64, tick uint64, price float64)
+	Progress(tick uint64)
+	GetPrice() float64
+	GetSamplePrices(time uint64, sampleSize int) []float64
+	Frequency() uint64
+}
+
+type TradeModel interface {
+	Update(feedID uint64, tick uint64, size float64)
+	Progress(tick uint64)
+}
+
+type SellTradeModel interface {
+	TradeModel
+	GetSampleMatchBid(time uint64, sampleSize int) []float64
+}
+
+type BuyTradeModel interface {
+	TradeModel
+	GetSampleMatchAsk(time uint64, sampleSize int) []float64
+}
 
 type ConstantPriceModel struct {
 	price        float64
