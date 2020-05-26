@@ -2,6 +2,7 @@ package exchanges
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/exchanges/binance"
 	"gitlab.com/alphaticks/alphac/exchanges/bitfinex"
 	"gitlab.com/alphaticks/alphac/exchanges/bitmex"
@@ -21,10 +22,24 @@ import (
 	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
-func NewAccountListenerProducer(account *models.Account) actor.Producer {
-	switch account.Exchange.ID {
+var Accounts = make(map[string]*account.Account)
+
+func NewAccount(accountInfo *models.Account, securities []*models.Security) *account.Account {
+	if accnt, ok := Accounts[accountInfo.AccountID]; ok {
+		return accnt
+	}
+	switch accountInfo.Exchange.ID {
 	case constants.BITMEX.ID:
-		return func() actor.Actor { return bitmex.NewAccountListener(account) }
+		return account.NewAccount(accountInfo.AccountID, securities, &constants.BITCOIN, 1./0.00000001)
+	default:
+		return nil
+	}
+}
+
+func NewAccountListenerProducer(accountInfo *models.Account, accountPortfolio *account.Account) actor.Producer {
+	switch accountInfo.Exchange.ID {
+	case constants.BITMEX.ID:
+		return func() actor.Actor { return bitmex.NewAccountListener(accountInfo, accountPortfolio) }
 	default:
 		return nil
 	}

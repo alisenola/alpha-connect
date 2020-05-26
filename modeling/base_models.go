@@ -5,6 +5,71 @@ import (
 	"math/rand"
 )
 
+type Model interface {
+	GetSecurityPrice(securityID uint64) float64
+	GetAssetPrice(assetID uint32) float64
+	GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64
+	GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64
+	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
+	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
+}
+
+type MapModel struct {
+	buyTradeModels      map[uint64]BuyTradeModel
+	sellTradeModels     map[uint64]SellTradeModel
+	securityPriceModels map[uint64]PriceModel
+	assetPriceModels    map[uint32]PriceModel
+}
+
+func NewMapModel() *MapModel {
+	return &MapModel{
+		buyTradeModels:      make(map[uint64]BuyTradeModel),
+		sellTradeModels:     make(map[uint64]SellTradeModel),
+		securityPriceModels: make(map[uint64]PriceModel),
+		assetPriceModels:    make(map[uint32]PriceModel),
+	}
+}
+
+func (m *MapModel) GetSecurityPrice(securityID uint64) float64 {
+	return m.securityPriceModels[securityID].GetPrice()
+}
+
+func (m *MapModel) GetAssetPrice(assetID uint32) float64 {
+	return m.assetPriceModels[assetID].GetPrice()
+}
+
+func (m *MapModel) GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64 {
+	return m.assetPriceModels[assetID].GetSamplePrices(time, sampleSize)
+}
+
+func (m *MapModel) GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64 {
+	return m.securityPriceModels[securityID].GetSamplePrices(time, sampleSize)
+}
+
+func (m *MapModel) GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64 {
+	return m.sellTradeModels[securityID].GetSampleMatchBid(time, sampleSize)
+}
+
+func (m *MapModel) GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64 {
+	return m.buyTradeModels[securityID].GetSampleMatchAsk(time, sampleSize)
+}
+
+func (m *MapModel) SetSecurityPriceModel(securityID uint64, model PriceModel) {
+	m.securityPriceModels[securityID] = model
+}
+
+func (m *MapModel) SetAssetPriceModel(assetID uint32, model PriceModel) {
+	m.assetPriceModels[assetID] = model
+}
+
+func (m *MapModel) SetBuyTradeModel(securityID uint64, model BuyTradeModel) {
+	m.buyTradeModels[securityID] = model
+}
+
+func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
+	m.sellTradeModels[securityID] = model
+}
+
 type PriceModel interface {
 	Update(feedID uint64, tick uint64, price float64)
 	Progress(tick uint64)

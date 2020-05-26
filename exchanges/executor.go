@@ -16,15 +16,16 @@ import (
 // He is the main part of the whole software..
 //
 type Executor struct {
-	exchanges       []*xchangerModels.Exchange
-	accounts        []*models.Account
-	accountManagers map[string]*actor.PID
-	executors       map[uint32]*actor.PID       // A map from exchange ID to executor
-	securities      map[uint64]*models.Security // A map from security ID to security
-	instruments     map[uint64]*actor.PID       // A map from security ID to instrument listener
-	slSubscribers   map[uint64]*actor.PID       // A map from request ID to security list subscribers
-	execSubscribers map[uint64]*actor.PID       // A map from request ID to execution report subscribers
-	logger          *log.Logger
+	exchanges         []*xchangerModels.Exchange
+	accounts          []*models.Account
+	accountPortfolios map[string]*actor.PID
+	accountManagers   map[string]*actor.PID
+	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
+	securities        map[uint64]*models.Security // A map from security ID to security
+	instruments       map[uint64]*actor.PID       // A map from security ID to instrument listener
+	slSubscribers     map[uint64]*actor.PID       // A map from request ID to security list subscribers
+	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
+	logger            *log.Logger
 }
 
 func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*models.Account) actor.Producer {
@@ -144,6 +145,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.instruments = make(map[uint64]*actor.PID)
 	state.slSubscribers = make(map[uint64]*actor.PID)
+
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.exchanges {
@@ -153,18 +155,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		props := actor.PropsFromProducer(producer)
 		state.executors[exch.ID], _ = context.SpawnNamed(props, exch.Name+"_executor")
-	}
-
-	// Spawn all account listeners
-	state.accountManagers = make(map[string]*actor.PID)
-	for _, account := range state.accounts {
-		producer := NewAccountManagerProducer(account)
-		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", account.Exchange.Name)
-		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[account.AccountID] = context.Spawn(props)
 	}
 
 	// Request securities for each one of them
@@ -198,6 +188,30 @@ func (state *Executor) Initialize(context actor.Context) error {
 			state.securities[s.SecurityID] = s
 		}
 	}
+
+	var filter = func(ID uint32) []*models.Security {
+		var secs []*models.Security
+		for _, s := range state.securities {
+			if s.Exchange.ID == ID {
+				secs = append(secs, s)
+			}
+		}
+		return secs
+	}
+
+	// Spawn all account listeners
+	state.accountManagers = make(map[string]*actor.PID)
+	for _, accountInfo := range state.accounts {
+		accountPortfolio := NewAccount(accountInfo, filter(accountInfo.Exchange.ID))
+		producer := NewAccountManagerProducer(accountInfo, accountPortfolio)
+		if producer == nil {
+			return fmt.Errorf("unknown exchange %s", accountInfo.Exchange.Name)
+		}
+		props := actor.PropsFromProducer(producer).WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		state.accountManagers[accountInfo.AccountID] = context.Spawn(props)
+	}
+
 	return nil
 }
 

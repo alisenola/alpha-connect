@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"reflect"
@@ -13,24 +14,26 @@ import (
 // to actors who subscribed
 
 type AccountManager struct {
-	execSubscribers map[uint64]*actor.PID
-	trdSubscribers  map[uint64]*actor.PID
-	blcSubscribers  map[uint64]*actor.PID
-	listener        *actor.PID
-	account         *models.Account
-	logger          *log.Logger
+	execSubscribers  map[uint64]*actor.PID
+	trdSubscribers   map[uint64]*actor.PID
+	blcSubscribers   map[uint64]*actor.PID
+	listener         *actor.PID
+	accountInfo      *models.Account
+	accountPortfolio *account.Account
+	logger           *log.Logger
 }
 
-func NewAccountManagerProducer(account *models.Account) actor.Producer {
+func NewAccountManagerProducer(accountInfo *models.Account, accountPortfolio *account.Account) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(account)
+		return NewAccountManager(accountInfo, accountPortfolio)
 	}
 }
 
-func NewAccountManager(account *models.Account) actor.Actor {
+func NewAccountManager(accountInfo *models.Account, accountPortfolio *account.Account) actor.Actor {
 	return &AccountManager{
-		account: account,
-		logger:  nil,
+		accountInfo:      accountInfo,
+		accountPortfolio: accountPortfolio,
+		logger:           nil,
 	}
 }
 
@@ -109,7 +112,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 	state.trdSubscribers = make(map[uint64]*actor.PID)
 	state.execSubscribers = make(map[uint64]*actor.PID)
 	state.blcSubscribers = make(map[uint64]*actor.PID)
-	producer := NewAccountListenerProducer(state.account)
+	producer := NewAccountListenerProducer(state.accountInfo, state.accountPortfolio)
 	if producer == nil {
 		return fmt.Errorf("error getting account listener")
 	}

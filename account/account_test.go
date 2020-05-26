@@ -9,24 +9,7 @@ import (
 	"testing"
 )
 
-var ETHUSD_SEC = &models.Security{
-	SecurityID:        0,
-	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          &constants.BITMEX,
-	Symbol:            "ETHUSD",
-	MinPriceIncrement: 0.05,
-	RoundLot:          1,
-	Underlying:        &constants.ETHEREUM,
-	QuoteCurrency:     &constants.DOLLAR,
-	Enabled:           true,
-	IsInverse:         false,
-	MakerFee:          &types.DoubleValue{Value: -0.00025},
-	TakerFee:          &types.DoubleValue{Value: 0.00075},
-	Multiplier:        &types.DoubleValue{Value: 0.000001},
-	MaturityDate:      nil,
-}
-
-var BTCUSD_SEC = &models.Security{
+var BTCUSD_PERP_SEC = &models.Security{
 	SecurityID:        0,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.BITMEX,
@@ -43,8 +26,57 @@ var BTCUSD_SEC = &models.Security{
 	MaturityDate:      nil,
 }
 
+var ETHUSD_PERP_SEC = &models.Security{
+	SecurityID:        1,
+	SecurityType:      enum.SecurityType_CRYPTO_PERP,
+	Exchange:          &constants.BITMEX,
+	Symbol:            "ETHUSD",
+	MinPriceIncrement: 0.05,
+	RoundLot:          1,
+	Underlying:        &constants.ETHEREUM,
+	QuoteCurrency:     &constants.DOLLAR,
+	Enabled:           true,
+	IsInverse:         false,
+	MakerFee:          &types.DoubleValue{Value: -0.00025},
+	TakerFee:          &types.DoubleValue{Value: 0.00075},
+	Multiplier:        &types.DoubleValue{Value: 0.000001},
+	MaturityDate:      nil,
+}
+
+var BTCUSD_SPOT_SEC = &models.Security{
+	SecurityID:        2,
+	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
+	Exchange:          &constants.BITSTAMP,
+	Symbol:            "BTCUSD",
+	MinPriceIncrement: 0.05,
+	RoundLot:          0.0001,
+	Underlying:        &constants.BITCOIN,
+	QuoteCurrency:     &constants.DOLLAR,
+	Enabled:           true,
+	IsInverse:         false,
+	MakerFee:          &types.DoubleValue{Value: 0.0025},
+	TakerFee:          &types.DoubleValue{Value: 0.0025},
+	MaturityDate:      nil,
+}
+
+var ETHUSD_SPOT_SEC = &models.Security{
+	SecurityID:        3,
+	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
+	Exchange:          &constants.BITSTAMP,
+	Symbol:            "ETHUSD",
+	MinPriceIncrement: 0.05,
+	RoundLot:          0.0001,
+	Underlying:        &constants.ETHEREUM,
+	QuoteCurrency:     &constants.DOLLAR,
+	Enabled:           true,
+	IsInverse:         false,
+	MakerFee:          &types.DoubleValue{Value: 0.0025},
+	TakerFee:          &types.DoubleValue{Value: 0.0025},
+	MaturityDate:      nil,
+}
+
 func TestAccount_ConfirmFill(t *testing.T) {
-	accnt := NewAccount("a", []*models.Security{ETHUSD_SEC}, &constants.BITCOIN, 1./0.00000001)
+	accnt := NewAccount("a", []*models.Security{ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
 	err := accnt.Sync(nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +87,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 0},
+			SecurityID: &types.UInt64Value{Value: 1},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "ETHUSD"},
 		},
@@ -65,6 +97,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		TimeInForce:    models.Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -79,7 +112,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 0},
+			SecurityID: &types.UInt64Value{Value: 1},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "ETHUSD"},
 		},
@@ -89,6 +122,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		TimeInForce:    models.Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -143,7 +177,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
-	accnt := NewAccount("a", []*models.Security{BTCUSD_SEC}, &constants.BITCOIN, 1./0.00000001)
+	accnt := NewAccount("a", []*models.Security{BTCUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
 	err := accnt.Sync(nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
@@ -164,6 +198,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		TimeInForce:    models.Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -188,6 +223,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		TimeInForce:    models.Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())

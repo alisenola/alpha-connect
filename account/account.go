@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
+	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -24,11 +25,12 @@ type Security interface {
 	UpdateAskOrderQuantity(ID string, qty float64)
 	GetLotPrecision() float64
 	GetInstrument() *models.Instrument
-	AddSampleValueChange(time uint64, values []float64)
-	GetELROnCancelBid(ID string, time uint64, values []float64, value float64) float64
-	GetELROnCancelAsk(ID string, time uint64, values []float64, value float64) float64
-	GetELROnBidChange(ID string, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder)
-	GetELROnAskChange(ID string, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
+	Clear()
+	AddSampleValueChange(model modeling.Model, time uint64, values []float64)
+	GetELROnCancelBid(ID string, model modeling.Model, time uint64, values []float64, value float64) float64
+	GetELROnCancelAsk(ID string, model modeling.Model, time uint64, values []float64, value float64) float64
+	GetELROnLimitBidChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder)
+	GetELROnLimitAskChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
 }
 
 type Account struct {
@@ -60,7 +62,7 @@ func NewAccount(ID string, securities []*models.Security, marginCurrency *xchang
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
-			accnt.securities[s.SecurityID] = NewMarginSecurity(s, marginPrecision, nil, nil, nil, nil, 0)
+			accnt.securities[s.SecurityID] = NewMarginSecurity(s, marginCurrency)
 			accnt.positions[s.SecurityID] = &Position{
 				inverse:         s.IsInverse,
 				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement),
@@ -70,8 +72,8 @@ func NewAccount(ID string, securities []*models.Security, marginCurrency *xchang
 				makerFee:        s.MakerFee.Value,
 				takerFee:        s.TakerFee.Value,
 			}
-		}
-		if s.SecurityType == enum.SecurityType_CRYPTO_SPOT {
+		case enum.SecurityType_CRYPTO_SPOT:
+			accnt.securities[s.SecurityID] = NewSpotSecurity(s)
 			accnt.assets[s.Underlying.ID] = s.Underlying
 			accnt.assets[s.QuoteCurrency.ID] = s.QuoteCurrency
 		}
@@ -84,6 +86,10 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position,
 
 	accnt.margin = int64(math.Round(margin * accnt.marginPrecision))
 
+	for _, s := range accnt.securities {
+		s.Clear()
+	}
+
 	for _, o := range orders {
 		ord := &Order{
 			Order:          o,
@@ -91,6 +97,15 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position,
 		}
 		accnt.ordersID[o.OrderID] = ord
 		accnt.ordersClID[o.ClientOrderID] = ord
+
+		// Add orders to security
+		if (o.OrderStatus == models.New || o.OrderStatus == models.PartiallyFilled) && o.OrderType == models.Limit {
+			if o.Side == models.Buy {
+				accnt.securities[o.Instrument.SecurityID.Value].AddBidOrder(o.ClientOrderID, o.Price.Value, o.LeavesQuantity, 0)
+			} else {
+				accnt.securities[o.Instrument.SecurityID.Value].AddAskOrder(o.ClientOrderID, o.Price.Value, o.LeavesQuantity, 0)
+			}
+		}
 	}
 
 	// Reset positions
@@ -185,9 +200,9 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
 			// TODO price, queue
-			accnt.securities[order.Instrument.SecurityID.Value].AddBidOrder(order.ClientOrderID, 0., order.LeavesQuantity, 0)
+			accnt.securities[order.Instrument.SecurityID.Value].AddBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		} else {
-			accnt.securities[order.Instrument.SecurityID.Value].AddAskOrder(order.ClientOrderID, 0., order.LeavesQuantity, 0)
+			accnt.securities[order.Instrument.SecurityID.Value].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		}
 	}
 

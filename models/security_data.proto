@@ -77,6 +77,7 @@ message Order {
     TimeInForce time_in_force = 7;
     double leaves_quantity = 8;
     double cum_quantity = 9;
+    google.protobuf.DoubleValue price = 10;
 }
 
 message Position {

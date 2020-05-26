@@ -16,29 +16,29 @@ import (
 )
 
 type AccountListener struct {
-	account         *account.Account
-	accountM        *models.Account
-	seqNum          uint64
-	bitmexExecutor  *actor.PID
-	ws              *bitmex.Websocket
-	executorManager *actor.PID
-	logger          *log.Logger
+	accountInfo      *models.Account
+	accountPortfolio *account.Account
+	seqNum           uint64
+	bitmexExecutor   *actor.PID
+	ws               *bitmex.Websocket
+	executorManager  *actor.PID
+	logger           *log.Logger
 }
 
-func NewAccountListenerProducer(account *models.Account) actor.Producer {
+func NewAccountListenerProducer(accountInfo *models.Account, accountPortfolio *account.Account) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account)
+		return NewAccountListener(accountInfo, accountPortfolio)
 	}
 }
 
-func NewAccountListener(account *models.Account) actor.Actor {
+func NewAccountListener(accountInfo *models.Account, accountPortfolio *account.Account) actor.Actor {
 	return &AccountListener{
-		account:         nil,
-		accountM:        account,
-		seqNum:          0,
-		ws:              nil,
-		executorManager: nil,
-		logger:          nil,
+		accountInfo:      accountInfo,
+		accountPortfolio: accountPortfolio,
+		seqNum:           0,
+		ws:               nil,
+		executorManager:  nil,
+		logger:           nil,
 	}
 }
 
@@ -146,12 +146,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting securities: %s", securityList.Error)
 	}
 
-	// Instantiate account
-	state.account = account.NewAccount(state.accountM.AccountID, securityList.Securities, &constants.BITCOIN, 1./0.00000001)
-
 	// Then fetch balances
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.BalancesRequest{
-		Account: state.accountM,
+		Account: state.accountInfo,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -174,7 +171,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	// Then fetch positions
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.PositionsRequest{
 		Instrument: nil,
-		Account:    state.accountM,
+		Account:    state.accountInfo,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -192,7 +189,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	// Then fetch orders
 	res, err = context.RequestFuture(state.bitmexExecutor, &messages.OrderStatusRequest{
-		Account: state.accountM,
+		Account: state.accountInfo,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -210,7 +207,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	btcMargin := balanceList.Balances[0].Quantity
 	// Sync account
-	if err := state.account.Sync(orderList.Orders, positionList.Positions, nil, btcMargin); err != nil {
+	if err := state.accountPortfolio.Sync(orderList.Orders, positionList.Positions, nil, btcMargin); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -235,7 +232,7 @@ func (state *AccountListener) Clean(context actor.Context) error {
 func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.PositionsRequest)
 	// TODO FILTER
-	positions := state.account.GetPositions()
+	positions := state.accountPortfolio.GetPositions()
 	context.Respond(&messages.PositionList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
@@ -248,8 +245,8 @@ func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
 	// TODO FILTER
-	state.account.Settle()
-	balances := state.account.GetBalances()
+	state.accountPortfolio.Settle()
+	balances := state.accountPortfolio.GetBalances()
 	context.Respond(&messages.BalanceList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
@@ -261,7 +258,7 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderStatusRequest)
-	orders := state.account.GetOrders(req.Filter)
+	orders := state.accountPortfolio.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{
 		RequestID: req.RequestID,
 		Success:   true,
@@ -272,7 +269,7 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 
 func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
-	req.Account = state.accountM
+	req.Account = state.accountInfo
 	// Check order quantity
 	order := &models.Order{
 		OrderID:        "",
@@ -285,7 +282,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 		LeavesQuantity: req.Order.Quantity,
 		CumQuantity:    0,
 	}
-	report, res := state.account.NewOrder(order)
+	report, res := state.accountPortfolio.NewOrder(order)
 	if res != nil {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       req.RequestID,
@@ -301,7 +298,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 			fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
 			context.AwaitFuture(fut, func(res interface{}, err error) {
 				if err != nil {
-					report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
+					report, err := state.accountPortfolio.RejectNewOrder(order.ClientOrderID, messages.Other)
 					if err != nil {
 						panic(err)
 					}
@@ -321,14 +318,14 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 				context.Respond(response)
 
 				if response.Success {
-					nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+					nReport, _ := state.accountPortfolio.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
 					if nReport != nil {
 						nReport.SeqNum = state.seqNum + 1
 						state.seqNum += 1
 						context.Send(context.Parent(), nReport)
 					}
 				} else {
-					nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
+					nReport, _ := state.accountPortfolio.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
 					if nReport != nil {
 						nReport.SeqNum = state.seqNum + 1
 						state.seqNum += 1
@@ -344,7 +341,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 
 func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderBulkRequest)
-	req.Account = state.accountM
+	req.Account = state.accountInfo
 	reports := make([]*messages.ExecutionReport, 0, len(req.Orders))
 	for _, reqOrder := range req.Orders {
 		order := &models.Order{
@@ -358,11 +355,11 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			LeavesQuantity: reqOrder.Quantity,
 			CumQuantity:    0,
 		}
-		report, res := state.account.NewOrder(order)
+		report, res := state.accountPortfolio.NewOrder(order)
 		if res != nil {
 			// Cancel all new order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.accountPortfolio.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					return err
 				}
@@ -388,7 +385,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
-				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.accountPortfolio.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					panic(err)
 				}
@@ -411,7 +408,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		if response.Success {
 			fmt.Println(len(response.OrderIDs), len(reports))
 			for i, r := range reports {
-				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				report, err := state.accountPortfolio.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
 				if err != nil {
 					panic(err)
 				}
@@ -424,7 +421,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			}
 		} else {
 			for _, r := range reports {
-				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.accountPortfolio.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					panic(err)
 				}
@@ -448,7 +445,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	} else if req.OrderID != nil {
 		ID = req.OrderID.Value
 	}
-	report, res := state.account.CancelOrder(ID)
+	report, res := state.accountPortfolio.CancelOrder(ID)
 	if res != nil {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
@@ -462,7 +459,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
 			context.AwaitFuture(fut, func(res interface{}, err error) {
 				if err != nil {
-					report, err := state.account.RejectCancelOrder(ID, messages.Other)
+					report, err := state.accountPortfolio.RejectCancelOrder(ID, messages.Other)
 					if err != nil {
 						panic(err)
 					}
@@ -482,7 +479,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 				context.Respond(response)
 
 				if response.Success {
-					report, err := state.account.ConfirmCancelOrder(ID)
+					report, err := state.accountPortfolio.ConfirmCancelOrder(ID)
 					if err != nil {
 						panic(err)
 					}
@@ -492,7 +489,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 						context.Send(context.Parent(), report)
 					}
 				} else {
-					report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
+					report, err := state.accountPortfolio.RejectCancelOrder(ID, response.RejectionReason)
 					if err != nil {
 						panic(err)
 					}
@@ -511,7 +508,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 
 func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
-	orders := state.account.GetOrders(req.Filter)
+	orders := state.accountPortfolio.GetOrders(req.Filter)
 	if len(orders) == 0 {
 		context.Respond(&messages.OrderMassCancelResponse{
 			RequestID: req.RequestID,
@@ -524,11 +521,11 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
 			continue
 		}
-		report, res := state.account.CancelOrder(o.ClientOrderID)
+		report, res := state.accountPortfolio.CancelOrder(o.ClientOrderID)
 		if res != nil {
 			// Reject all cancel order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.accountPortfolio.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					return err
 				}
@@ -552,7 +549,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
-				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.accountPortfolio.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					panic(err)
 				}
@@ -575,7 +572,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 
 		if response.Success {
 			for _, r := range reports {
-				report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
+				report, err := state.accountPortfolio.ConfirmCancelOrder(r.ClientOrderID.Value)
 				if err != nil {
 					panic(err)
 				}
@@ -587,7 +584,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 			}
 		} else {
 			for _, r := range reports {
-				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.accountPortfolio.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
 					panic(err)
 				}
@@ -633,7 +630,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			if data.ClOrdID == nil {
 				return fmt.Errorf("got an order with nil ClOrdID")
 			}
-			report, err := state.account.ConfirmNewOrder(*data.ClOrdID, data.OrderID)
+			report, err := state.accountPortfolio.ConfirmNewOrder(*data.ClOrdID, data.OrderID)
 			if err != nil {
 				return fmt.Errorf("error confirming new order: %v", err)
 			}
@@ -643,7 +640,17 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 				context.Send(context.Parent(), report)
 			}
 		case "Canceled":
-			report, err := state.account.ConfirmCancelOrder(*data.ClOrdID)
+			report, err := state.accountPortfolio.ConfirmCancelOrder(*data.ClOrdID)
+			if err != nil {
+				return fmt.Errorf("error confirming cancel order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+		case "Rejected":
+			report, err := state.accountPortfolio.RejectNewOrder(*data.ClOrdID, messages.Other)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
 			}
@@ -654,7 +661,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Trade":
-			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty), true)
+			report, err := state.accountPortfolio.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty), true)
 			if err != nil {
 				return fmt.Errorf("error confirming fill: %v", err)
 			}
@@ -681,7 +688,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error connecting to bitmex websocket: %v", err)
 	}
 
-	if err := ws.Auth(state.accountM.Credentials); err != nil {
+	if err := ws.Auth(state.accountInfo.Credentials); err != nil {
 		return fmt.Errorf("error sending auth request: %v", err)
 	}
 
