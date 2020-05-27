@@ -2,6 +2,7 @@ package account
 
 import (
 	"gitlab.com/alphaticks/alphac/modeling"
+	"gitlab.com/alphaticks/alphac/models"
 	"math"
 )
 
@@ -125,4 +126,15 @@ func (accnt *Account) GetAvailableMargin(model modeling.Model, leverage float64)
 	}
 
 	return math.Max(availableMargin, 0.)
+}
+
+// TODO improve speed of that one, called often
+func (accnt *Account) UpdateQueue(orderID string, queue float64) {
+	if o, ok := accnt.ordersClID[orderID]; ok {
+		if o.Side == models.Buy {
+			accnt.securities[o.Instrument.SecurityID.Value].UpdateBidOrderQueue(orderID, queue)
+		} else {
+			accnt.securities[o.Instrument.SecurityID.Value].UpdateAskOrderQueue(orderID, queue)
+		}
+	}
 }

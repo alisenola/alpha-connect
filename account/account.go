@@ -23,6 +23,8 @@ type Security interface {
 	RemoveAskOrder(ID string)
 	UpdateBidOrderQuantity(ID string, qty float64)
 	UpdateAskOrderQuantity(ID string, qty float64)
+	UpdateBidOrderQueue(ID string, queue float64)
+	UpdateAskOrderQueue(ID string, queue float64)
 	UpdatePositionSize(size float64)
 	GetLotPrecision() float64
 	GetInstrument() *models.Instrument
@@ -447,6 +449,12 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	return er, nil
 }
 
+func (accnt *Account) Settle() {
+	accnt.balances[accnt.marginCurrency.ID] += float64(accnt.margin) / accnt.marginPrecision
+	// TODO check less than zero
+	accnt.margin = 0
+}
+
 func (accnt *Account) GetPositions() []*models.Position {
 	var positions []*models.Position
 	for k, pos := range accnt.positions {
@@ -461,12 +469,6 @@ func (accnt *Account) GetPositions() []*models.Position {
 	return positions
 }
 
-func (accnt *Account) Settle() {
-	accnt.balances[accnt.marginCurrency.ID] += float64(accnt.margin) / accnt.marginPrecision
-	// TODO check less than zero
-	accnt.margin = 0
-}
-
 func (accnt *Account) GetBalances() []*models.Balance {
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
@@ -478,6 +480,15 @@ func (accnt *Account) GetBalances() []*models.Balance {
 	}
 
 	return balances
+}
+
+func (accnt *Account) GetPositionSize(securityID uint64) float64 {
+	if pos, ok := accnt.positions[securityID]; ok {
+		// TODO mutex ?
+		return float64(pos.rawSize) / pos.lotPrecision
+	} else {
+		return 0.
+	}
 }
 
 func (accnt *Account) GetMargin() float64 {

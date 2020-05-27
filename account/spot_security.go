@@ -141,6 +141,20 @@ func (sec *SpotSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
 	sec.Unlock()
 }
 
+func (sec *SpotSecurity) UpdateBidOrderQueue(ID string, queue float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openBidOrders[ID].Queue = queue
+	sec.Unlock()
+}
+
+func (sec *SpotSecurity) UpdateAskOrderQueue(ID string, queue float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openAskOrders[ID].Queue = queue
+	sec.Unlock()
+}
+
 func (sec *SpotSecurity) UpdatePositionSize(_ float64) {}
 
 func (sec *SpotSecurity) GetPosition() *models.Position {

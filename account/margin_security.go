@@ -66,6 +66,8 @@ func (sec *MarginSecurity) AddBidOrder(ID string, price, quantity, queue float64
 		price = 1. / price
 		exp = -1
 	}
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 	N := len(sec.sampleValueChange)
 	sampleValueChange := sec.sampleValueChange
 	sampleMatchBid := sec.sampleMatchBid
@@ -73,8 +75,8 @@ func (sec *MarginSecurity) AddBidOrder(ID string, price, quantity, queue float64
 	sampleMarginPrice := sec.sampleMarginPrice
 	for i := 0; i < N; i++ {
 		contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * sec.Multiplier.Value
-		fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+		contractMarginValue := contractChange * price * mul
+		fee := math.Abs(contractMarginValue) * makerFee
 
 		// Compute the cost
 		cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -95,6 +97,8 @@ func (sec *MarginSecurity) AddAskOrder(ID string, price, quantity, queue float64
 		price = 1. / price
 		exp = -1
 	}
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 	sampleValueChange := sec.sampleValueChange
 	sampleMatchAsk := sec.sampleMatchAsk
 	sampleSecurityPrice := sec.sampleSecurityPrice
@@ -102,8 +106,8 @@ func (sec *MarginSecurity) AddAskOrder(ID string, price, quantity, queue float64
 	N := len(sampleValueChange)
 	for i := 0; i < N; i++ {
 		contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * sec.Multiplier.Value
-		fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+		contractMarginValue := contractChange * price * mul
+		fee := math.Abs(contractMarginValue) * makerFee
 
 		// Compute the cost
 		cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -125,6 +129,8 @@ func (sec *MarginSecurity) RemoveBidOrder(ID string) {
 	}
 	queue := o.Queue
 	quantity := o.Quantity
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 	sampleValueChange := sec.sampleValueChange
 	sampleMatchBid := sec.sampleMatchBid
 	sampleSecurityPrice := sec.sampleSecurityPrice
@@ -132,8 +138,8 @@ func (sec *MarginSecurity) RemoveBidOrder(ID string) {
 	N := len(sampleValueChange)
 	for i := 0; i < N; i++ {
 		contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * sec.Multiplier.Value
-		fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+		contractMarginValue := contractChange * price * mul
+		fee := math.Abs(contractMarginValue) * makerFee
 
 		// Remove cost from values
 		cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -156,6 +162,8 @@ func (sec *MarginSecurity) RemoveAskOrder(ID string) {
 	}
 	queue := o.Queue
 	quantity := o.Quantity
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 	sampleValueChange := sec.sampleValueChange
 	sampleMatchAsk := sec.sampleMatchAsk
 	sampleSecurityPrice := sec.sampleSecurityPrice
@@ -163,8 +171,8 @@ func (sec *MarginSecurity) RemoveAskOrder(ID string) {
 	N := len(sampleValueChange)
 	for i := 0; i < N; i++ {
 		contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * sec.Multiplier.Value
-		fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+		contractMarginValue := contractChange * price * mul
+		fee := math.Abs(contractMarginValue) * makerFee
 
 		// Remove cost from values
 		cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -185,6 +193,20 @@ func (sec *MarginSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
 	sec.Lock()
 	// TODO update sample value change
 	sec.openAskOrders[ID].Quantity = qty
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateBidOrderQueue(ID string, queue float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openBidOrders[ID].Queue = queue
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateAskOrderQueue(ID string, queue float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openAskOrders[ID].Queue = queue
 	sec.Unlock()
 }
 
@@ -225,6 +247,8 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.Model, time ui
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
 	sampleMarginPrice := model.GetSampleAssetPrices(sec.marginCurrency.ID, time, N)
 	sampleSecurityPrice := model.GetSampleSecurityPrices(sec.SecurityID, time, N)
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 
 	for _, o := range sec.openBidOrders {
 		var price, exp float64
@@ -237,10 +261,11 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.Model, time ui
 		}
 		queue := o.Queue
 		quantity := o.Quantity
+
 		for i := 0; i < N; i++ {
 			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 			// Compute the cost
 			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
 			sampleValueChange[i] -= cost * sampleMarginPrice[i]
@@ -259,8 +284,8 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.Model, time ui
 		quantity := o.Quantity
 		for i := 0; i < N; i++ {
 			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 
 			// Compute the cost
 			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -394,6 +419,8 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 	sampleMatchBid := sec.sampleMatchBid
 	sampleSecurityPrice := sec.sampleSecurityPrice
 	sampleMarginPrice := sec.sampleMarginPrice
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 
 	var maxOrder, currentOrder *COrder
 	maxExpectedLogReturn := -999.
@@ -414,8 +441,8 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 		quantity := o.Quantity
 		for i := 0; i < N; i++ {
 			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 
 			// Remove cost from values
 			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
@@ -452,7 +479,7 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 		}
 		if sec.size < 0 {
 			// If we are short, we can go long the short size + the available margin size
-			correctedAvailableMargin += math.Abs(price * sec.Multiplier.Value * sec.size)
+			correctedAvailableMargin += math.Abs(price * mul * sec.size)
 		}
 		queue := queues[l]
 		expectedLogReturn := 0.
@@ -460,8 +487,8 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 		for i := 0; i < N; i++ {
 			availableContracts := correctedAvailableMargin / (math.Abs(sec.Multiplier.Value) * price)
 			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), availableContracts)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
 			// Compute ELR with cost
 			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
@@ -497,9 +524,9 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 		}
 		if sec.size < 0 {
 			// If we are short, we can go long the short size + the available margin size
-			correctedAvailableMargin += math.Abs(price * sec.Multiplier.Value * sec.size)
+			correctedAvailableMargin += math.Abs(price * mul * sec.size)
 		}
-		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(sec.Multiplier.Value)))
+		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
 	}
 	sec.Unlock()
 
@@ -517,6 +544,8 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 	sampleMatchAsk := sec.sampleMatchAsk
 	sampleSecurityPrice := sec.sampleSecurityPrice
 	sampleMarginPrice := sec.sampleMarginPrice
+	mul := sec.Multiplier.Value
+	makerFee := sec.MakerFee.Value
 
 	var maxOrder, currentOrder *COrder
 	maxExpectedLogReturn := -999.
@@ -537,11 +566,11 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 		expectedLogReturn := 0.
 		for i := 0; i < N; i++ {
 			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 
 			// Remove the cost from values
-			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
 			values[i] += cost * sampleMarginPrice[i]
 		}
 		// Compute ELR with current order
@@ -563,7 +592,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 		maxOrder = nil
 	}
 
-	mul := sec.Multiplier.Value
 	for l := 0; l < len(prices); l++ {
 		correctedAvailableMargin := availableMargin
 		var price, exp float64
@@ -587,8 +615,7 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 			availableContracts := correctedAvailableMargin / (math.Abs(mul) * price)
 			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), availableContracts)
 			contractMarginValue := contractChange * price * mul
-			fee := math.Abs(contractMarginValue) * mul
-
+			fee := math.Abs(contractMarginValue) * makerFee
 			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
 			// Compute ELR with new cost
 			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
