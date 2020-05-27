@@ -88,7 +88,6 @@ func NewAccount(ID string, securities []*models.Security, marginCurrency *xchang
 func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
 
 	accnt.margin = int64(math.Round(margin * accnt.marginPrecision))
-
 	for _, s := range accnt.securities {
 		s.Clear()
 	}
@@ -204,7 +203,6 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
-			// TODO price, queue
 			accnt.securities[order.Instrument.SecurityID.Value].AddBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		} else {
 			accnt.securities[order.Instrument.SecurityID.Value].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)

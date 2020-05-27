@@ -16,14 +16,18 @@ func (accnt *Account) Value(model modeling.Model) float64 {
 	marginPrice := model.GetAssetPrice(accnt.marginCurrency.ID)
 	for k, v := range accnt.positions {
 		cost := float64(v.cost) / v.marginPrecision
-		size := float64(v.rawSize) / v.marginPrecision
-		value += (cost - model.GetSecurityPrice(k)*size*v.multiplier) * marginPrice
+		size := float64(v.rawSize) / v.lotPrecision
+		if v.inverse {
+			value += (cost - (1./model.GetSecurityPrice(k))*size*v.multiplier) * marginPrice
+		} else {
+			value += (cost - model.GetSecurityPrice(k)*size*v.multiplier) * marginPrice
+		}
 	}
 
 	margin := float64(accnt.margin) / accnt.marginPrecision
 	value += margin * marginPrice
 
-	return value
+	return math.Max(value, 0.)
 }
 
 func (accnt *Account) AddSampleValues(model modeling.Model, time uint64, values []float64) {
@@ -31,18 +35,23 @@ func (accnt *Account) AddSampleValues(model modeling.Model, time uint64, values 
 	for k, v := range accnt.balances {
 		samplePrices := model.GetSampleAssetPrices(k, time, N)
 		for i := 0; i < N; i++ {
-
 			values[i] += v * samplePrices[i]
 		}
 	}
 	marginPrices := model.GetSampleAssetPrices(accnt.marginCurrency.ID, time, N)
 	for k, v := range accnt.positions {
 		cost := float64(v.cost) / v.marginPrecision
-		size := float64(v.rawSize) / v.marginPrecision
+		size := float64(v.rawSize) / v.lotPrecision
 		factor := size * v.multiplier
+		var exp float64
+		if v.inverse {
+			exp = -1
+		} else {
+			exp = 1
+		}
 		samplePrices := model.GetSampleSecurityPrices(k, time, N)
 		for i := 0; i < N; i++ {
-			values[i] -= (cost - samplePrices[i]*factor) * marginPrices[i]
+			values[i] -= (cost - math.Pow(samplePrices[i], exp)*factor) * marginPrices[i]
 		}
 	}
 
@@ -53,6 +62,7 @@ func (accnt *Account) AddSampleValues(model modeling.Model, time uint64, values 
 	for _, s := range accnt.securities {
 		s.AddSampleValueChange(model, time, values)
 	}
+	// TODO handle neg values
 }
 
 func (accnt Account) GetELROnCancelBid(orderID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
@@ -101,7 +111,6 @@ func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.Model
 
 func (accnt *Account) GetAvailableMargin(model modeling.Model, leverage float64) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
-
 	for k, p := range accnt.positions {
 		// Entry price not defined if size = 0, division by 0 !
 		if p.rawSize == 0 {
