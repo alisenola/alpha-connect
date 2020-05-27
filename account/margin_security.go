@@ -24,6 +24,7 @@ type MarginSecurity struct {
 	marginCurrency *xchangerModels.Asset
 	openBidOrders  map[string]*COrder
 	openAskOrders  map[string]*COrder
+	size           float64
 
 	sampleValueChange   []float64
 	sampleMatchBid      []float64
@@ -42,6 +43,7 @@ func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asse
 		marginCurrency:      marginCurrency,
 		openBidOrders:       make(map[string]*COrder),
 		openAskOrders:       make(map[string]*COrder),
+		size:                0.,
 		sampleValueChange:   nil,
 		sampleMatchBid:      nil,
 		sampleMatchAsk:      nil,
@@ -186,6 +188,10 @@ func (sec *MarginSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
 	sec.Unlock()
 }
 
+func (sec *MarginSecurity) UpdatePositionSize(size float64) {
+	sec.size = size
+}
+
 func (sec *MarginSecurity) GetLotPrecision() float64 {
 	return sec.lotPrecision
 }
@@ -197,6 +203,7 @@ func (sec *MarginSecurity) Clear() {
 	for k, _ := range sec.openAskOrders {
 		sec.RemoveAskOrder(k)
 	}
+	sec.size = 0.
 }
 
 func (sec *MarginSecurity) GetInstrument() *models.Instrument {
@@ -434,6 +441,7 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 	}
 
 	for l := 0; l < len(prices); l++ {
+		correctedAvailableMargin := availableMargin
 		var price, exp float64
 		if sec.IsInverse {
 			price = 1. / prices[l]
@@ -442,11 +450,15 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 			price = prices[l]
 			exp = 1.
 		}
+		if sec.size < 0 {
+			// If we are short, we can go long the short size + the available margin size
+			correctedAvailableMargin += math.Abs(price * sec.Multiplier.Value * sec.size)
+		}
 		queue := queues[l]
 		expectedLogReturn := 0.
 
 		for i := 0; i < N; i++ {
-			availableContracts := availableMargin / (math.Abs(sec.Multiplier.Value) * price)
+			availableContracts := correctedAvailableMargin / (math.Abs(sec.Multiplier.Value) * price)
 			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), availableContracts)
 			contractMarginValue := contractChange * price * sec.Multiplier.Value
 			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
@@ -476,13 +488,18 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 		}
 		expectedMatch /= float64(N)
 
+		correctedAvailableMargin := availableMargin
 		var price float64
 		if sec.IsInverse {
 			price = 1. / maxOrder.Price
 		} else {
 			price = maxOrder.Price
 		}
-		maxOrder.Quantity = math.Min(expectedMatch, availableMargin/(price*math.Abs(sec.Multiplier.Value)))
+		if sec.size < 0 {
+			// If we are short, we can go long the short size + the available margin size
+			correctedAvailableMargin += math.Abs(price * sec.Multiplier.Value * sec.size)
+		}
+		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(sec.Multiplier.Value)))
 	}
 	sec.Unlock()
 
@@ -546,7 +563,9 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 		maxOrder = nil
 	}
 
+	mul := sec.Multiplier.Value
 	for l := 0; l < len(prices); l++ {
+		correctedAvailableMargin := availableMargin
 		var price, exp float64
 		if sec.IsInverse {
 			price = 1. / prices[l]
@@ -555,18 +574,22 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 			price = prices[l]
 			exp = 1
 		}
+		if sec.size > 0 {
+			// If we are long, we can go short the long size + the available margin size
+			correctedAvailableMargin += math.Abs(price * mul * sec.size)
+		}
 		queue := queues[l]
 		expectedLogReturn := 0.
 
 		// We need to compute what would happen if we changed
 		// our ask order on the instrument.
 		for i := 0; i < N; i++ {
-			availableContracts := availableMargin / (math.Abs(sec.Multiplier.Value) * price)
+			availableContracts := correctedAvailableMargin / (math.Abs(mul) * price)
 			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), availableContracts)
-			contractMarginValue := contractChange * price * sec.Multiplier.Value
-			fee := math.Abs(contractMarginValue) * sec.MakerFee.Value
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * mul
 
-			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
 			// Compute ELR with new cost
 			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
 		}
@@ -588,6 +611,7 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 		// Compute recommended order quantity based on price and queue
 		// Recommended order quantity is the expected match at the level
 		//fmt.Println("RETS", baseline, maxExpectedLogReturn)
+		correctedAvailableMargin := availableMargin
 		expectedMatch := 0.
 		for i := 0; i < N; i++ {
 			expectedMatch += math.Max(sampleMatchAsk[i]-maxOrder.Queue, 0.)
@@ -599,7 +623,11 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mode
 		} else {
 			price = maxOrder.Price
 		}
-		maxOrder.Quantity = math.Min(expectedMatch, availableMargin/(price*math.Abs(sec.Multiplier.Value)))
+		if sec.size > 0 {
+			// If we are long, we can go short the long size + the available margin size
+			correctedAvailableMargin += math.Abs(price * mul * sec.size)
+		}
+		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
 	}
 	sec.Unlock()
 

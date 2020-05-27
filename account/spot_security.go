@@ -141,7 +141,7 @@ func (sec *SpotSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
 	sec.Unlock()
 }
 
-func (sec *SpotSecurity) UpdatePosition(_, _ float64) {}
+func (sec *SpotSecurity) UpdatePositionSize(_ float64) {}
 
 func (sec *SpotSecurity) GetPosition() *models.Position {
 	return nil

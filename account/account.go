@@ -23,6 +23,7 @@ type Security interface {
 	RemoveAskOrder(ID string)
 	UpdateBidOrderQuantity(ID string, qty float64)
 	UpdateAskOrderQuantity(ID string, qty float64)
+	UpdatePositionSize(size float64)
 	GetLotPrecision() float64
 	GetInstrument() *models.Instrument
 	Clear()
@@ -127,6 +128,8 @@ func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position,
 			return fmt.Errorf("position %d for order not found", p.Instrument.SecurityID.Value)
 		}
 		pos.Sync(p.Cost, p.Quantity)
+
+		accnt.securities[p.Instrument.SecurityID.Value].UpdatePositionSize(p.Quantity)
 		// TODO cross
 		//sec.Position.Cross = p.Cross
 	}
@@ -423,21 +426,22 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		}
 	case *MarginSecurity:
 		marginSec := sec.(*MarginSecurity)
-		if pos, ok := accnt.positions[marginSec.SecurityID]; ok {
-			// Margin
-			var fee, cost int64
-			if order.Side == models.Buy {
-				fee, cost = pos.Buy(price, quantity, taker)
-			} else {
-				fee, cost = pos.Sell(price, quantity, taker)
-			}
-			accnt.margin -= fee
-			accnt.margin -= cost
-			er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.marginPrecision}
-			er.FeeCurrency = accnt.marginCurrency
-			er.FeeBasis = messages.Percentage
-			er.FeeType = messages.ExchangeFees
+		pos := accnt.positions[marginSec.SecurityID]
+		// Margin
+		var fee, cost int64
+		if order.Side == models.Buy {
+			fee, cost = pos.Buy(price, quantity, taker)
+		} else {
+			fee, cost = pos.Sell(price, quantity, taker)
 		}
+		accnt.margin -= fee
+		accnt.margin -= cost
+		er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.marginPrecision}
+		er.FeeCurrency = accnt.marginCurrency
+		er.FeeBasis = messages.Percentage
+		er.FeeType = messages.ExchangeFees
+		// TODO mutex on position ?
+		marginSec.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
 
 	return er, nil
