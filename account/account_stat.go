@@ -2,6 +2,7 @@ package account
 
 import (
 	"gitlab.com/alphaticks/alphac/modeling"
+	"math"
 )
 
 // TODO what about updating securities ?
@@ -95,4 +96,33 @@ func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.Model
 		// TODO ?
 		return 0., nil
 	}
+}
+
+func (accnt *Account) GetAvailableMargin(model modeling.Model, leverage float64) float64 {
+	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
+
+	for k, p := range accnt.positions {
+		// Entry price not defined if size = 0, division by 0 !
+		if p.rawSize == 0 {
+			continue
+		}
+		exitPrice := model.GetSecurityPrice(k)
+		cost := float64(p.cost) / accnt.marginPrecision
+
+		if p.inverse {
+			unrealizedPnL := (1./exitPrice)*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
+			// Cannot use unrealized profit in margin
+			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
+			// Remove leveraged entry value and add PnL
+			availableMargin = availableMargin - (math.Abs(cost) / leverage) + unrealizedPnL
+		} else {
+			unrealizedPnL := exitPrice*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
+			// Cannot use unrealized profit in margin
+			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
+			// Remove leveraged entry value and add PnL
+			availableMargin = availableMargin - (math.Abs(cost) / leverage) + unrealizedPnL
+		}
+	}
+
+	return math.Max(availableMargin, 0.)
 }

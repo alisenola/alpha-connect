@@ -38,6 +38,93 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestAccount_GetAvailableMargin(t *testing.T) {
+	account := NewAccount("1", []*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync(nil, nil, nil, 0.1); err != nil {
+		t.Fatal(err)
+	}
+	expectedAv := 0.1
+	avMargin := account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
+	_, rej := account.NewOrder(&models.Order{
+		OrderID:       "buy1",
+		ClientOrderID: "buy1",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: 1},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "ETHUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 90.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	account.ConfirmFill("buy1", "", 9., 10, false)
+	// Balance + maker rebate + entry cost + PnL
+	mul := ETHUSD_PERP_SEC.Multiplier.Value
+	expectedAv = 0.1 + (0.00025 * 10 * 9 * mul) - (10 * 9 * mul) + (10.-9.)*mul*10.
+	avMargin = account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+}
+
+func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
+	account := NewAccount("1", []*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync(nil, nil, nil, 0.1); err != nil {
+		t.Fatal(err)
+	}
+	expectedAv := 0.1
+	avMargin := account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
+	_, rej := account.NewOrder(&models.Order{
+		OrderID:       "buy1",
+		ClientOrderID: "buy1",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: 0},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 90.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	account.ConfirmFill("buy1", "", 90., 10, false)
+	// Balance + maker rebate + entry cost + PnL
+	expectedAv = 0.1 + (0.00025 * 10 * (1. / 90.)) - (10 * (1 / 90.)) + ((1./90.)-(1./100.))*10
+	avMargin = account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+}
+
 func TestPortfolio_Spot_ELR(t *testing.T) {
 	account := NewAccount("1", []*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, &constants.DOLLAR, 1./0.00000001)
 	dollarBalance := &models.Balance{

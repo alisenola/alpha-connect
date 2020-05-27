@@ -13,6 +13,7 @@ type COrder struct {
 	Price    float64
 	Quantity float64
 	Queue    float64
+	ID       string
 }
 
 type MarginSecurity struct {
