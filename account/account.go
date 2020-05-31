@@ -37,7 +37,8 @@ type Security interface {
 }
 
 type Account struct {
-	ID              string
+	*models.Account
+	Credentials     *xchangerModels.APICredentials
 	ordersID        map[string]*Order
 	ordersClID      map[string]*Order
 	securities      map[uint64]Security
@@ -49,9 +50,9 @@ type Account struct {
 	marginPrecision float64
 }
 
-func NewAccount(ID string, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
+func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
 	accnt := &Account{
-		ID:              ID,
+		Account:         account,
 		ordersID:        make(map[string]*Order),
 		ordersClID:      make(map[string]*Order),
 		securities:      make(map[uint64]Security),
@@ -116,7 +117,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		pos.Sync(0, 0)
 	}
 	for _, p := range positions {
-		if p.AccountID != accnt.ID {
+		if p.AccountID != accnt.AccountID {
 			return fmt.Errorf("got position for wrong account ID")
 		}
 		if p.Instrument == nil {
@@ -460,7 +461,7 @@ func (accnt *Account) GetPositions() []*models.Position {
 		pos := pos.GetPosition()
 		if pos != nil {
 			pos.Instrument = accnt.securities[k].GetInstrument()
-			pos.AccountID = accnt.ID
+			pos.AccountID = accnt.AccountID
 			positions = append(positions, pos)
 		}
 	}
@@ -472,7 +473,7 @@ func (accnt *Account) GetBalances() []*models.Balance {
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
 		balances = append(balances, &models.Balance{
-			AccountID: accnt.ID,
+			AccountID: accnt.AccountID,
 			Asset:     accnt.assets[k],
 			Quantity:  b,
 		})

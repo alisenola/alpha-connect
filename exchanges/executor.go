@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -17,7 +18,7 @@ import (
 //
 type Executor struct {
 	exchanges         []*xchangerModels.Exchange
-	accounts          []*models.Account
+	accounts          []*account.Account
 	accountPortfolios map[string]*actor.PID
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
@@ -28,13 +29,13 @@ type Executor struct {
 	logger            *log.Logger
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*models.Account) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(exchanges, accounts)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*models.Account) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account) actor.Actor {
 	return &Executor{
 		exchanges: exchanges,
 		accounts:  accounts,
@@ -189,27 +190,16 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 	}
 
-	var filter = func(ID uint32) []*models.Security {
-		var secs []*models.Security
-		for _, s := range state.securities {
-			if s.Exchange.ID == ID {
-				secs = append(secs, s)
-			}
-		}
-		return secs
-	}
-
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
-	for _, accountInfo := range state.accounts {
-		accountPortfolio := NewAccount(accountInfo, filter(accountInfo.Exchange.ID))
-		producer := NewAccountManagerProducer(accountInfo, accountPortfolio)
+	for _, account := range state.accounts {
+		producer := NewAccountManagerProducer(account)
 		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", accountInfo.Exchange.Name)
+			return fmt.Errorf("unknown exchange %s", account.Exchange.Name)
 		}
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[accountInfo.AccountID] = context.Spawn(props)
+		state.accountManagers[account.AccountID] = context.Spawn(props)
 	}
 
 	return nil

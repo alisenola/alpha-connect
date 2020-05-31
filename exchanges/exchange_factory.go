@@ -31,16 +31,16 @@ func NewAccount(accountInfo *models.Account) *account.Account {
 	}
 	switch accountInfo.Exchange.ID {
 	case constants.BITMEX.ID:
-		return account.NewAccount(accountInfo.AccountID, &constants.BITCOIN, 1./0.00000001)
+		return account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
 	default:
 		return nil
 	}
 }
 
-func NewAccountListenerProducer(accountInfo *models.Account, accountPortfolio *account.Account) actor.Producer {
-	switch accountInfo.Exchange.ID {
+func NewAccountListenerProducer(account *account.Account) actor.Producer {
+	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
-		return func() actor.Actor { return bitmex.NewAccountListener(accountInfo, accountPortfolio) }
+		return func() actor.Actor { return bitmex.NewAccountListener(account) }
 	default:
 		return nil
 	}
