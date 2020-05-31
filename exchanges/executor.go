@@ -75,6 +75,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.SecurityDefinitionRequest:
+		if err := state.OnSecurityDefinitionRequest(context); err != nil {
+			state.logger.Error("error processing OnSecurityDefinitionRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.SecurityListRequest:
 		if err := state.OnSecurityListRequest(context); err != nil {
 			state.logger.Error("error processing OnSecurityListRequest", log.Error(err))
@@ -237,6 +243,33 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		context.Forward(pid)
 	}
 
+	return nil
+}
+
+func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error {
+	request := context.Message().(*messages.SecurityDefinitionRequest)
+	if request.Instrument == nil || request.Instrument.SecurityID == nil {
+		context.Respond(&messages.SecurityDefinitionResponse{
+			RequestID:       request.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Security:        nil,
+			RejectionReason: messages.UnknownSecurityID,
+		})
+	}
+	if sec, ok := state.securities[request.Instrument.SecurityID.Value]; ok {
+		context.Respond(&messages.SecurityDefinitionResponse{
+			RequestID:  request.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Security:   sec,
+		})
+	} else {
+		context.Respond(&messages.SecurityDefinitionResponse{
+			RequestID:       request.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Security:        nil,
+			RejectionReason: messages.UnknownSecurityID,
+		})
+	}
 	return nil
 }
 

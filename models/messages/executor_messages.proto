@@ -46,6 +46,18 @@ message MarketDataIncrementalRefresh {
     repeated models.AggregatedTrade trades = 5;
 }
 
+message SecurityDefinitionRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+}
+
+message SecurityDefinitionResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.Security security = 3;
+    RejectionReason rejection_reason = 4;
+}
+
 message SecurityListRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
