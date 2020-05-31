@@ -22,15 +22,16 @@ import (
 	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
-var Accounts = make(map[string]*account.Account)
+// TODO sample size config
+var Portfolio = account.NewPortfolio(1000)
 
-func NewAccount(accountInfo *models.Account, securities []*models.Security) *account.Account {
-	if accnt, ok := Accounts[accountInfo.AccountID]; ok {
+func NewAccount(accountInfo *models.Account) *account.Account {
+	if accnt := Portfolio.GetAccount(accountInfo.AccountID); accnt != nil {
 		return accnt
 	}
 	switch accountInfo.Exchange.ID {
 	case constants.BITMEX.ID:
-		return account.NewAccount(accountInfo.AccountID, securities, &constants.BITCOIN, 1./0.00000001)
+		return account.NewAccount(accountInfo.AccountID, &constants.BITCOIN, 1./0.00000001)
 	default:
 		return nil
 	}

@@ -49,7 +49,7 @@ type Account struct {
 	marginPrecision float64
 }
 
-func NewAccount(ID string, securities []*models.Security, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
+func NewAccount(ID string, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
 	accnt := &Account{
 		ID:              ID,
 		ordersID:        make(map[string]*Order),
@@ -62,15 +62,21 @@ func NewAccount(ID string, securities []*models.Security, marginCurrency *xchang
 		marginCurrency:  marginCurrency,
 		marginPrecision: marginPrecision,
 	}
+
+	return accnt
+}
+
+func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
+
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
-			accnt.securities[s.SecurityID] = NewMarginSecurity(s, marginCurrency)
+			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.marginCurrency)
 			accnt.positions[s.SecurityID] = &Position{
 				inverse:         s.IsInverse,
 				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement),
 				lotPrecision:    math.Ceil(1. / s.RoundLot),
-				marginPrecision: marginPrecision,
+				marginPrecision: accnt.marginPrecision,
 				multiplier:      s.Multiplier.Value,
 				makerFee:        s.MakerFee.Value,
 				takerFee:        s.TakerFee.Value,
@@ -81,11 +87,6 @@ func NewAccount(ID string, securities []*models.Security, marginCurrency *xchang
 			accnt.assets[s.QuoteCurrency.ID] = s.QuoteCurrency
 		}
 	}
-
-	return accnt
-}
-
-func (accnt *Account) Sync(orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
 
 	accnt.margin = int64(math.Round(margin * accnt.marginPrecision))
 	for _, s := range accnt.securities {

@@ -34,6 +34,10 @@ func NewPortfolio(sampleSize int) *Portfolio {
 	return p
 }
 
+func (p *Portfolio) GetAccount(ID string) *Account {
+	return p.accountPortfolios[ID]
+}
+
 func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.ID] = account
 }

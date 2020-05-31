@@ -109,6 +109,20 @@ func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.Model
 	}
 }
 
+func (accnt *Account) GetLeverage(model modeling.Model) float64 {
+	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
+	usedMargin := 0.
+	for k, p := range accnt.positions {
+		exitPrice := model.GetSecurityPrice(k)
+		if p.inverse {
+			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / exitPrice) * math.Abs(p.multiplier)
+		} else {
+			usedMargin += (float64(p.rawSize) / p.lotPrecision) * exitPrice * math.Abs(p.multiplier)
+		}
+	}
+	return usedMargin / availableMargin
+}
+
 func (accnt *Account) GetAvailableMargin(model modeling.Model, leverage float64) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	for k, p := range accnt.positions {
