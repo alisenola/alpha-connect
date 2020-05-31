@@ -104,6 +104,7 @@ enum RejectionReason {
     DifferentSymbols = 11;
     InvalidRequest = 12;
     ExchangeAPIError = 13;
+    InvalidOrder = 14;
 }
 
 enum FeeType {
