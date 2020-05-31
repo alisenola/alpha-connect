@@ -198,14 +198,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
-	for _, account := range state.accounts {
-		producer := NewAccountManagerProducer(account)
+	for _, accnt := range state.accounts {
+		producer := NewAccountManagerProducer(accnt)
 		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", account.Exchange.Name)
+			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[account.AccountID] = context.Spawn(props)
+		state.accountManagers[accnt.AccountID] = context.Spawn(props)
 	}
 
 	return nil

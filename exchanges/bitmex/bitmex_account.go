@@ -285,6 +285,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 		Side:           req.Order.OrderSide,
 		TimeInForce:    req.Order.TimeInForce,
 		LeavesQuantity: req.Order.Quantity,
+		Price:          req.Order.Price,
 		CumQuantity:    0,
 	}
 	report, res := state.account.NewOrder(order)
@@ -358,6 +359,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			Side:           reqOrder.OrderSide,
 			TimeInForce:    reqOrder.TimeInForce,
 			LeavesQuantity: reqOrder.Quantity,
+			Price:          reqOrder.Price,
 			CumQuantity:    0,
 		}
 		report, res := state.account.NewOrder(order)
@@ -666,7 +668,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Trade":
-			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, float64(*data.LastPx), float64(*data.LastQty), true)
+			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, *data.LastPx, float64(*data.LastQty), true)
 			if err != nil {
 				return fmt.Errorf("error confirming fill: %v", err)
 			}
