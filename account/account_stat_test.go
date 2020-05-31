@@ -39,8 +39,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestAccount_GetAvailableMargin(t *testing.T) {
-	account := NewAccount("1", []*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync(nil, nil, nil, 0.1); err != nil {
+	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -83,8 +83,8 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 }
 
 func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
-	account := NewAccount("1", []*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync(nil, nil, nil, 0.1); err != nil {
+	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -126,7 +126,7 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 }
 
 func TestPortfolio_Spot_ELR(t *testing.T) {
-	account := NewAccount("1", []*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, &constants.DOLLAR, 1./0.00000001)
+	account := NewAccount(account, &constants.DOLLAR, 1./0.00000001)
 	dollarBalance := &models.Balance{
 		AccountID: "1",
 		Asset:     &constants.DOLLAR,
@@ -137,7 +137,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		Asset:     &constants.ETHEREUM,
 		Quantity:  10,
 	}
-	if err := account.Sync(nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, 0.); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, 0.); err != nil {
 		t.Fatal(err)
 	}
 
@@ -261,8 +261,8 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 
 func TestPortfolio_Margin_ELR(t *testing.T) {
 
-	account := NewAccount("1", []*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync(nil, nil, nil, 0.1); err != nil {
+	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
 		t.Fatal(err)
 	}
 

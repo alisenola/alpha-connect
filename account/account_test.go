@@ -9,6 +9,10 @@ import (
 	"testing"
 )
 
+var account = &models.Account{
+	AccountID: "1",
+}
+
 var BTCUSD_PERP_SEC = &models.Security{
 	SecurityID:        0,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
@@ -76,8 +80,8 @@ var ETHUSD_SPOT_SEC = &models.Security{
 }
 
 func TestAccount_ConfirmFill(t *testing.T) {
-	accnt := NewAccount("a", []*models.Security{ETHUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync(nil, nil, nil, 0.)
+	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err := accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,8 +181,8 @@ func TestAccount_ConfirmFill(t *testing.T) {
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
-	accnt := NewAccount("a", []*models.Security{BTCUSD_PERP_SEC}, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync(nil, nil, nil, 0.)
+	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
 	if err != nil {
 		t.Fatal(err)
 	}
