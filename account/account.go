@@ -38,7 +38,6 @@ type Security interface {
 
 type Account struct {
 	*models.Account
-	Credentials     *xchangerModels.APICredentials
 	ordersID        map[string]*Order
 	ordersClID      map[string]*Order
 	securities      map[uint64]Security
@@ -68,7 +67,6 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 }
 
 func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
-
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
@@ -171,6 +169,10 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	rawCumQty := int64(order.CumQuantity * lotPrecision)
 	if rawCumQty > 0 {
 		res := messages.IncorrectQuantity
+		return nil, &res
+	}
+	if order.OrderType == models.Limit && order.Price == nil {
+		res := messages.InvalidOrder
 		return nil, &res
 	}
 	accnt.ordersClID[order.ClientOrderID] = &Order{
