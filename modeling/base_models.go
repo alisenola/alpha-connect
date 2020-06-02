@@ -79,7 +79,7 @@ type PriceModel interface {
 }
 
 type TradeModel interface {
-	Update(feedID uint64, tick uint64, size float64)
+	Update(feedID uint64, tick uint64, price, size float64)
 	Progress(tick uint64)
 }
 
