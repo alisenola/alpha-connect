@@ -47,11 +47,11 @@ func (m *MapModel) GetSampleSecurityPrices(securityID uint64, time uint64, sampl
 }
 
 func (m *MapModel) GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64 {
-	return m.sellTradeModels[securityID].GetSampleMatchBid(time, sampleSize)
+	return m.sellTradeModels[securityID].GetSampleMatchBid(securityID, time, sampleSize)
 }
 
 func (m *MapModel) GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64 {
-	return m.buyTradeModels[securityID].GetSampleMatchAsk(time, sampleSize)
+	return m.buyTradeModels[securityID].GetSampleMatchAsk(securityID, time, sampleSize)
 }
 
 func (m *MapModel) SetSecurityPriceModel(securityID uint64, model PriceModel) {
@@ -85,12 +85,12 @@ type PriceModel interface {
 
 type SellTradeModel interface {
 	Model
-	GetSampleMatchBid(time uint64, sampleSize int) []float64
+	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
 }
 
 type BuyTradeModel interface {
 	Model
-	GetSampleMatchAsk(time uint64, sampleSize int) []float64
+	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
 }
 
 type ConstantPriceModel struct {
@@ -210,7 +210,7 @@ func (m *ConstantTradeModel) Progress(_ uint64) {
 
 }
 
-func (m *ConstantTradeModel) GetSampleMatchAsk(time uint64, sampleSize int) []float64 {
+func (m *ConstantTradeModel) GetSampleMatchAsk(ID, time uint64, sampleSize int) []float64 {
 	if m.sampleMatch == nil || len(m.sampleMatch) != sampleSize {
 		m.sampleMatch = make([]float64, sampleSize, sampleSize)
 		for i := 0; i < sampleSize; i++ {
@@ -220,7 +220,7 @@ func (m *ConstantTradeModel) GetSampleMatchAsk(time uint64, sampleSize int) []fl
 	return m.sampleMatch
 }
 
-func (m *ConstantTradeModel) GetSampleMatchBid(time uint64, sampleSize int) []float64 {
+func (m *ConstantTradeModel) GetSampleMatchBid(ID, time uint64, sampleSize int) []float64 {
 	if m.sampleMatch == nil || len(m.sampleMatch) != sampleSize {
 		m.sampleMatch = make([]float64, sampleSize, sampleSize)
 		for i := 0; i < sampleSize; i++ {
