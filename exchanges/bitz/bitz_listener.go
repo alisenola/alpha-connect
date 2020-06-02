@@ -178,7 +178,6 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = 0
-
 	state.obWs = ws
 
 	go func(ws *bitz.Websocket) {

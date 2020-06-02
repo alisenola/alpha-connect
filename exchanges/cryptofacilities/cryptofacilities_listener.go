@@ -26,6 +26,7 @@ type OBL2Request struct {
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
 	seqNum         uint64
+	lastUpdateID   uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
 	aggTrade       *models.AggregatedTrade
@@ -124,6 +125,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
 		seqNum:         0,
+		lastUpdateID:   0,
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
 		aggTrade:       nil,
@@ -232,8 +234,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	ob.Sync(bids, asks)
 	state.instrumentData.orderBook = ob
-	state.instrumentData.seqNum = obData.Seq
+	state.instrumentData.lastUpdateID = obData.Seq
 	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.seqNum = 0
 
 	state.obWs = ws
 
@@ -314,13 +317,14 @@ func (state *Listener) readSocket(context actor.Context) error {
 
 			ts := uint64(msg.Time.UnixNano()) / 1000000
 
-			if obData.Seq != instr.seqNum+1 {
+			if obData.Seq != instr.lastUpdateID+1 {
 				state.logger.Info("got inconsistent sequence")
 				// Stop the socket, we will restart instrument at the end
 				if err := state.obWs.Disconnect(); err != nil {
 					state.logger.Info("error disconnecting from socket", log.Error(err))
 				}
 			}
+			instr.lastUpdateID = obData.Seq
 
 			level := gorderbook.OrderBookLevel{
 				Price:    obData.Price,
