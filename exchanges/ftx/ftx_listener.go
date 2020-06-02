@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 	"math"
 	"reflect"
+	"sort"
 	"time"
 )
 
@@ -333,27 +334,53 @@ func (state *Listener) readSocket(context actor.Context) error {
 			tradeData := msg.Message.(ftx.WSTradeUpdate)
 			ts := uint64(msg.Time.UnixNano() / 1000000)
 
-			for _, trade := range tradeData.Trades {
-				fmt.Println(trade)
-			}
+			sort.Slice(tradeData.Trades, func(i, j int) bool {
+				return tradeData.Trades[i].Time.Before(tradeData.Trades[j].Time)
+			})
 
-			/*
-				trade := &exchangeModels.AggregatedTrade{
-					Bid:         tradeData.MarketSell,
-					Timestamp:   models.MilliToTimestamp(ts),
-					AggregateID: uint64(tradeData.AggregateTradeID),
-					Trades: []exchangeModels.Trade{{
-						Price:    tradeData.Price,
-						Quantity: tradeData.Quantity,
-						ID:       uint64(tradeData.AggregateTradeID),
-					}},
+			var aggTrade *models.AggregatedTrade
+			for _, trade := range tradeData.Trades {
+				aggID := uint64(trade.Time.UnixNano())
+				if trade.Side == "buy" {
+					aggID += 1
 				}
-				tradeTopic := fmt.Sprintf("%s/TRADE", state.instrument.DefaultFormat())
-				context.Send(state.mediator, &messages.PubSubMessage{
-					ID:      uint64(time.Now().UnixNano()),
-					Topic:   tradeTopic,
-					Message: trade})
-			*/
+				if aggTrade == nil || aggTrade.AggregateID != aggID {
+					if aggTrade != nil {
+						// Send aggregate trade
+						context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+							Trades: []*models.AggregatedTrade{aggTrade},
+							SeqNum: state.instrumentData.seqNum + 1,
+						})
+						state.instrumentData.seqNum += 1
+						state.instrumentData.lastAggTradeTs = ts
+					}
+
+					if ts <= state.instrumentData.lastAggTradeTs {
+						ts = state.instrumentData.lastAggTradeTs + 1
+					}
+					aggTrade = &models.AggregatedTrade{
+						Bid:         trade.Side == "sell",
+						Timestamp:   utils.MilliToTimestamp(ts),
+						AggregateID: aggID,
+						Trades:      nil,
+					}
+				}
+				trade := models.Trade{
+					Price:    trade.Price,
+					Quantity: trade.Size,
+					ID:       trade.ID,
+				}
+				aggTrade.Trades = append(aggTrade.Trades, trade)
+			}
+			if aggTrade != nil {
+				// Send aggregate trade
+				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+					Trades: []*models.AggregatedTrade{aggTrade},
+					SeqNum: state.instrumentData.seqNum + 1,
+				})
+				state.instrumentData.seqNum += 1
+				state.instrumentData.lastAggTradeTs = ts
+			}
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
