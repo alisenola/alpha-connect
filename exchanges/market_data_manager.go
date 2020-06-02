@@ -144,6 +144,7 @@ func (state *MarketDataManager) OnMarketDataIncrementalRefresh(context actor.Con
 			UpdateL2:   refresh.UpdateL2,
 			UpdateL3:   refresh.UpdateL3,
 			Trades:     refresh.Trades,
+			SeqNum:     refresh.SeqNum,
 		}
 		context.Send(v, forward)
 	}
