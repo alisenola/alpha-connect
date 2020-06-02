@@ -177,7 +177,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if len(splits) == 2 {
 				underlying, ok := constants.SYMBOL_TO_ASSET[market.Underlying]
 				if !ok {
-					fmt.Printf("unknown currency symbol %s \n", market.Underlying)
+					//fmt.Printf("unknown currency symbol %s \n", market.Underlying)
 					continue
 				}
 				security.Underlying = &underlying
