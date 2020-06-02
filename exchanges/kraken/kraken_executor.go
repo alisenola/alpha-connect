@@ -276,12 +276,13 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			Bids:      bids,
 			Asks:      asks,
 			Timestamp: utils.MicroToTimestamp(maxTs),
-			SeqNum:    maxTs,
 		}
 		context.Respond(&messages.MarketDataSnapshot{
 			RequestID:  msg.RequestID,
 			ResponseID: uint64(time.Now().UnixNano()),
-			SnapshotL2: snapshot})
+			SnapshotL2: snapshot,
+			SeqNum:     maxTs,
+		})
 	})
 	return nil
 }

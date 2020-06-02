@@ -301,13 +301,14 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 				Bids:      bids,
 				Asks:      asks,
 				Timestamp: utils.MilliToTimestamp(0),
-				SeqNum:    obData.Sequence,
 			}
 			state.orderBookL2Cache.Put(symbol, snapshot)
 			context.Respond(&messages.MarketDataSnapshot{
 				RequestID:  msg.RequestID,
 				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL2: snapshot})
+				SnapshotL2: snapshot,
+				SeqNum:     obData.Sequence,
+			})
 		})
 
 		return nil
@@ -381,13 +382,14 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 				Bids:      bids,
 				Asks:      asks,
 				Timestamp: nil,
-				SeqNum:    obData.Sequence,
 			}
 			state.orderBookL3Cache.Put(symbol, snapshot)
 			context.Respond(&messages.MarketDataSnapshot{
 				RequestID:  msg.RequestID,
 				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL3: snapshot})
+				SnapshotL3: snapshot,
+				SeqNum:     obData.Sequence,
+			})
 		})
 
 		return nil

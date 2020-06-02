@@ -206,7 +206,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = uint64(time.Now().UnixNano() / 1000000)
 	state.instrumentData.seqNum = 0
-	state.instrumentData.lastSequence = msg.SnapshotL3.SeqNum
+	state.instrumentData.lastSequence = msg.SeqNum
 	state.ws = ws
 
 	go func(ws *coinbasepro.Websocket) {
@@ -223,13 +223,13 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	response := &messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
+		SeqNum:     state.instrumentData.seqNum,
 	}
 	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),
 			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			SeqNum:    state.instrumentData.seqNum,
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -400,14 +400,14 @@ func (state *Listener) onOpenOrder(order coinbasepro.WSOpenOrder, context actor.
 	obDelta := &models.OBL2Update{
 		Levels:    []gorderbook.OrderBookLevel{levelDelta},
 		Timestamp: utils.MilliToTimestamp(ts),
-		SeqNum:    state.instrumentData.seqNum + 1,
 		Trade:     false,
 	}
-	state.instrumentData.seqNum += 1
 
 	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 		UpdateL2: obDelta,
+		SeqNum:   state.instrumentData.seqNum + 1,
 	})
+	state.instrumentData.seqNum += 1
 	state.instrumentData.lastUpdateTime = ts
 	/////////////////
 
@@ -471,13 +471,14 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 		obDelta := &models.OBL2Update{
 			Levels:    []gorderbook.OrderBookLevel{levelDelta},
 			Timestamp: utils.MilliToTimestamp(ts),
-			SeqNum:    state.instrumentData.seqNum,
 			Trade:     false,
 		}
-		state.instrumentData.seqNum += 1
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			UpdateL2: obDelta,
+			SeqNum:   state.instrumentData.seqNum + 1,
 		})
+		state.instrumentData.seqNum += 1
+
 		instr.lastUpdateTime = ts
 		//////////////
 
@@ -540,14 +541,14 @@ func (state *Listener) onMatchOrder(order coinbasepro.WSMatchOrder, context acto
 	obDelta := &models.OBL2Update{
 		Levels:    []gorderbook.OrderBookLevel{levelDelta},
 		Timestamp: utils.MilliToTimestamp(ts),
-		SeqNum:    state.instrumentData.seqNum + 1,
 		Trade:     true,
 	}
-	state.instrumentData.seqNum += 1
 
 	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 		UpdateL2: obDelta,
+		SeqNum:   state.instrumentData.seqNum + 1,
 	})
+	state.instrumentData.seqNum += 1
 	instr.lastUpdateTime = ts
 	///////////////
 
@@ -637,14 +638,14 @@ func (state *Listener) onDoneOrder(order coinbasepro.WSDoneOrder, context actor.
 			obDelta := &models.OBL2Update{
 				Levels:    []gorderbook.OrderBookLevel{levelDelta},
 				Timestamp: utils.MilliToTimestamp(ts),
-				SeqNum:    state.instrumentData.seqNum + 1,
 				Trade:     false,
 			}
-			state.instrumentData.seqNum += 1
 
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				UpdateL2: obDelta,
+				SeqNum:   state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
 			instr.lastUpdateTime = ts
 			///////////////
 
@@ -681,7 +682,10 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
 }
@@ -693,7 +697,9 @@ func (state *Listener) postAggTrade(context actor.Context) {
 	if state.instrumentData.aggTrade != nil {
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			Trades: []*models.AggregatedTrade{state.instrumentData.aggTrade},
+			SeqNum: state.instrumentData.seqNum + 1,
 		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.aggTrade = nil
 	}
 }

@@ -36,6 +36,7 @@ message MarketDataSnapshot {
     models.OBL2Snapshot snapshotL2 = 3;
     models.OBL3Snapshot snapshotL3 = 4;
     repeated models.AggregatedTrade trades = 5;
+    uint64 seq_num = 6;
 }
 
 message MarketDataIncrementalRefresh {
@@ -44,6 +45,7 @@ message MarketDataIncrementalRefresh {
     models.OBL2Update updateL2 = 3;
     models.OBL3Update updateL3 = 4;
     repeated models.AggregatedTrade trades = 5;
+    uint64 seq_num = 6;
 }
 
 message SecurityDefinitionRequest {

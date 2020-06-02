@@ -13,7 +13,6 @@ enum OrderBookAggregation {
 message OBL2Update {
     repeated gorderbook.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 2;
-    uint64 SeqNum = 3;
     bool trade = 4;
 }
 
@@ -21,21 +20,18 @@ message OBL2Snapshot {
     repeated gorderbook.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
     repeated gorderbook.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
-    uint64 SeqNum = 5;
 }
 
 message OBL3Update {
     repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
     repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
-    uint64 SeqNum = 5;
 }
 
 message OBL3Snapshot {
     repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
     repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
-    uint64 SeqNum = 5;
 }
 
 message Trade {

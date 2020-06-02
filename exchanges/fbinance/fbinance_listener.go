@@ -208,7 +208,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	)
 
 	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
-	state.instrumentData.lastUpdateID = msg.SnapshotL2.SeqNum
+	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
 
 	synced := false
@@ -283,13 +283,13 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	response := &messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
+		SeqNum:     state.instrumentData.seqNum,
 	}
 	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),
 			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			SeqNum:    state.instrumentData.seqNum,
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -339,7 +339,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 			}
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				Trades: []*models.AggregatedTrade{trade},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
@@ -384,10 +386,8 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	obDelta := &models.OBL2Update{
 		Levels:    []gorderbook.OrderBookLevel{},
 		Timestamp: utils.MilliToTimestamp(depthData.EventTime),
-		SeqNum:    instr.seqNum + 1,
 		Trade:     false,
 	}
-	state.instrumentData.seqNum += 1
 
 	for _, bid := range bids {
 		obDelta.Levels = append(
@@ -413,8 +413,9 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	state.instrumentData.lastUpdateTime = depthData.EventTime
 	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 		UpdateL2: obDelta,
+		SeqNum:   state.instrumentData.seqNum + 1,
 	})
-
+	state.instrumentData.seqNum += 1
 	state.instrumentData.lastHBTime = time.Now()
 	return nil
 }
@@ -446,7 +447,10 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
 }

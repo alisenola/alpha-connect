@@ -243,12 +243,12 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:      state.instrumentData.orderBook.GetBids(0),
 		Asks:      state.instrumentData.orderBook.GetAsks(0),
 		Timestamp: utils.MicroToTimestamp(state.instrumentData.lastUpdateTime),
-		SeqNum:    state.instrumentData.seqNum,
 	}
 	context.Respond(&messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SnapshotL2: snapshot,
+		SeqNum:     state.instrumentData.seqNum,
 	})
 	return nil
 }
@@ -279,10 +279,8 @@ func (state *Listener) readSocket(context actor.Context) error {
 			obDelta := &models.OBL2Update{
 				Levels:    deltas,
 				Timestamp: utils.MicroToTimestamp(ts),
-				SeqNum:    state.instrumentData.seqNum + 1,
 				Trade:     false,
 			}
-			state.instrumentData.seqNum += 1
 
 			state.instrumentData.orderBook = newOb
 			state.instrumentData.lastUpdateTime = ts
@@ -299,7 +297,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 			// Send OBData
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				UpdateL2: obDelta,
+				SeqNum:   state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
 
 		case bitstamp.WSTrade:
 			tradeData := msg.Message.(bitstamp.WSTrade)
@@ -395,7 +395,10 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
 }
@@ -408,7 +411,10 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		if trd != nil && nowMilli-utils.TimestampToMilli(trd.Timestamp) > 20 {
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				Trades: []*models.AggregatedTrade{trd},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
+
 			// At this point, the state.instrumentData.aggTrade can be our trade, or it can be a new one
 			if state.instrumentData.aggTrade == trd {
 				state.instrumentData.aggTrade = nil

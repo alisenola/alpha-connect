@@ -280,6 +280,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	response := &messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
+		SeqNum:     state.instrumentData.seqNum,
 	}
 
 	if msg.Aggregation == models.L2 {
@@ -287,7 +288,6 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),
 			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			SeqNum:    state.instrumentData.seqNum,
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -333,10 +333,8 @@ func (state *Listener) readSocket(context actor.Context) error {
 			obDelta := &models.OBL2Update{
 				Levels:    []gorderbook.OrderBookLevel{level},
 				Timestamp: utils.MilliToTimestamp(ts),
-				SeqNum:    instr.seqNum + 1,
 				Trade:     false,
 			}
-			instr.seqNum += 1
 
 			instr.lastUpdateTime = ts
 
@@ -351,7 +349,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				UpdateL2: obDelta,
+				SeqNum:   instr.seqNum + 1,
 			})
+			instr.seqNum += 1
 
 		case cryptofacilities.WSTrade:
 			trade := msg.Message.(cryptofacilities.WSTrade)
@@ -449,7 +449,10 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
 }
@@ -462,7 +465,9 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		if trd != nil && nowMilli-utils.TimestampToMilli(trd.Timestamp) > 20 {
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				Trades: []*models.AggregatedTrade{trd},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
 			// At this point, the state.instrumentData.aggTrade can be our trade, or it can be a new one
 			if state.instrumentData.aggTrade == trd {
 				state.instrumentData.aggTrade = nil

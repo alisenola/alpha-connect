@@ -266,12 +266,12 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:      state.instrumentData.orderBook.GetBids(0),
 		Asks:      state.instrumentData.orderBook.GetAsks(0),
 		Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		SeqNum:    state.instrumentData.seqNum,
 	}
 	context.Respond(&messages.MarketDataSnapshot{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SnapshotL2: snapshot,
+		SeqNum:     state.instrumentData.seqNum,
 	})
 	return nil
 }
@@ -289,7 +289,10 @@ func (state *Listener) readSocket(context actor.Context) error {
 			return fmt.Errorf("socket error: %v", err)
 
 		case bitfinex.WSHeartBeat:
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				SeqNum: state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
 
 		case bitfinex.WSSpotDepthL3Data:
 			obData := msg.Message.(bitfinex.WSSpotDepthL3Data)
@@ -311,10 +314,8 @@ func (state *Listener) readSocket(context actor.Context) error {
 				state.instrumentData.obDelta = &models.OBL2Update{
 					Levels:    []gorderbook.OrderBookLevel{},
 					Timestamp: utils.MilliToTimestamp(ts),
-					SeqNum:    state.instrumentData.seqNum + 1,
 					Trade:     false,
 				}
-				state.instrumentData.seqNum += 1
 			}
 
 			if order.Price == 0 {
@@ -430,7 +431,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 			if !state.instrumentData.orderBook.Crossed() {
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					UpdateL2: state.instrumentData.obDelta,
+					SeqNum:   state.instrumentData.seqNum + 1,
 				})
+				state.instrumentData.seqNum += 1
 				state.instrumentData.lastUpdateTime = utils.TimestampToMilli(state.instrumentData.obDelta.Timestamp)
 				state.instrumentData.obDelta = nil
 			}
@@ -573,7 +576,10 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{})
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
 }
@@ -586,7 +592,9 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		if trd != nil && nowMilli-utils.TimestampToMilli(trd.Timestamp) > 20 {
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 				Trades: []*models.AggregatedTrade{trd},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
+			state.instrumentData.seqNum += 1
 			// At this point, the state.instrumentData.aggTrade can be our trade, or it can be a new one
 			if state.instrumentData.aggTrade == trd {
 				state.instrumentData.aggTrade = nil
