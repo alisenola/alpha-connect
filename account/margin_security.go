@@ -239,7 +239,7 @@ func (sec *MarginSecurity) GetInstrument() *models.Instrument {
 // Security sample value will be either margin or base or quote
 // you can then use margin currency to eval portfolio value
 
-func (sec *MarginSecurity) updateSampleValueChange(model modeling.Model, time uint64, sampleSize int) {
+func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, time uint64, sampleSize int) {
 	N := sampleSize
 	// TODO handle change in sample size, need to recompute too
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
@@ -301,7 +301,7 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.Model, time ui
 	sec.sampleTime = time
 }
 
-func (sec *MarginSecurity) AddSampleValueChange(model modeling.Model, time uint64, values []float64) {
+func (sec *MarginSecurity) AddSampleValueChange(model modeling.MarketModel, time uint64, values []float64) {
 	sec.Lock()
 	// Update this instrument sample value change only if bid order or ask order set
 	if len(sec.openBidOrders) > 0 || len(sec.openAskOrders) > 0 {
@@ -318,7 +318,7 @@ func (sec *MarginSecurity) AddSampleValueChange(model modeling.Model, time uint6
 	sec.Unlock()
 }
 
-func (sec *MarginSecurity) GetELROnCancelBid(ID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (sec *MarginSecurity) GetELROnCancelBid(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	N := len(values)
 	sec.Lock()
 
@@ -363,7 +363,7 @@ func (sec *MarginSecurity) GetELROnCancelBid(ID string, model modeling.Model, ti
 	return expectedLogReturn
 }
 
-func (sec *MarginSecurity) GetELROnCancelAsk(ID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (sec *MarginSecurity) GetELROnCancelAsk(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	N := len(values)
 	sec.Lock()
 
@@ -408,7 +408,7 @@ func (sec *MarginSecurity) GetELROnCancelAsk(ID string, model modeling.Model, ti
 	return expectedLogReturn
 }
 
-func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, availableMargin float64) (float64, *COrder) {
+func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, availableMargin float64) (float64, *COrder) {
 	N := len(values)
 	sec.Lock()
 	// We want to see which option is the best, update, do nothing, or cancel
@@ -533,7 +533,7 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mode
 	return maxExpectedLogReturn, maxOrder
 }
 
-func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, availableMargin float64) (float64, *COrder) {
+func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, availableMargin float64) (float64, *COrder) {
 	N := len(values)
 	sec.Lock()
 	// We want to see which option is the best, update, do nothing, or cancel

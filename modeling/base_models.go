@@ -5,7 +5,7 @@ import (
 	"math/rand"
 )
 
-type Model interface {
+type MarketModel interface {
 	GetSecurityPrice(securityID uint64) float64
 	GetAssetPrice(assetID uint32) float64
 	GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64
@@ -70,26 +70,26 @@ func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
 	m.sellTradeModels[securityID] = model
 }
 
-type PriceModel interface {
-	Update(feedID uint64, tick uint64, price float64)
+type Model interface {
+	UpdatePrice(feedID uint64, tick uint64, price float64)
+	UpdateTrade(feedID uint64, tick uint64, price, size float64)
 	Progress(tick uint64)
+}
+
+type PriceModel interface {
+	Model
 	GetPrice() float64
 	GetSamplePrices(time uint64, sampleSize int) []float64
 	Frequency() uint64
 }
 
-type TradeModel interface {
-	Update(feedID uint64, tick uint64, price, size float64)
-	Progress(tick uint64)
-}
-
 type SellTradeModel interface {
-	TradeModel
+	Model
 	GetSampleMatchBid(time uint64, sampleSize int) []float64
 }
 
 type BuyTradeModel interface {
-	TradeModel
+	Model
 	GetSampleMatchAsk(time uint64, sampleSize int) []float64
 }
 
@@ -105,7 +105,11 @@ func NewConstantPriceModel(price float64) PriceModel {
 	}
 }
 
-func (m *ConstantPriceModel) Update(_ uint64, _ uint64, _ float64) {
+func (m *ConstantPriceModel) UpdatePrice(_ uint64, _ uint64, _ float64) {
+
+}
+
+func (m *ConstantPriceModel) UpdateTrade(_ uint64, _ uint64, _ float64, _ float64) {
 
 }
 
@@ -149,9 +153,8 @@ func NewGBMPriceModel(price float64, freq uint64) PriceModel {
 	}
 }
 
-func (m *GBMPriceModel) Update(_ uint64, _ uint64, _ float64) {
-
-}
+func (m *GBMPriceModel) UpdatePrice(_ uint64, _ uint64, _ float64)            {}
+func (m *GBMPriceModel) UpdateTrade(_ uint64, _ uint64, _ float64, _ float64) {}
 
 func (m *GBMPriceModel) Progress(time uint64) {
 	for m.time < time {
@@ -195,7 +198,11 @@ func NewConstantTradeModel(match float64) *ConstantTradeModel {
 	}
 }
 
-func (m *ConstantTradeModel) Update(_ uint64, _ uint64, _ float64) {
+func (m *ConstantTradeModel) UpdatePrice(_ uint64, _ uint64, _ float64) {
+
+}
+
+func (m *ConstantTradeModel) UpdateTrade(_ uint64, _ uint64, _ float64, _ float64) {
 
 }
 

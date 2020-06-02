@@ -42,7 +42,7 @@ func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.AccountID] = account
 }
 
-func (p *Portfolio) Value(model modeling.Model) float64 {
+func (p *Portfolio) Value(model modeling.MarketModel) float64 {
 	value := 0.
 	for _, exch := range p.accountPortfolios {
 		value += exch.Value(model)
@@ -63,7 +63,7 @@ func (p *Portfolio) GetAsset(asset uint32) float64 {
 */
 
 // Return the expected log return
-func (p *Portfolio) ExpectedLogReturn(model modeling.Model, time uint64) float64 {
+func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) float64 {
 	N := p.sampleSize
 
 	var value float64 = 0
@@ -128,7 +128,7 @@ func (p *Portfolio) ExpectedLogReturnOnCancel(time uint64, exchange uint64, inst
 	return maxExpectedLogReturn, true
 }
 */
-func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model modeling.Model, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model modeling.MarketModel, time uint64) float64 {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -146,7 +146,7 @@ func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model mo
 	return target.GetELROnCancelBid(orderID, model, time, values, value)
 }
 
-func (p *Portfolio) GetELROnCancelAsk(accountID string, orderID string, model modeling.Model, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelAsk(accountID string, orderID string, model modeling.MarketModel, time uint64) float64 {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -164,7 +164,7 @@ func (p *Portfolio) GetELROnCancelAsk(accountID string, orderID string, model mo
 	return target.GetELROnCancelAsk(orderID, model, time, values, value)
 }
 
-func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model modeling.Model, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -182,7 +182,7 @@ func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model 
 	return target.GetELROnLimitBid(securityID, model, time, values, value, prices, queues, maxQuantity)
 }
 
-func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model modeling.Model, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -206,7 +206,7 @@ func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model 
 // This assumption kind of make sense, as if, in case of bid, the expected match is big at one level, might as well place the order
 // at the level bellow to get a higher spread.
 // When at ask, a // TODO think more about that
-func (p *Portfolio) GetELROnLimitBidChange(accountID, orderID string, model modeling.Model, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitBidChange(accountID, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -224,7 +224,7 @@ func (p *Portfolio) GetELROnLimitBidChange(accountID, orderID string, model mode
 	return target.GetELROnLimitBidChange(orderID, model, time, values, value, prices, queues, maxQuantity)
 }
 
-func (p *Portfolio) GetELROnLimitAskChange(accountID, orderID string, model modeling.Model, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitAskChange(accountID, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 

@@ -8,7 +8,7 @@ import (
 
 // TODO what about updating securities ?
 
-func (accnt *Account) Value(model modeling.Model) float64 {
+func (accnt *Account) Value(model modeling.MarketModel) float64 {
 	value := 0.
 	for k, v := range accnt.balances {
 		value += v * model.GetAssetPrice(k)
@@ -30,7 +30,7 @@ func (accnt *Account) Value(model modeling.Model) float64 {
 	return math.Max(value, 0.)
 }
 
-func (accnt *Account) AddSampleValues(model modeling.Model, time uint64, values []float64) {
+func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, values []float64) {
 	N := len(values)
 	for k, v := range accnt.balances {
 		samplePrices := model.GetSampleAssetPrices(k, time, N)
@@ -65,7 +65,7 @@ func (accnt *Account) AddSampleValues(model modeling.Model, time uint64, values 
 	// TODO handle neg values
 }
 
-func (accnt Account) GetELROnCancelBid(orderID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (accnt Account) GetELROnCancelBid(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	if order, ok := accnt.ordersClID[orderID]; ok {
 		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnCancelBid(orderID, model, time, values, value)
 	} else {
@@ -74,7 +74,7 @@ func (accnt Account) GetELROnCancelBid(orderID string, model modeling.Model, tim
 	}
 }
 
-func (accnt Account) GetELROnCancelAsk(orderID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (accnt Account) GetELROnCancelAsk(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	if order, ok := accnt.ordersClID[orderID]; ok {
 		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnCancelAsk(orderID, model, time, values, value)
 	} else {
@@ -83,15 +83,15 @@ func (accnt Account) GetELROnCancelAsk(orderID string, model modeling.Model, tim
 	}
 }
 
-func (accnt Account) GetELROnLimitBid(securityID uint64, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
+func (accnt Account) GetELROnLimitBid(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitBidChange("", model, time, values, value, prices, queues, maxQuote)
 }
 
-func (accnt Account) GetELROnLimitAsk(securityID uint64, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
+func (accnt Account) GetELROnLimitAsk(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitAskChange("", model, time, values, value, prices, queues, maxBase)
 }
 
-func (accnt Account) GetELROnLimitBidChange(orderID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
+func (accnt Account) GetELROnLimitBidChange(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
 	if order, ok := accnt.ordersClID[orderID]; ok {
 		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnLimitBidChange(orderID, model, time, values, value, prices, queues, maxQuote)
 	} else {
@@ -100,7 +100,7 @@ func (accnt Account) GetELROnLimitBidChange(orderID string, model modeling.Model
 	}
 }
 
-func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
+func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
 	if order, ok := accnt.ordersClID[orderID]; ok {
 		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnLimitAskChange(orderID, model, time, values, value, prices, queues, maxBase)
 	} else {
@@ -109,7 +109,7 @@ func (accnt Account) GetELROnLimitAskChange(orderID string, model modeling.Model
 	}
 }
 
-func (accnt *Account) GetLeverage(model modeling.Model) float64 {
+func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	usedMargin := 0.
 	for k, p := range accnt.positions {
@@ -123,7 +123,7 @@ func (accnt *Account) GetLeverage(model modeling.Model) float64 {
 	return usedMargin / availableMargin
 }
 
-func (accnt *Account) GetAvailableMargin(model modeling.Model, leverage float64) float64 {
+func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage float64) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	for k, p := range accnt.positions {
 		// Entry price not defined if size = 0, division by 0 !

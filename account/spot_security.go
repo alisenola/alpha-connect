@@ -182,7 +182,7 @@ func (sec *SpotSecurity) GetInstrument() *models.Instrument {
 	}
 }
 
-func (sec *SpotSecurity) updateSampleValueChange(model modeling.Model, time uint64, sampleSize int) {
+func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, time uint64, sampleSize int) {
 	// TODO refresh when sample size changes
 	N := sampleSize
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
@@ -225,7 +225,7 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.Model, time uint
 	sec.sampleTime = time
 }
 
-func (sec *SpotSecurity) AddSampleValueChange(model modeling.Model, time uint64, values []float64) {
+func (sec *SpotSecurity) AddSampleValueChange(model modeling.MarketModel, time uint64, values []float64) {
 	sec.Lock()
 	// Update this instrument sample value change only if bid order or ask order set
 	if len(sec.openBidOrders) > 0 || len(sec.openAskOrders) > 0 {
@@ -242,7 +242,7 @@ func (sec *SpotSecurity) AddSampleValueChange(model modeling.Model, time uint64,
 	sec.Unlock()
 }
 
-func (sec *SpotSecurity) GetELROnCancelBid(ID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (sec *SpotSecurity) GetELROnCancelBid(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	N := len(values)
 	sec.Lock()
 
@@ -278,7 +278,7 @@ func (sec *SpotSecurity) GetELROnCancelBid(ID string, model modeling.Model, time
 	return expectedLogReturn
 }
 
-func (sec *SpotSecurity) GetELROnCancelAsk(ID string, model modeling.Model, time uint64, values []float64, value float64) float64 {
+func (sec *SpotSecurity) GetELROnCancelAsk(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	N := len(values)
 	sec.Lock()
 
@@ -314,7 +314,7 @@ func (sec *SpotSecurity) GetELROnCancelAsk(ID string, model modeling.Model, time
 	return expectedLogReturn
 }
 
-func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
+func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
 	N := len(values)
 	sec.Lock()
 	// We want to see which option is the best, update, do nothing, or cancel
@@ -400,7 +400,7 @@ func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.Model,
 	return maxExpectedLogReturn, maxOrder
 }
 
-func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
+func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
 	N := len(values)
 	sec.Lock()
 	// We want to see which option is the best, update, do nothing, or cancel

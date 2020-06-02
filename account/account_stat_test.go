@@ -12,7 +12,7 @@ import (
 )
 
 var bitmex = constants.BITMEX
-var model modeling.Model
+var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
 	mdl := modeling.NewMapModel()

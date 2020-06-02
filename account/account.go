@@ -29,11 +29,11 @@ type Security interface {
 	GetLotPrecision() float64
 	GetInstrument() *models.Instrument
 	Clear()
-	AddSampleValueChange(model modeling.Model, time uint64, values []float64)
-	GetELROnCancelBid(ID string, model modeling.Model, time uint64, values []float64, value float64) float64
-	GetELROnCancelAsk(ID string, model modeling.Model, time uint64, values []float64, value float64) float64
-	GetELROnLimitBidChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder)
-	GetELROnLimitAskChange(ID string, model modeling.Model, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
+	AddSampleValueChange(model modeling.MarketModel, time uint64, values []float64)
+	GetELROnCancelBid(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64
+	GetELROnCancelAsk(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64
+	GetELROnLimitBidChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder)
+	GetELROnLimitAskChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
 }
 
 type Account struct {
