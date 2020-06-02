@@ -9,7 +9,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	gitlab.com/alphaticks/gorderbook v0.0.0-20200514150550-2800aed69dfe
-	gitlab.com/alphaticks/xchanger v0.0.0-20200524105213-1d8bfc1c5fe3
+	gitlab.com/alphaticks/xchanger v0.0.0-20200602143927-dd23af54e838
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../../alphaticks/xchanger
