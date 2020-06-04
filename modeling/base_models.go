@@ -12,6 +12,10 @@ type MarketModel interface {
 	GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
+	SetSecurityPriceModel(securityID uint64, model PriceModel)
+	SetBuyTradeModel(securityID uint64, model BuyTradeModel)
+	SetSellTradeModel(securityID uint64, model SellTradeModel)
+	SetAssetPriceModel(assetID uint32, model PriceModel)
 }
 
 type MapModel struct {
