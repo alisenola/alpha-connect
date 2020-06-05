@@ -188,8 +188,8 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, tim
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleBasePrice := model.GetSampleAssetPrices(sec.Underlying.ID, time, N)
-	sampleQuotePrice := model.GetSampleAssetPrices(sec.QuoteCurrency.ID, time, N)
+	sampleBasePrice := model.GetSamplePrices(uint64(sec.Underlying.ID), time, N)
+	sampleQuotePrice := model.GetSamplePrices(uint64(sec.QuoteCurrency.ID), time, N)
 	for i := 0; i < N; i++ {
 		sampleValueChange[i] = 0.
 	}

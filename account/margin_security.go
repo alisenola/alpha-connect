@@ -245,8 +245,8 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleMarginPrice := model.GetSampleAssetPrices(sec.marginCurrency.ID, time, N)
-	sampleSecurityPrice := model.GetSampleSecurityPrices(sec.SecurityID, time, N)
+	sampleMarginPrice := model.GetSamplePrices(uint64(sec.marginCurrency.ID), time, N)
+	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
 	mul := sec.Multiplier.Value
 	makerFee := sec.MakerFee.Value
 

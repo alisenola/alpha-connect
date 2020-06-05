@@ -11,16 +11,16 @@ import (
 func (accnt *Account) Value(model modeling.MarketModel) float64 {
 	value := 0.
 	for k, v := range accnt.balances {
-		value += v * model.GetAssetPrice(k)
+		value += v * model.GetPrice(uint64(k))
 	}
-	marginPrice := model.GetAssetPrice(accnt.marginCurrency.ID)
+	marginPrice := model.GetPrice(uint64(accnt.marginCurrency.ID))
 	for k, v := range accnt.positions {
 		cost := float64(v.cost) / v.marginPrecision
 		size := float64(v.rawSize) / v.lotPrecision
 		if v.inverse {
-			value += (cost - (1./model.GetSecurityPrice(k))*size*v.multiplier) * marginPrice
+			value += (cost - (1./model.GetPrice(k))*size*v.multiplier) * marginPrice
 		} else {
-			value += (cost - model.GetSecurityPrice(k)*size*v.multiplier) * marginPrice
+			value += (cost - model.GetPrice(k)*size*v.multiplier) * marginPrice
 		}
 	}
 
@@ -33,12 +33,12 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, values []float64) {
 	N := len(values)
 	for k, v := range accnt.balances {
-		samplePrices := model.GetSampleAssetPrices(k, time, N)
+		samplePrices := model.GetSamplePrices(uint64(k), time, N)
 		for i := 0; i < N; i++ {
 			values[i] += v * samplePrices[i]
 		}
 	}
-	marginPrices := model.GetSampleAssetPrices(accnt.marginCurrency.ID, time, N)
+	marginPrices := model.GetSamplePrices(uint64(accnt.marginCurrency.ID), time, N)
 	for k, v := range accnt.positions {
 		cost := float64(v.cost) / v.marginPrecision
 		size := float64(v.rawSize) / v.lotPrecision
@@ -49,7 +49,7 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 		} else {
 			exp = 1
 		}
-		samplePrices := model.GetSampleSecurityPrices(k, time, N)
+		samplePrices := model.GetSamplePrices(uint64(k), time, N)
 		for i := 0; i < N; i++ {
 			values[i] -= (cost - math.Pow(samplePrices[i], exp)*factor) * marginPrices[i]
 		}
@@ -113,7 +113,7 @@ func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	usedMargin := 0.
 	for k, p := range accnt.positions {
-		exitPrice := model.GetSecurityPrice(k)
+		exitPrice := model.GetPrice(k)
 		if p.inverse {
 			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / exitPrice) * math.Abs(p.multiplier)
 		} else {
@@ -130,7 +130,7 @@ func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage fl
 		if p.rawSize == 0 {
 			continue
 		}
-		exitPrice := model.GetSecurityPrice(k)
+		exitPrice := model.GetPrice(k)
 		cost := float64(p.cost) / accnt.marginPrecision
 
 		if p.inverse {
