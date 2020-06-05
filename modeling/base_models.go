@@ -108,11 +108,7 @@ func (m *ConstantPriceModel) Frequency() uint64 {
 	return 0
 }
 
-func (m *ConstantPriceModel) GetAssetPrice(assetID uint32) float64 {
-	return m.price
-}
-
-func (m *ConstantPriceModel) GetSampleAssetPrices(time uint64, sampleSize int) []float64 {
+func (m *ConstantPriceModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
 	if m.samplePrices == nil || len(m.samplePrices) != sampleSize {
 		m.samplePrices = make([]float64, sampleSize, sampleSize)
 		for i := 0; i < sampleSize; i++ {
@@ -122,18 +118,8 @@ func (m *ConstantPriceModel) GetSampleAssetPrices(time uint64, sampleSize int) [
 	return m.samplePrices
 }
 
-func (m *ConstantPriceModel) GetSecurityPrice(securityID uint64) float64 {
+func (m *ConstantPriceModel) GetPrice(ID uint64) float64 {
 	return m.price
-}
-
-func (m *ConstantPriceModel) GetSampleSecurityPrices(time uint64, sampleSize int) []float64 {
-	if m.samplePrices == nil || len(m.samplePrices) != sampleSize {
-		m.samplePrices = make([]float64, sampleSize, sampleSize)
-		for i := 0; i < sampleSize; i++ {
-			m.samplePrices[i] = m.price
-		}
-	}
-	return m.samplePrices
 }
 
 type GBMPriceModel struct {
@@ -168,7 +154,7 @@ func (m *GBMPriceModel) Frequency() uint64 {
 	return m.freq
 }
 
-func (m *GBMPriceModel) GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64 {
+func (m *GBMPriceModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
 	if m.samplePrices == nil || len(m.samplePrices) != sampleSize || m.sampleTime != time {
 		intervalLength := int((time - m.time) / m.freq)
 		m.samplePrices = make([]float64, sampleSize, sampleSize)
@@ -183,26 +169,7 @@ func (m *GBMPriceModel) GetSampleAssetPrices(assetID uint32, time uint64, sample
 	return m.samplePrices
 }
 
-func (m *GBMPriceModel) GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64 {
-	if m.samplePrices == nil || len(m.samplePrices) != sampleSize || m.sampleTime != time {
-		intervalLength := int((time - m.time) / m.freq)
-		m.samplePrices = make([]float64, sampleSize, sampleSize)
-		for i := 0; i < sampleSize; i++ {
-			m.samplePrices[i] = m.price
-			for j := 0; j < intervalLength; j++ {
-				m.samplePrices[i] *= (rand.NormFloat64() / 10) + 1
-			}
-		}
-		m.sampleTime = time
-	}
-	return m.samplePrices
-}
-
-func (m *GBMPriceModel) GetAssetPrice(assetID uint32) float64 {
-	return m.price
-}
-
-func (m *GBMPriceModel) GetSecurityPrice(securityID uint64) float64 {
+func (m *GBMPriceModel) GetPrice(ID uint64) float64 {
 	return m.price
 }
 
