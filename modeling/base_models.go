@@ -12,42 +12,42 @@ type MarketModel interface {
 	GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
-	SetSecurityPriceModel(securityID uint64, model SecurityPriceModel)
+	SetSecurityPriceModel(securityID uint64, model PriceModel)
 	SetBuyTradeModel(securityID uint64, model BuyTradeModel)
 	SetSellTradeModel(securityID uint64, model SellTradeModel)
-	SetAssetPriceModel(assetID uint32, model AssetPriceModel)
+	SetAssetPriceModel(assetID uint32, model PriceModel)
 }
 
 type MapModel struct {
 	buyTradeModels      map[uint64]BuyTradeModel
 	sellTradeModels     map[uint64]SellTradeModel
-	securityPriceModels map[uint64]SecurityPriceModel
-	assetPriceModels    map[uint32]AssetPriceModel
+	securityPriceModels map[uint64]PriceModel
+	assetPriceModels    map[uint32]PriceModel
 }
 
 func NewMapModel() *MapModel {
 	return &MapModel{
 		buyTradeModels:      make(map[uint64]BuyTradeModel),
 		sellTradeModels:     make(map[uint64]SellTradeModel),
-		securityPriceModels: make(map[uint64]SecurityPriceModel),
-		assetPriceModels:    make(map[uint32]AssetPriceModel),
+		securityPriceModels: make(map[uint64]PriceModel),
+		assetPriceModels:    make(map[uint32]PriceModel),
 	}
 }
 
 func (m *MapModel) GetSecurityPrice(securityID uint64) float64 {
-	return m.securityPriceModels[securityID].GetSecurityPrice(securityID)
+	return m.securityPriceModels[securityID].GetPrice(securityID)
 }
 
 func (m *MapModel) GetAssetPrice(assetID uint32) float64 {
-	return m.assetPriceModels[assetID].GetAssetPrice(assetID)
+	return m.assetPriceModels[assetID].GetPrice(uint64(assetID))
 }
 
 func (m *MapModel) GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64 {
-	return m.assetPriceModels[assetID].GetSampleAssetPrices(assetID, time, sampleSize)
+	return m.assetPriceModels[assetID].GetSamplePrices(uint64(assetID), time, sampleSize)
 }
 
 func (m *MapModel) GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64 {
-	return m.securityPriceModels[securityID].GetSampleSecurityPrices(securityID, time, sampleSize)
+	return m.securityPriceModels[securityID].GetSamplePrices(securityID, time, sampleSize)
 }
 
 func (m *MapModel) GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64 {
@@ -58,11 +58,11 @@ func (m *MapModel) GetSampleMatchAsk(securityID uint64, time uint64, sampleSize 
 	return m.buyTradeModels[securityID].GetSampleMatchAsk(securityID, time, sampleSize)
 }
 
-func (m *MapModel) SetSecurityPriceModel(securityID uint64, model SecurityPriceModel) {
+func (m *MapModel) SetSecurityPriceModel(securityID uint64, model PriceModel) {
 	m.securityPriceModels[securityID] = model
 }
 
-func (m *MapModel) SetAssetPriceModel(assetID uint32, model AssetPriceModel) {
+func (m *MapModel) SetAssetPriceModel(assetID uint32, model PriceModel) {
 	m.assetPriceModels[assetID] = model
 }
 
@@ -80,18 +80,11 @@ type Model interface {
 	Progress(tick uint64)
 }
 
-type AssetPriceModel interface {
+type PriceModel interface {
 	Model
-	GetAssetPrice(assetID uint32) float64
-	GetSampleAssetPrices(assetID uint32, time uint64, sampleSize int) []float64
 	Frequency() uint64
-}
-
-type SecurityPriceModel interface {
-	Model
-	GetSecurityPrice(securityID uint64) float64
-	GetSampleSecurityPrices(securityID uint64, time uint64, sampleSize int) []float64
-	Frequency() uint64
+	GetPrice(feedID uint64) float64
+	GetSamplePrices(feedID uint64, time uint64, sampleSize int) []float64
 }
 
 type SellTradeModel interface {
