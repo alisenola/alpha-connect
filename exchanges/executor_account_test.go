@@ -5,6 +5,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
+	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -155,7 +156,7 @@ func TestBitmexAccount(t *testing.T) {
 
 	bitmex.EnableTestNet()
 
-	account := &models.Account{
+	accnt := &models.Account{
 		AccountID: "299210",
 		Exchange:  &constants.BITMEX,
 		Credentials: &xchangerModels.APICredentials{
@@ -171,10 +172,10 @@ func TestBitmexAccount(t *testing.T) {
 	}
 
 	exchanges := []*xchangerModels.Exchange{&constants.BITMEX}
-	accounts := []*models.Account{account}
+	accounts := []*account.Account{NewAccount(accnt)}
 	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, accounts)), "executor")
 
-	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(account, instrument)))
+	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(accnt, instrument)))
 	time.Sleep(5 * time.Second)
 	res, err := actor.EmptyRootContext.RequestFuture(accntChecker, &GetAccntCheckerStats{}, 10*time.Second).Result()
 	if err != nil {

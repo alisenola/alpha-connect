@@ -26,6 +26,7 @@ type OBChecker struct {
 	security  *models.Security
 	orderbook *gorderbook.OrderBookL2
 	seqNum    uint64
+	synced    bool
 	trades    int
 	OBUpdates int
 	err       error
@@ -42,6 +43,7 @@ func NewOBChecker(security *models.Security) actor.Actor {
 		security:  security,
 		orderbook: nil,
 		seqNum:    0,
+		synced:    false,
 		trades:    0,
 		OBUpdates: 0,
 		err:       nil,
@@ -117,7 +119,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 	state.OBUpdates += 1
 	state.orderbook = gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
 	state.orderbook.Sync(snapshot.SnapshotL2.Bids, snapshot.SnapshotL2.Asks)
-	state.seqNum = snapshot.SnapshotL2.SeqNum
+	state.seqNum = snapshot.SeqNum
 	if state.orderbook.Crossed() {
 		return fmt.Errorf("crossed OB on snapshot \n" + state.orderbook.String())
 	}
@@ -127,12 +129,19 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) error {
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
-
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
-	if refresh.UpdateL2 != nil && refresh.UpdateL2.SeqNum > state.seqNum {
-		if state.seqNum+1 != refresh.UpdateL2.SeqNum {
-			return fmt.Errorf("out of order sequence %d %d", state.seqNum, refresh.UpdateL2.SeqNum)
-		}
+
+	if !state.synced && refresh.SeqNum <= state.seqNum {
+		//fmt.Println("SKIPPING", refresh.SeqNum, state.securityInfo.seqNum)
+		return nil
+	}
+	state.synced = true
+	if state.seqNum+1 != refresh.SeqNum {
+		//fmt.Println("OUT OF SYNC", state.securityInfo.seqNum, refresh.SeqNum)
+		return fmt.Errorf("out of order sequence %d %d", state.seqNum, refresh.SeqNum)
+	}
+
+	if refresh.UpdateL2 != nil {
 		for _, l := range refresh.UpdateL2.Levels {
 			rawPrice := l.Price * float64(tickPrecision)
 			rawQty := l.Quantity * float64(lotPrecision)
@@ -147,7 +156,6 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 		if state.orderbook.Crossed() {
 			return fmt.Errorf("crossed OB \n" + state.orderbook.String())
 		}
-		state.seqNum = refresh.UpdateL2.SeqNum
 		state.OBUpdates += 1
 	}
 
@@ -164,6 +172,7 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 			state.trades += 1
 		}
 	}
+	state.seqNum = refresh.SeqNum
 	return nil
 }
 
