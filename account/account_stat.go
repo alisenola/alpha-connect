@@ -13,14 +13,18 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 	for k, v := range accnt.balances {
 		value += v * model.GetPrice(uint64(k))
 	}
+
 	marginPrice := model.GetPrice(uint64(accnt.marginCurrency.ID))
+
 	for k, v := range accnt.positions {
-		cost := float64(v.cost) / v.marginPrecision
-		size := float64(v.rawSize) / v.lotPrecision
-		if v.inverse {
-			value += (cost - (1./model.GetPrice(k))*size*v.multiplier) * marginPrice
-		} else {
-			value += (cost - model.GetPrice(k)*size*v.multiplier) * marginPrice
+		if v.rawSize > 0 {
+			cost := float64(v.cost) / v.marginPrecision
+			size := float64(v.rawSize) / v.lotPrecision
+			if v.inverse {
+				value += (cost - (1./model.GetPrice(k))*size*v.multiplier) * marginPrice
+			} else {
+				value += (cost - model.GetPrice(k)*size*v.multiplier) * marginPrice
+			}
 		}
 	}
 
