@@ -105,6 +105,10 @@ func (m *ConstantPriceModel) Progress(_ uint64) {
 
 }
 
+func (m *ConstantPriceModel) Ready() bool {
+	return true
+}
+
 func (m *ConstantPriceModel) Frequency() uint64 {
 	return 0
 }
