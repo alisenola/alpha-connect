@@ -495,7 +495,6 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 		}
 
 		expectedLogReturn /= float64(N)
-
 		if expectedLogReturn > maxExpectedLogReturn {
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = &COrder{
@@ -529,7 +528,6 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
 	}
 	sec.Unlock()
-
 	return maxExpectedLogReturn, maxOrder
 }
 

@@ -43,17 +43,20 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 		}
 	}
 	marginPrices := model.GetSamplePrices(uint64(accnt.marginCurrency.ID), time, N)
-	for k, v := range accnt.positions {
-		cost := float64(v.cost) / v.marginPrecision
-		size := float64(v.rawSize) / v.lotPrecision
-		factor := size * v.multiplier
+	for k, p := range accnt.positions {
+		if p.rawSize == 0 {
+			continue
+		}
+		cost := float64(p.cost) / p.marginPrecision
+		size := float64(p.rawSize) / p.lotPrecision
+		factor := size * p.multiplier
 		var exp float64
-		if v.inverse {
+		if p.inverse {
 			exp = -1
 		} else {
 			exp = 1
 		}
-		samplePrices := model.GetSamplePrices(uint64(k), time, N)
+		samplePrices := model.GetSamplePrices(k, time, N)
 		for i := 0; i < N; i++ {
 			values[i] -= (cost - math.Pow(samplePrices[i], exp)*factor) * marginPrices[i]
 		}
@@ -117,6 +120,9 @@ func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	usedMargin := 0.
 	for k, p := range accnt.positions {
+		if p.rawSize == 0 {
+			continue
+		}
 		exitPrice := model.GetPrice(k)
 		if p.inverse {
 			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / exitPrice) * math.Abs(p.multiplier)
