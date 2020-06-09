@@ -13,6 +13,7 @@ type MarketModel interface {
 	SetPriceModel(ID uint64, model PriceModel)
 	SetBuyTradeModel(ID uint64, model BuyTradeModel)
 	SetSellTradeModel(ID uint64, model SellTradeModel)
+	Progress(time uint64)
 }
 
 type MapModel struct {
@@ -55,6 +56,18 @@ func (m *MapModel) SetBuyTradeModel(securityID uint64, model BuyTradeModel) {
 
 func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
 	m.sellTradeModels[securityID] = model
+}
+
+func (m *MapModel) Progress(time uint64) {
+	for _, m := range m.priceModels {
+		m.Progress(time)
+	}
+	for _, m := range m.sellTradeModels {
+		m.Progress(time)
+	}
+	for _, m := range m.buyTradeModels {
+		m.Progress(time)
+	}
 }
 
 type Model interface {
