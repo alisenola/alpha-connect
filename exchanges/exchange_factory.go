@@ -31,7 +31,9 @@ func NewAccount(accountInfo *models.Account) *account.Account {
 	}
 	switch accountInfo.Exchange.ID {
 	case constants.BITMEX.ID:
-		return account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
+		accnt := account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
+		Portfolio.AddAccount(accnt)
+		return accnt
 	default:
 		return nil
 	}
