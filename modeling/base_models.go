@@ -7,8 +7,6 @@ import (
 
 type MarketModel interface {
 	GetPrice(ID uint64) float64
-	GetPairPrice(base uint64, quote uint64) float64
-	GetSamplePairPrices(base uint64, quote uint64, time uint64, sampleSize int) []float64
 	GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchAsk(ID uint64, time uint64, sampleSize int) []float64
@@ -36,27 +34,6 @@ func NewMapModel(quote uint64) *MapModel {
 
 func (m *MapModel) GetPrice(ID uint64) float64 {
 	return m.priceModels[ID].GetPrice(ID)
-}
-
-func (m *MapModel) GetPairPrice(base uint64, quote uint64) float64 {
-	if quote == m.quote {
-		return m.priceModels[base].GetPrice(base)
-	} else {
-		return m.priceModels[base].GetPrice(base) / m.priceModels[quote].GetPrice(quote)
-	}
-}
-
-func (m *MapModel) GetSamplePairPrices(base uint64, quote uint64, time uint64, sampleSize int) []float64 {
-	if quote == m.quote {
-		return m.priceModels[base].GetSamplePrices(base, time, sampleSize)
-	} else {
-		samplesBase := m.priceModels[base].GetSamplePrices(base, time, sampleSize)
-		samplesQuote := m.priceModels[quote].GetSamplePrices(quote, time, sampleSize)
-		for i := 0; i < sampleSize; i++ {
-			samplesBase[i] /= samplesQuote[i]
-		}
-		return samplesBase
-	}
 }
 
 func (m *MapModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
