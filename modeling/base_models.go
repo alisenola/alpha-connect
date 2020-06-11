@@ -7,6 +7,8 @@ import (
 
 type MarketModel interface {
 	GetPrice(ID uint64) float64
+	GetPairPrice(base uint32, quote uint32) float64
+	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64
 	GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchAsk(ID uint64, time uint64, sampleSize int) []float64
@@ -20,20 +22,28 @@ type MapModel struct {
 	buyTradeModels  map[uint64]BuyTradeModel
 	sellTradeModels map[uint64]SellTradeModel
 	priceModels     map[uint64]PriceModel
-	quote           uint64
 }
 
-func NewMapModel(quote uint64) *MapModel {
+func NewMapModel() *MapModel {
 	return &MapModel{
 		buyTradeModels:  make(map[uint64]BuyTradeModel),
 		sellTradeModels: make(map[uint64]SellTradeModel),
 		priceModels:     make(map[uint64]PriceModel),
-		quote:           quote,
 	}
 }
 
 func (m *MapModel) GetPrice(ID uint64) float64 {
 	return m.priceModels[ID].GetPrice(ID)
+}
+
+func (m *MapModel) GetPairPrice(base uint32, quote uint32) float64 {
+	ID := uint64(base)<<32 | uint64(quote)
+	return m.priceModels[ID].GetPrice(ID)
+}
+
+func (m *MapModel) GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64 {
+	ID := uint64(base)<<32 | uint64(quote)
+	return m.priceModels[ID].GetSamplePrices(ID, time, sampleSize)
 }
 
 func (m *MapModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
