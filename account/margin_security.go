@@ -247,8 +247,17 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
 	sampleMarginPrice := model.GetSamplePrices(uint64(sec.marginCurrency.ID), time, N)
 	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
+	securityPrice := model.GetPrice(sec.SecurityID)
+
 	mul := sec.Multiplier.Value
 	makerFee := sec.MakerFee.Value
+
+	if sec.IsInverse {
+		for i := 0; i < sampleSize; i++ {
+			sampleMatchBid[i] *= securityPrice
+			sampleMatchAsk[i] *= securityPrice
+		}
+	}
 
 	for _, o := range sec.openBidOrders {
 		var price, exp float64
