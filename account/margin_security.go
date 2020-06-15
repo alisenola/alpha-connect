@@ -4,6 +4,7 @@ import (
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"
@@ -245,7 +246,7 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleMarginPrice := model.GetSamplePrices(uint64(sec.marginCurrency.ID), time, N)
+	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, constants.DOLLAR.ID, time, N)
 	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
 	securityPrice := model.GetPrice(sec.SecurityID)
 

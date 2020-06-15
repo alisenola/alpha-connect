@@ -3,6 +3,7 @@ package account
 import (
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 )
 
@@ -11,10 +12,10 @@ import (
 func (accnt *Account) Value(model modeling.MarketModel) float64 {
 	value := 0.
 	for k, v := range accnt.balances {
-		value += v * model.GetPrice(uint64(k))
+		value += v * model.GetPairPrice(k, constants.DOLLAR.ID)
 	}
 
-	marginPrice := model.GetPrice(uint64(accnt.marginCurrency.ID))
+	marginPrice := model.GetPairPrice(accnt.marginCurrency.ID, constants.DOLLAR.ID)
 
 	for k, v := range accnt.positions {
 		if v.rawSize > 0 {
@@ -37,12 +38,12 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, values []float64) {
 	N := len(values)
 	for k, v := range accnt.balances {
-		samplePrices := model.GetSamplePrices(uint64(k), time, N)
+		samplePrices := model.GetSamplePairPrices(k, constants.DOLLAR.ID, time, N)
 		for i := 0; i < N; i++ {
 			values[i] += v * samplePrices[i]
 		}
 	}
-	marginPrices := model.GetSamplePrices(uint64(accnt.marginCurrency.ID), time, N)
+	marginPrices := model.GetSamplePairPrices(accnt.marginCurrency.ID, constants.DOLLAR.ID, time, N)
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
 			continue

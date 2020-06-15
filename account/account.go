@@ -484,6 +484,14 @@ func (accnt *Account) GetBalances() []*models.Balance {
 	return balances
 }
 
+func (accnt *Account) GetBalance(asset uint32) float64 {
+	if b, ok := accnt.balances[asset]; ok {
+		return b
+	} else {
+		return 0.
+	}
+}
+
 func (accnt *Account) GetPositionSize(securityID uint64) float64 {
 	if pos, ok := accnt.positions[securityID]; ok {
 		// TODO mutex ?
