@@ -227,6 +227,10 @@ func (m *ConstantTradeModel) Progress(_ uint64) {
 
 }
 
+func (m *ConstantTradeModel) Ready() bool {
+	return true
+}
+
 func (m *ConstantTradeModel) GetSampleMatchAsk(ID, time uint64, sampleSize int) []float64 {
 	if m.sampleMatch == nil || len(m.sampleMatch) != sampleSize {
 		m.sampleMatch = make([]float64, sampleSize, sampleSize)
