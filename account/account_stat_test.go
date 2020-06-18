@@ -16,12 +16,12 @@ var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
 	mdl := modeling.NewMapModel()
-	mdl.SetAssetPriceModel(constants.BITCOIN.ID, modeling.NewConstantPriceModel(100.))
-	mdl.SetAssetPriceModel(constants.ETHEREUM.ID, modeling.NewConstantPriceModel(10.))
-	mdl.SetAssetPriceModel(constants.DOLLAR.ID, modeling.NewConstantPriceModel(1.))
+	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(100.))
+	mdl.SetPriceModel(uint64(constants.ETHEREUM.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(10.))
+	mdl.SetPriceModel(uint64(constants.DOLLAR.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1.))
 
-	mdl.SetSecurityPriceModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(100.))
-	mdl.SetSecurityPriceModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(10.))
+	mdl.SetPriceModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(100.))
+	mdl.SetPriceModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(10.))
 
 	mdl.SetBuyTradeModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetBuyTradeModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
@@ -123,6 +123,85 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 	if math.Abs(avMargin-expectedAv) > 0.0000001 {
 		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
 	}
+	fmt.Println(account.GetLeverage(model))
+}
+
+func TestAccount_PnL_Inverse(t *testing.T) {
+	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
+		t.Fatal(err)
+	}
+	expectedAv := 0.1
+	avMargin := account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
+	_, rej := account.NewOrder(&models.Order{
+		OrderID:       "buy1",
+		ClientOrderID: "buy1",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: 0},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 100,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 90.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, rej = account.NewOrder(&models.Order{
+		OrderID:       "sell1",
+		ClientOrderID: "sell1",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: 0},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Sell,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 100,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 110.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err = account.ConfirmNewOrder("sell1", "sell1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	account.ConfirmFill("buy1", "", 90., 10, false)
+	// Balance + maker rebate + entry cost + PnL
+	expectedAv = 0.1 + (0.00025 * 10 * (1. / 90.)) - (10 * (1 / 90.)) + ((1./90.)-(1./100.))*10
+	avMargin = account.GetAvailableMargin(model, 1.)
+	if math.Abs(avMargin-expectedAv) > 0.0000001 {
+		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
+	}
+
+	account.ConfirmFill("sell1", "", 110., 20, false)
+	fmt.Println(account.GetLeverage(model))
+
+	account.ConfirmFill("buy1", "", 90., 10, false)
+	account.ConfirmFill("sell1", "", 110., 10, false)
+	account.ConfirmFill("buy1", "", 90., 10, false)
+
+	fmt.Println(account.GetAvailableMargin(model, 1.))
+	fmt.Println(account.GetLeverage(model))
 }
 
 func TestPortfolio_Spot_ELR(t *testing.T) {
