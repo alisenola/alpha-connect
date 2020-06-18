@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
@@ -446,16 +447,19 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 			price = o.Price
 			exp = 1
 		}
-		expectedLogReturn := 0.
 		queue := o.Queue
 		quantity := o.Quantity
+		expectedLogReturn := 0.
 		for i := 0; i < N; i++ {
+			// Compute ELR before removing order
+			expectedLogReturn += math.Log(values[i] / value)
 			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
 			contractMarginValue := contractChange * price * mul
 			fee := math.Abs(contractMarginValue) * makerFee
 
 			// Remove cost from values
 			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+
 			values[i] += cost * sampleMarginPrice[i]
 		}
 		// Compute ELR with current bid
@@ -573,6 +577,8 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 		quantity := o.Quantity
 		expectedLogReturn := 0.
 		for i := 0; i < N; i++ {
+			// Compute ELR before removing order
+			expectedLogReturn += math.Log(values[i] / value)
 			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
 			contractMarginValue := contractChange * price * mul
 			fee := math.Abs(contractMarginValue) * makerFee
@@ -584,6 +590,7 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 		// Compute ELR with current order
 		expectedLogReturn /= float64(N)
 		if expectedLogReturn > maxExpectedLogReturn {
+			fmt.Println("current order elr", expectedLogReturn)
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = o
 		}
@@ -596,6 +603,7 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 	}
 	expectedLogReturn /= float64(N)
 	if expectedLogReturn > maxExpectedLogReturn {
+		fmt.Println("naked elr", expectedLogReturn)
 		maxExpectedLogReturn = expectedLogReturn
 		maxOrder = nil
 	}
@@ -633,6 +641,7 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 
 		//fmt.Println(expectedLogReturn, maxExpectedLogReturn)
 		if expectedLogReturn > maxExpectedLogReturn {
+			fmt.Println("level elr", prices[l], expectedLogReturn)
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = &COrder{
 				Price:    prices[l],
