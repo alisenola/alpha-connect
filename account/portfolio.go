@@ -128,6 +128,26 @@ func (p *Portfolio) ExpectedLogReturnOnCancel(time uint64, exchange uint64, inst
 	return maxExpectedLogReturn, true
 }
 */
+
+func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) float64 {
+	N := p.sampleSize
+	var value float64 = 0
+	values := make([]float64, N, N)
+	for i := 0; i < N; i++ {
+		values[i] = 0.
+	}
+
+	for _, exch := range p.accountPortfolios {
+		exch.AddSampleValues(model, time, values)
+		value += exch.Value(model)
+	}
+	elr := 0.
+	for i := 0; i < N; i++ {
+		elr += math.Log(values[i] / value)
+	}
+	return elr / float64(N)
+}
+
 func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model modeling.MarketModel, time uint64) float64 {
 	// Need to compute the expected log return
 	N := p.sampleSize
@@ -206,7 +226,7 @@ func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model 
 // This assumption kind of make sense, as if, in case of bid, the expected match is big at one level, might as well place the order
 // at the level bellow to get a higher spread.
 // When at ask, a // TODO think more about that
-func (p *Portfolio) GetELROnLimitBidChange(accountID, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitBidChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -221,10 +241,10 @@ func (p *Portfolio) GetELROnLimitBidChange(accountID, orderID string, model mode
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnLimitBidChange(orderID, model, time, values, value, prices, queues, maxQuantity)
+	return target.GetELROnLimitBidChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
 }
 
-func (p *Portfolio) GetELROnLimitAskChange(accountID, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitAskChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -241,5 +261,45 @@ func (p *Portfolio) GetELROnLimitAskChange(accountID, orderID string, model mode
 
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnLimitAskChange(orderID, model, time, values, value, prices, queues, maxQuantity)
+	return target.GetELROnLimitAskChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
+}
+
+func (p *Portfolio) GetELROnMarketBuy(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+	// Need to compute the expected log return
+	N := p.sampleSize
+
+	var value float64 = 0
+	values := make([]float64, N, N)
+	for i := 0; i < N; i++ {
+		values[i] = 0.
+	}
+
+	for _, exch := range p.accountPortfolios {
+		exch.AddSampleValues(model, time, values)
+		value += exch.Value(model)
+	}
+
+	target := p.accountPortfolios[accountID]
+
+	return target.GetELROnMarketBuy(securityID, model, time, values, value, price, quantity, maxQuantity)
+}
+
+func (p *Portfolio) GetELROnMarketSell(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+	// Need to compute the expected log return
+	N := p.sampleSize
+
+	var value float64 = 0
+	values := make([]float64, N, N)
+	for i := 0; i < N; i++ {
+		values[i] = 0.
+	}
+
+	for _, exch := range p.accountPortfolios {
+		exch.AddSampleValues(model, time, values)
+		value += exch.Value(model)
+	}
+
+	target := p.accountPortfolios[accountID]
+
+	return target.GetELROnMarketSell(securityID, model, time, values, value, price, quantity, maxQuantity)
 }

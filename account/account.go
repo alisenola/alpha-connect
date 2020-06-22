@@ -34,6 +34,8 @@ type Security interface {
 	GetELROnCancelAsk(ID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64
 	GetELROnLimitBidChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder)
 	GetELROnLimitAskChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
+	GetELROnMarketBuy(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder)
+	GetELROnMarketSell(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder)
 }
 
 type Account struct {
@@ -383,7 +385,9 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	rawFillQuantity := int64(quantity * lotPrecision)
 	rawLeavesQuantity := int64(order.LeavesQuantity * lotPrecision)
 	if rawFillQuantity > rawLeavesQuantity {
-		return nil, fmt.Errorf("fill bigger than order leaves quantity")
+		// TODO
+		//return nil, fmt.Errorf("fill bigger than order leaves quantity %d %d", rawFillQuantity, rawLeavesQuantity)
+		rawFillQuantity = rawLeavesQuantity
 	}
 	rawCumQuantity := int64(order.CumQuantity * lotPrecision)
 	leavesQuantity := float64(rawLeavesQuantity-rawFillQuantity) / lotPrecision

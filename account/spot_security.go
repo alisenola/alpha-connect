@@ -4,6 +4,7 @@ import (
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"sync"
 )
@@ -21,10 +22,11 @@ type SpotSecurity struct {
 	sampleMatchBid    []float64
 	sampleMatchAsk    []float64
 	sampleTime        uint64
+	makerFee          float64
 }
 
 func NewSpotSecurity(sec *models.Security) *SpotSecurity {
-	return &SpotSecurity{
+	spotSec := &SpotSecurity{
 		RWMutex:           sync.RWMutex{},
 		Security:          sec,
 		lotPrecision:      math.Ceil(1. / sec.RoundLot),
@@ -37,6 +39,13 @@ func NewSpotSecurity(sec *models.Security) *SpotSecurity {
 		sampleMatchAsk:    nil,
 		sampleTime:        0,
 	}
+	if sec.MakerFee != nil {
+		spotSec.makerFee = sec.MakerFee.Value
+	} else {
+		spotSec.makerFee = 0.
+	}
+
+	return spotSec
 }
 
 func (sec *SpotSecurity) AddBidOrder(ID string, price, quantity, queue float64) {
@@ -54,7 +63,7 @@ func (sec *SpotSecurity) AddBidOrder(ID string, price, quantity, queue float64) 
 	for i := 0; i < N; i++ {
 		baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
 		// We get our reduced-by-fees base
-		sampleValueChange[i] += (baseChange - (baseChange * sec.MakerFee.Value)) * sampleBasePrice[i]
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
 		// We lose our quote
 		sampleValueChange[i] -= baseChange * price * sampleQuotePrice[i]
 	}
@@ -78,7 +87,7 @@ func (sec *SpotSecurity) AddAskOrder(ID string, price, quantity, queue float64) 
 		// We lose our base
 		sampleValueChange[i] -= baseChange * sampleBasePrice[i]
 		// We get our reduced-by-fees quote
-		sampleValueChange[i] += (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 	}
 	sec.Unlock()
 }
@@ -97,7 +106,7 @@ func (sec *SpotSecurity) RemoveBidOrder(ID string) {
 	for i := 0; i < N; i++ {
 		baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
 		// We don't get our reduced-by-fees base
-		sampleValueChange[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * sampleBasePrice[i]
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
 		// We keep our quote
 		sampleValueChange[i] += baseChange * price * sampleQuotePrice[i]
 	}
@@ -121,7 +130,7 @@ func (sec *SpotSecurity) RemoveAskOrder(ID string) {
 		// We keep our base
 		sampleValueChange[i] += baseChange * sampleBasePrice[i]
 		// We don't get our reduced-by-fees quote
-		sampleValueChange[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 	}
 	delete(sec.openAskOrders, ID)
 	sec.Unlock()
@@ -188,8 +197,8 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, tim
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleBasePrice := model.GetSamplePrices(uint64(sec.Underlying.ID), time, N)
-	sampleQuotePrice := model.GetSamplePrices(uint64(sec.QuoteCurrency.ID), time, N)
+	sampleBasePrice := model.GetSamplePairPrices(sec.Underlying.ID, constants.DOLLAR.ID, time, N)
+	sampleQuotePrice := model.GetSamplePairPrices(sec.QuoteCurrency.ID, constants.DOLLAR.ID, time, N)
 	for i := 0; i < N; i++ {
 		sampleValueChange[i] = 0.
 	}
@@ -200,7 +209,7 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, tim
 		for i := 0; i < N; i++ {
 			baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
 			// We get our reduced-by-fees base
-			sampleValueChange[i] += (baseChange - (baseChange * sec.MakerFee.Value)) * sampleBasePrice[i]
+			sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
 			// We lose our quote
 			sampleValueChange[i] -= baseChange * price * sampleQuotePrice[i]
 		}
@@ -214,7 +223,7 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, tim
 			// We lose our base
 			sampleValueChange[i] -= baseChange * sampleBasePrice[i]
 			// We get our reduced-by-fees quote
-			sampleValueChange[i] += (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+			sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 		}
 	}
 	sec.sampleValueChange = sampleValueChange
@@ -262,7 +271,7 @@ func (sec *SpotSecurity) GetELROnCancelBid(ID string, model modeling.MarketModel
 		for i := 0; i < N; i++ {
 			baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
 			// We don't get our reduced-by-fees base
-			values[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * sampleBasePrice[i]
+			values[i] -= (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
 			// We keep our quote
 			values[i] += baseChange * price * sampleQuotePrice[i]
 		}
@@ -300,7 +309,7 @@ func (sec *SpotSecurity) GetELROnCancelAsk(ID string, model modeling.MarketModel
 			// We keep our base
 			values[i] += baseChange * sampleBasePrice[i]
 			// We don't get our reduced-by-fees quote
-			values[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+			values[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 		}
 	}
 	sec.Unlock()
@@ -342,7 +351,7 @@ func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.Market
 			// We keep our base
 			values[i] += baseChange * sampleBasePrice[i]
 			// We don't get our reduced-by-fees quote
-			values[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+			values[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 		}
 		expectedLogReturn /= float64(N)
 		if expectedLogReturn > maxExpectedLogReturn {
@@ -371,7 +380,7 @@ func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.Market
 		for i := 0; i < N; i++ {
 			expectedMatchQuote := math.Min(math.Max(sampleMatchBid[i]-queue, 0)*price, maxQuote)
 			expectedMatchBase := expectedMatchQuote / price
-			valueChange := (expectedMatchBase*(1-sec.MakerFee.Value))*sampleBasePrice[i] - expectedMatchQuote*sampleQuotePrice[i]
+			valueChange := (expectedMatchBase*(1-sec.makerFee))*sampleBasePrice[i] - expectedMatchQuote*sampleQuotePrice[i]
 			expectedLogReturn += math.Log((values[i] + valueChange) / value)
 		}
 		expectedLogReturn /= float64(N)
@@ -428,7 +437,7 @@ func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.Market
 			// We keep our base
 			values[i] += baseChange * sampleBasePrice[i]
 			// We don't get our reduced-by-fees quote
-			values[i] -= (baseChange - (baseChange * sec.MakerFee.Value)) * price * sampleQuotePrice[i]
+			values[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 		}
 		expectedLogReturn /= float64(N)
 		if expectedLogReturn > maxExpectedLogReturn {
@@ -463,7 +472,7 @@ func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.Market
 			// We are expected to lose expectedMatch base
 			baseValueChange := -expectedMatch * sampleBasePrice[i]
 			// We are expected to gain expectedMatch * price quote
-			quoteValueChange := (expectedMatch - (sec.MakerFee.Value * expectedMatch)) * price * sampleQuotePrice[i]
+			quoteValueChange := (expectedMatch - (sec.makerFee * expectedMatch)) * price * sampleQuotePrice[i]
 
 			expectedLogReturn += math.Log((values[i] + baseValueChange + quoteValueChange) / value)
 		}
@@ -493,4 +502,12 @@ func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.Market
 	}
 	sec.Unlock()
 	return maxExpectedLogReturn, maxOrder
+}
+
+func (sec *SpotSecurity) GetELROnMarketBuy(model modeling.MarketModel, time uint64, values []float64, value float64, price, quantity float64, maxQuantity float64) (float64, *COrder) {
+	return 0, nil
+}
+
+func (sec *SpotSecurity) GetELROnMarketSell(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+	return 0, nil
 }

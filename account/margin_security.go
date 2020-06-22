@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
@@ -433,12 +432,11 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 	mul := sec.Multiplier.Value
 	makerFee := sec.MakerFee.Value
 
-	var maxOrder, currentOrder *COrder
+	var maxOrder *COrder
 	maxExpectedLogReturn := -999.
 
 	// If we have the bid order, we remove it from values
 	if o, ok := sec.openBidOrders[ID]; ok {
-		currentOrder = o
 		var price, exp float64
 		if sec.Security.IsInverse {
 			price = 1. / o.Price
@@ -458,13 +456,13 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 			fee := math.Abs(contractMarginValue) * makerFee
 
 			// Remove cost from values
-			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-
+			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
 			values[i] += cost * sampleMarginPrice[i]
 		}
 		// Compute ELR with current bid
 		expectedLogReturn /= float64(N)
 		if expectedLogReturn > maxExpectedLogReturn {
+			//fmt.Println("current ELR", expectedLogReturn)
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = o
 		}
@@ -476,6 +474,7 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 		expectedLogReturn += math.Log(values[i] / value)
 	}
 	expectedLogReturn /= float64(N)
+	//fmt.Println("naked ELR", expectedLogReturn)
 	if expectedLogReturn > maxExpectedLogReturn {
 		maxExpectedLogReturn = expectedLogReturn
 		maxOrder = nil
@@ -496,51 +495,57 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 			correctedAvailableMargin += math.Abs(price * mul * sec.size)
 		}
 		queue := queues[l]
-		expectedLogReturn := 0.
 
-		for i := 0; i < N; i++ {
-			availableContracts := correctedAvailableMargin / (math.Abs(sec.Multiplier.Value) * price)
-			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), availableContracts)
-			contractMarginValue := contractChange * price * mul
-			fee := math.Abs(contractMarginValue) * makerFee
-			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-			// Compute ELR with cost
-			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
-		}
+		for q := 1; q < 5; q++ {
+			expectedLogReturn := 0.
+			availableContracts := (correctedAvailableMargin / float64(q)) / (math.Abs(mul) * price)
 
-		expectedLogReturn /= float64(N)
-		if expectedLogReturn > maxExpectedLogReturn {
-			maxExpectedLogReturn = expectedLogReturn
-			maxOrder = &COrder{
-				Price:    prices[l],
-				Quantity: 0., // Computed at the end
-				Queue:    queue,
+			for i := 0; i < N; i++ {
+				contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), availableContracts)
+				contractMarginValue := contractChange * price * mul
+				fee := math.Abs(contractMarginValue) * makerFee
+				cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
+				// Compute ELR with cost
+				expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
+			}
+
+			expectedLogReturn /= float64(N)
+			if expectedLogReturn > maxExpectedLogReturn {
+				//fmt.Println("level ELR",  prices[l], expectedLogReturn)
+				maxExpectedLogReturn = expectedLogReturn
+				maxOrder = &COrder{
+					Price:    prices[l],
+					Quantity: (correctedAvailableMargin / float64(q)) / (price * math.Abs(mul)),
+					Queue:    queue,
+				}
 			}
 		}
 	}
 
-	if maxOrder != nil && maxOrder != currentOrder {
-		// Compute recommended order quantity based on price and queue
-		// Recommended order quantity is the expected match at the level
-		expectedMatch := 0.
-		for i := 0; i < N; i++ {
-			expectedMatch += math.Max(sampleMatchBid[i]-maxOrder.Queue, 0.)
-		}
-		expectedMatch /= float64(N)
+	/*
+		if maxOrder != nil && maxOrder != currentOrder {
+			// Compute recommended order quantity based on price and queue
+			// Recommended order quantity is the expected match at the level
+			expectedMatch := 0.
+			for i := 0; i < N; i++ {
+				expectedMatch += math.Max(sampleMatchBid[i]-maxOrder.Queue, 0.)
+			}
+			expectedMatch /= float64(N)
 
-		correctedAvailableMargin := availableMargin
-		var price float64
-		if sec.IsInverse {
-			price = 1. / maxOrder.Price
-		} else {
-			price = maxOrder.Price
+			correctedAvailableMargin := availableMargin
+			var price float64
+			if sec.IsInverse {
+				price = 1. / maxOrder.Price
+			} else {
+				price = maxOrder.Price
+			}
+			if sec.size < 0 {
+				// If we are short, we can go long the short size + the available margin size
+				correctedAvailableMargin += math.Abs(price * mul * sec.size)
+			}
+			maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
 		}
-		if sec.size < 0 {
-			// If we are short, we can go long the short size + the available margin size
-			correctedAvailableMargin += math.Abs(price * mul * sec.size)
-		}
-		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
-	}
+	*/
 	sec.Unlock()
 	return maxExpectedLogReturn, maxOrder
 }
@@ -559,12 +564,11 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 	mul := sec.Multiplier.Value
 	makerFee := sec.MakerFee.Value
 
-	var maxOrder, currentOrder *COrder
+	var maxOrder *COrder
 	maxExpectedLogReturn := -999.
 
 	// Remove ask order from value
 	if o, ok := sec.openAskOrders[ID]; ok {
-		currentOrder = o
 		var price, exp float64
 		if sec.Security.IsInverse {
 			price = 1. / o.Price
@@ -590,7 +594,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 		// Compute ELR with current order
 		expectedLogReturn /= float64(N)
 		if expectedLogReturn > maxExpectedLogReturn {
-			fmt.Println("current order elr", expectedLogReturn)
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = o
 		}
@@ -603,7 +606,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 	}
 	expectedLogReturn /= float64(N)
 	if expectedLogReturn > maxExpectedLogReturn {
-		fmt.Println("naked elr", expectedLogReturn)
 		maxExpectedLogReturn = expectedLogReturn
 		maxOrder = nil
 	}
@@ -623,57 +625,186 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 			correctedAvailableMargin += math.Abs(price * mul * sec.size)
 		}
 		queue := queues[l]
-		expectedLogReturn := 0.
 
-		// We need to compute what would happen if we changed
-		// our ask order on the instrument.
+		for q := 1; q < 5; q++ {
+			expectedLogReturn := 0.
+			availableContracts := (correctedAvailableMargin / float64(q)) / (math.Abs(mul) * price)
+			// We need to compute what would happen if we changed
+			// our ask order on the instrument.
+			for i := 0; i < N; i++ {
+				contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), availableContracts)
+				contractMarginValue := contractChange * price * mul
+				fee := math.Abs(contractMarginValue) * makerFee
+				cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
+				// Compute ELR with new cost
+				expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
+			}
+
+			expectedLogReturn /= float64(N)
+
+			//fmt.Println(expectedLogReturn, maxExpectedLogReturn)
+			if expectedLogReturn > maxExpectedLogReturn {
+				maxExpectedLogReturn = expectedLogReturn
+				maxOrder = &COrder{
+					Price:    prices[l],
+					Quantity: (correctedAvailableMargin / float64(q)) / (price * math.Abs(mul)),
+					Queue:    queue,
+				}
+			}
+		}
+	}
+
+	/*
+		if maxOrder != nil && maxOrder != currentOrder {
+			// Compute recommended order quantity based on price and queue
+			// Recommended order quantity is the expected match at the level
+			//fmt.Println("RETS", baseline, maxExpectedLogReturn)
+			correctedAvailableMargin := availableMargin
+			expectedMatch := 0.
+			for i := 0; i < N; i++ {
+				expectedMatch += math.Max(sampleMatchAsk[i]-maxOrder.Queue, 0.)
+			}
+			expectedMatch /= float64(N)
+			var price float64
+			if sec.IsInverse {
+				price = 1. / maxOrder.Price
+			} else {
+				price = maxOrder.Price
+			}
+			if sec.size > 0 {
+				// If we are long, we can go short the long size + the available margin size
+				correctedAvailableMargin += math.Abs(price * mul * sec.size)
+			}
+			maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
+		}
+	*/
+	sec.Unlock()
+
+	return maxExpectedLogReturn, maxOrder
+}
+
+func (sec *MarginSecurity) GetELROnMarketBuy(model modeling.MarketModel, time uint64, values []float64, value float64, price, quantity float64, maxQuantity float64) (float64, *COrder) {
+	N := len(values)
+	sec.Lock()
+	// We want to see which option is the best, update, do nothing, or cancel
+	if sec.sampleTime != time {
+		sec.updateSampleValueChange(model, time, N)
+	}
+
+	sampleSecurityPrice := sec.sampleSecurityPrice
+	sampleMarginPrice := sec.sampleMarginPrice
+	mul := sec.Multiplier.Value
+	takerFee := sec.TakerFee.Value
+
+	var maxOrder *COrder = nil
+	correctedAvailableMargin := maxQuantity
+	var exp, corrPrice float64
+	if sec.IsInverse {
+		corrPrice = 1. / price
+		exp = -1.
+	} else {
+		corrPrice = price
+		exp = 1.
+	}
+	if sec.size < 0 {
+		// If we are short, we can go long the short size + the available margin size
+		correctedAvailableMargin += math.Abs(price * mul * sec.size)
+	}
+	availableToMatch := math.Min(correctedAvailableMargin/(math.Abs(mul)*price), quantity)
+
+	// Compute ELR without any order
+	maxExpectedLogReturn := 0.
+	for i := 0; i < N; i++ {
+		maxExpectedLogReturn += math.Log(values[i] / value)
+	}
+	maxExpectedLogReturn /= float64(N)
+
+	for q := 1; q < 5; q++ {
+		expectedLogReturn := 0.
+		contractChange := availableToMatch / float64(q)
+
 		for i := 0; i < N; i++ {
-			availableContracts := correctedAvailableMargin / (math.Abs(mul) * price)
-			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), availableContracts)
-			contractMarginValue := contractChange * price * mul
-			fee := math.Abs(contractMarginValue) * makerFee
+			contractMarginValue := contractChange * corrPrice * mul
+			fee := math.Abs(contractMarginValue) * takerFee
+			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
+			// Compute ELR with cost
+			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
+		}
+
+		expectedLogReturn /= float64(N)
+		if expectedLogReturn > maxExpectedLogReturn {
+			//fmt.Println("level ELR",  prices[l], expectedLogReturn)
+			maxExpectedLogReturn = expectedLogReturn
+			maxOrder = &COrder{
+				Price:    price,
+				Quantity: (correctedAvailableMargin / float64(q)) / (price * math.Abs(mul)),
+				Queue:    0,
+			}
+		}
+	}
+
+	return maxExpectedLogReturn, maxOrder
+}
+
+func (sec *MarginSecurity) GetELROnMarketSell(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+	N := len(values)
+	sec.Lock()
+	// We want to see which option is the best, update, do nothing, or cancel
+	if sec.sampleTime != time {
+		sec.updateSampleValueChange(model, time, N)
+	}
+
+	sampleSecurityPrice := sec.sampleSecurityPrice
+	sampleMarginPrice := sec.sampleMarginPrice
+	mul := sec.Multiplier.Value
+	takerFee := sec.TakerFee.Value
+
+	var maxOrder *COrder = nil
+	correctedAvailableMargin := maxQuantity
+	var exp, corrPrice float64
+	if sec.IsInverse {
+		corrPrice = 1. / price
+		exp = -1.
+	} else {
+		corrPrice = price
+		exp = 1.
+	}
+	if sec.size > 0 {
+		// If we are long, we can go short the long size + the available margin size
+		correctedAvailableMargin += math.Abs(price * mul * sec.size)
+	}
+	availableToMatch := math.Min(correctedAvailableMargin/(math.Abs(mul)*price), quantity)
+
+	// Compute ELR without any order
+	maxExpectedLogReturn := 0.
+	for i := 0; i < N; i++ {
+		maxExpectedLogReturn += math.Log(values[i] / value)
+	}
+	maxExpectedLogReturn /= float64(N)
+
+	for q := 1; q < 5; q++ {
+		expectedLogReturn := 0.
+		contractChange := availableToMatch / float64(q)
+
+		for i := 0; i < N; i++ {
+			contractMarginValue := contractChange * corrPrice * mul
+			fee := math.Abs(contractMarginValue) * takerFee
 			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * mul)
 			// Compute ELR with new cost
 			expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
 		}
 
 		expectedLogReturn /= float64(N)
-
-		//fmt.Println(expectedLogReturn, maxExpectedLogReturn)
 		if expectedLogReturn > maxExpectedLogReturn {
-			fmt.Println("level elr", prices[l], expectedLogReturn)
+			//fmt.Println("level ELR",  prices[l], expectedLogReturn)
 			maxExpectedLogReturn = expectedLogReturn
 			maxOrder = &COrder{
-				Price:    prices[l],
-				Quantity: 0., // Computed at the end
-				Queue:    queue,
+				Price:    price,
+				Quantity: (correctedAvailableMargin / float64(q)) / (price * math.Abs(mul)),
+				Queue:    0,
 			}
 		}
 	}
-
-	if maxOrder != nil && maxOrder != currentOrder {
-		// Compute recommended order quantity based on price and queue
-		// Recommended order quantity is the expected match at the level
-		//fmt.Println("RETS", baseline, maxExpectedLogReturn)
-		correctedAvailableMargin := availableMargin
-		expectedMatch := 0.
-		for i := 0; i < N; i++ {
-			expectedMatch += math.Max(sampleMatchAsk[i]-maxOrder.Queue, 0.)
-		}
-		expectedMatch /= float64(N)
-		var price float64
-		if sec.IsInverse {
-			price = 1. / maxOrder.Price
-		} else {
-			price = maxOrder.Price
-		}
-		if sec.size > 0 {
-			// If we are long, we can go short the long size + the available margin size
-			correctedAvailableMargin += math.Abs(price * mul * sec.size)
-		}
-		maxOrder.Quantity = math.Min(expectedMatch, correctedAvailableMargin/(price*math.Abs(mul)))
-	}
-	sec.Unlock()
 
 	return maxExpectedLogReturn, maxOrder
 }
