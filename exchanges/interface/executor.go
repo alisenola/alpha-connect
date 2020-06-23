@@ -112,7 +112,7 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 
 	case *updateSecurityList:
 		if err := state.UpdateSecurityList(context); err != nil {
-			state.GetLogger().Error("error updating security list", log.Error(err))
+			state.GetLogger().Info("error updating security list", log.Error(err))
 		}
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
