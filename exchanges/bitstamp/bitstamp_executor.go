@@ -14,7 +14,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -152,16 +151,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		security.RoundLot = 1. / math.Pow10(pair.BaseDecimals)
-		nPair := xchangerModels.Pair{
-			Base:  &baseCurrency,
-			Quote: &quoteCurrency,
-		}
-		tickPrecision, ok := bitstamp.TickPrecisions[nPair.String()]
-		if !ok {
-			state.logger.Info("tickPrecisions not defined for " + pair.Name)
-			continue
-		}
-		security.MinPriceIncrement = 1. / float64(tickPrecision)
+		security.MinPriceIncrement = 1. / math.Pow10(pair.CounterDecimals)
 		securities = append(securities, &security)
 	}
 
