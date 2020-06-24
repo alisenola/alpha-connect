@@ -267,7 +267,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)
@@ -432,7 +434,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		positionList.RejectionReason = messages.RateLimitExceeded
+		context.Respond(positionList)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)
@@ -736,7 +740,9 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)
@@ -814,7 +820,9 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)
@@ -901,7 +909,9 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)

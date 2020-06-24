@@ -303,7 +303,9 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 		}
 
 		if state.rateLimit.IsRateLimited() {
-			time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+			response.RejectionReason = messages.RateLimitExceeded
+			context.Respond(response)
+			return nil
 		}
 
 		state.rateLimit.Request(weight)
