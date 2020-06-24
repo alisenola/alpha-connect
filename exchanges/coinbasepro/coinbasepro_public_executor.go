@@ -31,20 +31,21 @@ import (
 // The role of a CoinbasePro Executor is to
 // process api request
 type CoinbaseProPublicExecutor struct {
-	client      *http.Client
-	securities  map[uint64]*models.Security
-	rateLimit   *exchanges.RateLimit
-	queryRunner *actor.PID
-	logger      *log.Logger
+	client       *http.Client
+	securities   map[uint64]*models.Security
+	rateLimit    *exchanges.RateLimit
+	queryRunners []*actor.PID
+	qrIdx        int
+	logger       *log.Logger
 }
 
 func NewCoinbaseProPublicExecutor() actor.Actor {
 	return &CoinbaseProPublicExecutor{
-		client:      nil,
-		securities:  nil,
-		rateLimit:   nil,
-		queryRunner: nil,
-		logger:      nil,
+		client:       nil,
+		securities:   nil,
+		rateLimit:    nil,
+		queryRunners: nil,
+		logger:       nil,
 	}
 }
 
@@ -75,7 +76,9 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
-	state.queryRunner = context.Spawn(props)
+	for i := 0; i < 4; i++ {
+		state.queryRunners = append(state.queryRunners, context.Spawn(props))
+	}
 
 	return state.UpdateSecurityList(context)
 }
@@ -198,6 +201,11 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
+	if state.rateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
 	if msg.Subscribe {
 		response.RejectionReason = messages.SubscriptionNotSupported
 		context.Respond(response)
@@ -234,14 +242,10 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 			return err
 		}
 
-		if state.rateLimit.IsRateLimited() {
-			response.RejectionReason = messages.RateLimitExceeded
-			context.Respond(response)
-			return nil
-		}
-
 		state.rateLimit.Request(weight)
-		future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+		queryRunner := state.queryRunners[state.qrIdx]
+		state.qrIdx = (state.qrIdx + 1) % len(state.queryRunners)
+		future := context.RequestFuture(queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
@@ -302,14 +306,10 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 			return err
 		}
 
-		if state.rateLimit.IsRateLimited() {
-			response.RejectionReason = messages.RateLimitExceeded
-			context.Respond(response)
-			return nil
-		}
-
 		state.rateLimit.Request(weight)
-		future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+		queryRunner := state.queryRunners[state.qrIdx]
+		state.qrIdx = (state.qrIdx + 1) % len(state.queryRunners)
+		future := context.RequestFuture(queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {

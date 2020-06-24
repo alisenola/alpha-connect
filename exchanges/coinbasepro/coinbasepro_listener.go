@@ -162,7 +162,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return err
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	fut := context.RequestFuture(
 		state.coinbaseproExecutor,
 		&messages.MarketDataRequest{
@@ -175,7 +175,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			},
 			Aggregation: models.L3,
 		},
-		20*time.Second)
+		5*time.Second)
 
 	res, err := fut.Result()
 	if err != nil {
@@ -206,6 +206,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.seqNum = 0
 	state.instrumentData.lastSequence = msg.SeqNum
 	state.ws = ws
+
+	// Fetch messages until sync
 
 	go func(ws *coinbasepro.Websocket) {
 		for ws.ReadMessage() {
