@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/alphac/utils"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"time"
@@ -239,7 +240,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		context.Forward(pid)
 	} else {
 		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security)).WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[securityID] = pid
 		context.Forward(pid)
