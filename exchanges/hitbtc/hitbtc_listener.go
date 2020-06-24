@@ -414,11 +414,13 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		state.lastPingTime = time.Now()
 	}
 
-	if time.Now().Sub(state.lastSubscribeTime) > 1*time.Minute {
-		_ = state.obWs.SubscribeOrderBook(state.security.Symbol)
-		_ = state.tradeWs.SubscribeTrades(state.security.Symbol)
-		state.lastSubscribeTime = time.Now()
-	}
+	/*
+		if time.Now().Sub(state.lastSubscribeTime) > 1*time.Minute {
+			_ = state.obWs.SubscribeOrderBook(state.security.Symbol)
+			_ = state.tradeWs.SubscribeTrades(state.security.Symbol)
+			state.lastSubscribeTime = time.Now()
+		}
+	*/
 
 	if state.obWs.Err != nil || !state.obWs.Connected {
 		if state.obWs.Err != nil {
