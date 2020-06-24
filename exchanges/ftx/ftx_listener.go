@@ -191,10 +191,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			Bid:      false,
 		}
 	}
-
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
-	bestAsk := obUpdate.Snapshot.Asks[0].Price / float64(tickPrecision)
+	bestAsk := obUpdate.Snapshot.Asks[0].Price
 	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
 
 	if depth > 10000 {
