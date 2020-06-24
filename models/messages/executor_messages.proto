@@ -12,11 +12,6 @@ import "gitlab.com/alphaticks/alphac/models/account.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
-message BusinessRequestReject {
-    uint64 requestID = 1;
-    string reason = 2;
-}
-
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
@@ -25,18 +20,15 @@ message MarketDataRequest {
     models.OrderBookAggregation aggregation = 5;
 }
 
-message MarketDataRequestReject {
-    uint64 requestID = 1;
-    string reason = 2;
-}
-
-message MarketDataSnapshot {
+message MarketDataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     models.OBL2Snapshot snapshotL2 = 3;
     models.OBL3Snapshot snapshotL3 = 4;
     repeated models.AggregatedTrade trades = 5;
     uint64 seq_num = 6;
+    bool success = 7;
+    RejectionReason rejection_reason = 8;
 }
 
 message MarketDataIncrementalRefresh {
@@ -57,7 +49,8 @@ message SecurityDefinitionResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     models.Security security = 3;
-    RejectionReason rejection_reason = 4;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message SecurityListRequest {
@@ -69,8 +62,9 @@ message SecurityListRequest {
 message SecurityList {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    string error = 3;
-    repeated models.Security securities = 4;
+    repeated models.Security securities = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 enum ExecutionType {
@@ -107,6 +101,10 @@ enum RejectionReason {
     InvalidRequest = 12;
     ExchangeAPIError = 13;
     InvalidOrder = 14;
+    RateLimitExceeded = 15;
+    SubscriptionNotSupported = 16;
+    MissingInstrument = 17;
+    HTTPError = 18;
 }
 
 enum FeeType {
@@ -224,9 +222,10 @@ message NewOrderSingleRequest {
 
 message NewOrderSingleResponse {
     uint64 requestID = 1;
-    bool success = 2;
-    string orderID = 3;
-    RejectionReason rejection_reason = 4;
+    uint64 responseID = 2;
+    bool success = 3;
+    string orderID = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message NewOrderBulkRequest {
@@ -237,9 +236,10 @@ message NewOrderBulkRequest {
 
 message NewOrderBulkResponse {
     uint64 requestID = 1;
-    bool success = 2;
+    uint64 responseID = 2;
     repeated string orderIDs = 3;
-    RejectionReason rejection_reason = 4;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message OrderCancelRequest {
@@ -252,8 +252,9 @@ message OrderCancelRequest {
 
 message OrderCancelResponse {
     uint64 requestID = 1;
-    bool success = 2;
-    RejectionReason rejection_reason = 3;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
 }
 
 message OrderMassCancelRequest {
@@ -264,6 +265,7 @@ message OrderMassCancelRequest {
 
 message OrderMassCancelResponse {
     uint64 requestID = 1;
-    bool success = 2;
-    RejectionReason rejection_reason = 3;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
 }

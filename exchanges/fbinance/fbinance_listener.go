@@ -179,14 +179,12 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting OBL2")
 	}
-	msg, ok := res.(*messages.MarketDataSnapshot)
+	msg, ok := res.(*messages.MarketDataResponse)
 	if !ok {
-		reject, ok := res.(*messages.MarketDataRequestReject)
-		if ok {
-			return fmt.Errorf("impossible to fetch OBL2 from executor: %s", reject.Reason)
-		} else {
-			return fmt.Errorf("was expecting MarketDataSnapshot, got %s", reflect.TypeOf(msg).String())
-		}
+		return fmt.Errorf("was expecting MarketDataSnapshot, got %s", reflect.TypeOf(msg).String())
+	}
+	if !msg.Success {
+		return fmt.Errorf("error fetching snapshot: %s", msg.RejectionReason.String())
 	}
 	if msg.SnapshotL2 == nil {
 		return fmt.Errorf("market data snapshot has no OBL2")
@@ -280,10 +278,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 
-	response := &messages.MarketDataSnapshot{
+	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SeqNum:     state.instrumentData.seqNum,
+		Success:    true,
 	}
 	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{

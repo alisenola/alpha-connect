@@ -185,8 +185,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if !ok {
 			return fmt.Errorf("was expecting GetSecuritiesResponse, got %s", reflect.TypeOf(res).String())
 		}
-		if response.Error != "" {
-			return errors.New(response.Error)
+		if !response.Success {
+			return errors.New(response.RejectionReason.String())
 		}
 		for _, s := range response.Securities {
 			if sec2, ok := state.securities[s.SecurityID]; ok {
@@ -218,18 +218,20 @@ func (state *Executor) Clean(context actor.Context) error {
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
 	if request.Instrument == nil || request.Instrument.SecurityID == nil {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: request.RequestID,
-			Reason:    fmt.Sprintf("unknown security"),
+		context.Respond(&messages.MarketDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSecurityID,
 		})
 		return nil
 	}
 	securityID := request.Instrument.SecurityID.Value
 	security, ok := state.securities[securityID]
 	if !ok {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: request.RequestID,
-			Reason:    fmt.Sprintf("unknown security"),
+		context.Respond(&messages.MarketDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSecurityID,
 		})
 		return nil
 	}
@@ -283,6 +285,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		RequestID:  request.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Securities: securities,
+		Success:    true,
 	}
 	if request.Subscribe {
 		context.Watch(request.Subscriber)
@@ -320,6 +323,7 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 			RequestID:  k,
 			ResponseID: uint64(time.Now().UnixNano()),
 			Securities: securities,
+			Success:    true,
 		}
 		context.Send(v, securityList)
 	}

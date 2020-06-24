@@ -280,10 +280,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 
-	response := &messages.MarketDataSnapshot{
+	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SeqNum:     state.instrumentData.seqNum,
+		Success:    true,
 	}
 
 	if msg.Aggregation == models.L2 {

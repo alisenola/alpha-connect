@@ -38,8 +38,8 @@ func TestSecurities(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	b, err := json.Marshal(securityList.Securities)
 	if err != nil {

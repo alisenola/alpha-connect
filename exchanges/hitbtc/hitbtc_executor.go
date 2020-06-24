@@ -60,7 +60,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		},
 		Timeout: 10 * time.Second,
 	}
-	state.rateLimit = exchanges.NewRateLimit(3, time.Second)
+	state.rateLimit = exchanges.NewRateLimit(100, time.Second)
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
@@ -80,9 +80,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
-		return nil
+		return fmt.Errorf("rate limited")
 	}
+	state.rateLimit.Request(weight)
+
 	resp, err := state.client.Do(request)
 	if err != nil {
 		return err
@@ -164,7 +165,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
@@ -177,7 +178,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil

@@ -140,8 +140,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if !ok {
 		return fmt.Errorf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		return fmt.Errorf("error getting securities: %s", securityList.Error)
+	if !securityList.Success {
+		return fmt.Errorf("error getting securities: %s", securityList.RejectionReason.String())
 	}
 	// TODO filtering should be done by the executor, when specifying exchange in the request
 	var filteredSecurities []*models.Security

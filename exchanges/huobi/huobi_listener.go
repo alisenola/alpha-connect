@@ -163,6 +163,8 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		return fmt.Errorf("error subscribing to orderbook for %s", state.security.Symbol)
 	}
 
+	time.Sleep(1 * time.Second)
+
 	if err := ws.RequestMarketByPrice(state.security.Symbol, huobi.WSOBLevel150); err != nil {
 		return fmt.Errorf("error requesting orderbook snapshot for %s", state.security.Symbol)
 	}
@@ -245,10 +247,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
-	response := &messages.MarketDataSnapshot{
+	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SeqNum:     state.instrumentData.seqNum,
+		Success:    true,
 	}
 	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{

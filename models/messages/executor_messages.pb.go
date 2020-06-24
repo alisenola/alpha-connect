@@ -104,6 +104,10 @@ const (
 	InvalidRequest                 RejectionReason = 12
 	ExchangeAPIError               RejectionReason = 13
 	InvalidOrder                   RejectionReason = 14
+	RateLimitExceeded              RejectionReason = 15
+	SubscriptionNotSupported       RejectionReason = 16
+	MissingInstrument              RejectionReason = 17
+	HTTPError                      RejectionReason = 18
 )
 
 var RejectionReason_name = map[int32]string{
@@ -122,6 +126,10 @@ var RejectionReason_name = map[int32]string{
 	12: "InvalidRequest",
 	13: "ExchangeAPIError",
 	14: "InvalidOrder",
+	15: "RateLimitExceeded",
+	16: "SubscriptionNotSupported",
+	17: "MissingInstrument",
+	18: "HTTPError",
 }
 
 var RejectionReason_value = map[string]int32{
@@ -140,6 +148,10 @@ var RejectionReason_value = map[string]int32{
 	"InvalidRequest":                 12,
 	"ExchangeAPIError":               13,
 	"InvalidOrder":                   14,
+	"RateLimitExceeded":              15,
+	"SubscriptionNotSupported":       16,
+	"MissingInstrument":              17,
+	"HTTPError":                      18,
 }
 
 func (RejectionReason) EnumDescriptor() ([]byte, []int) {
@@ -197,57 +209,6 @@ func (FeeBasis) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_350c53ba9303a7e6, []int{3}
 }
 
-type BusinessRequestReject struct {
-	RequestID uint64 `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Reason    string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-}
-
-func (m *BusinessRequestReject) Reset()      { *m = BusinessRequestReject{} }
-func (*BusinessRequestReject) ProtoMessage() {}
-func (*BusinessRequestReject) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{0}
-}
-func (m *BusinessRequestReject) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *BusinessRequestReject) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_BusinessRequestReject.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *BusinessRequestReject) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BusinessRequestReject.Merge(m, src)
-}
-func (m *BusinessRequestReject) XXX_Size() int {
-	return m.Size()
-}
-func (m *BusinessRequestReject) XXX_DiscardUnknown() {
-	xxx_messageInfo_BusinessRequestReject.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_BusinessRequestReject proto.InternalMessageInfo
-
-func (m *BusinessRequestReject) GetRequestID() uint64 {
-	if m != nil {
-		return m.RequestID
-	}
-	return 0
-}
-
-func (m *BusinessRequestReject) GetReason() string {
-	if m != nil {
-		return m.Reason
-	}
-	return ""
-}
-
 type MarketDataRequest struct {
 	RequestID   uint64                      `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
 	Subscribe   bool                        `protobuf:"varint,2,opt,name=subscribe,proto3" json:"subscribe,omitempty"`
@@ -259,7 +220,7 @@ type MarketDataRequest struct {
 func (m *MarketDataRequest) Reset()      { *m = MarketDataRequest{} }
 func (*MarketDataRequest) ProtoMessage() {}
 func (*MarketDataRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{1}
+	return fileDescriptor_350c53ba9303a7e6, []int{0}
 }
 func (m *MarketDataRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -323,22 +284,28 @@ func (m *MarketDataRequest) GetAggregation() models.OrderBookAggregation {
 	return models.L2
 }
 
-type MarketDataRequestReject struct {
-	RequestID uint64 `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Reason    string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+type MarketDataResponse struct {
+	RequestID       uint64                    `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
+	ResponseID      uint64                    `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	SnapshotL2      *models.OBL2Snapshot      `protobuf:"bytes,3,opt,name=snapshotL2,proto3" json:"snapshotL2,omitempty"`
+	SnapshotL3      *models.OBL3Snapshot      `protobuf:"bytes,4,opt,name=snapshotL3,proto3" json:"snapshotL3,omitempty"`
+	Trades          []*models.AggregatedTrade `protobuf:"bytes,5,rep,name=trades,proto3" json:"trades,omitempty"`
+	SeqNum          uint64                    `protobuf:"varint,6,opt,name=seq_num,json=seqNum,proto3" json:"seq_num,omitempty"`
+	Success         bool                      `protobuf:"varint,7,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason           `protobuf:"varint,8,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
-func (m *MarketDataRequestReject) Reset()      { *m = MarketDataRequestReject{} }
-func (*MarketDataRequestReject) ProtoMessage() {}
-func (*MarketDataRequestReject) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{2}
+func (m *MarketDataResponse) Reset()      { *m = MarketDataResponse{} }
+func (*MarketDataResponse) ProtoMessage() {}
+func (*MarketDataResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_350c53ba9303a7e6, []int{1}
 }
-func (m *MarketDataRequestReject) XXX_Unmarshal(b []byte) error {
+func (m *MarketDataResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *MarketDataRequestReject) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *MarketDataResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_MarketDataRequestReject.Marshal(b, m, deterministic)
+		return xxx_messageInfo_MarketDataResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalTo(b)
@@ -348,113 +315,72 @@ func (m *MarketDataRequestReject) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return b[:n], nil
 	}
 }
-func (m *MarketDataRequestReject) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MarketDataRequestReject.Merge(m, src)
+func (m *MarketDataResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MarketDataResponse.Merge(m, src)
 }
-func (m *MarketDataRequestReject) XXX_Size() int {
+func (m *MarketDataResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *MarketDataRequestReject) XXX_DiscardUnknown() {
-	xxx_messageInfo_MarketDataRequestReject.DiscardUnknown(m)
+func (m *MarketDataResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MarketDataResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_MarketDataRequestReject proto.InternalMessageInfo
+var xxx_messageInfo_MarketDataResponse proto.InternalMessageInfo
 
-func (m *MarketDataRequestReject) GetRequestID() uint64 {
+func (m *MarketDataResponse) GetRequestID() uint64 {
 	if m != nil {
 		return m.RequestID
 	}
 	return 0
 }
 
-func (m *MarketDataRequestReject) GetReason() string {
-	if m != nil {
-		return m.Reason
-	}
-	return ""
-}
-
-type MarketDataSnapshot struct {
-	RequestID  uint64                    `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	ResponseID uint64                    `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
-	SnapshotL2 *models.OBL2Snapshot      `protobuf:"bytes,3,opt,name=snapshotL2,proto3" json:"snapshotL2,omitempty"`
-	SnapshotL3 *models.OBL3Snapshot      `protobuf:"bytes,4,opt,name=snapshotL3,proto3" json:"snapshotL3,omitempty"`
-	Trades     []*models.AggregatedTrade `protobuf:"bytes,5,rep,name=trades,proto3" json:"trades,omitempty"`
-	SeqNum     uint64                    `protobuf:"varint,6,opt,name=seq_num,json=seqNum,proto3" json:"seq_num,omitempty"`
-}
-
-func (m *MarketDataSnapshot) Reset()      { *m = MarketDataSnapshot{} }
-func (*MarketDataSnapshot) ProtoMessage() {}
-func (*MarketDataSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{3}
-}
-func (m *MarketDataSnapshot) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MarketDataSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_MarketDataSnapshot.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *MarketDataSnapshot) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MarketDataSnapshot.Merge(m, src)
-}
-func (m *MarketDataSnapshot) XXX_Size() int {
-	return m.Size()
-}
-func (m *MarketDataSnapshot) XXX_DiscardUnknown() {
-	xxx_messageInfo_MarketDataSnapshot.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MarketDataSnapshot proto.InternalMessageInfo
-
-func (m *MarketDataSnapshot) GetRequestID() uint64 {
-	if m != nil {
-		return m.RequestID
-	}
-	return 0
-}
-
-func (m *MarketDataSnapshot) GetResponseID() uint64 {
+func (m *MarketDataResponse) GetResponseID() uint64 {
 	if m != nil {
 		return m.ResponseID
 	}
 	return 0
 }
 
-func (m *MarketDataSnapshot) GetSnapshotL2() *models.OBL2Snapshot {
+func (m *MarketDataResponse) GetSnapshotL2() *models.OBL2Snapshot {
 	if m != nil {
 		return m.SnapshotL2
 	}
 	return nil
 }
 
-func (m *MarketDataSnapshot) GetSnapshotL3() *models.OBL3Snapshot {
+func (m *MarketDataResponse) GetSnapshotL3() *models.OBL3Snapshot {
 	if m != nil {
 		return m.SnapshotL3
 	}
 	return nil
 }
 
-func (m *MarketDataSnapshot) GetTrades() []*models.AggregatedTrade {
+func (m *MarketDataResponse) GetTrades() []*models.AggregatedTrade {
 	if m != nil {
 		return m.Trades
 	}
 	return nil
 }
 
-func (m *MarketDataSnapshot) GetSeqNum() uint64 {
+func (m *MarketDataResponse) GetSeqNum() uint64 {
 	if m != nil {
 		return m.SeqNum
 	}
 	return 0
+}
+
+func (m *MarketDataResponse) GetSuccess() bool {
+	if m != nil {
+		return m.Success
+	}
+	return false
+}
+
+func (m *MarketDataResponse) GetRejectionReason() RejectionReason {
+	if m != nil {
+		return m.RejectionReason
+	}
+	return Other
 }
 
 type MarketDataIncrementalRefresh struct {
@@ -469,7 +395,7 @@ type MarketDataIncrementalRefresh struct {
 func (m *MarketDataIncrementalRefresh) Reset()      { *m = MarketDataIncrementalRefresh{} }
 func (*MarketDataIncrementalRefresh) ProtoMessage() {}
 func (*MarketDataIncrementalRefresh) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{4}
+	return fileDescriptor_350c53ba9303a7e6, []int{2}
 }
 func (m *MarketDataIncrementalRefresh) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -548,7 +474,7 @@ type SecurityDefinitionRequest struct {
 func (m *SecurityDefinitionRequest) Reset()      { *m = SecurityDefinitionRequest{} }
 func (*SecurityDefinitionRequest) ProtoMessage() {}
 func (*SecurityDefinitionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{5}
+	return fileDescriptor_350c53ba9303a7e6, []int{3}
 }
 func (m *SecurityDefinitionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -595,13 +521,14 @@ type SecurityDefinitionResponse struct {
 	RequestID       uint64           `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
 	ResponseID      uint64           `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
 	Security        *models.Security `protobuf:"bytes,3,opt,name=security,proto3" json:"security,omitempty"`
-	RejectionReason RejectionReason  `protobuf:"varint,4,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	Success         bool             `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason  `protobuf:"varint,5,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *SecurityDefinitionResponse) Reset()      { *m = SecurityDefinitionResponse{} }
 func (*SecurityDefinitionResponse) ProtoMessage() {}
 func (*SecurityDefinitionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{6}
+	return fileDescriptor_350c53ba9303a7e6, []int{4}
 }
 func (m *SecurityDefinitionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -651,6 +578,13 @@ func (m *SecurityDefinitionResponse) GetSecurity() *models.Security {
 	return nil
 }
 
+func (m *SecurityDefinitionResponse) GetSuccess() bool {
+	if m != nil {
+		return m.Success
+	}
+	return false
+}
+
 func (m *SecurityDefinitionResponse) GetRejectionReason() RejectionReason {
 	if m != nil {
 		return m.RejectionReason
@@ -667,7 +601,7 @@ type SecurityListRequest struct {
 func (m *SecurityListRequest) Reset()      { *m = SecurityListRequest{} }
 func (*SecurityListRequest) ProtoMessage() {}
 func (*SecurityListRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{7}
+	return fileDescriptor_350c53ba9303a7e6, []int{5}
 }
 func (m *SecurityListRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -718,16 +652,17 @@ func (m *SecurityListRequest) GetSubscriber() *actor.PID {
 }
 
 type SecurityList struct {
-	RequestID  uint64             `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	ResponseID uint64             `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
-	Error      string             `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
-	Securities []*models.Security `protobuf:"bytes,4,rep,name=securities,proto3" json:"securities,omitempty"`
+	RequestID       uint64             `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
+	ResponseID      uint64             `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	Securities      []*models.Security `protobuf:"bytes,3,rep,name=securities,proto3" json:"securities,omitempty"`
+	Success         bool               `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason    `protobuf:"varint,5,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *SecurityList) Reset()      { *m = SecurityList{} }
 func (*SecurityList) ProtoMessage() {}
 func (*SecurityList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{8}
+	return fileDescriptor_350c53ba9303a7e6, []int{6}
 }
 func (m *SecurityList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -770,18 +705,25 @@ func (m *SecurityList) GetResponseID() uint64 {
 	return 0
 }
 
-func (m *SecurityList) GetError() string {
-	if m != nil {
-		return m.Error
-	}
-	return ""
-}
-
 func (m *SecurityList) GetSecurities() []*models.Security {
 	if m != nil {
 		return m.Securities
 	}
 	return nil
+}
+
+func (m *SecurityList) GetSuccess() bool {
+	if m != nil {
+		return m.Success
+	}
+	return false
+}
+
+func (m *SecurityList) GetRejectionReason() RejectionReason {
+	if m != nil {
+		return m.RejectionReason
+	}
+	return Other
 }
 
 type ExecutionReport struct {
@@ -808,7 +750,7 @@ type ExecutionReport struct {
 func (m *ExecutionReport) Reset()      { *m = ExecutionReport{} }
 func (*ExecutionReport) ProtoMessage() {}
 func (*ExecutionReport) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{9}
+	return fileDescriptor_350c53ba9303a7e6, []int{7}
 }
 func (m *ExecutionReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -970,7 +912,7 @@ type SideValue struct {
 func (m *SideValue) Reset()      { *m = SideValue{} }
 func (*SideValue) ProtoMessage() {}
 func (*SideValue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{10}
+	return fileDescriptor_350c53ba9303a7e6, []int{8}
 }
 func (m *SideValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1013,7 +955,7 @@ type OrderStatusValue struct {
 func (m *OrderStatusValue) Reset()      { *m = OrderStatusValue{} }
 func (*OrderStatusValue) ProtoMessage() {}
 func (*OrderStatusValue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{11}
+	return fileDescriptor_350c53ba9303a7e6, []int{9}
 }
 func (m *OrderStatusValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1060,7 +1002,7 @@ type OrderFilter struct {
 func (m *OrderFilter) Reset()      { *m = OrderFilter{} }
 func (*OrderFilter) ProtoMessage() {}
 func (*OrderFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{12}
+	return fileDescriptor_350c53ba9303a7e6, []int{10}
 }
 func (m *OrderFilter) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1135,7 +1077,7 @@ type OrderStatusRequest struct {
 func (m *OrderStatusRequest) Reset()      { *m = OrderStatusRequest{} }
 func (*OrderStatusRequest) ProtoMessage() {}
 func (*OrderStatusRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{13}
+	return fileDescriptor_350c53ba9303a7e6, []int{11}
 }
 func (m *OrderStatusRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1209,7 +1151,7 @@ type OrderList struct {
 func (m *OrderList) Reset()      { *m = OrderList{} }
 func (*OrderList) ProtoMessage() {}
 func (*OrderList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{14}
+	return fileDescriptor_350c53ba9303a7e6, []int{12}
 }
 func (m *OrderList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1277,7 +1219,7 @@ type PositionsRequest struct {
 func (m *PositionsRequest) Reset()      { *m = PositionsRequest{} }
 func (*PositionsRequest) ProtoMessage() {}
 func (*PositionsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{15}
+	return fileDescriptor_350c53ba9303a7e6, []int{13}
 }
 func (m *PositionsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1352,7 +1294,7 @@ type PositionList struct {
 func (m *PositionList) Reset()      { *m = PositionList{} }
 func (*PositionList) ProtoMessage() {}
 func (*PositionList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{16}
+	return fileDescriptor_350c53ba9303a7e6, []int{14}
 }
 func (m *PositionList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1427,7 +1369,7 @@ type BalancesRequest struct {
 func (m *BalancesRequest) Reset()      { *m = BalancesRequest{} }
 func (*BalancesRequest) ProtoMessage() {}
 func (*BalancesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{17}
+	return fileDescriptor_350c53ba9303a7e6, []int{15}
 }
 func (m *BalancesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1502,7 +1444,7 @@ type BalanceList struct {
 func (m *BalanceList) Reset()      { *m = BalanceList{} }
 func (*BalanceList) ProtoMessage() {}
 func (*BalanceList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{18}
+	return fileDescriptor_350c53ba9303a7e6, []int{16}
 }
 func (m *BalanceList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1579,7 +1521,7 @@ type NewOrder struct {
 func (m *NewOrder) Reset()      { *m = NewOrder{} }
 func (*NewOrder) ProtoMessage() {}
 func (*NewOrder) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{19}
+	return fileDescriptor_350c53ba9303a7e6, []int{17}
 }
 func (m *NewOrder) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1666,7 +1608,7 @@ type NewOrderSingleRequest struct {
 func (m *NewOrderSingleRequest) Reset()      { *m = NewOrderSingleRequest{} }
 func (*NewOrderSingleRequest) ProtoMessage() {}
 func (*NewOrderSingleRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{20}
+	return fileDescriptor_350c53ba9303a7e6, []int{18}
 }
 func (m *NewOrderSingleRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1718,15 +1660,16 @@ func (m *NewOrderSingleRequest) GetOrder() *NewOrder {
 
 type NewOrderSingleResponse struct {
 	RequestID       uint64          `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Success         bool            `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	OrderID         string          `protobuf:"bytes,3,opt,name=orderID,proto3" json:"orderID,omitempty"`
-	RejectionReason RejectionReason `protobuf:"varint,4,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	ResponseID      uint64          `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	Success         bool            `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	OrderID         string          `protobuf:"bytes,4,opt,name=orderID,proto3" json:"orderID,omitempty"`
+	RejectionReason RejectionReason `protobuf:"varint,5,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *NewOrderSingleResponse) Reset()      { *m = NewOrderSingleResponse{} }
 func (*NewOrderSingleResponse) ProtoMessage() {}
 func (*NewOrderSingleResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{21}
+	return fileDescriptor_350c53ba9303a7e6, []int{19}
 }
 func (m *NewOrderSingleResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1762,6 +1705,13 @@ func (m *NewOrderSingleResponse) GetRequestID() uint64 {
 	return 0
 }
 
+func (m *NewOrderSingleResponse) GetResponseID() uint64 {
+	if m != nil {
+		return m.ResponseID
+	}
+	return 0
+}
+
 func (m *NewOrderSingleResponse) GetSuccess() bool {
 	if m != nil {
 		return m.Success
@@ -1792,7 +1742,7 @@ type NewOrderBulkRequest struct {
 func (m *NewOrderBulkRequest) Reset()      { *m = NewOrderBulkRequest{} }
 func (*NewOrderBulkRequest) ProtoMessage() {}
 func (*NewOrderBulkRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{22}
+	return fileDescriptor_350c53ba9303a7e6, []int{20}
 }
 func (m *NewOrderBulkRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1844,15 +1794,16 @@ func (m *NewOrderBulkRequest) GetOrders() []*NewOrder {
 
 type NewOrderBulkResponse struct {
 	RequestID       uint64          `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Success         bool            `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	ResponseID      uint64          `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
 	OrderIDs        []string        `protobuf:"bytes,3,rep,name=orderIDs,proto3" json:"orderIDs,omitempty"`
-	RejectionReason RejectionReason `protobuf:"varint,4,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	Success         bool            `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason `protobuf:"varint,5,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *NewOrderBulkResponse) Reset()      { *m = NewOrderBulkResponse{} }
 func (*NewOrderBulkResponse) ProtoMessage() {}
 func (*NewOrderBulkResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{23}
+	return fileDescriptor_350c53ba9303a7e6, []int{21}
 }
 func (m *NewOrderBulkResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1888,11 +1839,11 @@ func (m *NewOrderBulkResponse) GetRequestID() uint64 {
 	return 0
 }
 
-func (m *NewOrderBulkResponse) GetSuccess() bool {
+func (m *NewOrderBulkResponse) GetResponseID() uint64 {
 	if m != nil {
-		return m.Success
+		return m.ResponseID
 	}
-	return false
+	return 0
 }
 
 func (m *NewOrderBulkResponse) GetOrderIDs() []string {
@@ -1900,6 +1851,13 @@ func (m *NewOrderBulkResponse) GetOrderIDs() []string {
 		return m.OrderIDs
 	}
 	return nil
+}
+
+func (m *NewOrderBulkResponse) GetSuccess() bool {
+	if m != nil {
+		return m.Success
+	}
+	return false
 }
 
 func (m *NewOrderBulkResponse) GetRejectionReason() RejectionReason {
@@ -1920,7 +1878,7 @@ type OrderCancelRequest struct {
 func (m *OrderCancelRequest) Reset()      { *m = OrderCancelRequest{} }
 func (*OrderCancelRequest) ProtoMessage() {}
 func (*OrderCancelRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{24}
+	return fileDescriptor_350c53ba9303a7e6, []int{22}
 }
 func (m *OrderCancelRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1986,14 +1944,15 @@ func (m *OrderCancelRequest) GetAccount() *models.Account {
 
 type OrderCancelResponse struct {
 	RequestID       uint64          `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Success         bool            `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	RejectionReason RejectionReason `protobuf:"varint,3,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	ResponseID      uint64          `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	Success         bool            `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason `protobuf:"varint,4,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *OrderCancelResponse) Reset()      { *m = OrderCancelResponse{} }
 func (*OrderCancelResponse) ProtoMessage() {}
 func (*OrderCancelResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{25}
+	return fileDescriptor_350c53ba9303a7e6, []int{23}
 }
 func (m *OrderCancelResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2029,6 +1988,13 @@ func (m *OrderCancelResponse) GetRequestID() uint64 {
 	return 0
 }
 
+func (m *OrderCancelResponse) GetResponseID() uint64 {
+	if m != nil {
+		return m.ResponseID
+	}
+	return 0
+}
+
 func (m *OrderCancelResponse) GetSuccess() bool {
 	if m != nil {
 		return m.Success
@@ -2052,7 +2018,7 @@ type OrderMassCancelRequest struct {
 func (m *OrderMassCancelRequest) Reset()      { *m = OrderMassCancelRequest{} }
 func (*OrderMassCancelRequest) ProtoMessage() {}
 func (*OrderMassCancelRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{26}
+	return fileDescriptor_350c53ba9303a7e6, []int{24}
 }
 func (m *OrderMassCancelRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2104,14 +2070,15 @@ func (m *OrderMassCancelRequest) GetFilter() *OrderFilter {
 
 type OrderMassCancelResponse struct {
 	RequestID       uint64          `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	Success         bool            `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	RejectionReason RejectionReason `protobuf:"varint,3,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	ResponseID      uint64          `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	Success         bool            `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason `protobuf:"varint,4,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (m *OrderMassCancelResponse) Reset()      { *m = OrderMassCancelResponse{} }
 func (*OrderMassCancelResponse) ProtoMessage() {}
 func (*OrderMassCancelResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_350c53ba9303a7e6, []int{27}
+	return fileDescriptor_350c53ba9303a7e6, []int{25}
 }
 func (m *OrderMassCancelResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2147,6 +2114,13 @@ func (m *OrderMassCancelResponse) GetRequestID() uint64 {
 	return 0
 }
 
+func (m *OrderMassCancelResponse) GetResponseID() uint64 {
+	if m != nil {
+		return m.ResponseID
+	}
+	return 0
+}
+
 func (m *OrderMassCancelResponse) GetSuccess() bool {
 	if m != nil {
 		return m.Success
@@ -2166,10 +2140,8 @@ func init() {
 	proto.RegisterEnum("messages.RejectionReason", RejectionReason_name, RejectionReason_value)
 	proto.RegisterEnum("messages.FeeType", FeeType_name, FeeType_value)
 	proto.RegisterEnum("messages.FeeBasis", FeeBasis_name, FeeBasis_value)
-	proto.RegisterType((*BusinessRequestReject)(nil), "messages.BusinessRequestReject")
 	proto.RegisterType((*MarketDataRequest)(nil), "messages.MarketDataRequest")
-	proto.RegisterType((*MarketDataRequestReject)(nil), "messages.MarketDataRequestReject")
-	proto.RegisterType((*MarketDataSnapshot)(nil), "messages.MarketDataSnapshot")
+	proto.RegisterType((*MarketDataResponse)(nil), "messages.MarketDataResponse")
 	proto.RegisterType((*MarketDataIncrementalRefresh)(nil), "messages.MarketDataIncrementalRefresh")
 	proto.RegisterType((*SecurityDefinitionRequest)(nil), "messages.SecurityDefinitionRequest")
 	proto.RegisterType((*SecurityDefinitionResponse)(nil), "messages.SecurityDefinitionResponse")
@@ -2199,136 +2171,137 @@ func init() {
 func init() { proto.RegisterFile("executor_messages.proto", fileDescriptor_350c53ba9303a7e6) }
 
 var fileDescriptor_350c53ba9303a7e6 = []byte{
-	// 2058 bytes of a gzipped FileDescriptorProto
+	// 2068 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x59, 0x4f, 0x6f, 0x1b, 0xc7,
-	0x15, 0xd7, 0x92, 0xa2, 0x48, 0x3e, 0xfe, 0xd1, 0x6a, 0x64, 0x5b, 0x8c, 0x60, 0xb0, 0x2a, 0x8b,
-	0xa0, 0x8a, 0xd2, 0x50, 0xa9, 0x9c, 0x38, 0x87, 0x22, 0x01, 0x24, 0xd1, 0x06, 0x08, 0xf8, 0x8f,
-	0xba, 0x92, 0x7b, 0x25, 0x46, 0xbb, 0x4f, 0xd4, 0x56, 0xcb, 0x9d, 0xf5, 0xcc, 0xac, 0x6d, 0x1d,
-	0x0a, 0xf4, 0x54, 0x14, 0x39, 0x14, 0x01, 0x5a, 0xa0, 0xdf, 0xa0, 0xe8, 0xb1, 0xa7, 0x7e, 0x86,
-	0xf6, 0xd0, 0xc2, 0xa7, 0xc2, 0x05, 0x7a, 0xa8, 0xe5, 0x4b, 0x6e, 0xcd, 0x47, 0x28, 0x66, 0x76,
-	0x76, 0xb9, 0xa4, 0xe5, 0x98, 0x82, 0x54, 0xa3, 0xb9, 0xed, 0xcc, 0xfc, 0xde, 0xbc, 0x79, 0xbf,
-	0xf7, 0x67, 0xde, 0x90, 0xb0, 0x82, 0xcf, 0xd0, 0x8d, 0x25, 0xe3, 0x83, 0x11, 0x0a, 0x41, 0x87,
-	0x28, 0xba, 0x11, 0x67, 0x92, 0x91, 0x4a, 0x3a, 0x5e, 0xfd, 0xde, 0x90, 0xb1, 0x61, 0x80, 0x9b,
-	0x7a, 0xfe, 0x30, 0x3e, 0xda, 0x94, 0xfe, 0x08, 0x85, 0xa4, 0xa3, 0x28, 0x81, 0xae, 0xb6, 0xa7,
-	0x01, 0x4f, 0x39, 0x8d, 0x22, 0xe4, 0x66, 0xab, 0xd5, 0xad, 0xa1, 0x2f, 0x03, 0x7a, 0xd8, 0x75,
-	0xd9, 0x68, 0x93, 0x06, 0xd1, 0x31, 0x95, 0xbe, 0x7b, 0x22, 0x36, 0x9f, 0xb9, 0xc7, 0x34, 0x1c,
-	0x22, 0xdf, 0x1c, 0x31, 0x0f, 0x03, 0x91, 0x88, 0xa7, 0x32, 0x9f, 0x9e, 0x2f, 0xa3, 0x3f, 0xdd,
-	0x54, 0x62, 0x44, 0xf9, 0x09, 0xca, 0x81, 0x47, 0x25, 0x35, 0x62, 0x9f, 0xcd, 0x22, 0x26, 0xd0,
-	0x8d, 0xb9, 0x2f, 0x4f, 0xf3, 0x82, 0x3f, 0x9e, 0x45, 0x90, 0xba, 0x2e, 0x8b, 0x43, 0x69, 0x44,
-	0x6e, 0x0f, 0x7d, 0x79, 0x1c, 0x27, 0x22, 0xdb, 0xe2, 0x34, 0x3c, 0xe1, 0x2c, 0xec, 0x1f, 0x24,
-	0x66, 0x50, 0x57, 0x32, 0xfe, 0xd1, 0x90, 0x6d, 0xea, 0x8f, 0x09, 0xd3, 0x3a, 0xf7, 0xe1, 0xfa,
-	0x4e, 0x2c, 0xfc, 0x10, 0x85, 0x70, 0xf0, 0x71, 0x8c, 0x42, 0x3a, 0xf8, 0x73, 0x74, 0x25, 0xb9,
-	0x09, 0x55, 0x9e, 0x4c, 0xf4, 0x7b, 0x2d, 0x6b, 0xcd, 0x5a, 0x9f, 0x77, 0xc6, 0x13, 0xe4, 0x06,
-	0x2c, 0x70, 0xa4, 0x82, 0x85, 0xad, 0xc2, 0x9a, 0xb5, 0x5e, 0x75, 0xcc, 0xa8, 0xf3, 0x1f, 0x0b,
-	0x96, 0xee, 0x6b, 0x22, 0x7a, 0x54, 0x52, 0xb3, 0xe3, 0x5b, 0xf6, 0xba, 0x09, 0x55, 0x11, 0x1f,
-	0x0a, 0x97, 0xfb, 0x87, 0xa8, 0xb7, 0xab, 0x38, 0xe3, 0x09, 0xb2, 0x01, 0x90, 0x0d, 0x78, 0xab,
-	0xb8, 0x66, 0xad, 0xd7, 0xb6, 0xa0, 0xab, 0x2d, 0xe9, 0xee, 0xf5, 0x7b, 0x4e, 0x6e, 0x95, 0x6c,
-	0x01, 0xf8, 0xa1, 0x90, 0x3c, 0x1e, 0x61, 0x28, 0x5b, 0xf3, 0x1a, 0x4b, 0xba, 0x09, 0x5f, 0xdd,
-	0x7e, 0xb6, 0xe2, 0xe4, 0x50, 0xe4, 0x0b, 0xa8, 0xd1, 0xe1, 0x90, 0xe3, 0x90, 0x4a, 0x9f, 0x85,
-	0xad, 0xd2, 0x9a, 0xb5, 0xde, 0xdc, 0xba, 0x99, 0x0a, 0x3d, 0xe4, 0x1e, 0xf2, 0x1d, 0xc6, 0x4e,
-	0xb6, 0xc7, 0x18, 0x27, 0x2f, 0xd0, 0x79, 0x08, 0x2b, 0xaf, 0x19, 0x7c, 0x29, 0x0a, 0x7f, 0x5d,
-	0x00, 0x32, 0xde, 0x71, 0x3f, 0xa4, 0x91, 0x38, 0x66, 0x6f, 0xdb, 0xac, 0x0d, 0xc0, 0x51, 0x44,
-	0x2c, 0x14, 0xd8, 0xef, 0xe9, 0x0d, 0xe7, 0x9d, 0xdc, 0x0c, 0xf9, 0x04, 0x40, 0x98, 0x9d, 0xee,
-	0x6d, 0x19, 0x16, 0xaf, 0x65, 0x46, 0xee, 0xdc, 0xdb, 0x4a, 0xf5, 0x38, 0x39, 0xdc, 0x84, 0xd4,
-	0x2d, 0xc3, 0x67, 0x5e, 0xea, 0xd6, 0x39, 0x52, 0xb7, 0xc8, 0x26, 0x2c, 0x48, 0x4e, 0x3d, 0x14,
-	0xad, 0xd2, 0x5a, 0x71, 0xbd, 0xb6, 0xb5, 0x92, 0x4a, 0xa4, 0x1c, 0xa2, 0x77, 0xa0, 0xd6, 0x1d,
-	0x03, 0x23, 0x2b, 0x50, 0x16, 0xf8, 0x78, 0x10, 0xc6, 0xa3, 0xd6, 0x82, 0x3e, 0xf9, 0x82, 0xc0,
-	0xc7, 0x0f, 0xe2, 0x51, 0xe7, 0x57, 0x05, 0xb8, 0x39, 0xa6, 0xa2, 0x1f, 0xba, 0x1c, 0x95, 0xcf,
-	0x68, 0xe0, 0xe0, 0x11, 0x47, 0x71, 0x7c, 0x49, 0x52, 0xba, 0x50, 0x89, 0x23, 0x8f, 0x4a, 0xcc,
-	0x28, 0x21, 0x79, 0x4a, 0x1e, 0xe9, 0x35, 0x27, 0xc3, 0xe4, 0xf0, 0xb7, 0xa6, 0x83, 0x4b, 0x91,
-	0x31, 0x85, 0xbf, 0x4a, 0x22, 0x46, 0xf0, 0xde, 0xbe, 0xa9, 0x13, 0x3d, 0x3c, 0xf2, 0x43, 0x5f,
-	0xc7, 0xe1, 0x4c, 0xd9, 0x35, 0x99, 0x13, 0x85, 0x59, 0x72, 0xa2, 0xf3, 0x77, 0x0b, 0x56, 0xcf,
-	0xd3, 0x97, 0x30, 0x77, 0x49, 0xd6, 0x7f, 0x04, 0x95, 0xb4, 0xe6, 0x19, 0xd6, 0xed, 0xf4, 0x38,
-	0xa9, 0x4e, 0x27, 0x43, 0x90, 0x1e, 0xd8, 0x5c, 0x67, 0x93, 0xcf, 0xc2, 0x81, 0xc9, 0x97, 0x79,
-	0x9d, 0xa3, 0xef, 0x75, 0xb3, 0x4b, 0xc2, 0x49, 0x11, 0x8e, 0x06, 0x38, 0x8b, 0x7c, 0x72, 0xa2,
-	0xf3, 0x0b, 0x58, 0x4e, 0xf7, 0xbe, 0xe7, 0xab, 0xfc, 0x7c, 0xa7, 0x75, 0xa9, 0xf3, 0x3b, 0x0b,
-	0xea, 0x79, 0xfd, 0x97, 0x64, 0xf0, 0x1a, 0x94, 0x90, 0x73, 0x96, 0x68, 0xad, 0x3a, 0xc9, 0x80,
-	0x7c, 0x0c, 0x60, 0x58, 0xf3, 0x51, 0xb4, 0xe6, 0x75, 0xc4, 0xbd, 0xce, 0x6c, 0x0e, 0xd3, 0xf9,
-	0x73, 0x19, 0x16, 0xef, 0xe8, 0x1b, 0x57, 0x33, 0x15, 0x31, 0x2e, 0xf3, 0x21, 0x68, 0xe5, 0x43,
-	0x90, 0xb4, 0xa0, 0xcc, 0x54, 0x31, 0x34, 0x27, 0xaa, 0x3a, 0xe9, 0x90, 0xec, 0x42, 0xd3, 0x0d,
-	0x7c, 0x0c, 0xe5, 0x20, 0x05, 0x24, 0x6c, 0xdc, 0xec, 0x26, 0x57, 0x71, 0x37, 0xbd, 0x8a, 0xbb,
-	0xfb, 0x92, 0xfb, 0xe1, 0xf0, 0x67, 0x34, 0x88, 0xd1, 0x69, 0x24, 0x32, 0x0f, 0xcd, 0x26, 0x6b,
-	0x50, 0xc3, 0xf4, 0x28, 0xfd, 0x9e, 0x76, 0x71, 0xd5, 0xc9, 0x4f, 0x91, 0x2f, 0xa0, 0x99, 0x0d,
-	0x07, 0xf2, 0x34, 0x42, 0x53, 0xab, 0x57, 0xc6, 0x71, 0x90, 0x19, 0x73, 0x70, 0x1a, 0xa1, 0xd3,
-	0xc0, 0xfc, 0x90, 0xdc, 0x86, 0xba, 0x3e, 0xdf, 0x40, 0x48, 0x2a, 0x63, 0xa1, 0x33, 0xac, 0xb9,
-	0xb5, 0x3c, 0x51, 0xe9, 0xf7, 0xf5, 0x92, 0x53, 0x63, 0xe3, 0xc1, 0x54, 0x02, 0x95, 0x67, 0xba,
-	0x54, 0x7e, 0x08, 0x8b, 0x01, 0xd2, 0x27, 0x28, 0x06, 0x8f, 0x63, 0x1a, 0x4a, 0x15, 0xea, 0xd5,
-	0x35, 0x6b, 0xdd, 0x72, 0x9a, 0xc9, 0xf4, 0x4f, 0xcd, 0x2c, 0xf9, 0x3e, 0xd4, 0xdd, 0x78, 0x34,
-	0x46, 0x81, 0x46, 0xd5, 0xdc, 0x78, 0x94, 0x41, 0xee, 0x80, 0x2d, 0x39, 0x0d, 0x05, 0x4d, 0x72,
-	0x40, 0xf5, 0x3b, 0xad, 0x9a, 0x3e, 0xc5, 0xea, 0x6b, 0x04, 0x1f, 0xa4, 0xcd, 0x90, 0xb3, 0x98,
-	0x93, 0x51, 0xb3, 0xe4, 0x36, 0x94, 0x75, 0x95, 0xe9, 0xf7, 0x5a, 0xf5, 0x19, 0xdc, 0x93, 0x82,
-	0xc9, 0x4f, 0x00, 0x8e, 0xfc, 0x20, 0x18, 0x44, 0xdc, 0x77, 0xb1, 0xd5, 0x78, 0x83, 0x68, 0x8f,
-	0xc5, 0x87, 0x01, 0x26, 0xa2, 0x55, 0x85, 0xdf, 0x53, 0x70, 0xb2, 0x0d, 0x0d, 0x2d, 0x9c, 0xd9,
-	0xd7, 0x9c, 0x41, 0xbe, 0xae, 0x44, 0x32, 0xf3, 0x95, 0x7e, 0xc4, 0x01, 0x1d, 0xa9, 0x66, 0xa7,
-	0xb5, 0x38, 0x93, 0x7e, 0xc4, 0x6d, 0x0d, 0x27, 0x1f, 0x43, 0x5d, 0x09, 0xbb, 0x31, 0xe7, 0x18,
-	0xba, 0xa7, 0x2d, 0x5b, 0x8b, 0x37, 0xb2, 0x3a, 0x2c, 0x04, 0x4a, 0xa7, 0x76, 0x84, 0xb8, 0x6b,
-	0x10, 0xaa, 0x3a, 0x29, 0x09, 0x1d, 0x5f, 0x4b, 0x3a, 0x42, 0x96, 0xc6, 0xf1, 0x75, 0x17, 0x51,
-	0x47, 0x56, 0xf9, 0x28, 0xf9, 0x20, 0x9b, 0xa0, 0x94, 0x0d, 0x0e, 0xa9, 0xf0, 0x45, 0x8b, 0x68,
-	0x38, 0x99, 0x80, 0xef, 0xa8, 0x15, 0x47, 0x6d, 0xa9, 0xbf, 0xce, 0x2d, 0x67, 0xcb, 0x17, 0x2e,
-	0x67, 0x9b, 0x50, 0xdd, 0xf7, 0xbd, 0xc4, 0x5c, 0xd2, 0x81, 0xd2, 0x13, 0xf5, 0xa1, 0xf3, 0xb5,
-	0xb9, 0x55, 0xcf, 0x52, 0xde, 0xf7, 0xd0, 0x49, 0x96, 0x3a, 0x9f, 0x83, 0x9d, 0x8b, 0xef, 0x44,
-	0xee, 0x83, 0x49, 0xb9, 0x73, 0x13, 0xc1, 0x88, 0xff, 0xa1, 0x00, 0x35, 0x3d, 0x7d, 0xd7, 0x0f,
-	0x24, 0x72, 0x15, 0x4b, 0x69, 0xaa, 0x5b, 0xb3, 0xc4, 0xd2, 0x9b, 0x2b, 0x45, 0xe1, 0xe2, 0x95,
-	0x62, 0x32, 0x1f, 0x8b, 0x33, 0xe6, 0xe3, 0xbc, 0xf0, 0x3d, 0x34, 0xb7, 0xf6, 0xf2, 0x98, 0xea,
-	0x8c, 0x46, 0x47, 0x03, 0xc8, 0xe7, 0x53, 0x45, 0xa2, 0x64, 0x12, 0x2d, 0x13, 0x98, 0xa6, 0x71,
-	0xa2, 0x56, 0x74, 0xfe, 0x61, 0x01, 0xc9, 0xf3, 0xf7, 0x8e, 0xfb, 0xdf, 0x0f, 0xa0, 0x6c, 0x5e,
-	0x05, 0xc6, 0xd2, 0xc5, 0x2c, 0xd2, 0x93, 0x69, 0x27, 0x5d, 0x27, 0x1f, 0xc1, 0xc2, 0x91, 0x76,
-	0xa6, 0x31, 0xf1, 0xfa, 0x94, 0x89, 0x89, 0xa7, 0x1d, 0x03, 0xea, 0xfc, 0xc9, 0x82, 0xaa, 0x9e,
-	0x9f, 0xe1, 0xfa, 0x6a, 0x41, 0x59, 0xc4, 0xae, 0x8b, 0x42, 0x18, 0x6b, 0xd2, 0x21, 0x79, 0x1f,
-	0x16, 0x34, 0x5b, 0xa2, 0x55, 0xd4, 0xd7, 0x53, 0x63, 0x22, 0xe6, 0x1c, 0xb3, 0x78, 0x45, 0x77,
-	0xfe, 0x3f, 0x2d, 0xb0, 0xf7, 0x98, 0xd0, 0xad, 0x8b, 0xf8, 0x2e, 0xbc, 0x44, 0x72, 0xde, 0x2b,
-	0x7d, 0xbb, 0xf7, 0x3a, 0xff, 0xb2, 0xa0, 0x9e, 0xda, 0x76, 0x05, 0x0d, 0x45, 0x17, 0xaa, 0x51,
-	0xca, 0x94, 0x71, 0x4d, 0xd6, 0x39, 0xa4, 0x6a, 0x9c, 0x31, 0x24, 0xef, 0xe1, 0xf9, 0x49, 0x0f,
-	0x9f, 0xe7, 0xba, 0xd2, 0x85, 0x5d, 0xf7, 0x57, 0x0b, 0x16, 0x77, 0x68, 0x40, 0x43, 0x17, 0xdf,
-	0xb9, 0xe7, 0x7e, 0x00, 0x25, 0xaa, 0xae, 0x05, 0xe3, 0xb4, 0xa9, 0xbb, 0x22, 0x59, 0xbb, 0x88,
-	0xab, 0x5e, 0x58, 0x50, 0x33, 0xb6, 0x5c, 0x81, 0xa7, 0x3e, 0x84, 0xca, 0xa1, 0x21, 0xc6, 0x38,
-	0x2a, 0xd3, 0x6c, 0x94, 0x38, 0x19, 0xe0, 0x7f, 0xee, 0xa6, 0xbf, 0x15, 0xa0, 0xf2, 0x00, 0x9f,
-	0xea, 0xe4, 0x25, 0xef, 0xbf, 0x56, 0xdb, 0x2d, 0xdd, 0xc3, 0x7d, 0x6b, 0xf5, 0x9e, 0xe9, 0x39,
-	0xa2, 0x3a, 0xdb, 0xa4, 0x28, 0xe7, 0xba, 0xbe, 0xa5, 0x89, 0xd2, 0xa1, 0x6f, 0xe5, 0x2a, 0x4b,
-	0x3f, 0xc9, 0x87, 0xa9, 0x84, 0xae, 0xfa, 0x0b, 0xe7, 0x5c, 0x8c, 0x09, 0x58, 0x7d, 0x92, 0xcf,
-	0xa0, 0xa1, 0x9a, 0xaa, 0x81, 0x1f, 0x0e, 0x8e, 0x18, 0x77, 0x51, 0xf7, 0x78, 0xb9, 0x0b, 0x51,
-	0xb5, 0x4f, 0xfd, 0xf0, 0xae, 0x5a, 0x72, 0x6a, 0x72, 0x3c, 0x20, 0xab, 0x50, 0xc9, 0x1a, 0x9b,
-	0x8a, 0x6e, 0xdc, 0xb2, 0x31, 0xd9, 0x82, 0x52, 0xd2, 0x31, 0x55, 0x67, 0xe8, 0x58, 0x12, 0x68,
-	0xe7, 0x4b, 0x0b, 0xae, 0xa7, 0x7c, 0xee, 0xfb, 0xe1, 0x30, 0xc0, 0xd9, 0x82, 0x3f, 0x17, 0x8d,
-	0x85, 0xb7, 0x94, 0xfd, 0x75, 0x28, 0x69, 0xc3, 0xc7, 0xf7, 0x66, 0xea, 0xed, 0x54, 0xb1, 0x93,
-	0x00, 0x54, 0xc5, 0xbf, 0x31, 0x7d, 0x98, 0x99, 0xde, 0x7f, 0x6f, 0x2e, 0xff, 0xb9, 0x27, 0x44,
-	0x71, 0xf2, 0x09, 0x71, 0x35, 0x15, 0xff, 0x4b, 0x0b, 0x96, 0xd3, 0x23, 0xef, 0xc4, 0xc1, 0xc9,
-	0x95, 0xb3, 0xb7, 0x31, 0x75, 0x7f, 0x9d, 0x47, 0x9f, 0x41, 0x28, 0xfe, 0xae, 0x4d, 0x1e, 0xe6,
-	0x92, 0xec, 0xad, 0x42, 0xc5, 0xd0, 0x95, 0xa8, 0xaf, 0x3a, 0xd9, 0xf8, 0x8a, 0xf8, 0xfb, 0x4d,
-	0xc1, 0x74, 0x2f, 0xbb, 0xaa, 0x7e, 0x04, 0xb3, 0xd1, 0x77, 0x7b, 0xf2, 0x5d, 0x78, 0x89, 0x5e,
-	0xb0, 0x78, 0xd9, 0x5e, 0xf0, 0xca, 0xaf, 0xd9, 0xdf, 0x5a, 0xb0, 0x3c, 0x41, 0xc8, 0x25, 0x5d,
-	0x78, 0x9e, 0x9b, 0x8a, 0x17, 0x76, 0xd3, 0x57, 0x16, 0xdc, 0xd0, 0xa7, 0xba, 0x4f, 0x85, 0xb8,
-	0x88, 0xab, 0x2e, 0x10, 0xe9, 0xe3, 0xf6, 0xb0, 0x38, 0x4b, 0x7b, 0xf8, 0x7b, 0x0b, 0x56, 0x5e,
-	0x3b, 0xd2, 0xff, 0x03, 0x59, 0x1b, 0x5f, 0x5b, 0xd0, 0x98, 0xf8, 0x59, 0x80, 0x94, 0xa1, 0xf8,
-	0x00, 0x9f, 0xda, 0x73, 0xa4, 0x02, 0xf3, 0x3d, 0x16, 0xa2, 0x6d, 0x91, 0x3a, 0x54, 0x92, 0x43,
-	0xa3, 0x67, 0x17, 0xd4, 0xc8, 0xc1, 0x28, 0xa0, 0x2e, 0x7a, 0x76, 0x91, 0x2c, 0x41, 0x63, 0x0f,
-	0x43, 0xcf, 0x0f, 0x87, 0x09, 0xc4, 0x9e, 0x27, 0x35, 0x28, 0xef, 0x4b, 0x16, 0x45, 0xe8, 0xd9,
-	0xa5, 0x04, 0xad, 0x74, 0xa2, 0x67, 0x2f, 0x90, 0x06, 0x54, 0xf7, 0x63, 0x11, 0x61, 0xe8, 0xa1,
-	0x67, 0x97, 0x49, 0x13, 0xc0, 0x08, 0x2b, 0x95, 0x15, 0x35, 0xde, 0xa5, 0x81, 0x1b, 0x07, 0x54,
-	0xc1, 0xab, 0x6a, 0xa7, 0x3b, 0xcf, 0x22, 0x9f, 0xa3, 0x67, 0x03, 0x21, 0xd0, 0x34, 0x60, 0xa3,
-	0xde, 0xae, 0x91, 0x2a, 0x94, 0xf4, 0x4f, 0x84, 0x76, 0x9d, 0x2c, 0x9a, 0x37, 0x58, 0xf2, 0xb4,
-	0xb0, 0x1b, 0x6a, 0xb3, 0x7d, 0x94, 0x32, 0xd0, 0xbf, 0x89, 0xda, 0xcd, 0x8d, 0xe7, 0x05, 0x58,
-	0x9c, 0xe2, 0x43, 0xc9, 0x3f, 0x94, 0xc7, 0xc8, 0xed, 0x39, 0x65, 0xc8, 0xa3, 0xf0, 0x24, 0x64,
-	0x4f, 0xc3, 0xfd, 0xd3, 0xd1, 0x21, 0x0b, 0x6c, 0x8b, 0x5c, 0x87, 0xa5, 0x74, 0xca, 0xfc, 0x3e,
-	0xd4, 0xef, 0xd9, 0x05, 0xd2, 0x81, 0xf6, 0xa3, 0x50, 0xc4, 0x51, 0xc4, 0xb8, 0x44, 0x2f, 0x49,
-	0x80, 0x63, 0xca, 0xa9, 0x2b, 0x91, 0xfb, 0x42, 0xfa, 0xae, 0x5d, 0x54, 0xa2, 0xfd, 0xd0, 0x65,
-	0x9c, 0xa3, 0x2b, 0xd3, 0xb7, 0xba, 0x3d, 0xaf, 0x6c, 0xb8, 0x63, 0xfe, 0x4a, 0xd9, 0x0d, 0x98,
-	0xd0, 0x0c, 0x11, 0x68, 0xf6, 0xe2, 0x28, 0xf0, 0x5d, 0x2a, 0x51, 0x6f, 0x66, 0x2f, 0xa8, 0xb9,
-	0x7e, 0xf8, 0x84, 0x06, 0xbe, 0x67, 0x42, 0xcf, 0x2e, 0x93, 0x65, 0x58, 0x3c, 0x60, 0xec, 0x1e,
-	0x95, 0x78, 0xc0, 0x0c, 0xd7, 0x15, 0x62, 0x43, 0xdd, 0x1c, 0x31, 0x11, 0xad, 0x92, 0x16, 0x5c,
-	0x4b, 0x56, 0xb7, 0x03, 0x8e, 0xd4, 0x3b, 0x35, 0x9c, 0xd9, 0x40, 0xae, 0x81, 0xdd, 0xf3, 0x8f,
-	0x8e, 0x90, 0x63, 0x28, 0x13, 0x1b, 0x85, 0x5d, 0xcb, 0xa9, 0x32, 0x59, 0x62, 0xd7, 0x15, 0x32,
-	0x3d, 0xe6, 0xf6, 0x5e, 0xff, 0x0e, 0xe7, 0x8c, 0xdb, 0x0d, 0xa5, 0xcb, 0x20, 0x13, 0x5d, 0xcd,
-	0x8d, 0x3e, 0x94, 0xcd, 0x9b, 0x5f, 0xb1, 0xed, 0xe0, 0x50, 0x79, 0x8e, 0xf1, 0x53, 0x7b, 0x4e,
-	0x85, 0xd1, 0x01, 0x7d, 0x66, 0x5b, 0xea, 0xd8, 0xf7, 0x98, 0x4b, 0x83, 0x5d, 0x36, 0x1a, 0xf9,
-	0x42, 0xf8, 0x2c, 0xb4, 0x0b, 0x6a, 0xab, 0x54, 0xc1, 0x5d, 0x44, 0x61, 0x17, 0x37, 0x3e, 0x85,
-	0x4a, 0xfa, 0x7b, 0x80, 0x8a, 0x99, 0xed, 0x43, 0xc1, 0x82, 0x58, 0xa2, 0x3d, 0xa7, 0x82, 0x60,
-	0x0f, 0xf9, 0xa3, 0xd0, 0x97, 0xb6, 0x95, 0x44, 0x0c, 0x77, 0x31, 0x94, 0x74, 0x88, 0x76, 0x61,
-	0xe7, 0x93, 0xe7, 0x2f, 0xdb, 0x73, 0x2f, 0x5e, 0xb6, 0xe7, 0xbe, 0x79, 0xd9, 0xb6, 0x7e, 0x79,
-	0xd6, 0xb6, 0xfe, 0x78, 0xd6, 0xb6, 0xfe, 0x72, 0xd6, 0xb6, 0x9e, 0x9f, 0xb5, 0xad, 0x7f, 0x9f,
-	0xb5, 0xad, 0xaf, 0xcf, 0xda, 0x73, 0xdf, 0x9c, 0xb5, 0xad, 0xaf, 0x5e, 0xb5, 0xe7, 0x9e, 0xbf,
-	0x6a, 0xcf, 0xbd, 0x78, 0xd5, 0x9e, 0x3b, 0x5c, 0xd0, 0xc5, 0xf3, 0xd6, 0x7f, 0x03, 0x00, 0x00,
-	0xff, 0xff, 0x83, 0xee, 0x64, 0x15, 0x51, 0x1b, 0x00, 0x00,
+	0x15, 0xd7, 0x92, 0xa2, 0x48, 0x3e, 0xfe, 0x1b, 0x8d, 0xec, 0x98, 0x11, 0x0c, 0x56, 0x65, 0x11,
+	0x54, 0x51, 0x1a, 0x2a, 0x95, 0x13, 0xe7, 0x50, 0x24, 0x80, 0x24, 0xca, 0x28, 0x01, 0xd9, 0x56,
+	0x97, 0x72, 0xaf, 0xc4, 0x68, 0xf9, 0x44, 0x6d, 0xb5, 0xdc, 0x5d, 0xcf, 0xcc, 0xda, 0xd6, 0xa1,
+	0x40, 0x4f, 0x3d, 0xe4, 0x50, 0xe4, 0x53, 0x14, 0x05, 0x7a, 0x29, 0x50, 0xa0, 0xfd, 0x0a, 0xed,
+	0xa1, 0x80, 0x4f, 0x85, 0x0b, 0x14, 0x45, 0x2d, 0x5f, 0x7c, 0x6b, 0x3e, 0x42, 0x31, 0xb3, 0xb3,
+	0xcb, 0x25, 0xad, 0xc4, 0x14, 0x2c, 0x1b, 0xc8, 0x6d, 0x67, 0xe6, 0xf7, 0xe3, 0x9b, 0xf7, 0x9b,
+	0xf7, 0xde, 0xbc, 0x5d, 0xc2, 0x0d, 0x7c, 0x82, 0x4e, 0x24, 0x03, 0x3e, 0x18, 0xa3, 0x10, 0x6c,
+	0x84, 0xa2, 0x13, 0xf2, 0x40, 0x06, 0xb4, 0x94, 0x8c, 0x57, 0x7f, 0x30, 0x0a, 0x82, 0x91, 0x87,
+	0x9b, 0x7a, 0xfe, 0x28, 0x3a, 0xde, 0x94, 0xee, 0x18, 0x85, 0x64, 0xe3, 0x30, 0x86, 0xae, 0xb6,
+	0x66, 0x01, 0x8f, 0x39, 0x0b, 0x43, 0xe4, 0xe6, 0xa7, 0x56, 0xb7, 0x46, 0xae, 0xf4, 0xd8, 0x51,
+	0xc7, 0x09, 0xc6, 0x9b, 0xcc, 0x0b, 0x4f, 0x98, 0x74, 0x9d, 0x53, 0xb1, 0xf9, 0xc4, 0x39, 0x61,
+	0xfe, 0x08, 0xf9, 0xe6, 0x38, 0x18, 0xa2, 0x27, 0x62, 0x7a, 0xc2, 0xf9, 0xec, 0x62, 0x8e, 0x7e,
+	0x74, 0x12, 0xc6, 0x98, 0xf1, 0x53, 0x94, 0x83, 0x21, 0x93, 0xcc, 0xd0, 0x3e, 0x9f, 0x87, 0x26,
+	0xd0, 0x89, 0xb8, 0x2b, 0xcf, 0xb2, 0xc4, 0x9f, 0xce, 0x43, 0x64, 0x8e, 0x13, 0x44, 0xbe, 0x34,
+	0x94, 0xdb, 0x23, 0x57, 0x9e, 0x44, 0x31, 0x65, 0x5b, 0x9c, 0xf9, 0xa7, 0x3c, 0xf0, 0x7b, 0x87,
+	0xb1, 0x1b, 0xcc, 0x91, 0x01, 0xff, 0x78, 0x14, 0x6c, 0xea, 0x87, 0x29, 0xd7, 0xda, 0xff, 0xb3,
+	0x60, 0xf9, 0xae, 0xde, 0x79, 0x97, 0x49, 0x66, 0xe3, 0xc3, 0x08, 0x85, 0xa4, 0x37, 0xa1, 0xcc,
+	0xe3, 0xc7, 0x5e, 0xb7, 0x69, 0xad, 0x59, 0xeb, 0x8b, 0xf6, 0x64, 0x42, 0xad, 0x8a, 0xe8, 0x48,
+	0x38, 0xdc, 0x3d, 0xc2, 0x66, 0x6e, 0xcd, 0x5a, 0x2f, 0xd9, 0x93, 0x09, 0xba, 0x01, 0x90, 0x0e,
+	0x78, 0x33, 0xbf, 0x66, 0xad, 0x57, 0xb6, 0xa0, 0xa3, 0x4d, 0x77, 0x0e, 0x7a, 0x5d, 0x3b, 0xb3,
+	0x4a, 0xb7, 0x00, 0x5c, 0x5f, 0x48, 0x1e, 0x8d, 0xd1, 0x97, 0xcd, 0x45, 0x8d, 0xa5, 0x9d, 0xd8,
+	0xc1, 0x4e, 0x2f, 0x5d, 0xb1, 0x33, 0x28, 0xfa, 0x25, 0x54, 0xd8, 0x68, 0xc4, 0x71, 0xc4, 0xa4,
+	0x1b, 0xf8, 0xcd, 0xc2, 0x9a, 0xb5, 0x5e, 0xdf, 0xba, 0x99, 0x90, 0xee, 0xf3, 0x21, 0xf2, 0x9d,
+	0x20, 0x38, 0xdd, 0x9e, 0x60, 0xec, 0x2c, 0xa1, 0xfd, 0x32, 0x07, 0x34, 0xeb, 0xb1, 0x08, 0x03,
+	0x5f, 0xe0, 0x6b, 0x5c, 0x6e, 0x01, 0x70, 0x83, 0xec, 0x75, 0xb5, 0xcf, 0x8b, 0x76, 0x66, 0x86,
+	0x7e, 0x0a, 0x20, 0x7c, 0x16, 0x8a, 0x93, 0x40, 0xee, 0x6f, 0x19, 0xa7, 0xaf, 0xa5, 0x7b, 0xda,
+	0xd9, 0xdf, 0xea, 0x9b, 0x55, 0x3b, 0x83, 0x9b, 0x62, 0xdd, 0x32, 0xee, 0x67, 0x59, 0xb7, 0x2e,
+	0x60, 0xdd, 0xa2, 0x9b, 0xb0, 0x24, 0x39, 0x1b, 0xa2, 0x68, 0x16, 0xd6, 0xf2, 0xeb, 0x95, 0xad,
+	0x1b, 0x09, 0x23, 0x71, 0x19, 0x87, 0x87, 0x6a, 0xdd, 0x36, 0x30, 0x7a, 0x03, 0x8a, 0x02, 0x1f,
+	0x0e, 0xfc, 0x68, 0xdc, 0x5c, 0xd2, 0x3b, 0x5f, 0x12, 0xf8, 0xf0, 0x5e, 0x34, 0xa6, 0x4d, 0x28,
+	0x8a, 0xc8, 0x71, 0x50, 0x88, 0x66, 0x51, 0x1f, 0x63, 0x32, 0xa4, 0x5d, 0x20, 0x1c, 0x7f, 0x85,
+	0x8e, 0x52, 0x6c, 0xc0, 0x91, 0x89, 0xc0, 0x6f, 0x96, 0xb4, 0xd2, 0xef, 0x77, 0xd2, 0xdc, 0xb4,
+	0x13, 0x84, 0xad, 0x01, 0x76, 0x83, 0x4f, 0x4f, 0xb4, 0x7f, 0x9b, 0x83, 0x9b, 0x13, 0xa9, 0x7b,
+	0xbe, 0xc3, 0x51, 0x1d, 0x21, 0xf3, 0x6c, 0x3c, 0xe6, 0x28, 0x4e, 0xde, 0x50, 0xf4, 0x0e, 0x94,
+	0xa2, 0x70, 0xc8, 0x24, 0xa6, 0x92, 0xd3, 0xac, 0xe4, 0x0f, 0xf4, 0x9a, 0x9d, 0x62, 0x32, 0xf8,
+	0x5b, 0xb3, 0xb1, 0xa6, 0xc4, 0x9e, 0xc1, 0x5f, 0xa1, 0xd0, 0xed, 0x31, 0xbc, 0xdf, 0x37, 0x79,
+	0xde, 0xc5, 0x63, 0xd7, 0x77, 0x63, 0x91, 0xe6, 0x49, 0xb6, 0xe9, 0x14, 0xc9, 0xcd, 0x93, 0x22,
+	0xed, 0x97, 0x16, 0xac, 0x5e, 0x64, 0xef, 0x4a, 0x42, 0xfd, 0x27, 0x50, 0x4a, 0x6a, 0x96, 0x51,
+	0x9d, 0x24, 0xdb, 0x49, 0x6c, 0xda, 0x29, 0x22, 0x1b, 0x62, 0x8b, 0xaf, 0x0f, 0xb1, 0xc2, 0xa5,
+	0x43, 0xec, 0xd7, 0xb0, 0x92, 0x58, 0xdd, 0x77, 0x85, 0x7c, 0xc7, 0x05, 0xac, 0xfd, 0x1f, 0x0b,
+	0xaa, 0x59, 0xfb, 0x6f, 0xa8, 0xed, 0x27, 0x00, 0x46, 0x39, 0x17, 0x45, 0x33, 0xaf, 0xa3, 0xee,
+	0x55, 0x75, 0x33, 0x98, 0xb7, 0xae, 0xef, 0x5f, 0x8a, 0xd0, 0xd8, 0xd3, 0xb7, 0xb2, 0x9e, 0x0b,
+	0x03, 0x2e, 0xb3, 0x61, 0x6e, 0xcd, 0xd6, 0x93, 0x40, 0xd5, 0x5f, 0xe3, 0x5b, 0xd9, 0x4e, 0x86,
+	0x74, 0x17, 0xea, 0x8e, 0xe7, 0xa2, 0x2f, 0x07, 0x09, 0x20, 0xd6, 0xf5, 0x66, 0x27, 0xbe, 0xae,
+	0x3b, 0xc9, 0x75, 0xdd, 0xe9, 0x4b, 0xee, 0xfa, 0xa3, 0x5f, 0x32, 0x2f, 0x42, 0xbb, 0x16, 0x73,
+	0xee, 0x9b, 0x1f, 0x59, 0x83, 0x0a, 0x26, 0x5b, 0xe9, 0x75, 0xb5, 0xbf, 0x65, 0x3b, 0x3b, 0x45,
+	0xbf, 0x84, 0x7a, 0x3a, 0x1c, 0xc8, 0xb3, 0x10, 0x8d, 0xc7, 0x37, 0x26, 0x1e, 0xa7, 0xce, 0x1c,
+	0x9e, 0x85, 0x68, 0xd7, 0x30, 0x3b, 0xa4, 0xb7, 0xa1, 0xaa, 0xf7, 0x37, 0x10, 0x92, 0xc9, 0x48,
+	0xe8, 0x2c, 0xae, 0x6f, 0xad, 0x4c, 0x5d, 0x2e, 0x7d, 0xbd, 0x64, 0x57, 0x82, 0xc9, 0x60, 0x26,
+	0x49, 0x8b, 0x73, 0xdd, 0x63, 0x3f, 0x86, 0x86, 0x87, 0xec, 0x11, 0x8a, 0xc1, 0xc3, 0x88, 0xf9,
+	0x52, 0xa5, 0x53, 0x79, 0xcd, 0x5a, 0xb7, 0xec, 0x7a, 0x3c, 0xfd, 0x0b, 0x33, 0x4b, 0x7f, 0x08,
+	0x55, 0x27, 0x1a, 0x4f, 0x50, 0xa0, 0x51, 0x15, 0x27, 0x1a, 0xa7, 0x90, 0x3d, 0x20, 0x92, 0x33,
+	0x5f, 0xb0, 0xf8, 0xb4, 0x55, 0x4f, 0xd4, 0xac, 0xe8, 0x5d, 0xac, 0xbe, 0x22, 0xf0, 0x61, 0xd2,
+	0x30, 0xd9, 0x8d, 0x0c, 0x47, 0xcd, 0xd2, 0xdb, 0x50, 0xd4, 0x95, 0xac, 0xd7, 0x6d, 0x56, 0xe7,
+	0x38, 0x9e, 0x04, 0x4c, 0x7f, 0x06, 0x70, 0xec, 0x7a, 0xde, 0x20, 0xe4, 0xae, 0x83, 0xcd, 0xda,
+	0xb7, 0x50, 0xbb, 0x41, 0x74, 0xe4, 0x61, 0x4c, 0x2d, 0x2b, 0xfc, 0x81, 0x82, 0xd3, 0x6d, 0xa8,
+	0x69, 0x72, 0xea, 0x5f, 0x7d, 0x0e, 0x7e, 0x55, 0x51, 0x52, 0xf7, 0x95, 0x7d, 0xc4, 0x01, 0x1b,
+	0xab, 0x86, 0xa8, 0xd9, 0x98, 0xcb, 0x3e, 0xe2, 0xb6, 0x86, 0xd3, 0x4f, 0xa0, 0xaa, 0xc8, 0x4e,
+	0xc4, 0x39, 0xfa, 0xce, 0x59, 0x93, 0x68, 0x7a, 0x2d, 0xad, 0xf5, 0x42, 0xa0, 0xb4, 0x2b, 0xc7,
+	0x88, 0xbb, 0x06, 0xa1, 0x2a, 0xa0, 0x62, 0xe8, 0xf8, 0x5a, 0xd6, 0x11, 0xb2, 0x3c, 0x89, 0xaf,
+	0x3b, 0x88, 0x3a, 0xb2, 0x8a, 0xc7, 0xf1, 0x03, 0xdd, 0x04, 0x65, 0x6c, 0x70, 0xc4, 0x84, 0x2b,
+	0x9a, 0x54, 0xc3, 0xe9, 0x14, 0x7c, 0x47, 0xad, 0xd8, 0xea, 0x27, 0xf5, 0xd3, 0x85, 0x89, 0xbb,
+	0x72, 0xe9, 0xc4, 0xdd, 0x84, 0x72, 0xdf, 0x1d, 0xc6, 0xee, 0xd2, 0x36, 0x14, 0x1e, 0xa9, 0x07,
+	0x9d, 0xaf, 0xf5, 0xad, 0x6a, 0x5a, 0x52, 0xdc, 0x21, 0xda, 0xf1, 0x52, 0xfb, 0x0b, 0x20, 0x99,
+	0xf8, 0x8e, 0x79, 0x1f, 0x4e, 0xf3, 0x2e, 0x4c, 0x04, 0x43, 0xff, 0x7d, 0x0e, 0x2a, 0x7a, 0xfa,
+	0x8e, 0xeb, 0x49, 0xe4, 0x2a, 0x96, 0x92, 0x54, 0xb7, 0xe6, 0x89, 0xa5, 0x6f, 0xaf, 0x14, 0xb9,
+	0xcb, 0x57, 0x8a, 0xe9, 0x7c, 0xcc, 0xcf, 0x99, 0x8f, 0x8b, 0xc2, 0x1d, 0xa2, 0xe9, 0x0c, 0x56,
+	0x26, 0x52, 0xa7, 0x32, 0xda, 0x1a, 0x40, 0xbf, 0x98, 0x29, 0x12, 0x05, 0x93, 0x68, 0x29, 0x61,
+	0x56, 0xc6, 0xa9, 0x5a, 0xd1, 0xfe, 0xa7, 0x05, 0x34, 0xab, 0xdf, 0x3b, 0x6e, 0xb9, 0x3f, 0x84,
+	0xa2, 0x79, 0x73, 0x30, 0x9e, 0x36, 0xd2, 0x48, 0x8f, 0xa7, 0xed, 0x64, 0x9d, 0x7e, 0x0c, 0x4b,
+	0xc7, 0xfa, 0x30, 0x8d, 0x8b, 0xd7, 0x67, 0x5c, 0x8c, 0x4f, 0xda, 0x36, 0xa0, 0xf6, 0x9f, 0x2c,
+	0x28, 0xeb, 0xf9, 0x39, 0x2e, 0xc2, 0xcc, 0xb5, 0x95, 0x9b, 0xbe, 0xb6, 0x3e, 0x80, 0x25, 0xad,
+	0x56, 0x72, 0xfd, 0xd5, 0xa6, 0x62, 0xce, 0x36, 0x8b, 0x17, 0x26, 0xc9, 0xe2, 0xa5, 0x93, 0xe4,
+	0x5f, 0x16, 0x90, 0x83, 0x40, 0xe8, 0xf6, 0x48, 0x7c, 0x1f, 0x5e, 0x7e, 0x32, 0xa7, 0x57, 0xf8,
+	0xee, 0xd3, 0x6b, 0xff, 0xdb, 0x82, 0x6a, 0xe2, 0xdb, 0x15, 0xb4, 0x26, 0x1d, 0x28, 0x87, 0x89,
+	0x52, 0xb3, 0x9d, 0x49, 0x62, 0xc6, 0x9e, 0x40, 0xde, 0x7a, 0x63, 0xf2, 0x77, 0x0b, 0x1a, 0x3b,
+	0xcc, 0x63, 0xbe, 0x83, 0xef, 0xfc, 0xe4, 0x7e, 0x04, 0x05, 0xa6, 0xae, 0x05, 0x73, 0x68, 0x33,
+	0x77, 0x45, 0xbc, 0x76, 0x99, 0xa3, 0x7a, 0x66, 0x41, 0xc5, 0xf8, 0x72, 0x05, 0x27, 0xf5, 0x11,
+	0x94, 0x8e, 0x8c, 0x30, 0xe6, 0xa0, 0x52, 0xcb, 0xc6, 0x88, 0x9d, 0x02, 0xde, 0xfa, 0x31, 0xfd,
+	0x23, 0x07, 0xa5, 0x7b, 0xf8, 0x58, 0x27, 0x2f, 0xfd, 0xe0, 0x95, 0xda, 0x6e, 0xe9, 0x1e, 0xee,
+	0x3b, 0xab, 0xf7, 0x5c, 0xaf, 0x3c, 0xaa, 0x73, 0x8e, 0x8b, 0x72, 0xa6, 0xeb, 0x5b, 0x9e, 0x2a,
+	0x1d, 0xfa, 0x56, 0x2e, 0x07, 0xc9, 0x23, 0xfd, 0x28, 0x61, 0xe8, 0xaa, 0xbf, 0x74, 0xc1, 0xc5,
+	0x18, 0x83, 0xd5, 0x23, 0xfd, 0x1c, 0x6a, 0xaa, 0xa9, 0x1a, 0xb8, 0xfe, 0xe0, 0x38, 0xe0, 0x0e,
+	0xea, 0x1e, 0x2f, 0x73, 0x21, 0xaa, 0xf6, 0xa9, 0xe7, 0xdf, 0x51, 0x4b, 0x76, 0x45, 0x4e, 0x06,
+	0x74, 0x15, 0x4a, 0x69, 0x63, 0x53, 0xd2, 0x8d, 0x5b, 0x3a, 0xa6, 0x5b, 0x50, 0x88, 0x3b, 0xa6,
+	0xf2, 0x1c, 0x1d, 0x4b, 0x0c, 0x6d, 0x7f, 0x65, 0xc1, 0xf5, 0x44, 0xcf, 0xbe, 0xeb, 0x8f, 0x3c,
+	0x9c, 0x2f, 0xf8, 0x33, 0xd1, 0x98, 0x7b, 0x4d, 0xd9, 0x5f, 0x87, 0x82, 0x76, 0x7c, 0x72, 0x6f,
+	0x26, 0xa7, 0x9d, 0x18, 0xb6, 0x63, 0x40, 0xfb, 0xa9, 0x05, 0xef, 0xcd, 0x6e, 0xe6, 0x4a, 0xde,
+	0x31, 0x33, 0x51, 0x99, 0x9f, 0x8e, 0xca, 0xcc, 0x2b, 0xc6, 0xe2, 0xf4, 0x2b, 0xc6, 0xd5, 0xc4,
+	0xeb, 0x57, 0x16, 0xac, 0x24, 0x2e, 0xed, 0x44, 0xde, 0xe9, 0x95, 0xab, 0xbb, 0x31, 0x73, 0xbf,
+	0x5d, 0x24, 0xaf, 0x41, 0x28, 0x7d, 0xaf, 0x4d, 0x6f, 0xe6, 0x4a, 0xd4, 0x5d, 0x85, 0x92, 0x11,
+	0x2d, 0xde, 0x44, 0xd9, 0x4e, 0xc7, 0x6f, 0xbd, 0x1e, 0xfc, 0x2e, 0x67, 0xba, 0x9f, 0x5d, 0x55,
+	0x7f, 0xbc, 0xf9, 0xe4, 0xbd, 0x3d, 0xfd, 0x5e, 0xf9, 0x06, 0xbd, 0x64, 0xfe, 0x4d, 0x7b, 0xc9,
+	0x2b, 0xbf, 0xa6, 0xff, 0x6c, 0xc1, 0xca, 0x94, 0x20, 0x6f, 0x39, 0x81, 0xae, 0xa6, 0x71, 0xfa,
+	0xda, 0x82, 0xf7, 0xf4, 0xae, 0xef, 0x32, 0x21, 0x2e, 0x73, 0x94, 0x97, 0xc8, 0x94, 0x49, 0xfb,
+	0x99, 0x9f, 0xa7, 0xfd, 0xfc, 0xab, 0x05, 0x37, 0x5e, 0xd9, 0xd2, 0xf7, 0x41, 0xcc, 0x8d, 0x97,
+	0x16, 0xd4, 0xa6, 0x3e, 0x4b, 0xd0, 0x22, 0xe4, 0xef, 0xe1, 0x63, 0xb2, 0x40, 0x4b, 0xb0, 0xd8,
+	0x0d, 0x7c, 0x24, 0x16, 0xad, 0x42, 0x29, 0x76, 0x0a, 0x87, 0x24, 0xa7, 0x46, 0x36, 0x86, 0x1e,
+	0x73, 0x70, 0x48, 0xf2, 0x74, 0x19, 0x6a, 0x07, 0xe8, 0x0f, 0x5d, 0x7f, 0x14, 0x43, 0xc8, 0x22,
+	0xad, 0x40, 0xb1, 0x2f, 0x83, 0x30, 0xc4, 0x21, 0x29, 0xc4, 0x68, 0x65, 0x13, 0x87, 0x64, 0x89,
+	0xd6, 0xa0, 0xdc, 0x8f, 0x44, 0x88, 0xfe, 0x10, 0x87, 0xa4, 0x48, 0xeb, 0x00, 0x86, 0xac, 0x4c,
+	0x96, 0xd4, 0x78, 0x97, 0x79, 0x4e, 0xe4, 0x31, 0x05, 0x2f, 0xab, 0x5f, 0xda, 0x7b, 0x12, 0xba,
+	0x1c, 0x87, 0x04, 0x28, 0x85, 0xba, 0x01, 0x1b, 0xf3, 0xa4, 0x42, 0xcb, 0x50, 0xd0, 0x9f, 0x41,
+	0x49, 0x95, 0x36, 0xcc, 0x3b, 0x60, 0xfc, 0x6a, 0x43, 0x6a, 0xea, 0xc7, 0xfa, 0x28, 0xa5, 0xa7,
+	0xbf, 0xfb, 0x92, 0xfa, 0xc6, 0x1f, 0xf3, 0xd0, 0x98, 0xd1, 0x43, 0xf1, 0xef, 0xcb, 0x13, 0xe4,
+	0x64, 0x41, 0x39, 0xf2, 0xc0, 0x3f, 0xf5, 0x83, 0xc7, 0x7e, 0xff, 0x6c, 0x7c, 0x14, 0x78, 0xc4,
+	0xa2, 0xd7, 0x61, 0x39, 0x99, 0x32, 0xdf, 0xbf, 0x7a, 0x5d, 0x92, 0xa3, 0x6d, 0x68, 0x3d, 0xf0,
+	0x45, 0x14, 0x86, 0x01, 0x97, 0x38, 0x8c, 0x13, 0xe8, 0x84, 0x71, 0xe6, 0x48, 0xe4, 0xae, 0x90,
+	0xae, 0x43, 0xf2, 0x8a, 0xda, 0xf3, 0x9d, 0x80, 0x73, 0x74, 0x64, 0xf2, 0xad, 0x80, 0x2c, 0x2a,
+	0x1f, 0xf6, 0xcc, 0xdf, 0x3d, 0xbb, 0x5e, 0x20, 0xb4, 0x42, 0x14, 0xea, 0xdd, 0x28, 0xf4, 0x5c,
+	0x87, 0x49, 0xd4, 0x3f, 0x46, 0x96, 0xd4, 0x5c, 0xcf, 0x7f, 0xc4, 0x3c, 0x77, 0x68, 0x42, 0x93,
+	0x14, 0xe9, 0x0a, 0x34, 0x0e, 0x83, 0x60, 0x9f, 0x49, 0x3c, 0x0c, 0x8c, 0xd6, 0x25, 0x4a, 0xa0,
+	0x6a, 0xb6, 0x18, 0x53, 0xcb, 0xb4, 0x09, 0xd7, 0xe2, 0xd5, 0x6d, 0x8f, 0x23, 0x1b, 0x9e, 0x19,
+	0xcd, 0x08, 0xd0, 0x6b, 0x40, 0xba, 0xee, 0xf1, 0x31, 0x72, 0xf4, 0x65, 0xec, 0xa3, 0x20, 0x95,
+	0x8c, 0x29, 0x93, 0x45, 0xa4, 0xaa, 0x90, 0xc9, 0x36, 0xb7, 0x0f, 0x7a, 0x7b, 0x9c, 0x07, 0x9c,
+	0xd4, 0x94, 0x2d, 0x83, 0x8c, 0x6d, 0xd5, 0x95, 0x97, 0x36, 0x93, 0xb8, 0xef, 0x8e, 0x5d, 0xb9,
+	0xf7, 0xc4, 0x41, 0x54, 0xc7, 0xda, 0xa0, 0x37, 0xa1, 0xd9, 0x8f, 0x3b, 0xd6, 0x50, 0x69, 0x7d,
+	0x2f, 0x90, 0xfd, 0x44, 0x2d, 0x42, 0x14, 0xe9, 0xae, 0x2b, 0x84, 0xeb, 0x8f, 0x26, 0x15, 0x8c,
+	0x2c, 0xab, 0xd0, 0xf8, 0xf9, 0xe1, 0xe1, 0x41, 0x6c, 0x8c, 0x6e, 0xf4, 0xa0, 0x68, 0x3e, 0x67,
+	0xa8, 0x83, 0xb4, 0x71, 0xa4, 0x82, 0x22, 0xe0, 0x67, 0x64, 0x41, 0x45, 0xe8, 0x21, 0x7b, 0x42,
+	0x2c, 0xa5, 0xc8, 0x7e, 0xe0, 0x30, 0x6f, 0x37, 0x18, 0x8f, 0xd5, 0x2f, 0x06, 0x3e, 0xc9, 0xa9,
+	0x5d, 0x26, 0x7b, 0xbf, 0x83, 0x28, 0x48, 0x7e, 0xe3, 0x33, 0x28, 0x25, 0x9f, 0x3a, 0x54, 0x38,
+	0x6e, 0x1f, 0x89, 0xc0, 0x8b, 0x24, 0x92, 0x05, 0x15, 0x5f, 0x07, 0xc8, 0x1f, 0xf8, 0xae, 0x24,
+	0x56, 0x1c, 0x8c, 0xdc, 0x41, 0x5f, 0xb2, 0x11, 0x92, 0xdc, 0xce, 0xa7, 0x4f, 0x9f, 0xb7, 0x16,
+	0x9e, 0x3d, 0x6f, 0x2d, 0x7c, 0xf3, 0xbc, 0x65, 0xfd, 0xe6, 0xbc, 0x65, 0xfd, 0xe1, 0xbc, 0x65,
+	0xfd, 0xed, 0xbc, 0x65, 0x3d, 0x3d, 0x6f, 0x59, 0xff, 0x3d, 0x6f, 0x59, 0x2f, 0xcf, 0x5b, 0x0b,
+	0xdf, 0x9c, 0xb7, 0xac, 0xaf, 0x5f, 0xb4, 0x16, 0x9e, 0xbe, 0x68, 0x2d, 0x3c, 0x7b, 0xd1, 0x5a,
+	0x38, 0x5a, 0xd2, 0x75, 0xfd, 0xd6, 0xff, 0x03, 0x00, 0x00, 0xff, 0xff, 0x2c, 0x18, 0xc2, 0xa9,
+	0x50, 0x1c, 0x00, 0x00,
 }
 
 func (x ExecutionType) String() string {
@@ -2358,33 +2331,6 @@ func (x FeeBasis) String() string {
 		return s
 	}
 	return strconv.Itoa(int(x))
-}
-func (this *BusinessRequestReject) Equal(that interface{}) bool {
-	if that == nil {
-		return this == nil
-	}
-
-	that1, ok := that.(*BusinessRequestReject)
-	if !ok {
-		that2, ok := that.(BusinessRequestReject)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		return this == nil
-	} else if this == nil {
-		return false
-	}
-	if this.RequestID != that1.RequestID {
-		return false
-	}
-	if this.Reason != that1.Reason {
-		return false
-	}
-	return true
 }
 func (this *MarketDataRequest) Equal(that interface{}) bool {
 	if that == nil {
@@ -2422,41 +2368,14 @@ func (this *MarketDataRequest) Equal(that interface{}) bool {
 	}
 	return true
 }
-func (this *MarketDataRequestReject) Equal(that interface{}) bool {
+func (this *MarketDataResponse) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
 	}
 
-	that1, ok := that.(*MarketDataRequestReject)
+	that1, ok := that.(*MarketDataResponse)
 	if !ok {
-		that2, ok := that.(MarketDataRequestReject)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		return this == nil
-	} else if this == nil {
-		return false
-	}
-	if this.RequestID != that1.RequestID {
-		return false
-	}
-	if this.Reason != that1.Reason {
-		return false
-	}
-	return true
-}
-func (this *MarketDataSnapshot) Equal(that interface{}) bool {
-	if that == nil {
-		return this == nil
-	}
-
-	that1, ok := that.(*MarketDataSnapshot)
-	if !ok {
-		that2, ok := that.(MarketDataSnapshot)
+		that2, ok := that.(MarketDataResponse)
 		if ok {
 			that1 = &that2
 		} else {
@@ -2489,6 +2408,12 @@ func (this *MarketDataSnapshot) Equal(that interface{}) bool {
 		}
 	}
 	if this.SeqNum != that1.SeqNum {
+		return false
+	}
+	if this.Success != that1.Success {
+		return false
+	}
+	if this.RejectionReason != that1.RejectionReason {
 		return false
 	}
 	return true
@@ -2592,6 +2517,9 @@ func (this *SecurityDefinitionResponse) Equal(that interface{}) bool {
 	if !this.Security.Equal(that1.Security) {
 		return false
 	}
+	if this.Success != that1.Success {
+		return false
+	}
 	if this.RejectionReason != that1.RejectionReason {
 		return false
 	}
@@ -2652,9 +2580,6 @@ func (this *SecurityList) Equal(that interface{}) bool {
 	if this.ResponseID != that1.ResponseID {
 		return false
 	}
-	if this.Error != that1.Error {
-		return false
-	}
 	if len(this.Securities) != len(that1.Securities) {
 		return false
 	}
@@ -2662,6 +2587,12 @@ func (this *SecurityList) Equal(that interface{}) bool {
 		if !this.Securities[i].Equal(that1.Securities[i]) {
 			return false
 		}
+	}
+	if this.Success != that1.Success {
+		return false
+	}
+	if this.RejectionReason != that1.RejectionReason {
+		return false
 	}
 	return true
 }
@@ -3146,6 +3077,9 @@ func (this *NewOrderSingleResponse) Equal(that interface{}) bool {
 	if this.RequestID != that1.RequestID {
 		return false
 	}
+	if this.ResponseID != that1.ResponseID {
+		return false
+	}
 	if this.Success != that1.Success {
 		return false
 	}
@@ -3214,7 +3148,7 @@ func (this *NewOrderBulkResponse) Equal(that interface{}) bool {
 	if this.RequestID != that1.RequestID {
 		return false
 	}
-	if this.Success != that1.Success {
+	if this.ResponseID != that1.ResponseID {
 		return false
 	}
 	if len(this.OrderIDs) != len(that1.OrderIDs) {
@@ -3224,6 +3158,9 @@ func (this *NewOrderBulkResponse) Equal(that interface{}) bool {
 		if this.OrderIDs[i] != that1.OrderIDs[i] {
 			return false
 		}
+	}
+	if this.Success != that1.Success {
+		return false
 	}
 	if this.RejectionReason != that1.RejectionReason {
 		return false
@@ -3288,6 +3225,9 @@ func (this *OrderCancelResponse) Equal(that interface{}) bool {
 	if this.RequestID != that1.RequestID {
 		return false
 	}
+	if this.ResponseID != that1.ResponseID {
+		return false
+	}
 	if this.Success != that1.Success {
 		return false
 	}
@@ -3348,6 +3288,9 @@ func (this *OrderMassCancelResponse) Equal(that interface{}) bool {
 	if this.RequestID != that1.RequestID {
 		return false
 	}
+	if this.ResponseID != that1.ResponseID {
+		return false
+	}
 	if this.Success != that1.Success {
 		return false
 	}
@@ -3355,17 +3298,6 @@ func (this *OrderMassCancelResponse) Equal(that interface{}) bool {
 		return false
 	}
 	return true
-}
-func (this *BusinessRequestReject) GoString() string {
-	if this == nil {
-		return "nil"
-	}
-	s := make([]string, 0, 6)
-	s = append(s, "&messages.BusinessRequestReject{")
-	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
-	s = append(s, "Reason: "+fmt.Sprintf("%#v", this.Reason)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
 }
 func (this *MarketDataRequest) GoString() string {
 	if this == nil {
@@ -3385,23 +3317,12 @@ func (this *MarketDataRequest) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
-func (this *MarketDataRequestReject) GoString() string {
+func (this *MarketDataResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 6)
-	s = append(s, "&messages.MarketDataRequestReject{")
-	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
-	s = append(s, "Reason: "+fmt.Sprintf("%#v", this.Reason)+",\n")
-	s = append(s, "}")
-	return strings.Join(s, "")
-}
-func (this *MarketDataSnapshot) GoString() string {
-	if this == nil {
-		return "nil"
-	}
-	s := make([]string, 0, 10)
-	s = append(s, "&messages.MarketDataSnapshot{")
+	s := make([]string, 0, 12)
+	s = append(s, "&messages.MarketDataResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
 	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	if this.SnapshotL2 != nil {
@@ -3414,6 +3335,8 @@ func (this *MarketDataSnapshot) GoString() string {
 		s = append(s, "Trades: "+fmt.Sprintf("%#v", this.Trades)+",\n")
 	}
 	s = append(s, "SeqNum: "+fmt.Sprintf("%#v", this.SeqNum)+",\n")
+	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
+	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -3455,13 +3378,14 @@ func (this *SecurityDefinitionResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&messages.SecurityDefinitionResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
 	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	if this.Security != nil {
 		s = append(s, "Security: "+fmt.Sprintf("%#v", this.Security)+",\n")
 	}
+	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
 	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
@@ -3484,14 +3408,15 @@ func (this *SecurityList) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&messages.SecurityList{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
 	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
-	s = append(s, "Error: "+fmt.Sprintf("%#v", this.Error)+",\n")
 	if this.Securities != nil {
 		s = append(s, "Securities: "+fmt.Sprintf("%#v", this.Securities)+",\n")
 	}
+	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
+	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -3729,9 +3654,10 @@ func (this *NewOrderSingleResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&messages.NewOrderSingleResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
+	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
 	s = append(s, "OrderID: "+fmt.Sprintf("%#v", this.OrderID)+",\n")
 	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
@@ -3758,11 +3684,12 @@ func (this *NewOrderBulkResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 8)
+	s := make([]string, 0, 9)
 	s = append(s, "&messages.NewOrderBulkResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
-	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
+	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	s = append(s, "OrderIDs: "+fmt.Sprintf("%#v", this.OrderIDs)+",\n")
+	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
 	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
@@ -3793,9 +3720,10 @@ func (this *OrderCancelResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 8)
 	s = append(s, "&messages.OrderCancelResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
+	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
 	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
@@ -3821,9 +3749,10 @@ func (this *OrderMassCancelResponse) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 8)
 	s = append(s, "&messages.OrderMassCancelResponse{")
 	s = append(s, "RequestID: "+fmt.Sprintf("%#v", this.RequestID)+",\n")
+	s = append(s, "ResponseID: "+fmt.Sprintf("%#v", this.ResponseID)+",\n")
 	s = append(s, "Success: "+fmt.Sprintf("%#v", this.Success)+",\n")
 	s = append(s, "RejectionReason: "+fmt.Sprintf("%#v", this.RejectionReason)+",\n")
 	s = append(s, "}")
@@ -3837,35 +3766,6 @@ func valueToGoStringExecutorMessages(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
-func (m *BusinessRequestReject) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *BusinessRequestReject) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
-	}
-	if len(m.Reason) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintExecutorMessages(dAtA, i, uint64(len(m.Reason)))
-		i += copy(dAtA[i:], m.Reason)
-	}
-	return i, nil
-}
-
 func (m *MarketDataRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -3924,7 +3824,7 @@ func (m *MarketDataRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *MarketDataRequestReject) Marshal() (dAtA []byte, err error) {
+func (m *MarketDataResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -3934,36 +3834,7 @@ func (m *MarketDataRequestReject) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *MarketDataRequestReject) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
-	}
-	if len(m.Reason) > 0 {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintExecutorMessages(dAtA, i, uint64(len(m.Reason)))
-		i += copy(dAtA[i:], m.Reason)
-	}
-	return i, nil
-}
-
-func (m *MarketDataSnapshot) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *MarketDataSnapshot) MarshalTo(dAtA []byte) (int, error) {
+func (m *MarketDataResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4014,6 +3885,21 @@ func (m *MarketDataSnapshot) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x30
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.SeqNum))
+	}
+	if m.Success {
+		dAtA[i] = 0x38
+		i++
+		if m.Success {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.RejectionReason != 0 {
+		dAtA[i] = 0x40
+		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
 	return i, nil
 }
@@ -4151,8 +4037,18 @@ func (m *SecurityDefinitionResponse) MarshalTo(dAtA []byte) (int, error) {
 		}
 		i += n8
 	}
-	if m.RejectionReason != 0 {
+	if m.Success {
 		dAtA[i] = 0x20
+		i++
+		if m.Success {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.RejectionReason != 0 {
+		dAtA[i] = 0x28
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
@@ -4227,15 +4123,9 @@ func (m *SecurityList) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.ResponseID))
 	}
-	if len(m.Error) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintExecutorMessages(dAtA, i, uint64(len(m.Error)))
-		i += copy(dAtA[i:], m.Error)
-	}
 	if len(m.Securities) > 0 {
 		for _, msg := range m.Securities {
-			dAtA[i] = 0x22
+			dAtA[i] = 0x1a
 			i++
 			i = encodeVarintExecutorMessages(dAtA, i, uint64(msg.Size()))
 			n, err := msg.MarshalTo(dAtA[i:])
@@ -4244,6 +4134,21 @@ func (m *SecurityList) MarshalTo(dAtA []byte) (int, error) {
 			}
 			i += n
 		}
+	}
+	if m.Success {
+		dAtA[i] = 0x20
+		i++
+		if m.Success {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.RejectionReason != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
 	return i, nil
 }
@@ -4999,8 +4904,13 @@ func (m *NewOrderSingleResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
 	}
-	if m.Success {
+	if m.ResponseID != 0 {
 		dAtA[i] = 0x10
+		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.ResponseID))
+	}
+	if m.Success {
+		dAtA[i] = 0x18
 		i++
 		if m.Success {
 			dAtA[i] = 1
@@ -5010,13 +4920,13 @@ func (m *NewOrderSingleResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 	}
 	if len(m.OrderID) > 0 {
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x22
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(len(m.OrderID)))
 		i += copy(dAtA[i:], m.OrderID)
 	}
 	if m.RejectionReason != 0 {
-		dAtA[i] = 0x20
+		dAtA[i] = 0x28
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
@@ -5088,15 +4998,10 @@ func (m *NewOrderBulkResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
 	}
-	if m.Success {
+	if m.ResponseID != 0 {
 		dAtA[i] = 0x10
 		i++
-		if m.Success {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.ResponseID))
 	}
 	if len(m.OrderIDs) > 0 {
 		for _, s := range m.OrderIDs {
@@ -5113,8 +5018,18 @@ func (m *NewOrderBulkResponse) MarshalTo(dAtA []byte) (int, error) {
 			i += copy(dAtA[i:], s)
 		}
 	}
-	if m.RejectionReason != 0 {
+	if m.Success {
 		dAtA[i] = 0x20
+		i++
+		if m.Success {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	if m.RejectionReason != 0 {
+		dAtA[i] = 0x28
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
@@ -5204,8 +5119,13 @@ func (m *OrderCancelResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
 	}
-	if m.Success {
+	if m.ResponseID != 0 {
 		dAtA[i] = 0x10
+		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.ResponseID))
+	}
+	if m.Success {
+		dAtA[i] = 0x18
 		i++
 		if m.Success {
 			dAtA[i] = 1
@@ -5215,7 +5135,7 @@ func (m *OrderCancelResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 	}
 	if m.RejectionReason != 0 {
-		dAtA[i] = 0x18
+		dAtA[i] = 0x20
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
@@ -5285,8 +5205,13 @@ func (m *OrderMassCancelResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RequestID))
 	}
-	if m.Success {
+	if m.ResponseID != 0 {
 		dAtA[i] = 0x10
+		i++
+		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.ResponseID))
+	}
+	if m.Success {
+		dAtA[i] = 0x18
 		i++
 		if m.Success {
 			dAtA[i] = 1
@@ -5296,7 +5221,7 @@ func (m *OrderMassCancelResponse) MarshalTo(dAtA []byte) (int, error) {
 		i++
 	}
 	if m.RejectionReason != 0 {
-		dAtA[i] = 0x18
+		dAtA[i] = 0x20
 		i++
 		i = encodeVarintExecutorMessages(dAtA, i, uint64(m.RejectionReason))
 	}
@@ -5312,22 +5237,6 @@ func encodeVarintExecutorMessages(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *BusinessRequestReject) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.RequestID != 0 {
-		n += 1 + sovExecutorMessages(uint64(m.RequestID))
-	}
-	l = len(m.Reason)
-	if l > 0 {
-		n += 1 + l + sovExecutorMessages(uint64(l))
-	}
-	return n
-}
-
 func (m *MarketDataRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -5354,23 +5263,7 @@ func (m *MarketDataRequest) Size() (n int) {
 	return n
 }
 
-func (m *MarketDataRequestReject) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.RequestID != 0 {
-		n += 1 + sovExecutorMessages(uint64(m.RequestID))
-	}
-	l = len(m.Reason)
-	if l > 0 {
-		n += 1 + l + sovExecutorMessages(uint64(l))
-	}
-	return n
-}
-
-func (m *MarketDataSnapshot) Size() (n int) {
+func (m *MarketDataResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -5398,6 +5291,12 @@ func (m *MarketDataSnapshot) Size() (n int) {
 	}
 	if m.SeqNum != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.SeqNum))
+	}
+	if m.Success {
+		n += 2
+	}
+	if m.RejectionReason != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.RejectionReason))
 	}
 	return n
 }
@@ -5466,6 +5365,9 @@ func (m *SecurityDefinitionResponse) Size() (n int) {
 		l = m.Security.Size()
 		n += 1 + l + sovExecutorMessages(uint64(l))
 	}
+	if m.Success {
+		n += 2
+	}
 	if m.RejectionReason != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RejectionReason))
 	}
@@ -5503,15 +5405,17 @@ func (m *SecurityList) Size() (n int) {
 	if m.ResponseID != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.ResponseID))
 	}
-	l = len(m.Error)
-	if l > 0 {
-		n += 1 + l + sovExecutorMessages(uint64(l))
-	}
 	if len(m.Securities) > 0 {
 		for _, e := range m.Securities {
 			l = e.Size()
 			n += 1 + l + sovExecutorMessages(uint64(l))
 		}
+	}
+	if m.Success {
+		n += 2
+	}
+	if m.RejectionReason != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.RejectionReason))
 	}
 	return n
 }
@@ -5863,6 +5767,9 @@ func (m *NewOrderSingleResponse) Size() (n int) {
 	if m.RequestID != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RequestID))
 	}
+	if m.ResponseID != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.ResponseID))
+	}
 	if m.Success {
 		n += 2
 	}
@@ -5907,14 +5814,17 @@ func (m *NewOrderBulkResponse) Size() (n int) {
 	if m.RequestID != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RequestID))
 	}
-	if m.Success {
-		n += 2
+	if m.ResponseID != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.ResponseID))
 	}
 	if len(m.OrderIDs) > 0 {
 		for _, s := range m.OrderIDs {
 			l = len(s)
 			n += 1 + l + sovExecutorMessages(uint64(l))
 		}
+	}
+	if m.Success {
+		n += 2
 	}
 	if m.RejectionReason != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RejectionReason))
@@ -5959,6 +5869,9 @@ func (m *OrderCancelResponse) Size() (n int) {
 	if m.RequestID != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RequestID))
 	}
+	if m.ResponseID != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.ResponseID))
+	}
 	if m.Success {
 		n += 2
 	}
@@ -5997,6 +5910,9 @@ func (m *OrderMassCancelResponse) Size() (n int) {
 	if m.RequestID != 0 {
 		n += 1 + sovExecutorMessages(uint64(m.RequestID))
 	}
+	if m.ResponseID != 0 {
+		n += 1 + sovExecutorMessages(uint64(m.ResponseID))
+	}
 	if m.Success {
 		n += 2
 	}
@@ -6019,17 +5935,6 @@ func sovExecutorMessages(x uint64) (n int) {
 func sozExecutorMessages(x uint64) (n int) {
 	return sovExecutorMessages(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *BusinessRequestReject) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&BusinessRequestReject{`,
-		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
-		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func (this *MarketDataRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -6044,28 +5949,19 @@ func (this *MarketDataRequest) String() string {
 	}, "")
 	return s
 }
-func (this *MarketDataRequestReject) String() string {
+func (this *MarketDataResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MarketDataRequestReject{`,
-		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
-		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *MarketDataSnapshot) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&MarketDataSnapshot{`,
+	s := strings.Join([]string{`&MarketDataResponse{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
 		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`SnapshotL2:` + strings.Replace(fmt.Sprintf("%v", this.SnapshotL2), "OBL2Snapshot", "models.OBL2Snapshot", 1) + `,`,
 		`SnapshotL3:` + strings.Replace(fmt.Sprintf("%v", this.SnapshotL3), "OBL3Snapshot", "models.OBL3Snapshot", 1) + `,`,
 		`Trades:` + strings.Replace(fmt.Sprintf("%v", this.Trades), "AggregatedTrade", "models.AggregatedTrade", 1) + `,`,
 		`SeqNum:` + fmt.Sprintf("%v", this.SeqNum) + `,`,
+		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
+		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6104,6 +6000,7 @@ func (this *SecurityDefinitionResponse) String() string {
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
 		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`Security:` + strings.Replace(fmt.Sprintf("%v", this.Security), "Security", "models.Security", 1) + `,`,
+		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
 		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
 	}, "")
@@ -6128,8 +6025,9 @@ func (this *SecurityList) String() string {
 	s := strings.Join([]string{`&SecurityList{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
 		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
-		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
 		`Securities:` + strings.Replace(fmt.Sprintf("%v", this.Securities), "Security", "models.Security", 1) + `,`,
+		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
+		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -6312,6 +6210,7 @@ func (this *NewOrderSingleResponse) String() string {
 	}
 	s := strings.Join([]string{`&NewOrderSingleResponse{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
+		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
 		`OrderID:` + fmt.Sprintf("%v", this.OrderID) + `,`,
 		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
@@ -6337,8 +6236,9 @@ func (this *NewOrderBulkResponse) String() string {
 	}
 	s := strings.Join([]string{`&NewOrderBulkResponse{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
-		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
+		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`OrderIDs:` + fmt.Sprintf("%v", this.OrderIDs) + `,`,
+		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
 		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
 	}, "")
@@ -6364,6 +6264,7 @@ func (this *OrderCancelResponse) String() string {
 	}
 	s := strings.Join([]string{`&OrderCancelResponse{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
+		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
 		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
@@ -6388,6 +6289,7 @@ func (this *OrderMassCancelResponse) String() string {
 	}
 	s := strings.Join([]string{`&OrderMassCancelResponse{`,
 		`RequestID:` + fmt.Sprintf("%v", this.RequestID) + `,`,
+		`ResponseID:` + fmt.Sprintf("%v", this.ResponseID) + `,`,
 		`Success:` + fmt.Sprintf("%v", this.Success) + `,`,
 		`RejectionReason:` + fmt.Sprintf("%v", this.RejectionReason) + `,`,
 		`}`,
@@ -6401,110 +6303,6 @@ func valueToStringExecutorMessages(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
-}
-func (m *BusinessRequestReject) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowExecutorMessages
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: BusinessRequestReject: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: BusinessRequestReject: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequestID", wireType)
-			}
-			m.RequestID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecutorMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecutorMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Reason = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipExecutorMessages(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *MarketDataRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -6689,7 +6487,7 @@ func (m *MarketDataRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *MarketDataRequestReject) Unmarshal(dAtA []byte) error {
+func (m *MarketDataResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6712,114 +6510,10 @@ func (m *MarketDataRequestReject) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: MarketDataRequestReject: wiretype end group for non-group")
+			return fmt.Errorf("proto: MarketDataResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: MarketDataRequestReject: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequestID", wireType)
-			}
-			m.RequestID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecutorMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecutorMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Reason = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipExecutorMessages(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *MarketDataSnapshot) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowExecutorMessages
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: MarketDataSnapshot: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: MarketDataSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: MarketDataResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -6981,6 +6675,45 @@ func (m *MarketDataSnapshot) Unmarshal(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.SeqNum |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Success = bool(v != 0)
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
+			}
+			m.RejectionReason = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RejectionReason |= RejectionReason(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -7438,6 +7171,26 @@ func (m *SecurityDefinitionResponse) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Success = bool(v != 0)
+		case 5:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
 			}
 			m.RejectionReason = 0
@@ -7676,38 +7429,6 @@ func (m *SecurityList) Unmarshal(dAtA []byte) error {
 			}
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowExecutorMessages
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthExecutorMessages
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Error = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Securities", wireType)
 			}
 			var msglen int
@@ -7740,6 +7461,45 @@ func (m *SecurityList) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Success = bool(v != 0)
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
+			}
+			m.RejectionReason = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RejectionReason |= RejectionReason(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipExecutorMessages(dAtA[iNdEx:])
@@ -10174,6 +9934,25 @@ func (m *NewOrderSingleResponse) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
+			}
+			m.ResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResponseID |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
 			}
 			var v int
@@ -10192,7 +9971,7 @@ func (m *NewOrderSingleResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Success = bool(v != 0)
-		case 3:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field OrderID", wireType)
 			}
@@ -10224,7 +10003,7 @@ func (m *NewOrderSingleResponse) Unmarshal(dAtA []byte) error {
 			}
 			m.OrderID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
 			}
@@ -10459,9 +10238,9 @@ func (m *NewOrderBulkResponse) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
 			}
-			var v int
+			m.ResponseID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowExecutorMessages
@@ -10471,12 +10250,11 @@ func (m *NewOrderBulkResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				v |= int(b&0x7F) << shift
+				m.ResponseID |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			m.Success = bool(v != 0)
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field OrderIDs", wireType)
@@ -10510,6 +10288,26 @@ func (m *NewOrderBulkResponse) Unmarshal(dAtA []byte) error {
 			m.OrderIDs = append(m.OrderIDs, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Success = bool(v != 0)
+		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
 			}
@@ -10818,6 +10616,25 @@ func (m *OrderCancelResponse) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
+			}
+			m.ResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResponseID |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
 			}
 			var v int
@@ -10836,7 +10653,7 @@ func (m *OrderCancelResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Success = bool(v != 0)
-		case 3:
+		case 4:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
 			}
@@ -11073,6 +10890,25 @@ func (m *OrderMassCancelResponse) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
+			}
+			m.ResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowExecutorMessages
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResponseID |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
 			}
 			var v int
@@ -11091,7 +10927,7 @@ func (m *OrderMassCancelResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Success = bool(v != 0)
-		case 3:
+		case 4:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RejectionReason", wireType)
 			}

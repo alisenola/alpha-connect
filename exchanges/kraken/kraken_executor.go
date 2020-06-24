@@ -62,7 +62,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		},
 		Timeout: 10 * time.Second,
 	}
-	state.rateLimit = exchanges.NewRateLimit(8000, 10*time.Minute)
+	state.rateLimit = exchanges.NewRateLimit(1, time.Second)
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
@@ -82,7 +82,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		return fmt.Errorf("rate limited")
 	}
 
 	state.rateLimit.Request(weight)
@@ -171,7 +171,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
@@ -183,7 +183,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
@@ -192,15 +192,20 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.MarketDataRequest)
+	response := &messages.MarketDataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
 	if msg.Subscribe {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "market data subscription not supported on executor"})
+		response.RejectionReason = messages.SubscriptionNotSupported
+		context.Respond(response)
+		return nil
 	}
 	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "symbol needed"})
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
 	}
 	// Get http request and the expected response
 	symbol := msg.Instrument.Symbol.Value
@@ -210,7 +215,9 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	state.rateLimit.Request(weight)
@@ -219,9 +226,9 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
+			state.logger.Info("http client error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
@@ -232,42 +239,44 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					"http client error: %d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
 					"http server error: %d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
 			}
 			return
 		}
 
-		var response struct {
+		var apiResponse struct {
 			Error  []string                      `json:"error"`
 			Result map[string]kraken.OrderBookL2 `json:"result"`
 		}
-		err = json.Unmarshal(queryResponse.Response, &response)
+		err = json.Unmarshal(queryResponse.Response, &apiResponse)
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
+			state.logger.Info("http client error", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
 			return
 		}
 
-		bids, asks := response.Result[symbol].ToBidAsk()
+		bids, asks := apiResponse.Result[symbol].ToBidAsk()
 		var maxTs uint64 = 0
-		for _, bid := range response.Result[symbol].Bids {
+		for _, bid := range apiResponse.Result[symbol].Bids {
 			if bid.Time > maxTs {
 				maxTs = bid.Time
 			}
 		}
-		for _, ask := range response.Result[symbol].Asks {
+		for _, ask := range apiResponse.Result[symbol].Asks {
 			if ask.Time > maxTs {
 				maxTs = ask.Time
 			}
@@ -277,12 +286,10 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			Asks:      asks,
 			Timestamp: utils.MicroToTimestamp(maxTs),
 		}
-		context.Respond(&messages.MarketDataSnapshot{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			SnapshotL2: snapshot,
-			SeqNum:     maxTs,
-		})
+		response.Success = true
+		response.SnapshotL2 = snapshot
+		response.SeqNum = maxTs
+		context.Respond(response)
 	})
 	return nil
 }

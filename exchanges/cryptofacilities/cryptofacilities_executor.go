@@ -66,7 +66,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	// TODO rate limitting
+	state.rateLimit = exchanges.NewRateLimit(500, 10*time.Second)
 	return state.UpdateSecurityList(context)
 }
 
@@ -75,6 +75,9 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
+	if state.rateLimit.IsRateLimited() {
+		return fmt.Errorf("rate limited")
+	}
 	request, _, err := cryptofacilities.GetInstruments()
 	if err != nil {
 		return err
@@ -198,7 +201,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	state.securities = securities
@@ -211,7 +214,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil

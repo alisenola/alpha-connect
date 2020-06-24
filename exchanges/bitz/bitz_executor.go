@@ -160,7 +160,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
@@ -172,7 +172,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil

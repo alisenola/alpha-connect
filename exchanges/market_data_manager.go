@@ -65,7 +65,7 @@ func (state *MarketDataManager) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.MarketDataSnapshot:
+	case *messages.MarketDataResponse:
 		if err := state.OnMarketDataSnapshot(context); err != nil {
 			state.logger.Error("error processing OnMarketDataSnapshot", log.Error(err))
 			panic(err)
@@ -121,9 +121,9 @@ func (state *MarketDataManager) OnMarketDataRequest(context actor.Context) error
 }
 
 func (state *MarketDataManager) OnMarketDataSnapshot(context actor.Context) error {
-	snapshot := context.Message().(*messages.MarketDataSnapshot)
+	snapshot := context.Message().(*messages.MarketDataResponse)
 	for k, v := range state.subscribers {
-		forward := &messages.MarketDataSnapshot{
+		forward := &messages.MarketDataResponse{
 			RequestID:  k,
 			ResponseID: uint64(time.Now().UnixNano()),
 			SnapshotL2: snapshot.SnapshotL2,

@@ -34,17 +34,18 @@ import (
 // The role of a Binance Executor is to
 // process api request
 type Executor struct {
-	client      *http.Client
-	securities  []*models.Security
-	rateLimit   *exchanges.RateLimit
-	queryRunner *actor.PID
-	logger      *log.Logger
+	client           *http.Client
+	securities       []*models.Security
+	obRateLimit      *exchanges.RateLimit
+	symbolsRateLimit *exchanges.RateLimit
+	queryRunner      *actor.PID
+	logger           *log.Logger
 }
 
 func NewExecutor() actor.Actor {
 	return &Executor{
 		client:      nil,
-		rateLimit:   nil,
+		obRateLimit: nil,
 		queryRunner: nil,
 		logger:      nil,
 	}
@@ -71,7 +72,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	// TODO rate limiting
+	state.obRateLimit = exchanges.NewRateLimit(30, time.Minute)
+	state.symbolsRateLimit = exchanges.NewRateLimit(10, time.Minute)
+
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewAPIQuery(state.client)
 	})
@@ -85,7 +88,11 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	request, _, err := bitfinex.GetSymbolsDetails()
+	if state.symbolsRateLimit.IsRateLimited() {
+		return fmt.Errorf("rate limited")
+	}
+	request, weight, err := bitfinex.GetSymbolsDetails()
+	state.symbolsRateLimit.Request(weight)
 	if err != nil {
 		return err
 	}
@@ -177,7 +184,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
@@ -188,38 +195,49 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: state.securities})
 
 	return nil
 }
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.MarketDataRequest)
-	if msg.Subscribe {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "market data subscription not supported on executor"})
+	response := &messages.MarketDataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
 	}
-	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "symbol needed"})
+	if msg.Subscribe {
+		response.RejectionReason = messages.SubscriptionNotSupported
+		context.Respond(response)
+		return nil
+	}
+	if msg.Instrument == nil {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
 	}
 	symbol := msg.Instrument.Symbol.Value
 
+	if state.obRateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
 	// Get http request and the expected response
-	request, _, err := bitfinex.GetOrderBook(symbol, 100, 100)
+	request, weight, err := bitfinex.GetOrderBook(symbol, 100, 100)
 	if err != nil {
 		return err
 	}
+	state.obRateLimit.Request(weight)
+
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
+			state.logger.Info("http client error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
@@ -230,17 +248,19 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					"http client error: %d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
 					"http server error: %d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
 			}
 			return
 		}
@@ -249,9 +269,9 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		err = json.Unmarshal(queryResponse.Response, &obData)
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    err.Error()})
+			state.logger.Info("http client error", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
 			return
 		}
 		var bids []gorderbook.OrderBookLevel
@@ -279,17 +299,15 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			})
 		}
 
-		snapshot = &models.OBL2Snapshot{
+		snapshot := &models.OBL2Snapshot{
 			Bids:      bids,
 			Asks:      asks,
 			Timestamp: utils.MilliToTimestamp(ts),
 		}
-		context.Respond(&messages.MarketDataSnapshot{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			SnapshotL2: snapshot,
-			SeqNum:     ts,
-		})
+		response.SnapshotL2 = snapshot
+		response.SeqNum = ts
+		response.Success = true
+		context.Respond(response)
 	})
 	return nil
 }

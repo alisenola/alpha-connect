@@ -31,24 +31,20 @@ import (
 // The role of a CoinbasePro Executor is to
 // process api request
 type CoinbaseProPublicExecutor struct {
-	client           *http.Client
-	securities       map[uint64]*models.Security
-	rateLimit        *exchanges.RateLimit
-	orderBookL2Cache *utils.TTLMap
-	orderBookL3Cache *utils.TTLMap
-	queryRunner      *actor.PID
-	logger           *log.Logger
+	client      *http.Client
+	securities  map[uint64]*models.Security
+	rateLimit   *exchanges.RateLimit
+	queryRunner *actor.PID
+	logger      *log.Logger
 }
 
 func NewCoinbaseProPublicExecutor() actor.Actor {
 	return &CoinbaseProPublicExecutor{
-		client:           nil,
-		securities:       nil,
-		rateLimit:        nil,
-		orderBookL2Cache: nil,
-		orderBookL3Cache: nil,
-		queryRunner:      nil,
-		logger:           nil,
+		client:      nil,
+		securities:  nil,
+		rateLimit:   nil,
+		queryRunner: nil,
+		logger:      nil,
 	}
 }
 
@@ -81,10 +77,6 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 	})
 	state.queryRunner = context.Spawn(props)
 
-	// 5 seconds cache for orderbooks
-	state.orderBookL2Cache = utils.NewTTLMap(5)
-	state.orderBookL3Cache = utils.NewTTLMap(5)
-
 	return state.UpdateSecurityList(context)
 }
 
@@ -99,7 +91,7 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+		return fmt.Errorf("rate limit exceeded")
 	}
 
 	state.rateLimit.Request(weight)
@@ -175,7 +167,7 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: securities})
 
 	return nil
@@ -193,7 +185,7 @@ func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Cont
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Error:      "",
+		Success:    true,
 		Securities: securities})
 
 	return nil
@@ -201,16 +193,19 @@ func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Cont
 
 func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
+	response := &messages.MarketDataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
 	if msg.Subscribe {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "market data subscription not supported on executor"})
+		response.RejectionReason = messages.SubscriptionNotSupported
+		context.Respond(response)
 		return nil
 	}
 	if msg.Instrument == nil {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "instrument missing"})
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
 		return nil
 	}
 	var symbol = ""
@@ -219,32 +214,20 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 	} else if msg.Instrument.SecurityID != nil {
 		sec, ok := state.securities[msg.Instrument.SecurityID.Value]
 		if !ok {
-			context.Respond(&messages.MarketDataRequestReject{
-				RequestID: msg.RequestID,
-				Reason:    "unknown security"})
+			response.RejectionReason = messages.UnknownSecurityID
+			context.Respond(response)
 			return nil
 		}
 		symbol = sec.Symbol
 	}
 	if symbol == "" {
-		context.Respond(&messages.MarketDataRequestReject{
-			RequestID: msg.RequestID,
-			Reason:    "unable to identify security"})
+		response.RejectionReason = messages.UnknownSymbol
+		context.Respond(response)
 		return nil
 	}
 
 	if msg.Aggregation == models.L2 {
 		var snapshot *models.OBL2Snapshot
-
-		// Check if we don't have it already cached
-		if ob, ok := state.orderBookL2Cache.Get(symbol); ok {
-			context.Respond(&messages.MarketDataSnapshot{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL2: ob.(*models.OBL2Snapshot)})
-			return nil
-		}
-
 		// Get http request and the expected response
 		request, weight, err := coinbasepro.GetProductOrderBook(symbol, coinbasepro.L2ORDERBOOK)
 		if err != nil {
@@ -252,7 +235,9 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 		}
 
 		if state.rateLimit.IsRateLimited() {
-			time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
+			response.RejectionReason = messages.RateLimitExceeded
+			context.Respond(response)
+			return nil
 		}
 
 		state.rateLimit.Request(weight)
@@ -260,9 +245,9 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 				return
 			}
 			queryResponse := res.(*jobs.PerformQueryResponse)
@@ -272,27 +257,26 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 						"http client error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					context.Respond(&messages.MarketDataRequestReject{
-						RequestID: msg.RequestID,
-						Reason:    err.Error()})
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
 				} else if queryResponse.StatusCode >= 500 {
 					err := fmt.Errorf(
 						"http server error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					context.Respond(&messages.MarketDataRequestReject{
-						RequestID: msg.RequestID,
-						Reason:    err.Error()})
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
 				}
 				return
 			}
 			var obData coinbasepro.OrderBookL2
 			err = json.Unmarshal(queryResponse.Response, &obData)
 			if err != nil {
-				err = fmt.Errorf("error decoding query response: %v", err)
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("error decoding query response", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 				return
 			}
 
@@ -302,28 +286,15 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 				Asks:      asks,
 				Timestamp: utils.MilliToTimestamp(0),
 			}
-			state.orderBookL2Cache.Put(symbol, snapshot)
-			context.Respond(&messages.MarketDataSnapshot{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL2: snapshot,
-				SeqNum:     obData.Sequence,
-			})
+			response.SnapshotL2 = snapshot
+			response.SeqNum = obData.Sequence
+			response.Success = true
+			context.Respond(response)
 		})
 
 		return nil
 	} else {
 		var snapshot *models.OBL3Snapshot
-
-		// Check if we don't have it already cached
-
-		if ob, ok := state.orderBookL3Cache.Get(symbol); ok {
-			context.Respond(&messages.MarketDataSnapshot{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL3: ob.(*models.OBL3Snapshot)})
-			return nil
-		}
 
 		// Get http request and the expected response
 		request, weight, err := coinbasepro.GetProductOrderBook(symbol, coinbasepro.L3ORDERBOOK)
@@ -340,9 +311,9 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 				return
 			}
 			queryResponse := res.(*jobs.PerformQueryResponse)
@@ -352,17 +323,17 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 						"http client error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					context.Respond(&messages.MarketDataRequestReject{
-						RequestID: msg.RequestID,
-						Reason:    err.Error()})
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
 				} else if queryResponse.StatusCode >= 500 {
 					err := fmt.Errorf(
 						"http server error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					context.Respond(&messages.MarketDataRequestReject{
-						RequestID: msg.RequestID,
-						Reason:    err.Error()})
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
 				}
 				return
 			}
@@ -370,10 +341,9 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 			var obData coinbasepro.OrderBookL3
 			err = json.Unmarshal(queryResponse.Response, &obData)
 			if err != nil {
-				err = fmt.Errorf("error decoding query response: %v", err)
-				context.Respond(&messages.MarketDataRequestReject{
-					RequestID: msg.RequestID,
-					Reason:    err.Error()})
+				state.logger.Info("error decoding query response", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 				return
 			}
 
@@ -383,13 +353,10 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 				Asks:      asks,
 				Timestamp: nil,
 			}
-			state.orderBookL3Cache.Put(symbol, snapshot)
-			context.Respond(&messages.MarketDataSnapshot{
-				RequestID:  msg.RequestID,
-				ResponseID: uint64(time.Now().UnixNano()),
-				SnapshotL3: snapshot,
-				SeqNum:     obData.Sequence,
-			})
+			response.SnapshotL3 = snapshot
+			response.SeqNum = obData.Sequence
+			response.Success = true
+			context.Respond(response)
 		})
 
 		return nil

@@ -89,37 +89,37 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-	snapshot, ok := res.(*messages.MarketDataSnapshot)
+	response, ok := res.(*messages.MarketDataResponse)
 	if !ok {
 		return fmt.Errorf("was expecting market data snapshot, got %s", reflect.TypeOf(res).String())
 	}
 
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
-	for _, b := range snapshot.SnapshotL2.Bids {
+	for _, b := range response.SnapshotL2.Bids {
 		rawPrice := b.Price * float64(tickPrecision)
 		rawQty := b.Quantity * float64(lotPrecision)
 		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
 		}
-		if (math.Round(rawQty) - rawQty) > 0.00001 {
+		if (math.Round(rawQty) - rawQty) > 0.0001 {
 			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
 		}
 	}
-	for _, a := range snapshot.SnapshotL2.Asks {
+	for _, a := range response.SnapshotL2.Asks {
 		rawPrice := a.Price * float64(tickPrecision)
 		rawQty := a.Quantity * float64(lotPrecision)
 		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
 		}
-		if (math.Round(rawQty) - rawQty) > 0.00001 {
+		if (math.Round(rawQty) - rawQty) > 0.0001 {
 			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
 		}
 	}
 	state.OBUpdates += 1
 	state.orderbook = gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
-	state.orderbook.Sync(snapshot.SnapshotL2.Bids, snapshot.SnapshotL2.Asks)
-	state.seqNum = snapshot.SeqNum
+	state.orderbook.Sync(response.SnapshotL2.Bids, response.SnapshotL2.Asks)
+	state.seqNum = response.SeqNum
 	if state.orderbook.Crossed() {
 		return fmt.Errorf("crossed OB on snapshot \n" + state.orderbook.String())
 	}
@@ -148,7 +148,7 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 				return fmt.Errorf("residue in ob price: %f %f", rawPrice, math.Round(rawPrice))
 			}
-			if (math.Round(rawQty) - rawQty) > 0.00001 {
+			if (math.Round(rawQty) - rawQty) > 0.0001 {
 				return fmt.Errorf("residue in ob qty: %f %f", rawQty, math.Round(rawQty))
 			}
 			state.orderbook.UpdateOrderBookLevel(l)
@@ -166,7 +166,7 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 				return fmt.Errorf("residue in trade price: %f %f", rawPrice, math.Round(rawPrice))
 			}
-			if (math.Round(rawQty) - rawQty) > 0.00001 {
+			if (math.Round(rawQty) - rawQty) > 0.0001 {
 				return fmt.Errorf("residue in trade qty: %f %f", rawQty, math.Round(rawQty))
 			}
 			state.trades += 1
@@ -206,8 +206,8 @@ func TestBinance(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -283,8 +283,8 @@ func TestBitfinex(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -360,8 +360,8 @@ func TestBitmex(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -397,8 +397,8 @@ func TestBitmex(t *testing.T) {
 	if sec.QuoteCurrency.ID != constants.DOLLAR.ID {
 		t.Fatalf("was expecting USD quote, got %d", sec.QuoteCurrency.ID)
 	}
-	if sec.IsInverse {
-		t.Fatalf("was expecting non inverse, got inverse")
+	if !sec.IsInverse {
+		t.Fatalf("was expecting inverse, got noninverse")
 	}
 	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
 		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement)
@@ -437,8 +437,8 @@ func TestBitstamp(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -514,8 +514,8 @@ func TestBitz(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -591,8 +591,8 @@ func TestCoinbasePro(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 
 	for _, s := range securityList.Securities {
@@ -668,8 +668,8 @@ func TestCryptofacilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -747,8 +747,8 @@ func TestFBinance(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -826,8 +826,8 @@ func TestFTX(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -911,8 +911,8 @@ func TestHuobi(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -990,8 +990,8 @@ func TestGemini(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -1069,8 +1069,8 @@ func TestHitbtc(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -1148,8 +1148,8 @@ func TestKraken(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false
@@ -1227,8 +1227,8 @@ func TestOKCoin(t *testing.T) {
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
-	if securityList.Error != "" {
-		t.Fatal(securityList.Error)
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
 		tested := false

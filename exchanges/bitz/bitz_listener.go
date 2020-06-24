@@ -222,11 +222,12 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Asks:      state.instrumentData.orderBook.GetAsks(0),
 		Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
 	}
-	context.Respond(&messages.MarketDataSnapshot{
+	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		SnapshotL2: snapshot,
 		SeqNum:     state.instrumentData.seqNum,
+		Success:    true,
 	})
 	return nil
 }
