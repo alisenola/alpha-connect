@@ -64,6 +64,7 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
+	state.rateLimit = exchanges.NewRateLimit(3, time.Second)
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
@@ -71,12 +72,18 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 		},
 		Timeout: 10 * time.Second,
 	}
-	state.rateLimit = exchanges.NewRateLimit(3, time.Second)
 
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
-	})
 	for i := 0; i < 4; i++ {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
 		state.queryRunners = append(state.queryRunners, context.Spawn(props))
 	}
 

@@ -208,6 +208,68 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.ws = ws
 
 	// Fetch messages until sync
+	synced := false
+	for !synced {
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
+		}
+		switch ws.Msg.Message.(type) {
+		case error:
+			return fmt.Errorf("socket error: %v", msg)
+
+		case coinbasepro.WSOpenOrder:
+			order := ws.Msg.Message.(coinbasepro.WSOpenOrder)
+			if order.Sequence < state.instrumentData.lastSequence {
+				continue
+			} else if order.Sequence == state.instrumentData.lastSequence {
+				synced = true
+			} else {
+				return fmt.Errorf("out of order sequence %d:%d", order.Sequence, state.instrumentData.lastSequence)
+			}
+		case coinbasepro.WSChangeOrder:
+			order := ws.Msg.Message.(coinbasepro.WSChangeOrder)
+			if order.Sequence < state.instrumentData.lastSequence {
+				continue
+			} else if order.Sequence == state.instrumentData.lastSequence {
+				synced = true
+			} else {
+				return fmt.Errorf("out of order sequence %d:%d", order.Sequence, state.instrumentData.lastSequence)
+			}
+
+		case coinbasepro.WSMatchOrder:
+			order := ws.Msg.Message.(coinbasepro.WSMatchOrder)
+			if order.Sequence < state.instrumentData.lastSequence {
+				continue
+			} else if order.Sequence == state.instrumentData.lastSequence {
+				synced = true
+			} else {
+				return fmt.Errorf("out of order sequence %d:%d", order.Sequence, state.instrumentData.lastSequence)
+			}
+
+		case coinbasepro.WSDoneOrder:
+			order := ws.Msg.Message.(coinbasepro.WSDoneOrder)
+			if order.Sequence < state.instrumentData.lastSequence {
+				continue
+			} else if order.Sequence == state.instrumentData.lastSequence {
+				synced = true
+			} else {
+				return fmt.Errorf("out of order sequence %d:%d", order.Sequence, state.instrumentData.lastSequence)
+			}
+
+		case coinbasepro.WSReceivedOrder:
+			order := ws.Msg.Message.(coinbasepro.WSReceivedOrder)
+			if order.Sequence < state.instrumentData.lastSequence {
+				continue
+			} else if order.Sequence == state.instrumentData.lastSequence {
+				synced = true
+			} else {
+				return fmt.Errorf("out of order sequence %d:%d", order.Sequence, state.instrumentData.lastSequence)
+			}
+
+		case coinbasepro.WSSubscriptions:
+			break
+		}
+	}
 
 	go func(ws *coinbasepro.Websocket) {
 		for ws.ReadMessage() {
