@@ -349,7 +349,6 @@ func (state *Listener) readSocket(context actor.Context) error {
 				SeqNum:   state.instrumentData.seqNum + 1,
 			})
 			state.instrumentData.seqNum += 1
-			fmt.Println(state.security.Symbol, ts, state.instrumentData.seqNum)
 
 		case kraken.WSTradeUpdate:
 			tradeUpdate := msg.Message.(kraken.WSTradeUpdate)
