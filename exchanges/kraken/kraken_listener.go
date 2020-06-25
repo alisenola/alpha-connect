@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
 	"math"
+	"math/rand"
 	"reflect"
 	"sort"
 	"time"
@@ -121,7 +122,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
-		seqNum:         0,
+		seqNum:         uint64(time.Now().UnixNano()),
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
 		lastAggTradeTs: 0,
@@ -222,9 +223,8 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
-	state.instrumentData.seqNum = 0
+	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
-
 	state.obWs = ws
 
 	go func(ws *kraken.Websocket) {
@@ -294,9 +294,6 @@ func (state *Listener) readSocket(context actor.Context) error {
 		case kraken.WSOrderBookL2Update:
 			obData := msg.Message.(kraken.WSOrderBookL2Update)
 
-			// The idea of exploding bid and ask won't do, multiple listeners
-			// is buggy
-
 			nLevels := len(obData.Bids) + len(obData.Asks)
 
 			if nLevels == 0 {
@@ -334,8 +331,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 				instr.orderBook.UpdateOrderBookLevel(level)
 			}
 
-			if state.instrumentData.orderBook.Crossed() {
+			if state.instrumentData.orderBook.Crossed() || rand.Int()%100 == 0 {
 				state.logger.Info("crossed order book")
+
 				// Stop the socket, we will restart instrument at the end
 				if err := state.obWs.Disconnect(); err != nil {
 					state.logger.Info("error disconnecting from socket", log.Error(err))
@@ -351,6 +349,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				SeqNum:   state.instrumentData.seqNum + 1,
 			})
 			state.instrumentData.seqNum += 1
+			fmt.Println(state.security.Symbol, ts, state.instrumentData.seqNum)
 
 		case kraken.WSTradeUpdate:
 			tradeUpdate := msg.Message.(kraken.WSTradeUpdate)
@@ -460,7 +459,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		// "Ping" by resubscribing to the topic
 		_ = state.obWs.Ping()
-		_ = state.tradeWs.SubscribeTrade([]string{state.security.Symbol})
+		_ = state.tradeWs.Ping()
 		state.lastPingTime = time.Now()
 	}
 

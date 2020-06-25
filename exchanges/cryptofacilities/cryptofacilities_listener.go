@@ -124,7 +124,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
-		seqNum:         0,
+		seqNum:         uint64(time.Now().UnixNano()),
 		lastUpdateID:   0,
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
@@ -236,7 +236,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateID = obData.Seq
 	state.instrumentData.lastUpdateTime = ts
-	state.instrumentData.seqNum = 0
+	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 
 	state.obWs = ws
 
