@@ -10,7 +10,6 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
 	"math"
-	"math/rand"
 	"reflect"
 	"sort"
 	"time"
