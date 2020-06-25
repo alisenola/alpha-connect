@@ -331,7 +331,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				instr.orderBook.UpdateOrderBookLevel(level)
 			}
 
-			if state.instrumentData.orderBook.Crossed() || rand.Int()%100 == 0 {
+			if state.instrumentData.orderBook.Crossed() {
 				state.logger.Info("crossed order book")
 
 				// Stop the socket, we will restart instrument at the end
