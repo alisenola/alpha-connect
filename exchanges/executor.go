@@ -24,7 +24,7 @@ type Executor struct {
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
 	securities        map[uint64]*models.Security // A map from security ID to security
-	instruments       map[uint64]*actor.PID       // A map from security ID to instrument listener
+	instruments       map[uint64]*actor.PID       // A map from security ID to market manager
 	slSubscribers     map[uint64]*actor.PID       // A map from request ID to security list subscribers
 	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
 	logger            *log.Logger

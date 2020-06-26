@@ -2,7 +2,6 @@ package account
 
 import (
 	"gitlab.com/alphaticks/alphac/modeling"
-	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 )
@@ -10,6 +9,8 @@ import (
 // TODO what about updating securities ?
 
 func (accnt *Account) Value(model modeling.MarketModel) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	value := 0.
 	for k, v := range accnt.balances {
 		value += v * model.GetPairPrice(k, constants.DOLLAR.ID)
@@ -40,6 +41,8 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 }
 
 func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, values []float64) {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	N := len(values)
 	for k, v := range accnt.balances {
 		samplePrices := model.GetSamplePairPrices(k, constants.DOLLAR.ID, time, N)
@@ -77,22 +80,12 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 	// TODO handle neg values
 }
 
-func (accnt Account) GetELROnCancelBid(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
-	if order, ok := accnt.ordersClID[orderID]; ok {
-		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnCancelBid(orderID, model, time, values, value)
-	} else {
-		// TODO compute ELR using given values and val
-		return 0.
-	}
+func (accnt Account) GetELROnCancelBid(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
+	return accnt.securities[securityID].GetELROnCancelBid(orderID, model, time, values, value)
 }
 
-func (accnt Account) GetELROnCancelAsk(orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
-	if order, ok := accnt.ordersClID[orderID]; ok {
-		return accnt.securities[order.Instrument.SecurityID.Value].GetELROnCancelAsk(orderID, model, time, values, value)
-	} else {
-		// TODO
-		return 0.
-	}
+func (accnt Account) GetELROnCancelAsk(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
+	return accnt.securities[securityID].GetELROnCancelAsk(orderID, model, time, values, value)
 }
 
 func (accnt Account) GetELROnLimitBid(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
@@ -120,6 +113,8 @@ func (accnt Account) GetELROnMarketSell(securityID uint64, model modeling.Market
 }
 
 func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	usedMargin := 0.
 	for k, p := range accnt.positions {
@@ -137,6 +132,8 @@ func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 }
 
 func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage float64) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
 	for k, p := range accnt.positions {
 		// Entry price not defined if size = 0, division by 0 !
@@ -165,12 +162,10 @@ func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage fl
 }
 
 // TODO improve speed of that one, called often
-func (accnt *Account) UpdateQueue(orderID string, queue float64) {
-	if o, ok := accnt.ordersClID[orderID]; ok {
-		if o.Side == models.Buy {
-			accnt.securities[o.Instrument.SecurityID.Value].UpdateBidOrderQueue(orderID, queue)
-		} else {
-			accnt.securities[o.Instrument.SecurityID.Value].UpdateAskOrderQueue(orderID, queue)
-		}
-	}
+func (accnt *Account) UpdateAskOrderQueue(securityID uint64, orderID string, queue float64) {
+	accnt.securities[securityID].UpdateAskOrderQueue(orderID, queue)
+}
+
+func (accnt *Account) UpdateBidOrderQueue(securityID uint64, orderID string, queue float64) {
+	accnt.securities[securityID].UpdateBidOrderQueue(orderID, queue)
 }

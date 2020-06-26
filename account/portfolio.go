@@ -148,7 +148,7 @@ func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) float64 {
 	return elr / float64(N)
 }
 
-func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelBid(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) float64 {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -163,10 +163,10 @@ func (p *Portfolio) GetELROnCancelBid(accountID string, orderID string, model mo
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnCancelBid(orderID, model, time, values, value)
+	return target.GetELROnCancelBid(securityID, orderID, model, time, values, value)
 }
 
-func (p *Portfolio) GetELROnCancelAsk(accountID string, orderID string, model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelAsk(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) float64 {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -181,7 +181,7 @@ func (p *Portfolio) GetELROnCancelAsk(accountID string, orderID string, model mo
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnCancelAsk(orderID, model, time, values, value)
+	return target.GetELROnCancelAsk(securityID, orderID, model, time, values, value)
 }
 
 func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {

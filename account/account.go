@@ -9,6 +9,7 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
+	"sync"
 )
 
 type Order struct {
@@ -39,6 +40,7 @@ type Security interface {
 }
 
 type Account struct {
+	sync.RWMutex
 	*models.Account
 	ordersID        map[string]*Order
 	ordersClID      map[string]*Order
@@ -69,6 +71,8 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 }
 
 func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
+	accnt.Lock()
+	defer accnt.Unlock()
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
@@ -145,6 +149,8 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 }
 
 func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, *messages.RejectionReason) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	if _, ok := accnt.ordersClID[order.ClientOrderID]; ok {
 		res := messages.DuplicateOrder
 		return nil, &res
@@ -195,6 +201,8 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 }
 
 func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	order, ok := accnt.ordersClID[clientID]
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
@@ -229,6 +237,8 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 }
 
 func (accnt *Account) RejectNewOrder(clientID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	order, ok := accnt.ordersClID[clientID]
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
@@ -251,6 +261,8 @@ func (accnt *Account) RejectNewOrder(clientID string, reason messages.RejectionR
 }
 
 func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messages.RejectionReason) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
 	if order == nil {
@@ -283,6 +295,8 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 }
 
 func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	var orders []*models.Order
 	for _, o := range accnt.ordersClID {
 		if filter != nil && filter.Instrument != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
@@ -307,6 +321,8 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 }
 
 func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
 	if order == nil {
@@ -346,6 +362,8 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 }
 
 func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
 	if order == nil {
@@ -371,6 +389,8 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 }
 
 func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity float64, taker bool) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
 	var order *Order
 	order, _ = accnt.ordersClID[ID]
 	if order == nil {
@@ -462,6 +482,8 @@ func (accnt *Account) Settle() {
 }
 
 func (accnt *Account) GetPositions() []*models.Position {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	var positions []*models.Position
 	for k, pos := range accnt.positions {
 		pos := pos.GetPosition()
@@ -476,6 +498,8 @@ func (accnt *Account) GetPositions() []*models.Position {
 }
 
 func (accnt *Account) GetBalances() []*models.Balance {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
 		balances = append(balances, &models.Balance{
@@ -489,6 +513,8 @@ func (accnt *Account) GetBalances() []*models.Balance {
 }
 
 func (accnt *Account) GetBalance(asset uint32) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	if b, ok := accnt.balances[asset]; ok {
 		return b
 	} else {
@@ -497,6 +523,8 @@ func (accnt *Account) GetBalance(asset uint32) float64 {
 }
 
 func (accnt *Account) GetPositionSize(securityID uint64) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	if pos, ok := accnt.positions[securityID]; ok {
 		// TODO mutex ?
 		return float64(pos.rawSize) / pos.lotPrecision
@@ -506,5 +534,7 @@ func (accnt *Account) GetPositionSize(securityID uint64) float64 {
 }
 
 func (accnt *Account) GetMargin() float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	return float64(accnt.margin) / accnt.marginPrecision
 }

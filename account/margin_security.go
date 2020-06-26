@@ -212,7 +212,9 @@ func (sec *MarginSecurity) UpdateAskOrderQueue(ID string, queue float64) {
 }
 
 func (sec *MarginSecurity) UpdatePositionSize(size float64) {
+	sec.Lock()
 	sec.size = size
+	sec.Unlock()
 }
 
 func (sec *MarginSecurity) GetLotPrecision() float64 {
