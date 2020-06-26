@@ -3,8 +3,6 @@ package portfolio
 import (
 	"fmt"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"testing"
 )

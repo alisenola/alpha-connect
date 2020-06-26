@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
 	"math"
 	"sync"
@@ -587,12 +588,12 @@ func (p *SpotPortfolio) UpdateSampleAssetValue(time uint64, values []float64) {
 // What triggers a change in sample values ?
 // - A change in sample asset
 // - A change in sample prices
-func (p *SpotPortfolio) AddSampleValues(time uint64, values []float64) {
+func (p *SpotPortfolio) AddSampleValues(model modeling.Model, time uint64, values []float64) {
 	N := p.sampleSize
 	// TODO add state var to prevent re-computing fixed assets value
 	// TODO asset lock
 	for k, v := range p.assets {
-		samplePrices := p.priceModels[k].GetSamplePrices(time, p.sampleSize)
+		samplePrices := model.GetSampleAssetPrices(k, time, p.sampleSize)
 		for i := 0; i < N; i++ {
 			values[i] += v * samplePrices[i]
 		}
