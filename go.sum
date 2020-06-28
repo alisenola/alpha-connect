@@ -24,6 +24,8 @@ github.com/AsynkronIT/goconsole v0.0.0-20160504192649-bfa12eebf716/go.mod h1:2wH
 github.com/AsynkronIT/gonet v0.0.0-20161127091928-0553637be225/go.mod h1:RwIiSK8AJBCPP7hBBfXD1iferErYAmGbqv/Lu84ZFIA=
 github.com/AsynkronIT/protoactor-go v0.0.0-20191119210846-07df21a705b8 h1:V6Y5gN3fWajk1D9931Da+KV+Hvixpw0pBPqq3tY4TK4=
 github.com/AsynkronIT/protoactor-go v0.0.0-20191119210846-07df21a705b8/go.mod h1:oA0usvSnxPdbRUKVDvMBUqFyWQdVes7Xfcg5QSLE87A=
+github.com/AsynkronIT/protoactor-go v0.0.0-20200317173033-c483abfa40e2 h1:UTgOl+i/Y/91Si6EZeWLGbw5qoOw/gG918VKe6eqUm4=
+github.com/AsynkronIT/protoactor-go v0.0.0-20200317173033-c483abfa40e2/go.mod h1:oA0usvSnxPdbRUKVDvMBUqFyWQdVes7Xfcg5QSLE87A=
 github.com/Azure/azure-sdk-for-go v16.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-sdk-for-go v31.1.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-sdk-for-go v36.1.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
@@ -1252,6 +1254,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200624130541-9ca823c0dcd1 h1:SilE/CQrBhR
 gitlab.com/alphaticks/xchanger v0.0.0-20200624130541-9ca823c0dcd1/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200626130105-dfacaa3b69f1 h1:GG1XPjKtuvihBhNIQt886/VXjXW/4XQsqxNkpwVyUoU=
 gitlab.com/alphaticks/xchanger v0.0.0-20200626130105-dfacaa3b69f1/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200626130403-0ebd1f640249 h1:ppPAyZHB7QzC3N5OFt4Mp5a9oVg60pEuhaVqCWU8HeA=
+gitlab.com/alphaticks/xchanger v0.0.0-20200626130403-0ebd1f640249/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200330122509-3e19a6a55d22/go.mod h1:JKx9FbhKUtIXoK6KICP2sCm4rbxjpGzPCv6RnfM9WCg=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200313084212-78eb76e8dea2/go.mod h1:AQT5SCHwRJdk0nUa8TCdlP3oCRg7kPs0y0RXuPbCSFY=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
