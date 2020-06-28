@@ -28,19 +28,21 @@ type Executor struct {
 	slSubscribers     map[uint64]*actor.PID       // A map from request ID to security list subscribers
 	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
 	logger            *log.Logger
+	paperTrading      bool
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges, accounts)
+		return NewExecutor(exchanges, accounts, paperTrading)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool) actor.Actor {
 	return &Executor{
-		exchanges: exchanges,
-		accounts:  accounts,
-		logger:    nil,
+		exchanges:    exchanges,
+		accounts:     accounts,
+		logger:       nil,
+		paperTrading: paperTrading,
 	}
 }
 
@@ -124,6 +126,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.OrderReplaceRequest:
+		if err := state.OnOrderReplaceRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderCancelRequest:
 		if err := state.OnOrderCancelRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
@@ -200,7 +208,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.accounts {
-		producer := NewAccountManagerProducer(accnt)
+		producer := NewAccountManagerProducer(accnt, state.paperTrading)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -464,6 +472,29 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 			RequestID: msg.RequestID,
 			Success:   true,
 			OrderIDs:  nil,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderReplaceRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
 		})
 		return nil
 	}

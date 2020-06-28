@@ -14,7 +14,9 @@ import (
 
 type Order struct {
 	*models.Order
-	previousStatus models.OrderStatus
+	previousStatus    models.OrderStatus
+	pendingAmendPrice *types.DoubleValue
+	pendingAmendQty   *types.DoubleValue
 }
 
 type Security interface {
@@ -22,6 +24,10 @@ type Security interface {
 	AddAskOrder(ID string, price, quantity, queue float64)
 	RemoveBidOrder(ID string)
 	RemoveAskOrder(ID string)
+	UpdateBidOrder(ID string, price, qty float64)
+	UpdateAskOrder(ID string, price, qty float64)
+	UpdateBidOrderPrice(ID string, price float64)
+	UpdateAskOrderPrice(ID string, price float64)
 	UpdateBidOrderQuantity(ID string, qty float64)
 	UpdateAskOrderQuantity(ID string, qty float64)
 	UpdateBidOrderQueue(ID string, queue float64)
@@ -260,6 +266,116 @@ func (accnt *Account) RejectNewOrder(clientID string, reason messages.RejectionR
 	}, nil
 }
 
+func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity *types.DoubleValue) (*messages.ExecutionReport, *messages.RejectionReason) {
+	accnt.Lock()
+	defer accnt.Unlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		res := messages.UnknownOrder
+		return nil, &res
+	}
+	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled {
+		res := messages.NonReplaceableOrder
+		return nil, &res
+	}
+
+	order.pendingAmendPrice = price
+	order.pendingAmendQty = quantity
+	order.previousStatus = order.OrderStatus
+	order.OrderStatus = models.PendingReplace
+
+	return &messages.ExecutionReport{
+		OrderID:         order.OrderID,
+		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.PendingReplace,
+		OrderStatus:     models.PendingReplace,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: types.TimestampNow(),
+	}, nil
+}
+
+func (accnt *Account) ConfirmReplaceOrder(ID string) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	if order.OrderStatus != models.PendingReplace {
+		return nil, fmt.Errorf("error not pending replace")
+	}
+	order.OrderStatus = order.previousStatus
+	if order.pendingAmendQty != nil {
+		order.LeavesQuantity = order.pendingAmendQty.Value
+		order.pendingAmendQty = nil
+	}
+	if order.pendingAmendPrice != nil {
+		if order.Price == nil {
+			return nil, fmt.Errorf("replacing price on an order without price")
+		}
+		order.Price.Value = order.pendingAmendPrice.Value
+		order.pendingAmendPrice = nil
+	}
+
+	if order.OrderType == models.Limit {
+		if order.Side == models.Buy {
+			accnt.securities[order.Instrument.SecurityID.Value].UpdateBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity)
+		} else {
+			accnt.securities[order.Instrument.SecurityID.Value].UpdateAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity)
+		}
+	}
+
+	return &messages.ExecutionReport{
+		OrderID:         order.OrderID,
+		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.Canceled,
+		OrderStatus:     models.Canceled,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: types.TimestampNow(),
+	}, nil
+}
+
+func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	order.OrderStatus = order.previousStatus
+
+	return &messages.ExecutionReport{
+		OrderID:         order.OrderID,
+		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.Rejected,
+		OrderStatus:     order.OrderStatus,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: types.TimestampNow(),
+		RejectionReason: reason,
+	}, nil
+}
+
 func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messages.RejectionReason) {
 	accnt.Lock()
 	defer accnt.Unlock()
@@ -274,6 +390,10 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 	}
 	if order.OrderStatus == models.PendingCancel {
 		res := messages.CancelAlreadyPending
+		return nil, &res
+	}
+	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled {
+		res := messages.NonCancelableOrder
 		return nil, &res
 	}
 
@@ -292,32 +412,6 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 		CumQuantity:     order.CumQuantity,
 		TransactionTime: types.TimestampNow(),
 	}, nil
-}
-
-func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
-	accnt.RLock()
-	defer accnt.RUnlock()
-	var orders []*models.Order
-	for _, o := range accnt.ordersClID {
-		if filter != nil && filter.Instrument != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
-			continue
-		}
-		if filter != nil && filter.Side != nil && o.Side != filter.Side.Value {
-			continue
-		}
-		if filter != nil && filter.OrderID != nil && o.OrderID != filter.OrderID.Value {
-			continue
-		}
-		if filter != nil && filter.ClientOrderID != nil && o.ClientOrderID != filter.ClientOrderID.Value {
-			continue
-		}
-		if filter != nil && filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
-			continue
-		}
-		orders = append(orders, o.Order)
-	}
-
-	return orders
 }
 
 func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, error) {
@@ -479,6 +573,32 @@ func (accnt *Account) Settle() {
 	accnt.balances[accnt.marginCurrency.ID] += float64(accnt.margin) / accnt.marginPrecision
 	// TODO check less than zero
 	accnt.margin = 0
+}
+
+func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	var orders []*models.Order
+	for _, o := range accnt.ordersClID {
+		if filter != nil && filter.Instrument != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
+			continue
+		}
+		if filter != nil && filter.Side != nil && o.Side != filter.Side.Value {
+			continue
+		}
+		if filter != nil && filter.OrderID != nil && o.OrderID != filter.OrderID.Value {
+			continue
+		}
+		if filter != nil && filter.ClientOrderID != nil && o.ClientOrderID != filter.ClientOrderID.Value {
+			continue
+		}
+		if filter != nil && filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
+			continue
+		}
+		orders = append(orders, o.Order)
+	}
+
+	return orders
 }
 
 func (accnt *Account) GetPositions() []*models.Position {

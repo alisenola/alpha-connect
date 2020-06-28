@@ -136,6 +136,34 @@ func (sec *SpotSecurity) RemoveAskOrder(ID string) {
 	sec.Unlock()
 }
 
+func (sec *SpotSecurity) UpdateBidOrder(ID string, price, qty float64) {
+	sec.Lock()
+	sec.openBidOrders[ID].Quantity = qty
+	sec.openBidOrders[ID].Price = price
+	sec.Unlock()
+}
+
+func (sec *SpotSecurity) UpdateAskOrder(ID string, price, qty float64) {
+	sec.Lock()
+	sec.openAskOrders[ID].Quantity = qty
+	sec.openAskOrders[ID].Price = price
+	sec.Unlock()
+}
+
+func (sec *SpotSecurity) UpdateBidOrderPrice(ID string, price float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openBidOrders[ID].Price = price
+	sec.Unlock()
+}
+
+func (sec *SpotSecurity) UpdateAskOrderPrice(ID string, price float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openAskOrders[ID].Price = price
+	sec.Unlock()
+}
+
 func (sec *SpotSecurity) UpdateBidOrderQuantity(ID string, qty float64) {
 	sec.Lock()
 	// TODO update sample value change

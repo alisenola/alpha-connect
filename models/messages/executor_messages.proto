@@ -105,6 +105,8 @@ enum RejectionReason {
     SubscriptionNotSupported = 16;
     MissingInstrument = 17;
     HTTPError = 18;
+    NonReplaceableOrder = 19;
+    NonCancelableOrder = 20;
 }
 
 enum FeeType {
@@ -240,6 +242,23 @@ message NewOrderBulkResponse {
     repeated string orderIDs = 3;
     bool success = 4;
     RejectionReason rejection_reason = 5;
+}
+
+message OrderReplaceRequest {
+    uint64 requestID = 1;
+    google.protobuf.StringValue orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+    google.protobuf.DoubleValue quantity = 6;
+    google.protobuf.DoubleValue price = 7;
+}
+
+message OrderReplaceResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
 }
 
 message OrderCancelRequest {

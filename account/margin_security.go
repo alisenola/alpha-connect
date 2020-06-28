@@ -183,9 +183,39 @@ func (sec *MarginSecurity) RemoveAskOrder(ID string) {
 	sec.Unlock()
 }
 
-func (sec *MarginSecurity) UpdateBidOrderQuantity(ID string, qty float64) {
+func (sec *MarginSecurity) UpdateBidOrder(ID string, price float64, qty float64) {
 	sec.Lock()
 	// TODO update sample value change ?
+	sec.openBidOrders[ID].Price = price
+	sec.openBidOrders[ID].Quantity = qty
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateAskOrder(ID string, price float64, qty float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openAskOrders[ID].Price = price
+	sec.openAskOrders[ID].Quantity = qty
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateBidOrderPrice(ID string, price float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openBidOrders[ID].Price = price
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateAskOrderPrice(ID string, price float64) {
+	sec.Lock()
+	// TODO update sample value change
+	sec.openAskOrders[ID].Price = price
+	sec.Unlock()
+}
+
+func (sec *MarginSecurity) UpdateBidOrderQuantity(ID string, qty float64) {
+	sec.Lock()
+	// TODO update sample value change
 	sec.openBidOrders[ID].Quantity = qty
 	sec.Unlock()
 }

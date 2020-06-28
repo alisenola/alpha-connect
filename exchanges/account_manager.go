@@ -19,18 +19,20 @@ type AccountManager struct {
 	listener        *actor.PID
 	account         *account.Account
 	logger          *log.Logger
+	paperTrading    bool
 }
 
-func NewAccountManagerProducer(account *account.Account) actor.Producer {
+func NewAccountManagerProducer(account *account.Account, paperTrading bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(account)
+		return NewAccountManager(account, paperTrading)
 	}
 }
 
-func NewAccountManager(account *account.Account) actor.Actor {
+func NewAccountManager(account *account.Account, paperTrading bool) actor.Actor {
 	return &AccountManager{
-		account: account,
-		logger:  nil,
+		account:      account,
+		logger:       nil,
+		paperTrading: paperTrading,
 	}
 }
 
@@ -81,7 +83,8 @@ func (state *AccountManager) Receive(context actor.Context) {
 	case *messages.NewOrderSingleRequest,
 		*messages.NewOrderBulkRequest,
 		*messages.OrderCancelRequest,
-		*messages.OrderMassCancelRequest:
+		*messages.OrderMassCancelRequest,
+		*messages.OrderReplaceRequest:
 
 		context.Forward(state.listener)
 
@@ -109,10 +112,19 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 	state.trdSubscribers = make(map[uint64]*actor.PID)
 	state.execSubscribers = make(map[uint64]*actor.PID)
 	state.blcSubscribers = make(map[uint64]*actor.PID)
-	producer := NewAccountListenerProducer(state.account)
-	if producer == nil {
-		return fmt.Errorf("error getting account listener")
+	var producer actor.Producer
+	if state.paperTrading {
+		producer = NewPaperAccountListenerProducer(state.account)
+		if producer == nil {
+			return fmt.Errorf("error getting account listener")
+		}
+	} else {
+		producer = NewAccountListenerProducer(state.account)
+		if producer == nil {
+			return fmt.Errorf("error getting account listener")
+		}
 	}
+
 	props := actor.PropsFromProducer(producer)
 	state.listener = context.Spawn(props)
 

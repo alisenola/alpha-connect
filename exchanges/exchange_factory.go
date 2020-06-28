@@ -48,6 +48,15 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 	}
 }
 
+func NewPaperAccountListenerProducer(account *account.Account) actor.Producer {
+	switch account.Exchange.ID {
+	case constants.BITMEX.ID:
+		return func() actor.Actor { return bitmex.NewPaperAccountListener(account) }
+	default:
+		return nil
+	}
+}
+
 func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 	switch security.Exchange.ID {
 	case constants.BINANCE.ID:
