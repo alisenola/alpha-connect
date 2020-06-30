@@ -14,7 +14,7 @@ var account = &models.Account{
 }
 
 var BTCUSD_PERP_SEC = &models.Security{
-	SecurityID:        0,
+	SecurityID:        9999999,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.BITMEX,
 	Symbol:            "XBTUSD",
@@ -31,7 +31,7 @@ var BTCUSD_PERP_SEC = &models.Security{
 }
 
 var ETHUSD_PERP_SEC = &models.Security{
-	SecurityID:        1,
+	SecurityID:        8888888,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.BITMEX,
 	Symbol:            "ETHUSD",
@@ -48,7 +48,7 @@ var ETHUSD_PERP_SEC = &models.Security{
 }
 
 var BTCUSD_SPOT_SEC = &models.Security{
-	SecurityID:        2,
+	SecurityID:        7777777,
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 	Exchange:          &constants.BITSTAMP,
 	Symbol:            "BTCUSD",
@@ -64,7 +64,7 @@ var BTCUSD_SPOT_SEC = &models.Security{
 }
 
 var ETHUSD_SPOT_SEC = &models.Security{
-	SecurityID:        3,
+	SecurityID:        6666666,
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 	Exchange:          &constants.BITSTAMP,
 	Symbol:            "ETHUSD",
@@ -91,7 +91,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 1},
+			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "ETHUSD"},
 		},
@@ -116,7 +116,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 1},
+			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "ETHUSD"},
 		},
@@ -192,7 +192,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 0},
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "XBTUSD"},
 		},
@@ -217,7 +217,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: 0},
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
 			Exchange:   &constants.BITMEX,
 			Symbol:     &types.StringValue{Value: "XBTUSD"},
 		},
