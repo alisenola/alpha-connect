@@ -93,7 +93,13 @@ func (state *PaperAccountListener) Receive(context actor.Context) {
 
 	case *messages.OrderReplaceRequest:
 		if err := state.OnOrderReplaceRequest(context); err != nil {
-			state.logger.Error("error processing OrderAmendRequest", log.Error(err))
+			state.logger.Error("error processing OrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderBulkReplaceRequest:
+		if err := state.OnOrderBulkReplaceRequest(context); err != nil {
+			state.logger.Error("error processing OrderBulkReplaceRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -353,12 +359,12 @@ func (state *PaperAccountListener) OnOrderCancelRequest(context actor.Context) e
 func (state *PaperAccountListener) OnOrderReplaceRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderReplaceRequest)
 	var ID string
-	if req.ClientOrderID != nil {
-		ID = req.ClientOrderID.Value
-	} else if req.OrderID != nil {
-		ID = req.OrderID.Value
+	if req.Update.ClientOrderID != nil {
+		ID = req.Update.ClientOrderID.Value
+	} else if req.Update.OrderID != nil {
+		ID = req.Update.OrderID.Value
 	}
-	report, res := state.account.ReplaceOrder(ID, req.Price, req.Quantity)
+	report, res := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
 	if res != nil {
 		context.Respond(&messages.OrderReplaceResponse{
 			RequestID:       req.RequestID,
@@ -385,6 +391,62 @@ func (state *PaperAccountListener) OnOrderReplaceRequest(context actor.Context) 
 					context.Send(context.Parent(), report)
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+func (state *PaperAccountListener) OnOrderBulkReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderBulkReplaceRequest)
+	var reports []*messages.ExecutionReport
+	for _, u := range req.Updates {
+		var ID string
+		if u.ClientOrderID != nil {
+			ID = u.ClientOrderID.Value
+		} else if u.OrderID != nil {
+			ID = u.OrderID.Value
+		}
+		report, res := state.account.ReplaceOrder(ID, u.Price, u.Quantity)
+		if res != nil {
+			// Reject all replace order up until now
+			for _, r := range reports {
+				_, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					return err
+				}
+			}
+			context.Respond(&messages.OrderBulkReplaceResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+			return nil
+		} else if report != nil {
+			reports = append(reports, report)
+		}
+	}
+
+	context.Respond(&messages.OrderBulkReplaceResponse{
+		RequestID: req.RequestID,
+		Success:   true,
+	})
+
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+
+	for _, r := range reports {
+		report, err := state.account.ConfirmReplaceOrder(r.ClientOrderID.Value)
+		if err != nil {
+			panic(err)
+		}
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
 		}
 	}
 

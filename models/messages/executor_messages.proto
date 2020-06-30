@@ -244,17 +244,35 @@ message NewOrderBulkResponse {
     RejectionReason rejection_reason = 5;
 }
 
+message OrderUpdate {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    google.protobuf.DoubleValue quantity = 3;
+    google.protobuf.DoubleValue price = 4;
+}
+
 message OrderReplaceRequest {
     uint64 requestID = 1;
-    google.protobuf.StringValue orderID = 2;
-    google.protobuf.StringValue client_orderID = 3;
-    models.Instrument instrument = 4;
-    models.Account account = 5;
-    google.protobuf.DoubleValue quantity = 6;
-    google.protobuf.DoubleValue price = 7;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+    OrderUpdate update = 4;
 }
 
 message OrderReplaceResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message OrderBulkReplaceRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+    repeated OrderUpdate updates = 4;
+}
+
+message OrderBulkReplaceResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     bool success = 3;

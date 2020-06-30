@@ -84,7 +84,8 @@ func (state *AccountManager) Receive(context actor.Context) {
 		*messages.NewOrderBulkRequest,
 		*messages.OrderCancelRequest,
 		*messages.OrderMassCancelRequest,
-		*messages.OrderReplaceRequest:
+		*messages.OrderReplaceRequest,
+		*messages.OrderBulkReplaceRequest:
 
 		context.Forward(state.listener)
 

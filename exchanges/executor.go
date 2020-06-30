@@ -128,7 +128,13 @@ func (state *Executor) Receive(context actor.Context) {
 
 	case *messages.OrderReplaceRequest:
 		if err := state.OnOrderReplaceRequest(context); err != nil {
-			state.logger.Error("error processing OnOrderReplaceRequest", log.Error(err))
+			state.logger.Error("error processing OrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderBulkReplaceRequest:
+		if err := state.OnOrderBulkReplaceRequest(context); err != nil {
+			state.logger.Error("error processing OrderBulkReplaceRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -492,6 +498,29 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
 		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderBulkReplaceRequest)
+	if msg.Account == nil {
+		context.Respond(&messages.OrderBulkReplaceResponse{
+			RequestID:       msg.RequestID,
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		context.Respond(&messages.OrderBulkReplaceResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
 			RejectionReason: messages.InvalidAccount,
