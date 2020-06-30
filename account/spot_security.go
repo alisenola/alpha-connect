@@ -152,43 +152,143 @@ func (sec *SpotSecurity) UpdateAskOrder(ID string, price, qty float64) {
 
 func (sec *SpotSecurity) UpdateBidOrderPrice(ID string, price float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openBidOrders[ID].Price = price
+	o := sec.openBidOrders[ID]
+	queue := o.Queue
+	quantity := o.Quantity
+	oldPrice := o.Price
+	sampleMatchBid := sec.sampleMatchBid
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
+		sampleValueChange[i] += baseChange * oldPrice * sampleQuotePrice[i]
+		sampleValueChange[i] -= baseChange * price * sampleQuotePrice[i]
+	}
+	o.Price = price
 	sec.Unlock()
 }
 
 func (sec *SpotSecurity) UpdateAskOrderPrice(ID string, price float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openAskOrders[ID].Price = price
+	o := sec.openAskOrders[ID]
+	queue := o.Queue
+	quantity := o.Quantity
+	oldPrice := o.Price
+	sampleMatchAsk := sec.sampleMatchAsk
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * oldPrice * sampleQuotePrice[i]
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
+	}
+	o.Price = price
 	sec.Unlock()
 }
 
-func (sec *SpotSecurity) UpdateBidOrderQuantity(ID string, qty float64) {
+func (sec *SpotSecurity) UpdateBidOrderQuantity(ID string, quantity float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openBidOrders[ID].Quantity = qty
+	o := sec.openBidOrders[ID]
+	queue := o.Queue
+	oldQuantity := o.Quantity
+	price := o.Price
+	sampleMatchBid := sec.sampleMatchBid
+	sampleBasePrice := sec.sampleBasePrice
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), oldQuantity)
+		// We don't get our reduced-by-fees base
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
+		// We keep our quote
+		sampleValueChange[i] += baseChange * price * sampleQuotePrice[i]
+
+		baseChange = math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
+		sampleValueChange[i] -= baseChange * price * sampleQuotePrice[i]
+	}
+	o.Quantity = quantity
 	sec.Unlock()
 }
 
-func (sec *SpotSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
+func (sec *SpotSecurity) UpdateAskOrderQuantity(ID string, quantity float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openAskOrders[ID].Quantity = qty
+	o := sec.openAskOrders[ID]
+	queue := o.Queue
+	oldQuantity := o.Quantity
+	price := o.Price
+	sampleMatchAsk := sec.sampleMatchAsk
+	sampleBasePrice := sec.sampleBasePrice
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), oldQuantity)
+		// We keep our base
+		sampleValueChange[i] += baseChange * sampleBasePrice[i]
+		// We don't get our reduced-by-fees quote
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
+
+		baseChange = math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
+		sampleValueChange[i] -= baseChange * sampleBasePrice[i]
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
+	}
+	o.Quantity = quantity
 	sec.Unlock()
 }
 
 func (sec *SpotSecurity) UpdateBidOrderQueue(ID string, queue float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openBidOrders[ID].Queue = queue
+	o := sec.openBidOrders[ID]
+	oldQueue := o.Queue
+	quantity := o.Quantity
+	price := o.Price
+	sampleMatchBid := sec.sampleMatchBid
+	sampleBasePrice := sec.sampleBasePrice
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchBid[i]-oldQueue, 0.), quantity)
+		// We don't get our reduced-by-fees base
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
+		// We keep our quote
+		sampleValueChange[i] += baseChange * price * sampleQuotePrice[i]
+
+		baseChange = math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * sampleBasePrice[i]
+		sampleValueChange[i] -= baseChange * price * sampleQuotePrice[i]
+	}
+	o.Queue = queue
 	sec.Unlock()
 }
 
 func (sec *SpotSecurity) UpdateAskOrderQueue(ID string, queue float64) {
 	sec.Lock()
-	// TODO update sample value change
-	sec.openAskOrders[ID].Queue = queue
+	o := sec.openAskOrders[ID]
+	oldQueue := o.Queue
+	quantity := o.Quantity
+	price := o.Price
+	sampleMatchAsk := sec.sampleMatchAsk
+	sampleBasePrice := sec.sampleBasePrice
+	sampleQuotePrice := sec.sampleQuotePrice
+	sampleValueChange := sec.sampleValueChange
+	N := len(sampleValueChange)
+	for i := 0; i < N; i++ {
+		baseChange := math.Min(math.Max(sampleMatchAsk[i]-oldQueue, 0.), quantity)
+		// We keep our base
+		sampleValueChange[i] += baseChange * sampleBasePrice[i]
+		// We don't get our reduced-by-fees quote
+		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
+
+		baseChange = math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
+		sampleValueChange[i] -= baseChange * sampleBasePrice[i]
+		sampleValueChange[i] += (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
+	}
+	o.Queue = queue
 	sec.Unlock()
 }
 
@@ -388,17 +488,18 @@ func (sec *SpotSecurity) GetELROnLimitBidChange(ID string, model modeling.Market
 		}
 	}
 
-	// Compute expected log return without any order
-
-	expectedLogReturn := 0.
-	for i := 0; i < N; i++ {
-		expectedLogReturn += math.Log(values[i] / value)
-	}
-	expectedLogReturn /= float64(N)
-	if expectedLogReturn > maxExpectedLogReturn {
-		maxExpectedLogReturn = expectedLogReturn
-		maxOrder = nil
-	}
+	/*
+		// Compute expected log return without any order
+		expectedLogReturn := 0.
+		for i := 0; i < N; i++ {
+			expectedLogReturn += math.Log(values[i] / value)
+		}
+		expectedLogReturn /= float64(N)
+		if expectedLogReturn > maxExpectedLogReturn {
+			maxExpectedLogReturn = expectedLogReturn
+			maxOrder = nil
+		}
+	*/
 
 	for l := 0; l < len(prices); l++ {
 		price := prices[l]
@@ -474,17 +575,18 @@ func (sec *SpotSecurity) GetELROnLimitAskChange(ID string, model modeling.Market
 		}
 	}
 
-	// Compute expected log return without any order
-
-	expectedLogReturn := 0.
-	for i := 0; i < N; i++ {
-		expectedLogReturn += math.Log(values[i] / value)
-	}
-	expectedLogReturn /= float64(N)
-	if expectedLogReturn > maxExpectedLogReturn {
-		maxExpectedLogReturn = expectedLogReturn
-		maxOrder = nil
-	}
+	/*
+		// Compute expected log return without any order
+		expectedLogReturn := 0.
+		for i := 0; i < N; i++ {
+			expectedLogReturn += math.Log(values[i] / value)
+		}
+		expectedLogReturn /= float64(N)
+		if expectedLogReturn > maxExpectedLogReturn {
+			maxExpectedLogReturn = expectedLogReturn
+			maxOrder = nil
+		}
+	*/
 
 	for l := 0; l < len(prices); l++ {
 		price := prices[l]
