@@ -442,6 +442,9 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 		}
 	}
 
+	delete(accnt.ordersClID, order.ClientOrderID)
+	delete(accnt.ordersID, order.OrderID)
+
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
@@ -509,15 +512,25 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
 	if rawFillQuantity == rawLeavesQuantity {
 		order.OrderStatus = models.Filled
+		delete(accnt.ordersClID, order.ClientOrderID)
+		delete(accnt.ordersID, order.OrderID)
 	} else {
 		order.OrderStatus = models.PartiallyFilled
 	}
 
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
-			accnt.securities[order.Instrument.SecurityID.Value].UpdateBidOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
+			if order.OrderStatus == models.Filled {
+				accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
+			} else {
+				accnt.securities[order.Instrument.SecurityID.Value].UpdateBidOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
+			}
 		} else {
-			accnt.securities[order.Instrument.SecurityID.Value].UpdateAskOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
+			if order.OrderStatus == models.Filled {
+				accnt.securities[order.Instrument.SecurityID.Value].RemoveAskOrder(order.ClientOrderID)
+			} else {
+				accnt.securities[order.Instrument.SecurityID.Value].UpdateAskOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
+			}
 		}
 	}
 
