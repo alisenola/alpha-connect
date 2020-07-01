@@ -1,6 +1,7 @@
 package account
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
@@ -18,6 +19,8 @@ type Order struct {
 	pendingAmendPrice *types.DoubleValue
 	pendingAmendQty   *types.DoubleValue
 }
+
+var ErrNotPendingReplace = errors.New("not pending replace")
 
 type Security interface {
 	AddBidOrder(ID string, price, quantity, queue float64)
@@ -313,7 +316,7 @@ func (accnt *Account) ConfirmReplaceOrder(ID string) (*messages.ExecutionReport,
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
 	if order.OrderStatus != models.PendingReplace {
-		return nil, fmt.Errorf("error not pending replace")
+		return nil, ErrNotPendingReplace
 	}
 	order.OrderStatus = order.previousStatus
 	if order.pendingAmendQty != nil {
@@ -442,9 +445,6 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 		}
 	}
 
-	delete(accnt.ordersClID, order.ClientOrderID)
-	delete(accnt.ordersID, order.OrderID)
-
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
@@ -512,8 +512,6 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
 	if rawFillQuantity == rawLeavesQuantity {
 		order.OrderStatus = models.Filled
-		delete(accnt.ordersClID, order.ClientOrderID)
-		delete(accnt.ordersID, order.OrderID)
 	} else {
 		order.OrderStatus = models.PartiallyFilled
 	}
@@ -670,4 +668,19 @@ func (accnt *Account) GetMargin() float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	return float64(accnt.margin) / accnt.marginPrecision
+}
+
+func (accnt *Account) CleanOrders() {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	for k, o := range accnt.ordersClID {
+		if o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled {
+			delete(accnt.ordersClID, k)
+		}
+	}
+	for k, o := range accnt.ordersID {
+		if o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled {
+			delete(accnt.ordersClID, k)
+		}
+	}
 }

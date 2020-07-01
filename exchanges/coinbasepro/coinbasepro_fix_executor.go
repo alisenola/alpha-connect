@@ -83,6 +83,14 @@ func (state *CoinbaseProFixExecutor) OnNewOrderBulkRequest(context actor.Context
 	return nil
 }
 
+func (state *CoinbaseProFixExecutor) OnOrderReplaceRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *CoinbaseProFixExecutor) OnOrderBulkReplaceRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *CoinbaseProFixExecutor) OnOrderCancelRequest(context actor.Context) error {
 	return nil
 }

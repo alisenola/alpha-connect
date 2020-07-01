@@ -244,6 +244,14 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	return nil
 }

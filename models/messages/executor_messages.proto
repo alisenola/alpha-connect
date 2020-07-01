@@ -246,7 +246,7 @@ message NewOrderBulkResponse {
 
 message OrderUpdate {
     google.protobuf.StringValue orderID = 1;
-    google.protobuf.StringValue client_orderID = 2;
+    google.protobuf.StringValue orig_client_orderID = 2;
     google.protobuf.DoubleValue quantity = 3;
     google.protobuf.DoubleValue price = 4;
 }

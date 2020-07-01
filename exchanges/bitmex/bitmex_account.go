@@ -96,6 +96,18 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.OrderReplaceRequest:
+		if err := state.OnOrderReplaceRequest(context); err != nil {
+			state.logger.Error("error processing OrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderBulkReplaceRequest:
+		if err := state.OnBulkOrderReplaceRequest(context); err != nil {
+			state.logger.Error("error processing BulkOrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.OrderCancelRequest:
 		if err := state.OnOrderCancelRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
@@ -354,6 +366,26 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 	req := context.Message().(*messages.NewOrderBulkRequest)
 	req.Account = state.account.Account
 	reports := make([]*messages.ExecutionReport, 0, len(req.Orders))
+	response := &messages.NewOrderBulkResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	symbol := ""
+	if req.Orders[0].Instrument != nil && req.Orders[0].Instrument.Symbol != nil {
+		symbol = req.Orders[0].Instrument.Symbol.Value
+	}
+	for _, order := range req.Orders {
+		if order.Instrument == nil || order.Instrument.Symbol == nil {
+			response.RejectionReason = messages.UnknownSymbol
+			context.Respond(response)
+			return nil
+		} else if symbol != order.Instrument.Symbol.Value {
+			response.RejectionReason = messages.DifferentSymbols
+			context.Respond(response)
+			return nil
+		}
+	}
 	for _, reqOrder := range req.Orders {
 		order := &models.Order{
 			OrderID:        "",
@@ -376,11 +408,8 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 					return err
 				}
 			}
-			context.Respond(&messages.NewOrderBulkResponse{
-				RequestID:       req.RequestID,
-				Success:         false,
-				RejectionReason: *res,
-			})
+			response.RejectionReason = *res
+			context.Respond(response)
 			return nil
 		}
 		if report != nil {
@@ -388,10 +417,8 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		}
 	}
 
-	context.Respond(&messages.NewOrderBulkResponse{
-		RequestID: req.RequestID,
-		Success:   true,
-	})
+	response.Success = true
+	context.Respond(response)
 
 	for _, report := range reports {
 		report.SeqNum = state.seqNum + 1
@@ -450,6 +477,184 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			}
 		}
 	})
+	return nil
+}
+
+func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderReplaceRequest)
+	var ID string
+	if req.Update.OrigClientOrderID != nil {
+		ID = req.Update.OrigClientOrderID.Value
+	} else if req.Update.OrderID != nil {
+		ID = req.Update.OrderID.Value
+	}
+	report, res := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
+	if res != nil {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *res,
+		})
+	} else {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
+			if report.ExecutionType == messages.PendingReplace {
+				fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
+				context.AwaitFuture(fut, func(res interface{}, err error) {
+					if err != nil {
+						report, err := state.account.RejectReplaceOrder(ID, messages.Other)
+						if err != nil {
+							panic(err)
+						}
+						context.Respond(&messages.OrderReplaceResponse{
+							RequestID:       req.RequestID,
+							Success:         false,
+							RejectionReason: messages.Other,
+						})
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+						return
+					}
+					response := res.(*messages.OrderReplaceResponse)
+					context.Respond(response)
+
+					if response.Success {
+						// TODO for now let the WS do the job
+						/*
+							report, err := state.account.ConfirmReplaceOrder(ID)
+							if err != nil {
+								panic(err)
+							}
+							if report != nil {
+								report.SeqNum = state.seqNum + 1
+								state.seqNum += 1
+								context.Send(context.Parent(), report)
+							}
+						*/
+					} else {
+						report, err := state.account.RejectReplaceOrder(ID, response.RejectionReason)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					}
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountListener) OnBulkOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderBulkReplaceRequest)
+	var reports []*messages.ExecutionReport
+	for _, u := range req.Updates {
+		var ID string
+		if u.OrigClientOrderID != nil {
+			ID = u.OrigClientOrderID.Value
+		} else if u.OrderID != nil {
+			ID = u.OrderID.Value
+		}
+		report, res := state.account.ReplaceOrder(ID, u.Price, u.Quantity)
+		if res != nil {
+			// Reject all cancel order up until now
+			for _, r := range reports {
+				_, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					return err
+				}
+			}
+
+			context.Respond(&messages.OrderBulkReplaceResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+
+			return nil
+		} else if report != nil {
+			reports = append(reports, report)
+		}
+	}
+
+	context.Respond(&messages.OrderBulkReplaceResponse{
+		RequestID: req.RequestID,
+		Success:   true,
+	})
+
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+	fut := context.RequestFuture(state.bitmexExecutor, req, 10*time.Second)
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			for _, r := range reports {
+				report, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+			context.Respond(&messages.OrderBulkReplaceResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+
+			return
+		}
+		response := res.(*messages.OrderBulkReplaceResponse)
+		context.Respond(response)
+
+		if response.Success {
+			// TODO for now let the WS do the job
+			/*
+				for _, r := range reports {
+					report, err := state.account.ConfirmReplaceOrder(r.ClientOrderID.Value)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+				}
+			*/
+		} else {
+			for _, r := range reports {
+				report, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		}
+	})
+
 	return nil
 }
 
@@ -589,7 +794,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 					context.Send(context.Parent(), report)
 				}
 			}
-			context.Respond(&messages.OrderCancelResponse{
+			context.Respond(&messages.OrderMassCancelResponse{
 				RequestID:       req.RequestID,
 				Success:         false,
 				RejectionReason: messages.Other,
@@ -682,7 +887,21 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 		case "Rejected":
 			report, err := state.account.RejectNewOrder(*data.ClOrdID, messages.Other)
 			if err != nil {
-				return fmt.Errorf("error confirming cancel order: %v", err)
+				return fmt.Errorf("error rejecting new order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
+		case "Replaced":
+			report, err := state.account.ConfirmReplaceOrder(*data.ClOrdID)
+			if err != nil {
+				if err == account.ErrNotPendingReplace {
+
+				}
+				return fmt.Errorf("error confirming replace order: %v", err)
 			}
 			if report != nil {
 				report.SeqNum = state.seqNum + 1

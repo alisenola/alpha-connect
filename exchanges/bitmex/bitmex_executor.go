@@ -706,7 +706,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	// Launch futures, and await on each of them
 	req := context.Message().(*messages.NewOrderBulkRequest)
+	response := &messages.NewOrderBulkResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
 	if len(req.Orders) == 0 {
+		response.Success = true
+		context.Respond(response)
 		return nil
 	}
 
@@ -716,24 +723,21 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	if req.Orders[0].Instrument != nil && req.Orders[0].Instrument.Symbol != nil {
 		symbol = req.Orders[0].Instrument.Symbol.Value
 	}
-	response := &messages.NewOrderBulkResponse{
-		RequestID:  req.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    false,
-	}
+
 	for _, order := range req.Orders {
 		if order.Instrument == nil || order.Instrument.Symbol == nil {
 			response.RejectionReason = messages.UnknownSymbol
 			context.Respond(response)
 			return nil
 		} else if symbol != order.Instrument.Symbol.Value {
+			fmt.Println("DIFFERENT SUYMBOL")
 			response.RejectionReason = messages.DifferentSymbols
-			context.Respond(response)
+			fmt.Println("RES", response)
 			return nil
 		}
 		params = append(params, buildPostOrderRequest(order))
 	}
-
+	fmt.Println("HELLOOO")
 	request, weight, err := bitmex.PostBulkOrder(req.Account.Credentials, params)
 	if err != nil {
 		return err
@@ -794,6 +798,164 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 			}
 		}
 		response.OrderIDs = orderIDs
+		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderReplaceRequest)
+	response := &messages.OrderReplaceResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	params := bitmex.NewAmendOrderRequest()
+	if req.Update.OrderID != nil {
+		params.SetOrderID(req.Update.OrderID.Value)
+	} else if req.Update.OrigClientOrderID != nil {
+		params.SetOrigClOrdID(req.Update.OrigClientOrderID.Value)
+	}
+
+	if req.Update.Price != nil {
+		params.SetPrice(req.Update.Price.Value)
+	}
+	if req.Update.Quantity != nil {
+		params.SetOrderQty(req.Update.Quantity.Value)
+	}
+
+	request, weight, err := bitmex.AmendOrder(req.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		// Only update rate limit if successful request
+		state.rateLimit.Request(weight)
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+
+			return
+		}
+		var order bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &order)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderBulkReplaceRequest)
+	response := &messages.OrderBulkReplaceResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	var params []bitmex.AmendOrderRequest
+	for _, u := range req.Updates {
+		param := bitmex.NewAmendOrderRequest()
+		if u.OrderID != nil {
+			param.SetOrderID(u.OrderID.Value)
+		} else if u.OrigClientOrderID != nil {
+			param.SetOrigClOrdID(u.OrigClientOrderID.Value)
+		}
+
+		if u.Price != nil {
+			param.SetPrice(u.Price.Value)
+		}
+		if u.Quantity != nil {
+			param.SetOrderQty(u.Quantity.Value)
+		}
+		params = append(params, param)
+	}
+
+	request, weight, err := bitmex.AmendBulkOrder(req.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	state.rateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var orders []bitmex.Order
+		err = json.Unmarshal(queryResponse.Response, &orders)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		response.Success = true
 		context.Respond(response)
 	})

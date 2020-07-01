@@ -359,8 +359,8 @@ func (state *PaperAccountListener) OnOrderCancelRequest(context actor.Context) e
 func (state *PaperAccountListener) OnOrderReplaceRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderReplaceRequest)
 	var ID string
-	if req.Update.ClientOrderID != nil {
-		ID = req.Update.ClientOrderID.Value
+	if req.Update.OrigClientOrderID != nil {
+		ID = req.Update.OrigClientOrderID.Value
 	} else if req.Update.OrderID != nil {
 		ID = req.Update.OrderID.Value
 	}
@@ -402,8 +402,8 @@ func (state *PaperAccountListener) OnOrderBulkReplaceRequest(context actor.Conte
 	var reports []*messages.ExecutionReport
 	for _, u := range req.Updates {
 		var ID string
-		if u.ClientOrderID != nil {
-			ID = u.ClientOrderID.Value
+		if u.OrigClientOrderID != nil {
+			ID = u.OrigClientOrderID.Value
 		} else if u.OrderID != nil {
 			ID = u.OrderID.Value
 		}

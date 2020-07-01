@@ -18,6 +18,8 @@ type ExchangeExecutor interface {
 	OnBalancesRequest(context actor.Context) error
 	OnNewOrderSingleRequest(context actor.Context) error
 	OnNewOrderBulkRequest(context actor.Context) error
+	OnOrderReplaceRequest(context actor.Context) error
+	OnOrderBulkReplaceRequest(context actor.Context) error
 	OnOrderCancelRequest(context actor.Context) error
 	OnOrderMassCancelRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
@@ -95,6 +97,18 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 	case *messages.NewOrderBulkRequest:
 		if err := state.OnNewOrderBulkRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnNewOrderBulkRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderReplaceRequest:
+		if err := state.OnOrderReplaceRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnOrderReplaceRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderBulkReplaceRequest:
+		if err := state.OnOrderBulkReplaceRequest(context); err != nil {
+			state.GetLogger().Error("erro procesing OnOrderBulkReplaceRequest", log.Error(err))
 			panic(err)
 		}
 

@@ -730,7 +730,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 			}
 
 			expectedLogReturn /= float64(N)
-
 			//fmt.Println(expectedLogReturn, maxExpectedLogReturn)
 			if expectedLogReturn > maxExpectedLogReturn {
 				maxExpectedLogReturn = expectedLogReturn
