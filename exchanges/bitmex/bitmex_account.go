@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+type checkSocket struct{}
+
 type AccountListener struct {
 	account         *account.Account
 	seqNum          uint64
@@ -22,6 +24,7 @@ type AccountListener struct {
 	ws              *bitmex.Websocket
 	executorManager *actor.PID
 	logger          *log.Logger
+	lastPingTime    time.Time
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -125,6 +128,16 @@ func (state *AccountListener) Receive(context actor.Context) {
 			state.logger.Error("error processing onWebocketMessage", log.Error(err))
 			panic(err)
 		}
+
+	case *checkSocket:
+		if err := state.checkSocket(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+		go func(pid *actor.PID) {
+			time.Sleep(5 * time.Second)
+			context.Send(pid, &checkSocket{})
+		}(context.Self())
 	}
 }
 
@@ -230,8 +243,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	state.seqNum = 0
 
-	context.Send(context.Self(), &readSocket{})
-
+	context.Send(context.Self(), &checkSocket{})
 	return nil
 }
 
@@ -836,6 +848,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 }
 
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
+	state.lastPingTime = time.Now()
 	msg := context.Message().(*bitmex.WebsocketMessage)
 	switch msg.Message.(type) {
 	case error:
@@ -857,8 +870,8 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 		return executionData.Data[i].TransactTime.Before(executionData.Data[j].TransactTime)
 	})
 	for _, data := range executionData.Data {
-		d, _ := json.Marshal(data)
-		fmt.Println(string(d))
+		b, _ := json.Marshal(data)
+		fmt.Println(string(b))
 		switch data.ExecType {
 		case "New":
 			// New order
@@ -874,7 +887,16 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 				state.seqNum += 1
 				context.Send(context.Parent(), report)
 			}
+
 		case "Canceled":
+			// TODO for now, do that to handle exchange initiated cancel
+			report, _ := state.account.CancelOrder(*data.ClOrdID)
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
 			report, err := state.account.ConfirmCancelOrder(*data.ClOrdID)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
@@ -884,6 +906,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 				state.seqNum += 1
 				context.Send(context.Parent(), report)
 			}
+
 		case "Rejected":
 			report, err := state.account.RejectNewOrder(*data.ClOrdID, messages.Other)
 			if err != nil {
@@ -981,6 +1004,24 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		}
 	}(ws, context.Self())
 	state.ws = ws
+
+	return nil
+}
+
+func (state *AccountListener) checkSocket(context actor.Context) error {
+
+	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
+		_ = state.ws.Ping()
+	}
+
+	if state.ws.Err != nil || !state.ws.Connected {
+		if state.ws.Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws.Err))
+		}
+		if err := state.subscribeAccount(context); err != nil {
+			return fmt.Errorf("error subscribing to account: %v", err)
+		}
+	}
 
 	return nil
 }
