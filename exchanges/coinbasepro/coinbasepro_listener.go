@@ -119,8 +119,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.coinbaseproExecutor = actor.NewLocalPID("executor/" + constants.COINBASEPRO.Name + "_executor")
 	state.wsChan = make(chan *coinbasepro.WebsocketMessage, 10000)
 
-	context.Send(context.Self(), &readSocket{})
-
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
 		seqNum:         uint64(time.Now().UnixNano()),
@@ -133,6 +131,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
 	}
+	context.Send(context.Self(), &readSocket{})
 
 	return nil
 }

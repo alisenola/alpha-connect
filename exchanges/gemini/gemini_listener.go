@@ -53,6 +53,7 @@ func NewListener(security *models.Security) actor.Actor {
 }
 
 func (state *Listener) Receive(context actor.Context) {
+	fmt.Println("LISTENER MESSAGE", reflect.TypeOf(context.Message()).String())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -107,8 +108,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.wsChan = make(chan *gemini.WebsocketMessage, 10000)
 	state.stashedTrades = list.New()
 
-	context.Send(context.Self(), &readSocket{})
-
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
 		seqNum:         uint64(time.Now().UnixNano()),
@@ -121,6 +120,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
 	}
+
+	context.Send(context.Self(), &readSocket{})
 
 	return nil
 }

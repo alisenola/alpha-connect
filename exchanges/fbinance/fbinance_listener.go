@@ -108,8 +108,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.fbinanceExecutor = actor.NewLocalPID("executor/" + constants.FBINANCE.Name + "_executor")
 	state.wsChan = make(chan *fbinance.WebsocketMessage, 10000)
 
-	context.Send(context.Self(), &readSocket{})
-
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
 		seqNum:         uint64(time.Now().UnixNano()),
@@ -125,6 +123,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
+	context.Send(context.Self(), &readSocket{})
 
 	return nil
 }

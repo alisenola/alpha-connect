@@ -124,8 +124,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.wsChan = make(chan *bitfinex.WebsocketMessage, 10000)
 	state.stashedTrades = list.New()
 
-	context.Send(context.Self(), &readSocket{})
-
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
 
@@ -146,6 +144,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
+	context.Send(context.Self(), &readSocket{})
 
 	return nil
 }
