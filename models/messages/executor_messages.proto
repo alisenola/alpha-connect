@@ -122,6 +122,10 @@ enum FeeBasis {
     Percentage = 2;
 }
 
+enum ExecutionInstruction {
+    ParticipateDoNotInitiate = 0;
+}
+
 message ExecutionReport {
     uint64 seq_num = 1;
     string orderID = 2;
@@ -142,6 +146,8 @@ message ExecutionReport {
     FeeBasis fee_basis = 18;
     RejectionReason rejection_reason = 19;
 }
+
+
 
 message SideValue {
     models.Side value = 1;
@@ -214,6 +220,7 @@ message NewOrder {
     models.TimeInForce time_in_force = 7;
     double quantity = 8;
     google.protobuf.DoubleValue price = 9;
+    repeated ExecutionInstruction execution_instructions = 10;
 }
 
 message NewOrderSingleRequest {

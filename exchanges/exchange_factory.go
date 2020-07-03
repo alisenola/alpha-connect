@@ -23,7 +23,7 @@ import (
 )
 
 // TODO sample size config
-var Portfolio = account.NewPortfolio(100)
+var Portfolio = account.NewPortfolio(300)
 
 func NewAccount(accountInfo *models.Account) *account.Account {
 	if accnt := Portfolio.GetAccount(accountInfo.AccountID); accnt != nil {

@@ -256,6 +256,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			filters["clOrdID"] = msg.Filter.ClientOrderID.Value
 		}
 	}
+	filters["open"] = true
 
 	if len(filters) > 0 {
 		params.SetFilters(filters)
@@ -330,8 +331,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					Symbol:     &types.StringValue{Value: o.Symbol},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
-				LeavesQuantity: 0,
-				CumQuantity:    0,
+				LeavesQuantity: float64(o.LeavesQty),
+				CumQuantity:    float64(o.CumQty),
 			}
 
 			if o.ClOrdID != nil {
@@ -387,6 +388,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			default:
 				fmt.Println("UNKNOWN TOF", o.TimeInForce)
 			}
+
+			ord.Price = &types.DoubleValue{Value: o.Price}
 
 			morders = append(morders, &ord)
 		}
@@ -629,6 +632,14 @@ func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
 
 	if order.Price != nil {
 		request.SetPrice(order.Price.Value)
+	}
+
+	// TODO handle multiple exec inst
+	if len(order.ExecutionInstructions) > 0 {
+		switch order.ExecutionInstructions[0] {
+		case messages.ParticipateDoNotInitiate:
+			request.SetExecInst(bitmex.EI_PARTICIPATE_DO_NOT_INITIATE)
+		}
 	}
 
 	return request
