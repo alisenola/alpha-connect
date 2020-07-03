@@ -130,13 +130,14 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 		RequestID: 0,
 		Account:   testAccountInfo,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    instrument1,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
-			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 100.},
+			ClientOrderID:         uuid.NewV1().String(),
+			Instrument:            instrument1,
+			OrderType:             models.Limit,
+			ExecutionInstructions: []messages.ExecutionInstruction{messages.ParticipateDoNotInitiate},
+			OrderSide:             models.Buy,
+			TimeInForce:           models.Session,
+			Quantity:              1.,
+			Price:                 &types.DoubleValue{Value: 100.},
 		},
 	}, 10*time.Second).Result()
 
