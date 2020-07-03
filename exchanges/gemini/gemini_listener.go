@@ -53,7 +53,6 @@ func NewListener(security *models.Security) actor.Actor {
 }
 
 func (state *Listener) Receive(context actor.Context) {
-	fmt.Println("LISTENER MESSAGE", reflect.TypeOf(context.Message()).String())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
