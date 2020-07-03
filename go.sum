@@ -1218,6 +1218,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20200513101946-928ffaaf764f h1:30nzXYau7
 gitlab.com/alphaticks/gorderbook v0.0.0-20200513101946-928ffaaf764f/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200514150550-2800aed69dfe h1:ws2ZJMf75mZ7kRKP6Nrc0Trbh+oVeu7KqcMU8bgY+Wg=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200514150550-2800aed69dfe/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
+gitlab.com/alphaticks/gorderbook v0.0.0-20200703081116-690c4dda7a71 h1:hsBQByVvkCjAv/XFWwujcYuyOXzza4sorP01wf5rR/8=
+gitlab.com/alphaticks/gorderbook v0.0.0-20200703081116-690c4dda7a71/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77 h1:0Naa0vI4MH0soI7fPNGFEyjeFzEEzpRGtLix8TBJNAI=
 gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77/go.mod h1:b9qVYd/SQOPyXI+MnHx5PcC/tXYhZCsKxrDe1ioEAxs=
 gitlab.com/alphaticks/xchanger v0.0.0-20200512184925-cbfffbd8d798 h1:oJHapHLAW6RJzLik5hgmQCimCPDDx7as6qnmhFxIlbY=
@@ -1256,6 +1258,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200626130105-dfacaa3b69f1 h1:GG1XPjKtuvi
 gitlab.com/alphaticks/xchanger v0.0.0-20200626130105-dfacaa3b69f1/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200626130403-0ebd1f640249 h1:ppPAyZHB7QzC3N5OFt4Mp5a9oVg60pEuhaVqCWU8HeA=
 gitlab.com/alphaticks/xchanger v0.0.0-20200626130403-0ebd1f640249/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200703081250-a8a66ef01409 h1:ZD2e0ReWM3s98m5+3s6UDzz+8IGw+RXyl68UJAHyLH0=
+gitlab.com/alphaticks/xchanger v0.0.0-20200703081250-a8a66ef01409/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200330122509-3e19a6a55d22/go.mod h1:JKx9FbhKUtIXoK6KICP2sCm4rbxjpGzPCv6RnfM9WCg=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200313084212-78eb76e8dea2/go.mod h1:AQT5SCHwRJdk0nUa8TCdlP3oCRg7kPs0y0RXuPbCSFY=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
