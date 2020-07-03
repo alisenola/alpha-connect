@@ -716,17 +716,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 					response := res.(*messages.OrderCancelResponse)
 					context.Respond(response)
 
-					if response.Success {
-						report, err := state.account.ConfirmCancelOrder(ID)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-					} else {
+					if !response.Success {
 						report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
 						if err != nil {
 							panic(err)
@@ -817,19 +807,21 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		response := res.(*messages.OrderMassCancelResponse)
 		context.Respond(response)
 
-		if response.Success {
-			for _, r := range reports {
-				report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
-				if err != nil {
-					panic(err)
+		/*
+			if response.Success {
+				for _, r := range reports {
+					report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
 				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-			}
-		} else {
+		*/
+		if !response.Success {
 			for _, r := range reports {
 				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
 				if err != nil {
