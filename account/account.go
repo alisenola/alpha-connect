@@ -114,7 +114,6 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		}
 		accnt.ordersID[o.OrderID] = ord
 		accnt.ordersClID[o.ClientOrderID] = ord
-
 		// Add orders to security
 		if (o.OrderStatus == models.New || o.OrderStatus == models.PartiallyFilled) && o.OrderType == models.Limit {
 			if o.Side == models.Buy {
@@ -290,7 +289,6 @@ func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity
 	order.pendingAmendQty = quantity
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.PendingReplace
-
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
@@ -363,7 +361,10 @@ func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionRea
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	order.OrderStatus = order.previousStatus
+
+	if order.OrderStatus == models.PendingReplace {
+		order.OrderStatus = order.previousStatus
+	}
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -395,7 +396,7 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 		res := messages.CancelAlreadyPending
 		return nil, &res
 	}
-	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled {
+	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled && order.OrderStatus != models.PendingNew {
 		res := messages.NonCancelableOrder
 		return nil, &res
 	}
@@ -469,7 +470,9 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	order.OrderStatus = order.previousStatus
+	if order.OrderStatus == models.PendingCancel {
+		order.OrderStatus = order.previousStatus
+	}
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,

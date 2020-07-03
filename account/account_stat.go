@@ -158,6 +158,15 @@ func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage fl
 		}
 	}
 
+	// TODO remove open order from av margin
+	/*
+		for k, o := range accnt.ordersID {
+			if (o.OrderType == models.Limit) && (o.OrderStatus == models.PendingNew || o.OrderStatus == models.PendingReplace || o.OrderStatus == models.PartiallyFilled || o.OrderStatus == models.New) {
+
+			}
+		}
+	*/
+
 	return math.Max(availableMargin, 0.)
 }
 

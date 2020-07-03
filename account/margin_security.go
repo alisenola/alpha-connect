@@ -119,193 +119,210 @@ func (sec *MarginSecurity) AddAskOrder(ID string, price, quantity, queue float64
 
 func (sec *MarginSecurity) RemoveBidOrder(ID string) {
 	sec.Lock()
-	o := sec.openBidOrders[ID]
-	var price, exp float64
-	if sec.Security.IsInverse {
-		price = 1. / o.Price
-		exp = -1
-	} else {
-		price = o.Price
-		exp = 1
-	}
-	queue := o.Queue
-	quantity := o.Quantity
-	mul := sec.Multiplier.Value
-	makerFee := sec.MakerFee.Value
-	sampleValueChange := sec.sampleValueChange
-	sampleMatchBid := sec.sampleMatchBid
-	sampleSecurityPrice := sec.sampleSecurityPrice
-	sampleMarginPrice := sec.sampleMarginPrice
-	N := len(sampleValueChange)
-	for i := 0; i < N; i++ {
-		contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * mul
-		fee := math.Abs(contractMarginValue) * makerFee
+	if o, ok := sec.openBidOrders[ID]; ok {
 
-		// Remove cost from values
-		cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-		sampleValueChange[i] += cost * sampleMarginPrice[i]
+		var price, exp float64
+		if sec.Security.IsInverse {
+			price = 1. / o.Price
+			exp = -1
+		} else {
+			price = o.Price
+			exp = 1
+		}
+		queue := o.Queue
+		quantity := o.Quantity
+		mul := sec.Multiplier.Value
+		makerFee := sec.MakerFee.Value
+		sampleValueChange := sec.sampleValueChange
+		sampleMatchBid := sec.sampleMatchBid
+		sampleSecurityPrice := sec.sampleSecurityPrice
+		sampleMarginPrice := sec.sampleMarginPrice
+		N := len(sampleValueChange)
+		for i := 0; i < N; i++ {
+			contractChange := math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
+
+			// Remove cost from values
+			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			sampleValueChange[i] += cost * sampleMarginPrice[i]
+		}
+		delete(sec.openBidOrders, ID)
 	}
-	delete(sec.openBidOrders, ID)
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) RemoveAskOrder(ID string) {
 	sec.Lock()
-	o := sec.openAskOrders[ID]
-	var price, exp float64
-	if sec.Security.IsInverse {
-		price = 1. / o.Price
-		exp = -1
-	} else {
-		price = o.Price
-		exp = 1
-	}
-	queue := o.Queue
-	quantity := o.Quantity
-	mul := sec.Multiplier.Value
-	makerFee := sec.MakerFee.Value
-	sampleValueChange := sec.sampleValueChange
-	sampleMatchAsk := sec.sampleMatchAsk
-	sampleSecurityPrice := sec.sampleSecurityPrice
-	sampleMarginPrice := sec.sampleMarginPrice
-	N := len(sampleValueChange)
-	for i := 0; i < N; i++ {
-		contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-		contractMarginValue := contractChange * price * mul
-		fee := math.Abs(contractMarginValue) * makerFee
+	if o, ok := sec.openAskOrders[ID]; ok {
+		var price, exp float64
+		if sec.Security.IsInverse {
+			price = 1. / o.Price
+			exp = -1
+		} else {
+			price = o.Price
+			exp = 1
+		}
+		queue := o.Queue
+		quantity := o.Quantity
+		mul := sec.Multiplier.Value
+		makerFee := sec.MakerFee.Value
+		sampleValueChange := sec.sampleValueChange
+		sampleMatchAsk := sec.sampleMatchAsk
+		sampleSecurityPrice := sec.sampleSecurityPrice
+		sampleMarginPrice := sec.sampleMarginPrice
+		N := len(sampleValueChange)
+		for i := 0; i < N; i++ {
+			contractChange := math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
 
-		// Remove cost from values
-		cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-		sampleValueChange[i] += cost * sampleMarginPrice[i]
+			// Remove cost from values
+			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			sampleValueChange[i] += cost * sampleMarginPrice[i]
+		}
+		delete(sec.openAskOrders, ID)
 	}
-	delete(sec.openAskOrders, ID)
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateBidOrder(ID string, price float64, qty float64) {
 	sec.Lock()
 	// TODO update sample value change ?
-	sec.openBidOrders[ID].Price = price
-	sec.openBidOrders[ID].Quantity = qty
+	if o, ok := sec.openBidOrders[ID]; ok {
+		o.Price = price
+		o.Quantity = qty
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateAskOrder(ID string, price float64, qty float64) {
 	sec.Lock()
 	// TODO update sample value change
-	sec.openAskOrders[ID].Price = price
-	sec.openAskOrders[ID].Quantity = qty
+	if o, ok := sec.openAskOrders[ID]; ok {
+		o.Price = price
+		o.Quantity = qty
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateBidOrderPrice(ID string, price float64) {
 	sec.Lock()
 	// TODO update sample value change
-	sec.openBidOrders[ID].Price = price
+	if o, ok := sec.openBidOrders[ID]; ok {
+		o.Price = price
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateAskOrderPrice(ID string, price float64) {
 	sec.Lock()
 	// TODO update sample value change
-	sec.openAskOrders[ID].Price = price
+	if o, ok := sec.openAskOrders[ID]; ok {
+		o.Price = price
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateBidOrderQuantity(ID string, qty float64) {
 	sec.Lock()
 	// TODO update sample value change
-	sec.openBidOrders[ID].Quantity = qty
+	if o, ok := sec.openBidOrders[ID]; ok {
+		o.Quantity = qty
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateAskOrderQuantity(ID string, qty float64) {
 	sec.Lock()
 	// TODO update sample value change
-	sec.openAskOrders[ID].Quantity = qty
+	if o, ok := sec.openAskOrders[ID]; ok {
+		o.Quantity = qty
+	}
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateBidOrderQueue(ID string, queue float64) {
 	sec.Lock()
-	o := sec.openBidOrders[ID]
-	var price, exp float64
-	if sec.Security.IsInverse {
-		price = 1. / o.Price
-		exp = -1
-	} else {
-		price = o.Price
-		exp = 1
+	if o, ok := sec.openBidOrders[ID]; ok {
+		var price, exp float64
+		if sec.Security.IsInverse {
+			price = 1. / o.Price
+			exp = -1
+		} else {
+			price = o.Price
+			exp = 1
+		}
+		oldQueue := o.Queue
+		quantity := o.Quantity
+		mul := sec.Multiplier.Value
+		makerFee := sec.MakerFee.Value
+		sampleValueChange := sec.sampleValueChange
+		sampleMatchBid := sec.sampleMatchBid
+		sampleSecurityPrice := sec.sampleSecurityPrice
+		sampleMarginPrice := sec.sampleMarginPrice
+		N := len(sampleValueChange)
+		for i := 0; i < N; i++ {
+			contractChange := math.Min(math.Max(sampleMatchBid[i]-oldQueue, 0.), quantity)
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
+			// Remove cost from values
+			cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			sampleValueChange[i] += cost * sampleMarginPrice[i]
+
+			contractChange = math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
+			contractMarginValue = contractChange * price * mul
+			fee = math.Abs(contractMarginValue) * makerFee
+
+			// Add cost to values
+			cost = contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+
+			sampleValueChange[i] -= cost * sampleMarginPrice[i]
+		}
+		o.Queue = queue
 	}
-	oldQueue := o.Queue
-	quantity := o.Quantity
-	mul := sec.Multiplier.Value
-	makerFee := sec.MakerFee.Value
-	sampleValueChange := sec.sampleValueChange
-	sampleMatchBid := sec.sampleMatchBid
-	sampleSecurityPrice := sec.sampleSecurityPrice
-	sampleMarginPrice := sec.sampleMarginPrice
-	N := len(sampleValueChange)
-	for i := 0; i < N; i++ {
-		contractChange := math.Min(math.Max(sampleMatchBid[i]-oldQueue, 0.), quantity)
-		contractMarginValue := contractChange * price * mul
-		fee := math.Abs(contractMarginValue) * makerFee
-		// Remove cost from values
-		cost := contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-		sampleValueChange[i] += cost * sampleMarginPrice[i]
-
-		contractChange = math.Min(math.Max(sampleMatchBid[i]-queue, 0.), quantity)
-		contractMarginValue = contractChange * price * mul
-		fee = math.Abs(contractMarginValue) * makerFee
-
-		// Add cost to values
-		cost = contractMarginValue + fee - (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-
-		sampleValueChange[i] -= cost * sampleMarginPrice[i]
-	}
-	o.Queue = queue
 	sec.Unlock()
 }
 
 func (sec *MarginSecurity) UpdateAskOrderQueue(ID string, queue float64) {
 	sec.Lock()
-	o := sec.openAskOrders[ID]
-	var price, exp float64
-	if sec.Security.IsInverse {
-		price = 1. / o.Price
-		exp = -1
-	} else {
-		price = o.Price
-		exp = 1
+	if o, ok := sec.openAskOrders[ID]; ok {
+		var price, exp float64
+		if sec.Security.IsInverse {
+			price = 1. / o.Price
+			exp = -1
+		} else {
+			price = o.Price
+			exp = 1
+		}
+		oldQueue := o.Queue
+		quantity := o.Quantity
+		mul := sec.Multiplier.Value
+		makerFee := sec.MakerFee.Value
+		sampleValueChange := sec.sampleValueChange
+		sampleMatchAsk := sec.sampleMatchAsk
+		sampleSecurityPrice := sec.sampleSecurityPrice
+		sampleMarginPrice := sec.sampleMarginPrice
+		N := len(sampleValueChange)
+		for i := 0; i < N; i++ {
+			contractChange := math.Min(math.Max(sampleMatchAsk[i]-oldQueue, 0.), quantity)
+			contractMarginValue := contractChange * price * mul
+			fee := math.Abs(contractMarginValue) * makerFee
+
+			// Remove cost from values
+			cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			sampleValueChange[i] += cost * sampleMarginPrice[i]
+
+			contractChange = math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
+			contractMarginValue = contractChange * price * mul
+			fee = math.Abs(contractMarginValue) * makerFee
+
+			// Remove cost from values
+			cost = -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
+			sampleValueChange[i] -= cost * sampleMarginPrice[i]
+		}
+		o.Queue = queue
 	}
-	oldQueue := o.Queue
-	quantity := o.Quantity
-	mul := sec.Multiplier.Value
-	makerFee := sec.MakerFee.Value
-	sampleValueChange := sec.sampleValueChange
-	sampleMatchAsk := sec.sampleMatchAsk
-	sampleSecurityPrice := sec.sampleSecurityPrice
-	sampleMarginPrice := sec.sampleMarginPrice
-	N := len(sampleValueChange)
-	for i := 0; i < N; i++ {
-		contractChange := math.Min(math.Max(sampleMatchAsk[i]-oldQueue, 0.), quantity)
-		contractMarginValue := contractChange * price * mul
-		fee := math.Abs(contractMarginValue) * makerFee
-
-		// Remove cost from values
-		cost := -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-		sampleValueChange[i] += cost * sampleMarginPrice[i]
-
-		contractChange = math.Min(math.Max(sampleMatchAsk[i]-queue, 0.), quantity)
-		contractMarginValue = contractChange * price * mul
-		fee = math.Abs(contractMarginValue) * makerFee
-
-		// Remove cost from values
-		cost = -contractMarginValue + fee + (contractChange * math.Pow(sampleSecurityPrice[i], exp) * sec.Multiplier.Value)
-		sampleValueChange[i] -= cost * sampleMarginPrice[i]
-	}
-	o.Queue = queue
 	sec.Unlock()
 }
 
@@ -568,6 +585,17 @@ func (sec *MarginSecurity) GetELROnLimitBidChange(ID string, model modeling.Mark
 		}
 	}
 
+	// Compute ELR without any order
+	expectedLogReturn := 0.
+	for i := 0; i < N; i++ {
+		expectedLogReturn += math.Log(values[i] / value)
+	}
+	expectedLogReturn /= float64(N)
+	if expectedLogReturn > maxExpectedLogReturn {
+		maxExpectedLogReturn = expectedLogReturn
+		maxOrder = nil
+	}
+
 	for l := 0; l < len(prices); l++ {
 		correctedAvailableMargin := availableMargin
 		var price, exp float64
@@ -686,18 +714,16 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 		}
 	}
 
-	/*
-		// Compute ELR without any order
-		expectedLogReturn := 0.
-		for i := 0; i < N; i++ {
-			expectedLogReturn += math.Log(values[i] / value)
-		}
-		expectedLogReturn /= float64(N)
-		if expectedLogReturn > maxExpectedLogReturn {
-			maxExpectedLogReturn = expectedLogReturn
-			maxOrder = nil
-		}
-	*/
+	// Compute ELR without any order
+	expectedLogReturn := 0.
+	for i := 0; i < N; i++ {
+		expectedLogReturn += math.Log(values[i] / value)
+	}
+	expectedLogReturn /= float64(N)
+	if expectedLogReturn > maxExpectedLogReturn {
+		maxExpectedLogReturn = expectedLogReturn
+		maxOrder = nil
+	}
 
 	for l := 0; l < len(prices); l++ {
 		correctedAvailableMargin := availableMargin
@@ -730,7 +756,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 			}
 
 			expectedLogReturn /= float64(N)
-			//fmt.Println(expectedLogReturn, maxExpectedLogReturn)
 			if expectedLogReturn > maxExpectedLogReturn {
 				maxExpectedLogReturn = expectedLogReturn
 				maxOrder = &COrder{
