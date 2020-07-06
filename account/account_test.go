@@ -136,8 +136,8 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fee1 := math.Floor(0.00025*200*2*0.000001*accnt.marginPrecision) / accnt.marginPrecision
-	fee2 := math.Floor(0.00025*210*2*0.000001*accnt.marginPrecision) / accnt.marginPrecision
+	fee1 := math.Floor(0.00025*200*2*0.000001*accnt.MarginPrecision) / accnt.MarginPrecision
+	fee2 := math.Floor(0.00025*210*2*0.000001*accnt.MarginPrecision) / accnt.MarginPrecision
 	expectedMarginChange := ((210 - 200) * 2 * 0.000001) + fee1 + fee2
 
 	_, err = accnt.ConfirmFill("sell", "k1", 210., 1., false)
@@ -252,11 +252,11 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.marginPrecision) / accnt.marginPrecision
-	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.MarginPrecision) / accnt.MarginPrecision
+	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.MarginPrecision) / accnt.MarginPrecision
 
-	cost1 := (math.Round(1./200.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
-	cost2 := (math.Round(1./210.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	cost1 := (math.Round(1./200.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
+	cost2 := (math.Round(1./210.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
 	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
 		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
@@ -356,11 +356,11 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.marginPrecision) / accnt.marginPrecision
-	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.MarginPrecision) / accnt.MarginPrecision
+	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.MarginPrecision) / accnt.MarginPrecision
 
-	cost1 := (math.Round(1./200.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
-	cost2 := (math.Round(1./210.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	cost1 := (math.Round(1./200.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
+	cost2 := (math.Round(1./210.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
 	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
 		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())

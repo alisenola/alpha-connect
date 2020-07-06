@@ -180,6 +180,10 @@ func (m *GBMPriceModel) Progress(time uint64) {
 	}
 }
 
+func (m *GBMPriceModel) Ready() bool {
+	return true
+}
+
 func (m *GBMPriceModel) Frequency() uint64 {
 	return m.freq
 }
