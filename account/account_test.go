@@ -281,3 +281,333 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin())
 	}
 }
+
+func TestAccount_ConfirmFill_Replace(t *testing.T) {
+	// Post a matching limit order and post a replace right after
+
+	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a buy order
+	_, rej := accnt.NewOrder(&models.Order{
+		OrderID:       "buy",
+		ClientOrderID: "buy",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 1.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 20000.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err = accnt.ConfirmNewOrder("buy", "buy")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a sell order
+	_, rej = accnt.NewOrder(&models.Order{
+		OrderID:       "sell",
+		ClientOrderID: "sell",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Sell,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err = accnt.ConfirmNewOrder("sell", "sell")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fee1 := math.Floor(0.00025*(1./200.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+	fee2 := math.Floor(0.00025*(1./210.)*2.*accnt.marginPrecision) / accnt.marginPrecision
+
+	cost1 := (math.Round(1./200.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	cost2 := (math.Round(1./210.*accnt.marginPrecision) / accnt.marginPrecision) * 2.
+	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
+	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = accnt.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if math.Abs(accnt.GetMargin()-2*expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin())
+	}
+}
+
+func TestAccount_Compare(t *testing.T) {
+	accnt1 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err := accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accnt2 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	// Add a buy order
+	_, rej := accnt1.NewOrder(&models.Order{
+		OrderID:       "buy",
+		ClientOrderID: "buy",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	// Add a buy order
+	_, rej = accnt2.NewOrder(&models.Order{
+		OrderID:       "buy",
+		ClientOrderID: "buy",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmNewOrder("buy", "buy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmNewOrder("buy", "buy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	// Add a sell order
+	_, rej = accnt1.NewOrder(&models.Order{
+		OrderID:       "sell",
+		ClientOrderID: "sell",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Sell,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	// Add a sell order
+	_, rej = accnt2.NewOrder(&models.Order{
+		OrderID:       "sell",
+		ClientOrderID: "sell",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Sell,
+		TimeInForce:    models.Session,
+		LeavesQuantity: 10.,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: 10.},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmNewOrder("sell", "sell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmNewOrder("sell", "sell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("buy", "k1", 200., 1., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+
+	_, err = accnt1.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if accnt1.Compare(accnt2) {
+		t.Fatalf("same account")
+	}
+	_, err = accnt2.ConfirmFill("sell", "k1", 210., 2., false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accnt1.Compare(accnt2) {
+		t.Fatalf("different account")
+	}
+}

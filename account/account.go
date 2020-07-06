@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
+	"reflect"
 	"sync"
 )
 
@@ -505,9 +506,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	rawFillQuantity := int64(quantity * lotPrecision)
 	rawLeavesQuantity := int64(order.LeavesQuantity * lotPrecision)
 	if rawFillQuantity > rawLeavesQuantity {
-		// TODO
-		//return nil, fmt.Errorf("fill bigger than order leaves quantity %d %d", rawFillQuantity, rawLeavesQuantity)
-		rawFillQuantity = rawLeavesQuantity
+		return nil, fmt.Errorf("fill bigger than order leaves quantity %d %d", rawFillQuantity, rawLeavesQuantity)
 	}
 	rawCumQuantity := int64(order.CumQuantity * lotPrecision)
 	leavesQuantity := float64(rawLeavesQuantity-rawFillQuantity) / lotPrecision
@@ -686,4 +685,49 @@ func (accnt *Account) CleanOrders() {
 			delete(accnt.ordersClID, k)
 		}
 	}
+}
+
+func (accnt *Account) Compare(other *Account) bool {
+	// Compare positions, balances and margin
+	accnt.Lock()
+	other.Lock()
+	defer accnt.Unlock()
+	defer other.Unlock()
+
+	if accnt.margin != other.margin {
+		return false
+	}
+	for k, p1 := range accnt.positions {
+		if p2, ok := other.positions[k]; ok {
+			if p1.rawSize != p2.rawSize {
+				return false
+			}
+			if p1.cost != p2.cost {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	for k, b1 := range accnt.balances {
+		if b2, ok := other.balances[k]; ok {
+			// TODO
+			if math.Abs(b1-b2) < 0.0000001 {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	for k, o1 := range accnt.ordersID {
+		if o2, ok := other.ordersID[k]; ok {
+			if !reflect.DeepEqual(o1, o2) {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return true
 }
