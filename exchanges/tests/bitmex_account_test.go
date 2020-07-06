@@ -1055,3 +1055,106 @@ func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
 	checkPositions(t, instrument1)
 	checkBalances(t)
 }
+
+func TestAccountListener_ConfirmFillReplace(t *testing.T) {
+
+	order1ClID := uuid.NewV1().String()
+	// Test with two orders same symbol diff price
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+		RequestID: 0,
+		Account:   testAccountInfo,
+		Orders: []*messages.NewOrder{{
+			ClientOrderID: order1ClID,
+			Instrument:    instrument1,
+			OrderType:     models.Limit,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.Session,
+			Quantity:      1,
+			Price:         &types.DoubleValue{Value: 100000.},
+		}},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok := res.(*messages.NewOrderBulkResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Send a replace right after
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderReplaceRequest{
+		RequestID:  0,
+		Account:    testAccountInfo,
+		Instrument: instrument1,
+		Update: &messages.OrderUpdate{
+			OrderID:           nil,
+			OrigClientOrderID: &types.StringValue{Value: order1ClID},
+			Quantity:          &types.DoubleValue{Value: 5},
+			Price:             nil,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replaceResponse, ok := res.(*messages.OrderReplaceResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderReplaceResponse. got %s", reflect.TypeOf(res).String())
+	}
+	if replaceResponse.Success {
+		t.Fatalf("was expecting unsuccessful request")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Query order
+	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+		RequestID: 0,
+		Subscribe: false,
+		Account:   testAccountInfo,
+		Filter: &messages.OrderFilter{
+			ClientOrderID: &types.StringValue{Value: order1ClID},
+			Instrument:    instrument1,
+		},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderList, ok := res.(*messages.OrderList)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+	}
+	if !orderList.Success {
+		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
+	}
+	if len(orderList.Orders) != 1 {
+		t.Fatalf("was expecting 1 order, got %d", len(orderList.Orders))
+	}
+	order1 := orderList.Orders[0]
+	if order1.OrderStatus != models.Filled {
+		t.Fatalf("order status not filled %s", order1.OrderStatus.String())
+	}
+	if int(order1.LeavesQuantity) != 0 {
+		t.Fatalf("was expecting leaves quantity of 0")
+	}
+	if int(order1.CumQuantity) != 1 {
+		t.Fatalf("was expecting cum quantity of 1")
+	}
+	if order1.OrderType != models.Limit {
+		t.Fatalf("was expecting limit order type")
+	}
+	if order1.TimeInForce != models.Session {
+		t.Fatalf("was expecting session time in force")
+	}
+	if order1.Side != models.Buy {
+		t.Fatalf("was expecting buy side order")
+	}
+}

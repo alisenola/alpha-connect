@@ -741,14 +741,11 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 			context.Respond(response)
 			return nil
 		} else if symbol != order.Instrument.Symbol.Value {
-			fmt.Println("DIFFERENT SUYMBOL")
 			response.RejectionReason = messages.DifferentSymbols
-			fmt.Println("RES", response)
 			return nil
 		}
 		params = append(params, buildPostOrderRequest(order))
 	}
-	fmt.Println("HELLOOO")
 	request, weight, err := bitmex.PostBulkOrder(req.Account.Credentials, params)
 	if err != nil {
 		return err
