@@ -10,7 +10,6 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
-	"reflect"
 	"sync"
 )
 
@@ -59,8 +58,8 @@ type Account struct {
 	balances        map[uint32]float64
 	assets          map[uint32]*xchangerModels.Asset
 	margin          int64
-	marginCurrency  *xchangerModels.Asset
-	marginPrecision float64
+	MarginCurrency  *xchangerModels.Asset
+	MarginPrecision float64
 }
 
 func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
@@ -73,8 +72,8 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 		balances:        make(map[uint32]float64),
 		assets:          make(map[uint32]*xchangerModels.Asset),
 		margin:          0,
-		marginCurrency:  marginCurrency,
-		marginPrecision: marginPrecision,
+		MarginCurrency:  marginCurrency,
+		MarginPrecision: marginPrecision,
 	}
 
 	return accnt
@@ -86,12 +85,12 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
-			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.marginCurrency)
+			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.MarginCurrency)
 			accnt.positions[s.SecurityID] = &Position{
 				inverse:         s.IsInverse,
 				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement),
 				lotPrecision:    math.Ceil(1. / s.RoundLot),
-				marginPrecision: accnt.marginPrecision,
+				marginPrecision: accnt.MarginPrecision,
 				multiplier:      s.Multiplier.Value,
 				makerFee:        s.MakerFee.Value,
 				takerFee:        s.TakerFee.Value,
@@ -103,7 +102,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		}
 	}
 
-	accnt.margin = int64(math.Round(margin * accnt.marginPrecision))
+	accnt.margin = int64(math.Round(margin * accnt.MarginPrecision))
 	for _, s := range accnt.securities {
 		s.Clear()
 	}
@@ -571,8 +570,8 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		}
 		accnt.margin -= fee
 		accnt.margin -= cost
-		er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.marginPrecision}
-		er.FeeCurrency = accnt.marginCurrency
+		er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.MarginPrecision}
+		er.FeeCurrency = accnt.MarginCurrency
 		er.FeeBasis = messages.Percentage
 		er.FeeType = messages.ExchangeFees
 		// TODO mutex on position ?
@@ -583,7 +582,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 }
 
 func (accnt *Account) Settle() {
-	accnt.balances[accnt.marginCurrency.ID] += float64(accnt.margin) / accnt.marginPrecision
+	accnt.balances[accnt.MarginCurrency.ID] += float64(accnt.margin) / accnt.MarginPrecision
 	// TODO check less than zero
 	accnt.margin = 0
 }
@@ -669,7 +668,7 @@ func (accnt *Account) GetPositionSize(securityID uint64) float64 {
 func (accnt *Account) GetMargin() float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	return float64(accnt.margin) / accnt.marginPrecision
+	return float64(accnt.margin) / accnt.MarginPrecision
 }
 
 func (accnt *Account) CleanOrders() {
@@ -695,14 +694,22 @@ func (accnt *Account) Compare(other *Account) bool {
 	defer other.Unlock()
 
 	if accnt.margin != other.margin {
+		fmt.Println("DIFF MARGIN")
+		fmt.Println(accnt.margin, other.margin)
 		return false
 	}
 	for k, p1 := range accnt.positions {
 		if p2, ok := other.positions[k]; ok {
 			if p1.rawSize != p2.rawSize {
+				fmt.Println("DIFF POS")
+				fmt.Println(p1)
+				fmt.Println(p2)
 				return false
 			}
 			if p1.cost != p2.cost {
+				fmt.Println("DIFF POS")
+				fmt.Println(p1)
+				fmt.Println(p2)
 				return false
 			}
 		} else {
@@ -712,16 +719,9 @@ func (accnt *Account) Compare(other *Account) bool {
 	for k, b1 := range accnt.balances {
 		if b2, ok := other.balances[k]; ok {
 			// TODO
-			if math.Abs(b1-b2) < 0.0000001 {
-				return false
-			}
-		} else {
-			return false
-		}
-	}
-	for k, o1 := range accnt.ordersID {
-		if o2, ok := other.ordersID[k]; ok {
-			if !reflect.DeepEqual(o1, o2) {
+			if math.Abs(b1-b2) > 0.0000001 {
+				fmt.Println("DIFF BALANCE")
+				fmt.Println(b1, b2)
 				return false
 			}
 		} else {

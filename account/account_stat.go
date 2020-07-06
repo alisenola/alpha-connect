@@ -16,7 +16,7 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 		value += v * model.GetPairPrice(k, constants.DOLLAR.ID)
 	}
 
-	marginPrice := model.GetPairPrice(accnt.marginCurrency.ID, constants.DOLLAR.ID)
+	marginPrice := model.GetPairPrice(accnt.MarginCurrency.ID, constants.DOLLAR.ID)
 
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
@@ -34,7 +34,7 @@ func (accnt *Account) Value(model modeling.MarketModel) float64 {
 		value -= (cost - math.Pow(model.GetPrice(k), exp)*factor) * marginPrice
 	}
 
-	margin := float64(accnt.margin) / accnt.marginPrecision
+	margin := float64(accnt.margin) / accnt.MarginPrecision
 	value += margin * marginPrice
 
 	return math.Max(value, 0.)
@@ -50,7 +50,7 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 			values[i] += v * samplePrices[i]
 		}
 	}
-	marginPrices := model.GetSamplePairPrices(accnt.marginCurrency.ID, constants.DOLLAR.ID, time, N)
+	marginPrices := model.GetSamplePairPrices(accnt.MarginCurrency.ID, constants.DOLLAR.ID, time, N)
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
 			continue
@@ -70,7 +70,7 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 		}
 	}
 
-	margin := float64(accnt.margin) / accnt.marginPrecision
+	margin := float64(accnt.margin) / accnt.MarginPrecision
 	for i := 0; i < N; i++ {
 		values[i] += margin * marginPrices[i]
 	}
@@ -115,7 +115,7 @@ func (accnt Account) GetELROnMarketSell(securityID uint64, model modeling.Market
 func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
+	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
 	usedMargin := 0.
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
@@ -134,14 +134,14 @@ func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage float64) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	availableMargin := accnt.balances[accnt.marginCurrency.ID] + float64(accnt.margin)/accnt.marginPrecision
+	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
 	for k, p := range accnt.positions {
 		// Entry price not defined if size = 0, division by 0 !
 		if p.rawSize == 0 {
 			continue
 		}
 		exitPrice := model.GetPrice(k)
-		cost := float64(p.cost) / accnt.marginPrecision
+		cost := float64(p.cost) / accnt.MarginPrecision
 
 		if p.inverse {
 			unrealizedPnL := (1./exitPrice)*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost

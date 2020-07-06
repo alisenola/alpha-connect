@@ -10,12 +10,14 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
+	"math"
 	"reflect"
 	"sort"
 	"time"
 )
 
 type checkSocket struct{}
+type checkAccount struct{}
 
 type AccountListener struct {
 	account         *account.Account
@@ -25,6 +27,7 @@ type AccountListener struct {
 	executorManager *actor.PID
 	logger          *log.Logger
 	lastPingTime    time.Time
+	securities      []*models.Security
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -138,6 +141,16 @@ func (state *AccountListener) Receive(context actor.Context) {
 			time.Sleep(5 * time.Second)
 			context.Send(pid, &checkSocket{})
 		}(context.Self())
+
+	case *checkAccount:
+		if err := state.checkAccount(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+		go func(pid *actor.PID) {
+			time.Sleep(10 * time.Minute)
+			context.Send(pid, &checkAccount{})
+		}(context.Self())
 	}
 }
 
@@ -152,9 +165,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 	state.bitmexExecutor = actor.NewLocalPID("executor/" + constants.BITMEX.Name + "_executor")
 
-	if err := state.subscribeAccount(context); err != nil {
-		return fmt.Errorf("error subscribing to account: %v", err)
-	}
 	// Request securities
 	executor := actor.NewLocalPID("executor")
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
@@ -175,9 +185,25 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			filteredSecurities = append(filteredSecurities, s)
 		}
 	}
+	state.securities = filteredSecurities
+
+	if err := state.Sync(context); err != nil {
+		return fmt.Errorf("error syncing account: %v", err)
+	}
+
+	context.Send(context.Self(), &checkSocket{})
+	context.Send(context.Self(), &checkAccount{})
+
+	return nil
+}
+
+func (state *AccountListener) Sync(context actor.Context) error {
+	if err := state.subscribeAccount(context); err != nil {
+		return fmt.Errorf("error subscribing to account: %v", err)
+	}
 
 	// Then fetch balances
-	res, err = context.RequestFuture(state.bitmexExecutor, &messages.BalancesRequest{
+	res, err := context.RequestFuture(state.bitmexExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -237,13 +263,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	btcMargin := balanceList.Balances[0].Quantity
 	// Sync account
-	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, nil, btcMargin); err != nil {
+	if err := state.account.Sync(state.securities, orderList.Orders, positionList.Positions, nil, btcMargin); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
 	state.seqNum = 0
 
-	context.Send(context.Self(), &checkSocket{})
 	return nil
 }
 
@@ -943,8 +968,9 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 }
 
 func (state *AccountListener) subscribeAccount(context actor.Context) error {
-	if state.ws != nil {
-		_ = state.ws.Disconnect()
+	if state.ws != nil && state.ws.Err == nil && state.ws.Connected {
+		// Skip if socket ok
+		return nil
 	}
 
 	ws := bitmex.NewWebsocket()
@@ -1010,10 +1036,99 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 		if state.ws.Err != nil {
 			state.logger.Info("error on socket", log.Error(state.ws.Err))
 		}
-		if err := state.subscribeAccount(context); err != nil {
-			return fmt.Errorf("error subscribing to account: %v", err)
+		if err := state.Sync(context); err != nil {
+			return fmt.Errorf("error syncing account: %v", err)
 		}
 	}
 
+	return nil
+}
+
+func (state *AccountListener) checkAccount(context actor.Context) error {
+	// Fetch balances
+	res, err := context.RequestFuture(state.bitmexExecutor, &messages.BalancesRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting balances from executor: %v", err)
+	}
+
+	balanceList, ok := res.(*messages.BalanceList)
+	if !ok {
+		return fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !balanceList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	}
+
+	if len(balanceList.Balances) != 1 {
+		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+	}
+
+	// Fetch positions
+	res, err = context.RequestFuture(state.bitmexExecutor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	positionList, ok := res.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !positionList.Success {
+		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
+	}
+
+	rawMargin1 := int(math.Round(state.account.GetMargin() * state.account.MarginPrecision))
+	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
+	if rawMargin1 != rawMargin2 {
+		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(), balanceList.Balances[0].Quantity)
+	}
+
+	pos1 := state.account.GetPositions()
+
+	var pos2 []*models.Position
+	for _, p := range positionList.Positions {
+		if math.Abs(p.Quantity) > 0 {
+			pos2 = append(pos2, p)
+		}
+	}
+	if len(pos1) != len(pos2) {
+		// Re-sync
+		fmt.Println("RE-SYNCING !")
+		fmt.Println(pos1)
+		fmt.Println(pos2)
+		return state.Sync(context)
+	}
+
+	// sort
+	sort.Slice(pos1, func(i, j int) bool {
+		return pos1[i].Instrument.SecurityID.Value < pos1[j].Instrument.SecurityID.Value
+	})
+	sort.Slice(pos2, func(i, j int) bool {
+		return pos2[i].Instrument.SecurityID.Value < pos2[j].Instrument.SecurityID.Value
+	})
+
+	for i := range pos1 {
+		if int(pos1[i].Quantity) != int(pos2[i].Quantity) {
+			// Re-sync
+			fmt.Println("RE-SYNCING !")
+			return state.Sync(context)
+		}
+		rawCost1 := int(pos1[i].Cost * state.account.MarginPrecision)
+		rawCost2 := int(pos2[i].Cost * state.account.MarginPrecision)
+		if rawCost1 != rawCost2 {
+			// Re-sync
+			fmt.Println("RE-SYNCING !")
+			return state.Sync(context)
+		}
+	}
 	return nil
 }
