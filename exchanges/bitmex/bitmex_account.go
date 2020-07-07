@@ -1081,7 +1081,9 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	rawMargin1 := int(math.Round(state.account.GetMargin() * state.account.MarginPrecision))
 	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
 	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(), balanceList.Balances[0].Quantity)
+		err := fmt.Errorf("got different margin: %f %f", state.account.GetMargin(), balanceList.Balances[0].Quantity)
+		state.logger.Info("re-syncing", log.Error(err))
+		return state.Sync(context)
 	}
 
 	pos1 := state.account.GetPositions()
@@ -1094,9 +1096,8 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	}
 	if len(pos1) != len(pos2) {
 		// Re-sync
-		fmt.Println("RE-SYNCING !")
-		fmt.Println(pos1)
-		fmt.Println(pos2)
+		err := fmt.Errorf("got different position number")
+		state.logger.Info("re-syncing", log.Error(err))
 		return state.Sync(context)
 	}
 
@@ -1111,14 +1112,16 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	for i := range pos1 {
 		if int(pos1[i].Quantity) != int(pos2[i].Quantity) {
 			// Re-sync
-			fmt.Println("RE-SYNCING !")
+			err := fmt.Errorf("got different position quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
+			state.logger.Info("re-syncing", log.Error(err))
 			return state.Sync(context)
 		}
 		rawCost1 := int(pos1[i].Cost * state.account.MarginPrecision)
 		rawCost2 := int(pos2[i].Cost * state.account.MarginPrecision)
 		if rawCost1 != rawCost2 {
 			// Re-sync
-			fmt.Println("RE-SYNCING !")
+			err := fmt.Errorf("got different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
+			state.logger.Info("re-syncing", log.Error(err))
 			return state.Sync(context)
 		}
 	}
