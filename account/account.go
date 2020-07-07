@@ -432,9 +432,6 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	if order.OrderStatus == models.Canceled {
 		return nil, nil
 	}
-	if order.OrderStatus != models.PendingCancel {
-		return nil, fmt.Errorf("error not pending cancel")
-	}
 
 	order.OrderStatus = models.Canceled
 	order.LeavesQuantity = 0.

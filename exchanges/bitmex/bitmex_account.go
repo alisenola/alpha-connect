@@ -906,14 +906,6 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Canceled":
-			// TODO for now, do that to handle exchange initiated cancel
-			report, _ := state.account.CancelOrder(*data.ClOrdID)
-			if report != nil {
-				report.SeqNum = state.seqNum + 1
-				state.seqNum += 1
-				context.Send(context.Parent(), report)
-			}
-
 			report, err := state.account.ConfirmCancelOrder(*data.ClOrdID)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
