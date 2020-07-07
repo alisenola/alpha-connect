@@ -942,7 +942,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Trade":
-			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, *data.LastPx, float64(*data.LastQty), true)
+			report, err := state.account.ConfirmFill(*data.ClOrdID, *data.TrdMatchID, *data.LastPx, float64(*data.LastQty), *data.ExecComm > 0)
 			if err != nil {
 				return fmt.Errorf("error confirming fill: %v", err)
 			}
