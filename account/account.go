@@ -79,24 +79,32 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 	return accnt
 }
 
-func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64) error {
+func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64, makerFee, takerFee *float64) error {
 	accnt.Lock()
 	defer accnt.Unlock()
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
-			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.MarginCurrency)
+			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.MarginCurrency, makerFee, takerFee)
+			posMakerFee := s.MakerFee.Value
+			if makerFee != nil {
+				posMakerFee = *makerFee
+			}
+			posTakerFee := s.TakerFee.Value
+			if takerFee != nil {
+				posTakerFee = *takerFee
+			}
 			accnt.positions[s.SecurityID] = &Position{
 				inverse:         s.IsInverse,
 				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement),
 				lotPrecision:    math.Ceil(1. / s.RoundLot),
 				marginPrecision: accnt.MarginPrecision,
 				multiplier:      s.Multiplier.Value,
-				makerFee:        s.MakerFee.Value,
-				takerFee:        s.TakerFee.Value,
+				makerFee:        posMakerFee,
+				takerFee:        posTakerFee,
 			}
 		case enum.SecurityType_CRYPTO_SPOT:
-			accnt.securities[s.SecurityID] = NewSpotSecurity(s)
+			accnt.securities[s.SecurityID] = NewSpotSecurity(s, makerFee, takerFee)
 			accnt.assets[s.Underlying.ID] = s.Underlying
 			accnt.assets[s.QuoteCurrency.ID] = s.QuoteCurrency
 		}

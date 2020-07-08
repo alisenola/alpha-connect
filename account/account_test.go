@@ -81,7 +81,7 @@ var ETHUSD_SPOT_SEC = &models.Security{
 
 func TestAccount_ConfirmFill(t *testing.T) {
 	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0.)
+	err := accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	// Post a matching limit order and post a replace right after
 
 	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,12 +388,12 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 
 func TestAccount_Compare(t *testing.T) {
 	accnt1 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	err := accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	accnt2 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0.)
+	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

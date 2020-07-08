@@ -18,6 +18,11 @@ type Position struct {
 	cross           bool
 }
 
+func (pos *Position) UpdateFees(makerFee, takerFee float64) {
+	pos.makerFee = makerFee
+	pos.takerFee = takerFee
+}
+
 func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 	if pos.inverse {
 		price = 1. / price

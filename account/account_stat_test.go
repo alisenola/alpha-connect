@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 
 func TestAccount_GetAvailableMargin(t *testing.T) {
 	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -83,7 +83,7 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 
 func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -126,7 +126,7 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 
 func TestAccount_PnL_Inverse(t *testing.T) {
 	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -211,7 +211,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		Asset:     &constants.ETHEREUM,
 		Quantity:  10,
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, 0.); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, 0., nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -333,17 +333,24 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 func TestPortfolio_Margin_ELR(t *testing.T) {
 
 	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewPortfolio(1000)
 	p.AddAccount(account)
 
-	expectedMarginChange := ((1./90 - 1./100) * 9) + (0.00025 * (1. / 90) * 9)
+	expectedMarginChange := ((1./90 - 1./100) * 9) - (0.00075 * (1. / 90) * 9)
 	expectedElr := math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
+	elr, o := p.GetELROnMarketBuy("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 90, 9, 0.1)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
 
-	elr, o := p.GetELROnLimitBid("1", BTCUSD_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 0.1)
+	expectedMarginChange = ((1./90 - 1./100) * 9) + (0.00025 * (1. / 90) * 9)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
+
+	elr, o = p.GetELROnLimitBid("1", BTCUSD_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -401,6 +408,15 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
 	elr = p.ExpectedLogReturn(model, 10)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	// ETHUSD
+
+	expectedMarginChange = ((10 - 9) * 0.000001 * 19) + (-0.00075 * 9. * 19 * 0.000001)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
+	elr, o = p.GetELROnMarketBuy("1", ETHUSD_PERP_SEC.SecurityID, model, 10, 9, 19, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -468,10 +484,18 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
 
+	// BTC USD short
 	// Short 11
+
+	expectedMarginChange = ((1./100 - 1./110) * 1. * 11.) + (-0.00075 * (1. / 110) * 11.)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
+	elr, o = p.GetELROnMarketSell("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 110, 11, 0.1)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
 	expectedMarginChange = ((1./100 - 1./110) * 1. * 11.) + (0.00025 * (1. / 110) * 11.)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-
 	elr, o = p.GetELROnLimitAsk("1", BTCUSD_PERP_SEC.SecurityID, model, 10, []float64{110}, []float64{1}, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
@@ -536,9 +560,16 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
+	// ETHUSD Short
+	expectedMarginChange = ((11 - 10) * 0.000001 * 19) + (-0.00075 * 11. * 19 * 0.000001)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
+	elr, o = p.GetELROnMarketSell("1", ETHUSD_PERP_SEC.SecurityID, model, 11, 11, 19, 0.1)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
 	expectedMarginChange = ((11 - 10) * 0.000001 * 19) + (0.00025 * 11. * 19 * 0.000001)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-
 	elr, o = p.GetELROnLimitAsk("1", ETHUSD_PERP_SEC.SecurityID, model, 11, []float64{11}, []float64{1}, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)

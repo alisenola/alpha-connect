@@ -23,9 +23,10 @@ type SpotSecurity struct {
 	sampleMatchAsk    []float64
 	sampleTime        uint64
 	makerFee          float64
+	takerFee          float64
 }
 
-func NewSpotSecurity(sec *models.Security) *SpotSecurity {
+func NewSpotSecurity(sec *models.Security, makerFee, takerFee *float64) *SpotSecurity {
 	spotSec := &SpotSecurity{
 		RWMutex:           sync.RWMutex{},
 		Security:          sec,
@@ -39,12 +40,17 @@ func NewSpotSecurity(sec *models.Security) *SpotSecurity {
 		sampleMatchAsk:    nil,
 		sampleTime:        0,
 	}
-	if sec.MakerFee != nil {
-		spotSec.makerFee = sec.MakerFee.Value
-	} else {
-		spotSec.makerFee = 0.
-	}
 
+	if makerFee != nil {
+		spotSec.makerFee = *makerFee
+	} else {
+		spotSec.makerFee = sec.MakerFee.Value
+	}
+	if takerFee != nil {
+		spotSec.takerFee = *takerFee
+	} else {
+		spotSec.takerFee = sec.TakerFee.Value
+	}
 	return spotSec
 }
 
@@ -133,6 +139,13 @@ func (sec *SpotSecurity) RemoveAskOrder(ID string) {
 		sampleValueChange[i] -= (baseChange - (baseChange * sec.makerFee)) * price * sampleQuotePrice[i]
 	}
 	delete(sec.openAskOrders, ID)
+	sec.Unlock()
+}
+
+func (sec *SpotSecurity) UpdateFees(makerFee, takerFee float64) {
+	sec.Lock()
+	sec.makerFee = makerFee
+	sec.takerFee = takerFee
 	sec.Unlock()
 }
 
