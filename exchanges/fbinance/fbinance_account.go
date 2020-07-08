@@ -21,15 +21,17 @@ type checkSocket struct{}
 type checkAccount struct{}
 
 type AccountListener struct {
-	account          *account.Account
-	seqNum           uint64
-	fbinanceExecutor *actor.PID
-	ws               *fbinance.AuthWebsocket
-	executorManager  *actor.PID
-	logger           *log.Logger
-	lastPingTime     time.Time
-	securities       []*models.Security
-	client           *http.Client
+	account             *account.Account
+	seqNum              uint64
+	fbinanceExecutor    *actor.PID
+	ws                  *fbinance.AuthWebsocket
+	executorManager     *actor.PID
+	logger              *log.Logger
+	checkAccountPending bool
+	checkSocketPending  bool
+	lastPingTime        time.Time
+	securities          []*models.Security
+	client              *http.Client
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -40,11 +42,13 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 
 func NewAccountListener(account *account.Account) actor.Actor {
 	return &AccountListener{
-		account:         account,
-		seqNum:          0,
-		ws:              nil,
-		executorManager: nil,
-		logger:          nil,
+		account:             account,
+		seqNum:              0,
+		ws:                  nil,
+		executorManager:     nil,
+		logger:              nil,
+		checkSocketPending:  false,
+		checkAccountPending: false,
 	}
 }
 
@@ -135,25 +139,32 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *checkSocket:
+		state.checkSocketPending = false
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		go func(pid *actor.PID) {
-			time.Sleep(5 * time.Second)
-			context.Send(pid, &checkSocket{})
-		}(context.Self())
+		if !state.checkSocketPending {
+			state.checkSocketPending = true
+			go func(pid *actor.PID) {
+				time.Sleep(5 * time.Second)
+				context.Send(pid, &checkSocket{})
+			}(context.Self())
+		}
 
 	case *checkAccount:
+		state.checkAccountPending = false
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		go func(pid *actor.PID) {
-			fmt.Println("WAINTING TO SNED")
-			time.Sleep(1 * time.Minute)
-			context.Send(pid, &checkAccount{})
-		}(context.Self())
+		if !state.checkAccountPending {
+			state.checkAccountPending = true
+			go func(pid *actor.PID) {
+				time.Sleep(10 * time.Minute)
+				context.Send(pid, &checkAccount{})
+			}(context.Self())
+		}
 	}
 }
 
@@ -200,6 +211,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 	state.securities = filteredSecurities
 
+	fmt.Println("GOT SECURITIES")
 	// Then fetch balances
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
@@ -221,7 +233,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if len(balanceList.Balances) != 1 {
 		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
 	}
-
+	fmt.Println("GOT BALANCE")
 	// Then fetch positions
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -267,9 +279,20 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	state.seqNum = 0
 
-	context.Send(context.Self(), &checkSocket{})
-	context.Send(context.Self(), &checkAccount{})
-
+	if !state.checkSocketPending {
+		go func(pid *actor.PID) {
+			time.Sleep(5 * time.Second)
+			context.Send(pid, &checkSocket{})
+		}(context.Self())
+		state.checkSocketPending = true
+	}
+	if !state.checkAccountPending {
+		go func(pid *actor.PID) {
+			time.Sleep(10 * time.Minute)
+			context.Send(pid, &checkAccount{})
+		}(context.Self())
+		state.checkAccountPending = true
+	}
 	return nil
 }
 
@@ -312,6 +335,7 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 }
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
+	fmt.Println("GOT ORDERE STATUS REQUEST")
 	req := context.Message().(*messages.OrderStatusRequest)
 	orders := state.account.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{

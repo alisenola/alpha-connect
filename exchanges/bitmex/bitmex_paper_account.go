@@ -149,7 +149,7 @@ func (state *PaperAccountListener) Initialize(context actor.Context) error {
 		}
 	}
 
-	if err := state.account.Sync(filteredSecurities, nil, nil, nil, 1.); err != nil {
+	if err := state.account.Sync(filteredSecurities, nil, nil, nil, 1., nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 

@@ -34,6 +34,11 @@ func NewAccount(accountInfo *models.Account) *account.Account {
 		accnt := account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
 		Portfolio.AddAccount(accnt)
 		return accnt
+	case constants.FBINANCE.ID:
+		// TODO correct margin precision
+		accnt := account.NewAccount(accountInfo, &constants.TETHER, 1./0.00000001)
+		Portfolio.AddAccount(accnt)
+		return accnt
 	default:
 		return nil
 	}
@@ -43,6 +48,8 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
+	case constants.FBINANCE.ID:
+		return func() actor.Actor { return fbinance.NewAccountListener(account) }
 	default:
 		return nil
 	}

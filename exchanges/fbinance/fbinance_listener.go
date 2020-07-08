@@ -152,7 +152,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	symbol := strings.ToLower(state.security.Symbol)
 	err := obWs.Connect(
 		symbol,
-		[]string{fbinance.WSDepthStream100ms})
+		[]string{fbinance.WSDepthStreamRealTime})
 	if err != nil {
 		return err
 	}

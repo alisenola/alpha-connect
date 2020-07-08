@@ -1,4 +1,4 @@
-package tests
+package bitmex
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"

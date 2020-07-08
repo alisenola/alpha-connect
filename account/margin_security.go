@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"

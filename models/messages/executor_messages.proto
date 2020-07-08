@@ -107,6 +107,7 @@ enum RejectionReason {
     HTTPError = 18;
     NonReplaceableOrder = 19;
     NonCancelableOrder = 20;
+    FilterNotSupported = 21;
 }
 
 enum FeeType {

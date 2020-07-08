@@ -14,12 +14,12 @@ import (
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"io/ioutil"
 	"math"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -354,12 +354,23 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		RequestID: msg.RequestID,
 		Success:   false,
 	}
-	filters := make(map[string]interface{})
-	params := bitmex.NewGetOrderParams()
+	symbol := ""
+	orderID := ""
+	clOrderID := ""
 	if msg.Filter != nil {
+		if msg.Filter.OrderStatus != nil {
+			response.RejectionReason = messages.FilterNotSupported
+			context.Respond(response)
+			return nil
+		}
+		if msg.Filter.Side != nil {
+			response.RejectionReason = messages.FilterNotSupported
+			context.Respond(response)
+			return nil
+		}
 		if msg.Filter.Instrument != nil {
 			if msg.Filter.Instrument.Symbol != nil {
-				params.SetSymbol(msg.Filter.Instrument.Symbol.Value)
+				symbol = msg.Filter.Instrument.Symbol.Value
 			} else if msg.Filter.Instrument.SecurityID != nil {
 				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
 				if !ok {
@@ -367,25 +378,44 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					context.Respond(response)
 					return nil
 				}
-				params.SetSymbol(sec.Symbol)
+				symbol = sec.Symbol
 			}
 		}
 		if msg.Filter.OrderID != nil {
-			filters["orderID"] = msg.Filter.OrderID.Value
+			orderID = msg.Filter.OrderID.Value
 		}
 		if msg.Filter.ClientOrderID != nil {
-			filters["clOrdID"] = msg.Filter.ClientOrderID.Value
+			clOrderID = msg.Filter.ClientOrderID.Value
 		}
 	}
-	filters["open"] = true
 
-	if len(filters) > 0 {
-		params.SetFilters(filters)
-	}
-
-	request, weight, err := bitmex.GetOrder(msg.Account.Credentials, params)
-	if err != nil {
-		return err
+	var request *http.Request
+	var weight int
+	if orderID != "" || clOrderID != "" {
+		params := fbinance.NewQueryOrderRequest(symbol)
+		if orderID != "" {
+			orderIDInt, err := strconv.ParseInt(orderID, 10, 64)
+			if err != nil {
+				response.RejectionReason = messages.FilterNotSupported
+				context.Respond(response)
+				return nil
+			}
+			params.SetOrderID(orderIDInt)
+		}
+		if clOrderID != "" {
+			params.SetOrigClientOrderID(clOrderID)
+		}
+		var err error
+		request, weight, err = fbinance.QueryOrder(params, msg.Account.Credentials)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		request, weight, err = fbinance.QueryOpenOrders(symbol, msg.Account.Credentials)
+		if err != nil {
+			return err
+		}
 	}
 
 	if state.globalRateLimit.IsRateLimited() {
@@ -427,7 +457,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			}
 			return
 		}
-		var orders []bitmex.Order
+		var orders []fbinance.OrderData
 		err = json.Unmarshal(queryResponse.Response, &orders)
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
@@ -446,66 +476,69 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				return
 			}
 			ord := models.Order{
-				OrderID: o.OrderID,
+				OrderID:       fmt.Sprintf("%d", o.OrderID),
+				ClientOrderID: o.ClientOrderID,
 				Instrument: &models.Instrument{
 					Exchange:   &constants.BITMEX,
 					Symbol:     &types.StringValue{Value: o.Symbol},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
-				LeavesQuantity: float64(o.LeavesQty),
-				CumQuantity:    float64(o.CumQty),
+				LeavesQuantity: o.OriginalQuantity - o.ExecutedQuantity, // TODO check
+				CumQuantity:    o.CumQuantity,
 			}
 
-			if o.ClOrdID != nil {
-				ord.ClientOrderID = *o.ClOrdID
-			}
-
-			switch o.OrdStatus {
-			case "New":
+			switch o.Status {
+			case fbinance.OS_NEW:
 				ord.OrderStatus = models.New
-			case "Canceled":
+			case fbinance.OS_CANCELED:
 				ord.OrderStatus = models.Canceled
-			case "Filled":
-				ord.OrderStatus = models.Filled
 			default:
-				fmt.Println("UNKNWOEN ORDER STATUS", o.OrdStatus)
+				fmt.Println("UNKNWOEN ORDER STATUS", o.Status)
 			}
 
-			switch bitmex.OrderType(o.OrdType) {
-			case bitmex.LIMIT:
+			/*
+				const LIMIT = OrderType("LIMIT")
+				const MARKET = OrderType("MARKET")
+				const STOP_LOSS = OrderType("STOP_LOSS")
+				const STOP_MARKET = OrderType("STOP_MARKET")
+				const STOP_LOSS_LIMIT = OrderType("STOP_LOSS_LIMIT")
+				const TAKE_PROFIT = OrderType("TAKE_PROFIT")
+				const TAKE_PROFIT_LIMIT = OrderType("TAKE_PROFIT_LIMIT")
+				const TAKE_PROFIT_MARKET = OrderType("TAKE_PROFIT_MARKET")
+				const LIMIT_MAKER = OrderType("LIMIT_MAKER")
+				const TRAILING_STOP_MARKET = OrderType("TRAILING_STOP_MARKET")
+
+			*/
+
+			switch o.Type {
+			case fbinance.LIMIT:
 				ord.OrderType = models.Limit
-			case bitmex.MARKET:
+			case fbinance.MARKET:
 				ord.OrderType = models.Market
-			case bitmex.STOP:
+			case fbinance.STOP_LOSS:
 				ord.OrderType = models.Stop
-			case bitmex.STOP_LIMIT:
+			case fbinance.STOP_LOSS_LIMIT:
 				ord.OrderType = models.StopLimit
-			case bitmex.LIMIT_IF_TOUCHED:
-				ord.OrderType = models.LimitIfTouched
-			case bitmex.MARKET_IF_TOUCHED:
-				ord.OrderType = models.MarketIfTouched
 			default:
-				fmt.Println("UNKNOWN ORDER TYPE", o.OrdType)
+				fmt.Println("UNKNOWN ORDER TYPE", o.Type)
 			}
 
-			switch bitmex.OrderSide(o.Side) {
-			case bitmex.BUY_ORDER_SIDE:
+			switch o.Side {
+			case fbinance.BUY_SIDE:
 				ord.Side = models.Buy
-			case bitmex.SELL_ORDER_SIDE:
+			case fbinance.SELL_SIDE:
 				ord.Side = models.Sell
 			default:
 				fmt.Println("UNKNOWN ORDER SIDE", o.Side)
 			}
 
-			switch bitmex.TimeInForce(o.TimeInForce) {
-			case bitmex.TIF_DAY:
-				ord.TimeInForce = models.Session
-			case bitmex.GOOD_TILL_CANCEL:
+			switch o.TimeInForce {
+			case fbinance.GOOD_TILL_CANCEL:
 				ord.TimeInForce = models.GoodTillCancel
-			case bitmex.IMMEDIATE_OR_CANCEL:
-				ord.TimeInForce = models.ImmediateOrCancel
-			case bitmex.FILL_OR_KILL:
+			case fbinance.FILL_OR_KILL:
 				ord.TimeInForce = models.FillOrKill
+			case fbinance.IMMEDIATE_OR_CANCEL:
+				ord.TimeInForce = models.ImmediateOrCancel
 			default:
 				fmt.Println("UNKNOWN TOF", o.TimeInForce)
 			}
@@ -527,6 +560,79 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+
+	balanceList := &messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+		Balances:   nil,
+	}
+
+	request, weight, err := fbinance.GetBalance(msg.Account.Credentials)
+	if err != nil {
+		return err
+	}
+
+	if state.globalRateLimit.IsRateLimited() {
+		balanceList.RejectionReason = messages.RateLimitExceeded
+		context.Respond(balanceList)
+		return nil
+	}
+
+	state.globalRateLimit.Request(weight)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			balanceList.RejectionReason = messages.HTTPError
+			context.Respond(balanceList)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				balanceList.RejectionReason = messages.HTTPError
+				context.Respond(balanceList)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				balanceList.RejectionReason = messages.HTTPError
+				context.Respond(balanceList)
+			}
+			return
+		}
+		var balances []fbinance.AccountBalance
+		err = json.Unmarshal(queryResponse.Response, &balances)
+		if err != nil {
+			balanceList.RejectionReason = messages.HTTPError
+			context.Respond(balanceList)
+			return
+		}
+		for _, b := range balances {
+			asset, ok := constants.SYMBOL_TO_ASSET[b.Asset]
+			if !ok {
+				state.logger.Error("got balance for unknown asset", log.String("asset", b.Asset))
+			}
+			balanceList.Balances = append(balanceList.Balances, &models.Balance{
+				AccountID: msg.Account.AccountID,
+				Asset:     &asset,
+				Quantity:  b.Balance,
+			})
+		}
+
+		balanceList.Success = true
+		context.Respond(balanceList)
+	})
+
 	return nil
 }
 
