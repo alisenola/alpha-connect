@@ -30,6 +30,23 @@ var BTCUSD_PERP_SEC = &models.Security{
 	MaturityDate:      nil,
 }
 
+var BTCUSDT_PERP_SEC = &models.Security{
+	SecurityID:        7744455,
+	SecurityType:      enum.SecurityType_CRYPTO_PERP,
+	Exchange:          &constants.FBINANCE,
+	Symbol:            "BTCUSDT",
+	MinPriceIncrement: 0.05,
+	RoundLot:          1,
+	Underlying:        &constants.BITCOIN,
+	QuoteCurrency:     &constants.TETHER,
+	Enabled:           true,
+	IsInverse:         false,
+	MakerFee:          &types.DoubleValue{Value: 0.0002},
+	TakerFee:          &types.DoubleValue{Value: 0.0004},
+	Multiplier:        &types.DoubleValue{Value: 1.},
+	MaturityDate:      nil,
+}
+
 var ETHUSD_PERP_SEC = &models.Security{
 	SecurityID:        8888888,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,

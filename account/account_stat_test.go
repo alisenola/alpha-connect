@@ -15,18 +15,23 @@ var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
 	mdl := modeling.NewMapModel()
+	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.TETHER.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.ETHEREUM.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(10.))
 	mdl.SetPriceModel(uint64(constants.DOLLAR.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1.))
+	mdl.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1.))
 
+	mdl.SetPriceModel(BTCUSDT_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantPriceModel(10.))
 
+	mdl.SetBuyTradeModel(BTCUSDT_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(2))
 	mdl.SetBuyTradeModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetBuyTradeModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetBuyTradeModel(BTCUSD_SPOT_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetBuyTradeModel(ETHUSD_SPOT_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 
+	mdl.SetSellTradeModel(BTCUSDT_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(2))
 	mdl.SetSellTradeModel(BTCUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetSellTradeModel(ETHUSD_PERP_SEC.SecurityID, modeling.NewConstantTradeModel(20))
 	mdl.SetSellTradeModel(BTCUSD_SPOT_SEC.SecurityID, modeling.NewConstantTradeModel(20))
@@ -653,3 +658,153 @@ func TestBitmexPortfolio_Parallel(t *testing.T) {
 }
 
 */
+
+func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
+
+	account := NewAccount(account, &constants.TETHER, 1./0.00000001)
+	if err := account.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, 1000, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	p := NewPortfolio(1000)
+	p.AddAccount(account)
+
+	expectedMarginChange := ((100 - 90) * 0.1) - (0.0004 * 90 * 0.1)
+	expectedElr := math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
+	elr, o := p.GetELROnMarketBuy("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, 90, 0.1, 1000)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	// Match on bid of 2, queue of 1, match of 1
+	expectedMarginChange = ((100 - 90) * 1) - (0.0002 * 90 * 1)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
+
+	elr, o = p.GetELROnLimitBid("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 1000)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
+	o.Quantity = 1.
+	_, rej := account.NewOrder(&models.Order{
+		OrderID:       "buy1",
+		ClientOrderID: "buy1",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "XBTUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Buy,
+		TimeInForce:    models.Session,
+		LeavesQuantity: o.Quantity,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: o.Price},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	account.UpdateBidOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "buy1", 1)
+	// Try with same time to test value cache consistency
+	elr = p.ExpectedLogReturn(model, 10)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	// Try with different time
+	elr = p.ExpectedLogReturn(model, 11)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	elr = p.GetELROnCancelBid("1", BTCUSDT_PERP_SEC.SecurityID, "buy1", model, 11)
+	if math.Abs(elr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", 0., elr)
+	}
+
+	account.CancelOrder("buy1")
+	_, err = account.ConfirmCancelOrder("buy1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedElr = 0.
+	elr = p.ExpectedLogReturn(model, 11)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+	elr = p.ExpectedLogReturn(model, 10)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	// SHORT
+
+	// ETHUSD Short
+	expectedMarginChange = ((110 - 100) * 1) - (0.0004 * 110 * 1)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
+	elr, o = p.GetELROnMarketSell("1", BTCUSDT_PERP_SEC.SecurityID, model, 11, 110, 1, 1000)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	expectedMarginChange = ((110 - 100) * 1) - (0.0002 * 110 * 1)
+	expectedElr = math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
+	elr, o = p.GetELROnLimitAsk("1", BTCUSDT_PERP_SEC.SecurityID, model, 11, []float64{110}, []float64{1}, 1000)
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	o.Quantity = math.Round(o.Quantity)
+
+	// Add a sell order. Using o.quantity allows us to check if the returned order's quantity is correct too
+	_, rej = account.NewOrder(&models.Order{
+		OrderID:       "sell2",
+		ClientOrderID: "sell2",
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
+			Exchange:   &constants.BITMEX,
+			Symbol:     &types.StringValue{Value: "ETHUSD"},
+		},
+		OrderStatus:    models.PendingNew,
+		OrderType:      models.Limit,
+		Side:           models.Sell,
+		TimeInForce:    models.Session,
+		LeavesQuantity: o.Quantity,
+		CumQuantity:    0,
+		Price:          &types.DoubleValue{Value: o.Price},
+	})
+	if rej != nil {
+		t.Fatalf(rej.String())
+	}
+	_, err = account.ConfirmNewOrder("sell2", "sell2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	account.UpdateAskOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "sell2", 1)
+
+	elr = p.ExpectedLogReturn(model, 10)
+
+	if math.Abs(elr-expectedElr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", expectedElr, elr)
+	}
+
+	elr = p.GetELROnCancelAsk("1", BTCUSDT_PERP_SEC.SecurityID, "sell2", model, 10)
+	if math.Abs(elr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", 0., elr)
+	}
+
+	account.CancelOrder("sell2")
+	if _, err := account.ConfirmCancelOrder("sell2"); err != nil {
+		t.Fatal(err)
+	}
+	elr = p.ExpectedLogReturn(model, 10)
+	if math.Abs(elr) > 0.000001 {
+		t.Fatalf("was expecting %f got %f", 0., elr)
+	}
+}
