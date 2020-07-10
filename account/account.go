@@ -190,7 +190,7 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		res := messages.IncorrectQuantity
 		return nil, &res
 	}
-	rawCumQty := int64(order.CumQuantity * lotPrecision)
+	rawCumQty := int64(math.Round(order.CumQuantity * lotPrecision))
 	if rawCumQty > 0 {
 		res := messages.IncorrectQuantity
 		return nil, &res
@@ -507,12 +507,13 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
-	rawFillQuantity := int64(quantity * lotPrecision)
-	rawLeavesQuantity := int64(order.LeavesQuantity * lotPrecision)
+	//fmt.Println("FILL", price, quantity, lotPrecision)
+	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
+	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {
 		return nil, fmt.Errorf("fill bigger than order leaves quantity %d %d", rawFillQuantity, rawLeavesQuantity)
 	}
-	rawCumQuantity := int64(order.CumQuantity * lotPrecision)
+	rawCumQuantity := int64(math.Round(order.CumQuantity * lotPrecision))
 	leavesQuantity := float64(rawLeavesQuantity-rawFillQuantity) / lotPrecision
 	order.LeavesQuantity = leavesQuantity
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
@@ -567,12 +568,15 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		marginSec := sec.(*MarginSecurity)
 		pos := accnt.positions[marginSec.SecurityID]
 		// Margin
+		//fmt.Println("MARGIN POS", float64(pos.cost) / accnt.MarginPrecision, float64(pos.rawSize) / accnt.MarginPrecision)
 		var fee, cost int64
 		if order.Side == models.Buy {
 			fee, cost = pos.Buy(price, quantity, taker)
 		} else {
 			fee, cost = pos.Sell(price, quantity, taker)
 		}
+		//fmt.Println("MARGIN POS", float64(pos.cost) / accnt.MarginPrecision, float64(pos.rawSize) / accnt.MarginPrecision)
+
 		accnt.margin -= fee
 		accnt.margin -= cost
 		er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.MarginPrecision}
