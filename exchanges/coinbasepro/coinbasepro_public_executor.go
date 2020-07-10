@@ -214,7 +214,7 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 		return nil
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.SubscriptionNotSupported
+		response.RejectionReason = messages.UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}

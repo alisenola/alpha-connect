@@ -211,7 +211,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 	state.securities = filteredSecurities
 
-	fmt.Println("GOT SECURITIES")
 	// Then fetch balances
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
@@ -230,10 +229,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
-	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
-	}
-	fmt.Println("GOT BALANCE")
 	// Then fetch positions
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -271,9 +266,17 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
-	btcMargin := balanceList.Balances[0].Quantity
+	tetherMargin := 0.
+	var filteredBalances []*models.Balance
+	for _, b := range balanceList.Balances {
+		if b.Asset.ID == constants.TETHER.ID {
+			tetherMargin = b.Quantity
+		} else {
+			filteredBalances = append(filteredBalances, b)
+		}
+	}
 	// Sync account
-	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, nil, btcMargin, nil, nil); err != nil {
+	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, filteredBalances, tetherMargin, nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -379,9 +382,11 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingNew {
+				fmt.Println("PENDING NEW SENDING")
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
 					if err != nil {
+						fmt.Println("REJECTING")
 						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
 						if err != nil {
 							panic(err)
@@ -409,6 +414,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 							context.Send(context.Parent(), nReport)
 						}
 					} else {
+						fmt.Println("REJECTING", response.RejectionReason.String())
 						nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
@@ -543,180 +549,12 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 }
 
 func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
-	req := context.Message().(*messages.OrderReplaceRequest)
-	var ID string
-	if req.Update.OrigClientOrderID != nil {
-		ID = req.Update.OrigClientOrderID.Value
-	} else if req.Update.OrderID != nil {
-		ID = req.Update.OrderID.Value
-	}
-	report, res := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
-	if res != nil {
-		context.Respond(&messages.OrderReplaceResponse{
-			RequestID:       req.RequestID,
-			RejectionReason: *res,
-		})
-	} else {
-		context.Respond(&messages.OrderReplaceResponse{
-			RequestID: req.RequestID,
-			Success:   true,
-		})
-		if report != nil {
-			report.SeqNum = state.seqNum + 1
-			state.seqNum += 1
-			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingReplace {
-				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
-					if err != nil {
-						report, err := state.account.RejectReplaceOrder(ID, messages.Other)
-						if err != nil {
-							panic(err)
-						}
-						context.Respond(&messages.OrderReplaceResponse{
-							RequestID:       req.RequestID,
-							Success:         false,
-							RejectionReason: messages.Other,
-						})
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-						return
-					}
-					response := res.(*messages.OrderReplaceResponse)
-					context.Respond(response)
-
-					if response.Success {
-						// TODO for now let the WS do the job
-						/*
-							report, err := state.account.ConfirmReplaceOrder(ID)
-							if err != nil {
-								panic(err)
-							}
-							if report != nil {
-								report.SeqNum = state.seqNum + 1
-								state.seqNum += 1
-								context.Send(context.Parent(), report)
-							}
-						*/
-					} else {
-						report, err := state.account.RejectReplaceOrder(ID, response.RejectionReason)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-					}
-				})
-			}
-		}
-	}
-
+	// TODO
 	return nil
 }
 
 func (state *AccountListener) OnBulkOrderReplaceRequest(context actor.Context) error {
-	req := context.Message().(*messages.OrderBulkReplaceRequest)
-	var reports []*messages.ExecutionReport
-	for _, u := range req.Updates {
-		var ID string
-		if u.OrigClientOrderID != nil {
-			ID = u.OrigClientOrderID.Value
-		} else if u.OrderID != nil {
-			ID = u.OrderID.Value
-		}
-		report, res := state.account.ReplaceOrder(ID, u.Price, u.Quantity)
-		if res != nil {
-			// Reject all cancel order up until now
-			for _, r := range reports {
-				_, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
-				if err != nil {
-					return err
-				}
-			}
-
-			context.Respond(&messages.OrderBulkReplaceResponse{
-				RequestID:       req.RequestID,
-				Success:         false,
-				RejectionReason: *res,
-			})
-
-			return nil
-		} else if report != nil {
-			reports = append(reports, report)
-		}
-	}
-
-	context.Respond(&messages.OrderBulkReplaceResponse{
-		RequestID: req.RequestID,
-		Success:   true,
-	})
-
-	for _, report := range reports {
-		report.SeqNum = state.seqNum + 1
-		state.seqNum += 1
-		context.Send(context.Parent(), report)
-	}
-	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-	context.AwaitFuture(fut, func(res interface{}, err error) {
-		if err != nil {
-			for _, r := range reports {
-				report, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
-				if err != nil {
-					panic(err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-			}
-			context.Respond(&messages.OrderBulkReplaceResponse{
-				RequestID:       req.RequestID,
-				Success:         false,
-				RejectionReason: messages.Other,
-			})
-
-			return
-		}
-		response := res.(*messages.OrderBulkReplaceResponse)
-		context.Respond(response)
-
-		if response.Success {
-			// TODO for now let the WS do the job
-			/*
-				for _, r := range reports {
-					report, err := state.account.ConfirmReplaceOrder(r.ClientOrderID.Value)
-					if err != nil {
-						panic(err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
-				}
-			*/
-		} else {
-			for _, r := range reports {
-				report, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
-				if err != nil {
-					panic(err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-			}
-		}
-	})
-
+	//TODO
 	return nil
 }
 
@@ -832,6 +670,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		state.seqNum += 1
 		context.Send(context.Parent(), report)
 	}
+	fmt.Println("REQUESTING AMSS CANCEL FUTURE")
 	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
@@ -856,21 +695,6 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		}
 		response := res.(*messages.OrderMassCancelResponse)
 		context.Respond(response)
-
-		/*
-			if response.Success {
-				for _, r := range reports {
-					report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
-					if err != nil {
-						panic(err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
-				}
-		*/
 		if !response.Success {
 			for _, r := range reports {
 				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
@@ -897,6 +721,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 	}
 	switch msg.Message.Event {
 	case fbinance.ORDER_TRADE_UPDATE:
+		fmt.Println("EXECUTION", msg.Message.Execution)
 		if msg.Message.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
@@ -927,6 +752,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 			}
 		}
 	case fbinance.ACCOUNT_UPDATE:
+		fmt.Println("ACCOUNT UPDATE", msg.Message.Account)
 
 	case fbinance.MARGIN_CALL:
 		// TODO

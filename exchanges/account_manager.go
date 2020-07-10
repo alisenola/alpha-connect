@@ -144,6 +144,7 @@ func (state *AccountManager) OnOrderStatusRequest(context actor.Context) error {
 		context.Watch(request.Subscriber)
 	}
 
+	fmt.Println("FORWARDING ORDER STATUS REQUEST")
 	context.Forward(state.listener)
 
 	return nil

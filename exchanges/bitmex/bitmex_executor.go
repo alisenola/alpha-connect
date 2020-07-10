@@ -585,7 +585,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
-func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
+func buildPostOrderRequest(order *messages.NewOrder) (bitmex.PostOrderRequest, *messages.RejectionReason) {
 	request := bitmex.NewPostOrderRequest(order.Instrument.Symbol.Value)
 
 	request.SetOrderQty(order.Quantity)
@@ -614,7 +614,8 @@ func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
 	case models.MarketIfTouched:
 		request.SetOrderType(bitmex.MARKET_IF_TOUCHED)
 	default:
-		request.SetOrderType(bitmex.LIMIT)
+		rej := messages.UnsupportedOrderType
+		return nil, &rej
 	}
 
 	switch order.TimeInForce {
@@ -627,7 +628,8 @@ func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
 	case models.FillOrKill:
 		request.SetTimeInForce(bitmex.FILL_OR_KILL)
 	default:
-		request.SetTimeInForce(bitmex.TIF_DAY)
+		rej := messages.UnsupportedOrderTimeInForce
+		return nil, &rej
 	}
 
 	if order.Price != nil {
@@ -642,7 +644,7 @@ func buildPostOrderRequest(order *messages.NewOrder) bitmex.PostOrderRequest {
 		}
 	}
 
-	return request
+	return request, nil
 }
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
@@ -658,7 +660,12 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	params := buildPostOrderRequest(req.Order)
+	params, rej := buildPostOrderRequest(req.Order)
+	if rej != nil {
+		response.RejectionReason = *rej
+		context.Respond(response)
+		return nil
+	}
 
 	request, weight, err := bitmex.PostOrder(req.Account.Credentials, params)
 	if err != nil {
@@ -744,7 +751,13 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 			response.RejectionReason = messages.DifferentSymbols
 			return nil
 		}
-		params = append(params, buildPostOrderRequest(order))
+		param, rej := buildPostOrderRequest(order)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Respond(response)
+			return nil
+		}
+		params = append(params, param)
 	}
 	request, weight, err := bitmex.PostBulkOrder(req.Account.Credentials, params)
 	if err != nil {

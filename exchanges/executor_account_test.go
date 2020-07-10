@@ -173,7 +173,7 @@ func TestBitmexAccount(t *testing.T) {
 
 	exchanges := []*xchangerModels.Exchange{&constants.BITMEX}
 	accounts := []*account.Account{NewAccount(accnt)}
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, accounts)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, accounts, false)), "executor")
 
 	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(accnt, instrument)))
 	time.Sleep(5 * time.Second)

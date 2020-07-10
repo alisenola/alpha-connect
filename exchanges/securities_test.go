@@ -29,7 +29,7 @@ func TestSecurities(t *testing.T) {
 		&constants.HUOBI,
 		&constants.FTX,
 	}
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

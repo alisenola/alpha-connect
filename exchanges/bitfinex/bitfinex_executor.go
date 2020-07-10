@@ -209,7 +209,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.SubscriptionNotSupported
+		response.RejectionReason = messages.UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}

@@ -35,8 +35,7 @@ func NewAccount(accountInfo *models.Account) *account.Account {
 		Portfolio.AddAccount(accnt)
 		return accnt
 	case constants.FBINANCE.ID:
-		// TODO correct margin precision
-		accnt := account.NewAccount(accountInfo, &constants.TETHER, 1./0.00000001)
+		accnt := account.NewAccount(accountInfo, &constants.TETHER, 100000000)
 		Portfolio.AddAccount(accnt)
 		return accnt
 	default:

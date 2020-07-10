@@ -102,12 +102,14 @@ enum RejectionReason {
     ExchangeAPIError = 13;
     InvalidOrder = 14;
     RateLimitExceeded = 15;
-    SubscriptionNotSupported = 16;
+    UnsupportedSubscription = 16;
     MissingInstrument = 17;
     HTTPError = 18;
     NonReplaceableOrder = 19;
     NonCancelableOrder = 20;
-    FilterNotSupported = 21;
+    UnsupportedFilter = 21;
+    UnsupportedOrderType = 22;
+    UnsupportedOrderTimeInForce = 23;
 }
 
 enum FeeType {

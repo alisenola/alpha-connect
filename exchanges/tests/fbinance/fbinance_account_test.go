@@ -1,6 +1,7 @@
 package fbinance
 
 import (
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
@@ -120,19 +121,19 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 		t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
 	}
 
+	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   testAccountInfo,
 		Order: &messages.NewOrder{
-			ClientOrderID:         uuid.NewV1().String(),
-			Instrument:            instrument,
-			OrderType:             models.Limit,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ParticipateDoNotInitiate},
-			OrderSide:             models.Buy,
-			TimeInForce:           models.Session,
-			Quantity:              1.,
-			Price:                 &types.DoubleValue{Value: 100.},
+			ClientOrderID: orderID,
+			Instrument:    instrument,
+			OrderType:     models.Limit,
+			OrderSide:     models.Buy,
+			TimeInForce:   models.GoodTillCancel,
+			Quantity:      1.,
+			Price:         &types.DoubleValue{Value: 100.},
 		},
 	}, 10*time.Second).Result()
 
@@ -189,8 +190,8 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	if order.OrderType != models.Limit {
 		t.Fatalf("was expecting limit order type")
 	}
-	if order.TimeInForce != models.Session {
-		t.Fatalf("was expecting session time in force")
+	if order.TimeInForce != models.GoodTillCancel {
+		t.Fatalf("was expecting GoodTillCancel time in force")
 	}
 	if order.Side != models.Buy {
 		t.Fatalf("was expecting buy side order")
@@ -216,7 +217,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Query order and check if got canceled
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
@@ -307,7 +308,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 			Instrument:    instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			TimeInForce:   models.GoodTillCancel,
 			Quantity:      1.,
 			Price:         &types.DoubleValue{Value: 100.},
 		},
@@ -415,7 +416,7 @@ func checkBalances(t *testing.T) {
 }
 
 func checkPositions(t *testing.T, instrument *models.Instrument) {
-	// Request the same from bitmex directly
+	// Request the same from fbinance directly
 
 	res, err := actor.EmptyRootContext.RequestFuture(fbinanceExecutor, &messages.PositionsRequest{
 		RequestID:  0,
@@ -474,14 +475,14 @@ func checkPositions(t *testing.T, instrument *models.Instrument) {
 func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	// Market buy 1 contract
+	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: testAccountInfo,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: orderID,
 			Instrument:    instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
 			Quantity:      2.,
 		},
 	}, 10*time.Second).Result()
@@ -494,7 +495,7 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 		t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	checkPositions(t, instrument)
 	checkBalances(t)
@@ -515,7 +516,7 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	checkPositions(t, instrument)
 	checkBalances(t)

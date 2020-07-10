@@ -196,7 +196,7 @@ func TestBinance(t *testing.T) {
 		9281941173829172773, //BTCUSDT
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -273,7 +273,7 @@ func TestBitfinex(t *testing.T) {
 		17873758715870285590, //BTCUSDT
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -350,7 +350,7 @@ func TestBitmex(t *testing.T) {
 		5391998915988476130, //XBTUSD
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -427,7 +427,7 @@ func TestBitstamp(t *testing.T) {
 		5279696656781449381,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -504,7 +504,7 @@ func TestBitz(t *testing.T) {
 		243278890145991530,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -581,7 +581,7 @@ func TestCoinbasePro(t *testing.T) {
 		11630614572540763252,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -658,7 +658,7 @@ func TestCryptofacilities(t *testing.T) {
 		1416768858288349990,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -737,7 +737,7 @@ func TestFBinance(t *testing.T) {
 		5485975358912730733,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -816,7 +816,7 @@ func TestFTX(t *testing.T) {
 		4425198260936995601,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -901,7 +901,7 @@ func TestHuobi(t *testing.T) {
 		2195469462990134438,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -980,7 +980,7 @@ func TestGemini(t *testing.T) {
 		17496373742670049989,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1059,7 +1059,7 @@ func TestHitbtc(t *testing.T) {
 		12674447834540883135,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1138,7 +1138,7 @@ func TestKraken(t *testing.T) {
 		10955098577666557860,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1217,7 +1217,7 @@ func TestOKCoin(t *testing.T) {
 		16235745264492357730,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil)), "executor")
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
