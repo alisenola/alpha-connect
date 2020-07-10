@@ -47,8 +47,8 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 			closedSize = -pos.rawSize
 		}
 
-		contractMarginValue := -pos.rawSize * rawPrice
-		closedMarginValue := closedSize * rawPrice
+		contractMarginValue := int64(math.Round(float64(-pos.rawSize*rawPrice) / pos.lotPrecision))
+		closedMarginValue := int64(math.Round(float64(closedSize*rawPrice) / pos.lotPrecision))
 
 		unrealizedCost := pos.cost + contractMarginValue
 		realizedCost = int64(math.Round(float64(closedSize*unrealizedCost) / float64(-pos.rawSize)))
@@ -66,8 +66,7 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 		// math.Ceil doesn't work: -21581.95 -> -21581 but should have been -21582
 		// math.Round doesn't work: -21561.017 -> -21561 but should have been -21562
 		// math.Floor doesn't work: -21522.73 -> -21523 but should have been -21522
-		// TODO lot precision
-		openedMarginValue := rawFillQuantity * rawPrice
+		openedMarginValue := int64(math.Round(float64(rawFillQuantity*rawPrice) / pos.lotPrecision))
 		pos.cost += openedMarginValue
 		pos.rawSize += rawFillQuantity
 	}
@@ -98,8 +97,8 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 			closedSize = pos.rawSize
 		}
 		// math.Floor doesn't work
-		closedMarginValue := closedSize * rawPrice
-		contractMarginValue := pos.rawSize * rawPrice
+		closedMarginValue := int64(math.Round(float64(closedSize*rawPrice) / pos.lotPrecision))    //closedSize * rawPrice
+		contractMarginValue := int64(math.Round(float64(pos.rawSize*rawPrice) / pos.lotPrecision)) //pos.rawSize * rawPrice
 
 		unrealizedCost := pos.cost - contractMarginValue
 		realizedCost = int64(math.Round(float64(closedSize*unrealizedCost) / float64(pos.rawSize)))
@@ -113,7 +112,7 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 	}
 	if rawFillQuantity > 0 {
 		// We are opening a position
-		openedMarginValue := rawFillQuantity * rawPrice
+		openedMarginValue := int64(math.Round(float64(rawFillQuantity*rawPrice) / pos.lotPrecision))
 		pos.cost -= openedMarginValue
 		pos.rawSize -= rawFillQuantity
 	}
