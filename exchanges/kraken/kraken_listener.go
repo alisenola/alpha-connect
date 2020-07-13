@@ -331,7 +331,6 @@ func (state *Listener) readSocket(context actor.Context) error {
 
 			if state.instrumentData.orderBook.Crossed() {
 				state.logger.Info("crossed order book")
-
 				// Stop the socket, we will restart instrument at the end
 				if err := state.obWs.Disconnect(); err != nil {
 					state.logger.Info("error disconnecting from socket", log.Error(err))

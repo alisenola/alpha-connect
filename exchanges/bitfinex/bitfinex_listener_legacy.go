@@ -1,20 +1,6 @@
 package bitfinex
 
-import (
-	"container/list"
-	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alphac/models"
-	"gitlab.com/alphaticks/alphac/models/messages"
-	"gitlab.com/alphaticks/alphac/utils"
-	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
-	"math"
-	"reflect"
-	"time"
-)
-
+/*
 type readSocket struct{}
 type postAggTrade struct{}
 
@@ -26,13 +12,14 @@ type OBL2Request struct {
 type InstrumentData struct {
 	tickPrecision  uint64
 	lotPrecision   uint64
-	orderBook      *gorderbook.OrderBookL2
+	orderBook      *gorderbook.OrderBookL3
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
 	lastSequence   uint64
 	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
+	obDelta        *models.OBL2Update
 }
 
 // OBType: OBL3
@@ -175,7 +162,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	err := ws.SubscribeDepth(
 		state.security.Symbol,
-		bitfinex.WSDepthPrecisionP0,
+		bitfinex.WSDepthPrecisionR0,
 		bitfinex.WSDepthFrequency0,
 		bitfinex.WSDepthLength100)
 	if err != nil {
@@ -193,14 +180,14 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
-	snapshot, ok := ws.Msg.Message.(bitfinex.WSSpotDepthSnapshot)
+	snapshot, ok := ws.Msg.Message.(bitfinex.WSSpotDepthL3Snapshot)
 	if !ok {
 		return fmt.Errorf("was expecting WSSpotDepthL3Snapshot, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
 	state.instrumentData.lastSequence = snapshot.Sequence
 
-	bids, asks := snapshot.ToBidAsk(state.instrumentData.tickPrecision, state.instrumentData.lotPrecision)
+	bids, asks := snapshot.ToRawBidAsk(state.instrumentData.tickPrecision, state.instrumentData.lotPrecision)
 	bestAsk := float64(asks[0].Price) / float64(state.instrumentData.tickPrecision)
 	//Allow a 10% price variation
 	depth := int(((bestAsk * 1.1) - bestAsk) * float64(state.instrumentData.tickPrecision))
@@ -208,7 +195,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		depth = 10000
 	}
 
-	ob := gorderbook.NewOrderBookL2(
+	ob := gorderbook.NewOrderBookL3(
 		state.instrumentData.tickPrecision,
 		state.instrumentData.lotPrecision,
 		depth,
@@ -293,40 +280,151 @@ func (state *Listener) readSocket(context actor.Context) error {
 			})
 			state.instrumentData.seqNum += 1
 
-		case bitfinex.WSSpotDepthData:
-			obData := msg.Message.(bitfinex.WSSpotDepthData)
+		case bitfinex.WSSpotDepthL3Data:
+			obData := msg.Message.(bitfinex.WSSpotDepthL3Data)
 
 			state.instrumentData.lastSequence = obData.Sequence
 
-			level := obData.Depth.ToOrderBookLevel()
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-			obDelta := &models.OBL2Update{
-				Levels:    []gorderbook.OrderBookLevel{level},
-				Timestamp: utils.MilliToTimestamp(ts),
-				Trade:     false,
-			}
-			if state.instrumentData.orderBook.Crossed() {
-				state.logger.Info("crossed order book")
-				fmt.Println(state.instrumentData.orderBook, level, obData.Depth)
+			order := obData.Depth.ToRawOrder(state.instrumentData.tickPrecision, state.instrumentData.lotPrecision)
 
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
+			if state.instrumentData.obDelta == nil {
+				ts := uint64(msg.Time.UnixNano() / 1000000)
+				state.instrumentData.obDelta = &models.OBL2Update{
+					Levels:    []gorderbook.OrderBookLevel{},
+					Timestamp: utils.MilliToTimestamp(ts),
+					Trade:     false,
 				}
-				break
 			}
 
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				UpdateL2: obDelta,
-				SeqNum:   state.instrumentData.seqNum + 1,
-			})
-			state.instrumentData.seqNum += 1
-			state.instrumentData.lastUpdateTime = utils.TimestampToMilli(obDelta.Timestamp)
-			//fmt.Println(state.instrumentData.orderBook)
+			if order.Price == 0 {
+				// Delete order
+				if state.instrumentData.orderBook.HasOrder(order.ID) {
+					//fmt.Println(context.Self().Id, "deleted", obData.Depth)
+					obOrder := state.instrumentData.orderBook.GetOrder(order.ID)
+					state.instrumentData.orderBook.DeleteOrder(order.ID)
+
+					var quantity float64
+					if order.Bid {
+						quantity = state.instrumentData.orderBook.GetBid(obOrder.Price)
+					} else {
+						quantity = state.instrumentData.orderBook.GetAsk(obOrder.Price)
+					}
+					levelDelta := gorderbook.OrderBookLevel{
+						Price:    obOrder.Price,
+						Quantity: quantity,
+						Bid:      order.Bid,
+					}
+					state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, levelDelta)
+				}
+				// Only check for crossed on delete
+				if state.instrumentData.orderBook.Crossed() {
+					state.logger.Info("crossed order book")
+					// Stop the socket, we will restart instrument at the end
+					if err := state.obWs.Disconnect(); err != nil {
+						state.logger.Info("error disconnecting from socket", log.Error(err))
+					}
+					break
+				}
+			} else {
+				// TODO aggregate update order while crossed
+
+				if state.instrumentData.orderBook.HasOrder(order.ID) {
+					// Update order
+
+					//fmt.Println(context.Self().Id, "updated", obData.Depth)
+
+					lastRawOrder := state.instrumentData.orderBook.GetRawOrder(order.ID)
+					state.instrumentData.orderBook.UpdateRawOrder(order)
+					rawOrder := state.instrumentData.orderBook.GetRawOrder(order.ID)
+
+					if lastRawOrder.Price == rawOrder.Price {
+						var levelDelta gorderbook.OrderBookLevel
+						price := float64(rawOrder.Price) / float64(state.instrumentData.orderBook.TickPrecision)
+						if rawOrder.Bid {
+							levelDelta = gorderbook.OrderBookLevel{
+								Price:    price,
+								Quantity: state.instrumentData.orderBook.GetBid(price),
+								Bid:      true,
+							}
+						} else {
+							levelDelta = gorderbook.OrderBookLevel{
+								Price:    price,
+								Quantity: state.instrumentData.orderBook.GetAsk(price),
+								Bid:      false,
+							}
+						}
+
+						if rawOrder.Quantity != lastRawOrder.Quantity {
+							state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, levelDelta)
+						}
+					} else {
+						price := float64(lastRawOrder.Price) / float64(state.instrumentData.orderBook.TickPrecision)
+						var quantity float64
+						if lastRawOrder.Bid {
+							quantity = state.instrumentData.orderBook.GetBid(price)
+						} else {
+							quantity = state.instrumentData.orderBook.GetAsk(price)
+						}
+						oldLevelDelta := gorderbook.OrderBookLevel{
+							Price:    price,
+							Quantity: quantity,
+							Bid:      lastRawOrder.Bid,
+						}
+						state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, oldLevelDelta)
+
+						price = float64(rawOrder.Price) / float64(state.instrumentData.orderBook.TickPrecision)
+						if order.Bid {
+							quantity = state.instrumentData.orderBook.GetBid(price)
+						} else {
+							quantity = state.instrumentData.orderBook.GetAsk(price)
+						}
+						newLevelDelta := gorderbook.OrderBookLevel{
+							Price:    price,
+							Quantity: quantity,
+							Bid:      rawOrder.Bid,
+						}
+						state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, newLevelDelta)
+					}
+				} else {
+					// Created
+					//fmt.Println(context.Self().Id, "created", obData.Depth)
+					state.instrumentData.orderBook.AddRawOrder(order)
+					order := state.instrumentData.orderBook.GetOrder(order.ID)
+					var quantity float64
+					if order.Bid {
+						quantity = state.instrumentData.orderBook.GetBid(order.Price)
+					} else {
+						quantity = state.instrumentData.orderBook.GetAsk(order.Price)
+					}
+					levelDelta := gorderbook.OrderBookLevel{
+						Price:    order.Price,
+						Quantity: quantity,
+						Bid:      order.Bid,
+					}
+					state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, levelDelta)
+				}
+			}
+
+			// only publish if not crossed
+			if !state.instrumentData.orderBook.Crossed() {
+				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+					UpdateL2: state.instrumentData.obDelta,
+					SeqNum:   state.instrumentData.seqNum + 1,
+				})
+				state.instrumentData.seqNum += 1
+				state.instrumentData.lastUpdateTime = utils.TimestampToMilli(state.instrumentData.obDelta.Timestamp)
+				state.instrumentData.obDelta = nil
+			} else {
+				fmt.Println("BITFINEX CROSSED")
+			}
+
+			//fmt.Println(state.instruments[obData.Symbol].orderBook)
 
 		case bitfinex.WSSpotTrade:
+			// TODO problem with update
 			tradeData := msg.Message.(bitfinex.WSSpotTrade)
 			ts := uint64(msg.Time.UnixNano() / 1000000)
+
 
 			state.instrumentData.lastSequence = tradeData.Sequence
 
@@ -379,10 +477,13 @@ func (state *Listener) readSocket(context actor.Context) error {
 
 		case bitfinex.WSSpotTradeSnapshot:
 			tradeData := msg.Message.(bitfinex.WSSpotTradeSnapshot)
+
+
 			state.instrumentData.lastSequence = tradeData.Sequence
 
 		case bitfinex.WSSpotTradeU:
 			tradeData := msg.Message.(bitfinex.WSSpotTradeU)
+
 			state.instrumentData.lastSequence = tradeData.Sequence
 
 		case bitfinex.WSSubscribeSpotTradesResponse:
@@ -465,3 +566,4 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		}
 	}
 }
+*/
