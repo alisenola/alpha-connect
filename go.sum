@@ -1278,6 +1278,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200708204125-49a0346876ed h1:3ct3zmoV5QV
 gitlab.com/alphaticks/xchanger v0.0.0-20200708204125-49a0346876ed/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200709084526-519dc26017d7 h1:WM1/rnaJ3nF3wLXFHY2GxJ6J83LknTk8fn3XKzZlDbQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200709084526-519dc26017d7/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20200713211624-9ed3fa6959f7 h1:FhUeofsTRVYXxghkoYtpqJooPo/DItvB97jg9i+nfoM=
+gitlab.com/alphaticks/xchanger v0.0.0-20200713211624-9ed3fa6959f7/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/tachikoma.ai/tickpred v0.0.0-20200710184839-b7106d6c9d63 h1:zJdzmQSVihbWrrao9B9XyXnZuFVM+JV0zbNEfP10wpQ=
 gitlab.com/tachikoma.ai/tickpred v0.0.0-20200710184839-b7106d6c9d63/go.mod h1:BlWDTBMj1KLqzQdZ2uN2tHSW2fRbknSna1QBKV5V8Kg=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200330122509-3e19a6a55d22/go.mod h1:JKx9FbhKUtIXoK6KICP2sCm4rbxjpGzPCv6RnfM9WCg=
