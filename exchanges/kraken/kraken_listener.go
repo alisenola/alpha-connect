@@ -24,6 +24,8 @@ type OBL2Request struct {
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
+	obDelta        *models.OBL2Update
+	nCrossed       int
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
@@ -123,6 +125,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
 		lastAggTradeTs: 0,
+		obDelta:        nil,
+		nCrossed:       0,
 	}
 
 	if err := state.subscribeOrderBook(context); err != nil {
@@ -223,6 +227,8 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.obDelta = nil
+	state.instrumentData.nCrossed = 0
 	state.obWs = ws
 
 	go func(ws *kraken.Websocket) {
@@ -300,10 +306,13 @@ func (state *Listener) readSocket(context actor.Context) error {
 			instr := state.instrumentData
 
 			ts := uint64(msg.Time.UnixNano() / 1000000)
-			obDelta := &models.OBL2Update{
-				Levels:    make([]gorderbook.OrderBookLevel, nLevels, nLevels),
-				Timestamp: utils.MilliToTimestamp(ts),
-				Trade:     false,
+
+			if state.instrumentData.obDelta == nil {
+				state.instrumentData.obDelta = &models.OBL2Update{
+					Levels:    []gorderbook.OrderBookLevel{},
+					Timestamp: utils.MilliToTimestamp(ts),
+					Trade:     false,
+				}
 			}
 
 			lvlIdx := 0
@@ -313,9 +322,9 @@ func (state *Listener) readSocket(context actor.Context) error {
 					Quantity: bid.Amount,
 					Bid:      true,
 				}
-				obDelta.Levels[lvlIdx] = level
 				lvlIdx += 1
 				instr.orderBook.UpdateOrderBookLevel(level)
+				state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, level)
 			}
 
 			for _, ask := range obData.Asks {
@@ -324,28 +333,30 @@ func (state *Listener) readSocket(context actor.Context) error {
 					Quantity: ask.Amount,
 					Bid:      false,
 				}
-				obDelta.Levels[lvlIdx] = level
 				lvlIdx += 1
 				instr.orderBook.UpdateOrderBookLevel(level)
+				state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, level)
 			}
 
 			if state.instrumentData.orderBook.Crossed() {
-				state.logger.Info("crossed order book")
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
+				state.instrumentData.nCrossed += 1
+				fmt.Println(state.instrumentData.nCrossed)
+				if state.instrumentData.nCrossed > 5 {
+					// Stop the socket, we will restart instrument at the end
+					if err := state.obWs.Disconnect(); err != nil {
+						state.logger.Info("error disconnecting from socket", log.Error(err))
+					}
+					break
 				}
-				break
+			} else {
+				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+					UpdateL2: state.instrumentData.obDelta,
+					SeqNum:   state.instrumentData.seqNum + 1,
+				})
+				state.instrumentData.seqNum += 1
+				state.instrumentData.lastUpdateTime = utils.TimestampToMilli(state.instrumentData.obDelta.Timestamp)
+				state.instrumentData.obDelta = nil
 			}
-
-			instr.lastUpdateTime = ts
-
-			// Send OBData
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				UpdateL2: obDelta,
-				SeqNum:   state.instrumentData.seqNum + 1,
-			})
-			state.instrumentData.seqNum += 1
 
 		case kraken.WSTradeUpdate:
 			tradeUpdate := msg.Message.(kraken.WSTradeUpdate)

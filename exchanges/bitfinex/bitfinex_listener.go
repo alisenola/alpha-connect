@@ -27,6 +27,8 @@ type InstrumentData struct {
 	tickPrecision  uint64
 	lotPrecision   uint64
 	orderBook      *gorderbook.OrderBookL2
+	obDelta        *models.OBL2Update
+	nCrossed       int
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
@@ -135,6 +137,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastHBTime:     time.Now(),
 		aggTrade:       nil,
 		lastAggTradeTs: 0,
+		obDelta:        nil,
+		nCrossed:       0,
 	}
 
 	if err := state.subscribeOrderBook(context); err != nil {
@@ -221,6 +225,8 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.obDelta = nil
+	state.instrumentData.nCrossed = 0
 
 	state.obWs = ws
 
@@ -300,29 +306,36 @@ func (state *Listener) readSocket(context actor.Context) error {
 
 			level := obData.Depth.ToOrderBookLevel()
 			ts := uint64(msg.Time.UnixNano() / 1000000)
-			obDelta := &models.OBL2Update{
-				Levels:    []gorderbook.OrderBookLevel{level},
-				Timestamp: utils.MilliToTimestamp(ts),
-				Trade:     false,
-			}
-			if state.instrumentData.orderBook.Crossed() {
-				state.logger.Info("crossed order book")
-				fmt.Println(state.instrumentData.orderBook, level, obData.Depth)
-
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
+			if state.instrumentData.obDelta == nil {
+				state.instrumentData.obDelta = &models.OBL2Update{
+					Levels:    []gorderbook.OrderBookLevel{},
+					Timestamp: utils.MilliToTimestamp(ts),
+					Trade:     false,
 				}
-				break
 			}
 
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				UpdateL2: obDelta,
-				SeqNum:   state.instrumentData.seqNum + 1,
-			})
-			state.instrumentData.seqNum += 1
-			state.instrumentData.lastUpdateTime = utils.TimestampToMilli(obDelta.Timestamp)
-			//fmt.Println(state.instrumentData.orderBook)
+			state.instrumentData.orderBook.UpdateOrderBookLevel(level)
+			state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, level)
+
+			if state.instrumentData.orderBook.Crossed() {
+				state.instrumentData.nCrossed += 1
+				fmt.Println(state.instrumentData.nCrossed)
+				if state.instrumentData.nCrossed > 5 {
+					// Stop the socket, we will restart instrument at the end
+					if err := state.obWs.Disconnect(); err != nil {
+						state.logger.Info("error disconnecting from socket", log.Error(err))
+					}
+					break
+				}
+			} else {
+				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+					UpdateL2: state.instrumentData.obDelta,
+					SeqNum:   state.instrumentData.seqNum + 1,
+				})
+				state.instrumentData.seqNum += 1
+				state.instrumentData.lastUpdateTime = utils.TimestampToMilli(state.instrumentData.obDelta.Timestamp)
+				state.instrumentData.obDelta = nil
+			}
 
 		case bitfinex.WSSpotTrade:
 			tradeData := msg.Message.(bitfinex.WSSpotTrade)
