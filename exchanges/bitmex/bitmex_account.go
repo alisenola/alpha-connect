@@ -28,8 +28,8 @@ type AccountListener struct {
 	logger          *log.Logger
 	lastPingTime    time.Time
 	securities      []*models.Security
-	socketTimer     *time.Timer
-	accountTimer    *time.Timer
+	socketTicker    *time.Ticker
+	accountTicker   *time.Ticker
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -187,12 +187,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
-	socketTimer := time.NewTimer(5 * time.Second)
-	state.socketTimer = socketTimer
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTimer.C:
+			case _ = <-socketTicker.C:
 				fmt.Println("SENDING CHECK SOCKET")
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
@@ -203,12 +203,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	accountTimer := time.NewTimer(20 * time.Second)
-	state.accountTimer = accountTimer
+	accountTicker := time.NewTicker(20 * time.Second)
+	state.accountTicker = accountTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTimer.C:
+			case _ = <-accountTicker.C:
 				fmt.Println("SENDING CHECK ACCOUUNT")
 				context.Send(pid, &checkAccount{})
 			case <-time.After(25 * time.Second):
@@ -304,13 +304,13 @@ func (state *AccountListener) Clean(context actor.Context) error {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
 	}
-	if state.socketTimer != nil {
-		state.socketTimer.Stop()
-		state.socketTimer = nil
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
-	if state.accountTimer != nil {
-		state.accountTimer.Stop()
-		state.accountTimer = nil
+	if state.accountTicker != nil {
+		state.accountTicker.Stop()
+		state.accountTicker = nil
 	}
 
 	return nil
