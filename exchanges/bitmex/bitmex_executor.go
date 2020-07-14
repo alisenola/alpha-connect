@@ -679,8 +679,11 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	state.rateLimit.Request(weight)
+	requestStart := time.Now()
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
+		requestDur := time.Now().Sub(requestStart)
+		state.logger.Info(fmt.Sprintf("post order request done in %v", requestDur))
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
 			context.Respond(response)
