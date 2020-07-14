@@ -203,7 +203,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	accountTicker := time.NewTicker(20 * time.Second)
+	accountTicker := time.NewTicker(10 * time.Minute)
 	state.accountTicker = accountTicker
 	go func(pid *actor.PID) {
 		for {
@@ -211,7 +211,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			case _ = <-accountTicker.C:
 				fmt.Println("SENDING CHECK ACCOUUNT")
 				context.Send(pid, &checkAccount{})
-			case <-time.After(25 * time.Second):
+			case <-time.After(11 * time.Minute):
 				// timer stopped, we leave
 				fmt.Println("CHECK ACCOUNT TIMER STOPPED")
 				return
