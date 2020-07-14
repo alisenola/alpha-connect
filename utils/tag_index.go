@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
-	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/models"
 	"regexp"
 	"sort"
@@ -46,16 +45,9 @@ func NewTagIndex(securities []*models.Security) *TagIndex {
 func (idx *TagIndex) Add(sec *models.Security) bool {
 	idx.Lock()
 	defer idx.Unlock()
-	// Have to change
-	var typ string
-	switch sec.SecurityType {
-	case enum.SecurityType_CRYPTO_SPOT:
-		typ = "SPOT"
-	case enum.SecurityType_CRYPTO_PERP:
-		typ = sec.Exchange.Name + "-" + sec.Symbol
-	}
 	tags := map[string]string{
-		"type":     typ,
+		"ID":       fmt.Sprintf("%d", sec.SecurityID),
+		"type":     sec.SecurityType,
 		"base":     sec.Underlying.Symbol,
 		"quote":    sec.QuoteCurrency.Symbol,
 		"exchange": sec.Exchange.Name,
