@@ -20,16 +20,16 @@ type checkSocket struct{}
 type checkAccount struct{}
 
 type AccountListener struct {
-	account             *account.Account
-	seqNum              uint64
-	bitmexExecutor      *actor.PID
-	ws                  *bitmex.Websocket
-	executorManager     *actor.PID
-	logger              *log.Logger
-	checkAccountPending bool
-	checkSocketPending  bool
-	lastPingTime        time.Time
-	securities          []*models.Security
+	account         *account.Account
+	seqNum          uint64
+	bitmexExecutor  *actor.PID
+	ws              *bitmex.Websocket
+	executorManager *actor.PID
+	logger          *log.Logger
+	lastPingTime    time.Time
+	securities      []*models.Security
+	socketTimer     *time.Timer
+	accountTimer    *time.Timer
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -40,13 +40,11 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 
 func NewAccountListener(account *account.Account) actor.Actor {
 	return &AccountListener{
-		account:             account,
-		seqNum:              0,
-		ws:                  nil,
-		executorManager:     nil,
-		logger:              nil,
-		checkSocketPending:  false,
-		checkAccountPending: false,
+		account:         account,
+		seqNum:          0,
+		ws:              nil,
+		executorManager: nil,
+		logger:          nil,
 	}
 }
 
@@ -137,32 +135,26 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *checkSocket:
-		state.checkSocketPending = false
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		if !state.checkSocketPending {
-			state.checkSocketPending = true
-			go func(pid *actor.PID) {
-				time.Sleep(5 * time.Second)
-				context.Send(pid, &checkSocket{})
-			}(context.Self())
-		}
+		fmt.Println("STARTING CHECK SOCEKT TIMER")
+		go func(pid *actor.PID) {
+			time.Sleep(5 * time.Second)
+			context.Send(pid, &checkSocket{})
+		}(context.Self())
 
 	case *checkAccount:
-		state.checkAccountPending = false
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		if !state.checkAccountPending {
-			state.checkAccountPending = true
-			go func(pid *actor.PID) {
-				time.Sleep(10 * time.Minute)
-				context.Send(pid, &checkAccount{})
-			}(context.Self())
-		}
+		fmt.Println("STARTING CHECK ACCUONT TIMER")
+		go func(pid *actor.PID) {
+			time.Sleep(10 * time.Second)
+			context.Send(pid, &checkAccount{})
+		}(context.Self())
 	}
 }
 
@@ -203,20 +195,38 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
-	if !state.checkSocketPending {
-		go func(pid *actor.PID) {
-			time.Sleep(5 * time.Second)
-			context.Send(pid, &checkSocket{})
-		}(context.Self())
-		state.checkSocketPending = true
-	}
-	if !state.checkAccountPending {
-		go func(pid *actor.PID) {
-			time.Sleep(10 * time.Minute)
-			context.Send(pid, &checkAccount{})
-		}(context.Self())
-		state.checkAccountPending = true
-	}
+	socketTimer := time.NewTimer(5 * time.Second)
+	state.socketTimer = socketTimer
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTimer.C:
+				fmt.Println("SENDING CHECK SOCKET")
+				context.Send(pid, &checkSocket{})
+			case <-time.After(6 * time.Second):
+				fmt.Println("CHECK SOCKET TIMER STOPPED")
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	accountTimer := time.NewTimer(20 * time.Second)
+	state.accountTimer = accountTimer
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTimer.C:
+				fmt.Println("SENDING CHECK ACCOUUNT")
+				context.Send(pid, &checkAccount{})
+			case <-time.After(21 * time.Second):
+				// timer stopped, we leave
+				fmt.Println("CHECK ACCOUNT TIMER STOPPED")
+				return
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -301,6 +311,14 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTimer != nil {
+		state.socketTimer.Stop()
+		state.socketTimer = nil
+	}
+	if state.accountTimer != nil {
+		state.accountTimer.Stop()
+		state.accountTimer = nil
 	}
 
 	return nil
@@ -974,6 +992,58 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 				state.seqNum += 1
 				context.Send(context.Parent(), report)
 			}
+
+		case "Funding":
+			/*
+				{
+				"execID":"d7ba8934-366f-0ddb-31b8-f745db13e01d",
+				"orderID":"00000000-0000-0000-0000-000000000000",
+				"clOrdID":"",
+				"account":1502932,
+				"symbol":"XBTUSD","
+				side":"",
+				"lastQty":169,
+				"lastPx":9268.18,
+				"underlyingLastPx":null,
+				"lastMkt":"XBME",
+				"lastLiquidityInd":"",
+				"simpleOrderQty":null,
+				"orderQty":169,
+				"price":9268.18,
+				"displayQty":null,
+				"stopPx":null,
+				"pegOffsetValue":null,
+				"pegPriceType":"",
+				"currency":"USD",
+				"settlCurrency":"XBt",
+				"execType":"Funding",
+				"ordType":"Limit",
+				"timeInForce":"AtTheClose",
+				"execInst":"",
+				"contingencyType":"",
+				"exDestination":"XBME",
+				"ordStatus":"Filled",
+				"triggered":"",
+				"workingIndicator":false,
+				"ordRejReason":"",
+				"simpleLeavesQty":null,
+				"leavesQty":0,
+				"simpleCumQty":null,
+				"cumQty":169,
+				"avgPx":9268.18,
+				"commission":-0.0001,
+				"tradePublishIndicator":"",
+				"multiLegReportingType":"SingleSecurity",
+				"text":"Funding",
+				"trdMatchID":"5febca48-cb97-a9b3-1532-60e9418eb81d",
+				"execCost":1823510,
+				"execComm":-182,
+				"homeNotional":-0.0182351,
+				"foreignNotional":169,
+				"transactTime":"2020-07-14T20:00:00Z",
+				"timestamp":"2020-07-14T20:00:00.002Z"}
+
+			*/
 		default:
 			return fmt.Errorf("got unknown exec type: %s", data.ExecType)
 		}

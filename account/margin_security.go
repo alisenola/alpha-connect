@@ -731,7 +731,6 @@ func (sec *MarginSecurity) GetELROnLimitAskChange(ID string, model modeling.Mark
 				// Compute ELR with new cost
 				expectedLogReturn += math.Log((values[i] - cost*sampleMarginPrice[i]) / value)
 			}
-
 			expectedLogReturn /= float64(N)
 			if expectedLogReturn > maxExpectedLogReturn {
 				maxExpectedLogReturn = expectedLogReturn
