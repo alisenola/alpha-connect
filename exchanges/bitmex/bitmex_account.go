@@ -135,26 +135,18 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *checkSocket:
+		fmt.Println("CHECK SOCKET")
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		fmt.Println("STARTING CHECK SOCEKT TIMER")
-		go func(pid *actor.PID) {
-			time.Sleep(5 * time.Second)
-			context.Send(pid, &checkSocket{})
-		}(context.Self())
 
 	case *checkAccount:
+		fmt.Println("CHEKC ACCOUNT")
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		fmt.Println("STARTING CHECK ACCUONT TIMER")
-		go func(pid *actor.PID) {
-			time.Sleep(10 * time.Second)
-			context.Send(pid, &checkAccount{})
-		}(context.Self())
 	}
 }
 
@@ -203,7 +195,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			case _ = <-socketTimer.C:
 				fmt.Println("SENDING CHECK SOCKET")
 				context.Send(pid, &checkSocket{})
-			case <-time.After(6 * time.Second):
+			case <-time.After(10 * time.Second):
 				fmt.Println("CHECK SOCKET TIMER STOPPED")
 				// timer stopped, we leave
 				return
@@ -219,7 +211,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			case _ = <-socketTimer.C:
 				fmt.Println("SENDING CHECK ACCOUUNT")
 				context.Send(pid, &checkAccount{})
-			case <-time.After(21 * time.Second):
+			case <-time.After(25 * time.Second):
 				// timer stopped, we leave
 				fmt.Println("CHECK ACCOUNT TIMER STOPPED")
 				return
