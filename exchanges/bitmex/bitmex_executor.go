@@ -774,8 +774,11 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	}
 
 	state.rateLimit.Request(weight)
+	requestStart := time.Now()
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
+		requestDur := time.Now().Sub(requestStart)
+		state.logger.Info(fmt.Sprintf("post bulk order request done in %v", requestDur))
 		if err != nil {
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
