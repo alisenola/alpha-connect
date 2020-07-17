@@ -37,8 +37,7 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	obWs            *binance.Websocket
-	tradeWs         *binance.Websocket
+	ws              *binance.Websocket
 	security        *models.Security
 	instrumentData  *InstrumentData
 	binanceExecutor *actor.PID
@@ -55,8 +54,7 @@ func NewListenerProducer(security *models.Security) actor.Producer {
 
 func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
-		obWs:            nil,
-		tradeWs:         nil,
+		ws:              nil,
 		security:        security,
 		instrumentData:  nil,
 		binanceExecutor: nil,
@@ -137,11 +135,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastAggTradeTs: 0,
 	}
 
-	if err := state.subscribeOrderBook(context); err != nil {
+	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
-	}
-	if err := state.subscribeTrades(context); err != nil {
-		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -162,13 +157,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) Clean(context actor.Context) error {
-	if state.tradeWs != nil {
-		if err := state.tradeWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
-	}
-	if state.obWs != nil {
-		if err := state.obWs.Disconnect(); err != nil {
+	if state.ws != nil {
+		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
 	}
@@ -180,21 +170,21 @@ func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeOrderBook(context actor.Context) error {
-	if state.obWs != nil {
-		_ = state.obWs.Disconnect()
+func (state *Listener) subscribeInstrument(context actor.Context) error {
+	if state.ws != nil {
+		_ = state.ws.Disconnect()
 	}
 
-	obWs := binance.NewWebsocket()
+	ws := binance.NewWebsocket()
 	symbol := strings.ToLower(state.security.Symbol)
-	err := obWs.Connect(
+	err := ws.Connect(
 		symbol,
-		[]string{binance.WSDepthStream100ms})
+		[]string{binance.WSDepthStream100ms, binance.WSTradeStream})
 	if err != nil {
 		return err
 	}
 
-	state.obWs = obWs
+	state.ws = ws
 
 	time.Sleep(5 * time.Second)
 	fut := context.RequestFuture(
@@ -247,12 +237,13 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	synced := false
 	for !synced {
-		if !obWs.ReadMessage() {
-			return fmt.Errorf("error reading message: %v", obWs.Err)
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
 		}
-		depthData, ok := obWs.Msg.Message.(binance.WSDepthData)
+		depthData, ok := ws.Msg.Message.(binance.WSDepthData)
 		if !ok {
-			return fmt.Errorf("was expecting depth data, got %s", reflect.TypeOf(obWs.Msg.Message).String())
+			// Trade message
+			context.Send(context.Self(), ws.Msg)
 		}
 
 		if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
@@ -271,7 +262,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		}
 
 		state.instrumentData.lastUpdateID = depthData.FinalUpdateID
-		state.instrumentData.lastUpdateTime = uint64(obWs.Msg.Time.UnixNano() / 1000000)
+		state.instrumentData.lastUpdateTime = uint64(ws.Msg.Time.UnixNano() / 1000000)
 
 		synced = true
 	}
@@ -283,31 +274,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		for ws.ReadMessage() {
 			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(obWs, context.Self())
-
-	return nil
-}
-
-func (state *Listener) subscribeTrades(context actor.Context) error {
-	if state.tradeWs != nil {
-		_ = state.tradeWs.Disconnect()
-	}
-	tradeWs := binance.NewWebsocket()
-	symbol := strings.ToLower(state.security.Symbol)
-	err := tradeWs.Connect(
-		symbol,
-		[]string{binance.WSTradeStream})
-	if err != nil {
-		return err
-	}
-
-	state.tradeWs = tradeWs
-
-	go func(ws *binance.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
-		}
-	}(tradeWs, context.Self())
+	}(ws, context.Self())
 
 	return nil
 }
@@ -350,7 +317,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.logger.Info("error processing depth data for "+depthData.Symbol,
 				log.Error(err))
 			// Stop the socket, we will restart instrument at the end
-			if err := state.obWs.Disconnect(); err != nil {
+			if err := state.ws.Disconnect(); err != nil {
 				state.logger.Info("error disconnecting from socket", log.Error(err))
 			}
 		}
@@ -444,7 +411,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 
 	if state.instrumentData.orderBook.Crossed() {
 		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
-		return state.subscribeOrderBook(context)
+		return state.subscribeInstrument(context)
 	}
 
 	state.instrumentData.lastUpdateID = depthData.FinalUpdateID
@@ -460,20 +427,11 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 
 func (state *Listener) checkSockets(context actor.Context) error {
 	// TODO ping or HB ?
-	if state.obWs.Err != nil || !state.obWs.Connected {
-		if state.obWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.obWs.Err))
+	if state.ws.Err != nil || !state.ws.Connected {
+		if state.ws.Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws.Err))
 		}
-		if err := state.subscribeOrderBook(context); err != nil {
-			return fmt.Errorf("error subscribing to instrument: %v", err)
-		}
-	}
-
-	if state.tradeWs.Err != nil || !state.tradeWs.Connected {
-		if state.tradeWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.tradeWs.Err))
-		}
-		if err := state.subscribeTrades(context); err != nil {
+		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
 	}
