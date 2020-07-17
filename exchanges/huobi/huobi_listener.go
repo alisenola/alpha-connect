@@ -1,6 +1,7 @@
 package huobi
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -15,7 +16,7 @@ import (
 	"time"
 )
 
-type readSocket struct{}
+type checkSockets struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -29,14 +30,13 @@ type InstrumentData struct {
 type Listener struct {
 	obWs            *huobi.Websocket
 	tradeWs         *huobi.Websocket
-	obWsChan        chan *huobi.WebsocketMessage
-	tradeWsChan     chan *huobi.WebsocketMessage
 	security        *models.Security
 	instrumentData  *InstrumentData
 	executorManager *actor.PID
 	mediator        *actor.PID
 	logger          *log.Logger
 	lastPingTime    time.Time
+	socketTicker    *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -49,13 +49,12 @@ func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		obWs:            nil,
 		tradeWs:         nil,
-		obWsChan:        nil,
-		tradeWsChan:     nil,
 		security:        security,
 		instrumentData:  nil,
 		executorManager: nil,
 		mediator:        nil,
 		logger:          nil,
+		socketTicker:    nil,
 	}
 }
 
@@ -91,9 +90,15 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *huobi.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
+			panic(err)
+		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
 	}
@@ -110,8 +115,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 	state.mediator = actor.NewLocalPID("data_broker")
 	state.executorManager = actor.NewLocalPID("exchange_executor_manager")
-	state.obWsChan = make(chan *huobi.WebsocketMessage, 10000)
-	state.tradeWsChan = make(chan *huobi.WebsocketMessage, 10000)
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -128,7 +131,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
-	context.Send(context.Self(), &readSocket{})
+
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -143,6 +159,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -195,7 +215,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 		case huobi.WSMarketByPriceTick:
 			// buffer the update
-			state.obWsChan <- ws.Msg
+			context.Send(context.Self(), ws.Msg)
 
 		case huobi.WSError:
 			err := fmt.Errorf("error getting orderbook: %s", ws.Msg.Message.(huobi.WSError).ErrMsg)
@@ -210,11 +230,11 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	state.obWs = ws
 
-	go func(ws *huobi.Websocket) {
+	go func(ws *huobi.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.obWsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -235,11 +255,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 
 	state.tradeWs = ws
 
-	go func(ws *huobi.Websocket) {
+	go func(ws *huobi.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.tradeWsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -265,211 +285,164 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.obWsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*huobi.WebsocketMessage)
 
-		case error:
-			return fmt.Errorf("OB socket error: %v", msg)
+	switch msg.Message.(type) {
 
-		case huobi.WSMarketByPriceTick:
-			ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-			update := msg.Message.(huobi.WSMarketByPriceTick)
+	case error:
+		return fmt.Errorf("OB socket error: %v", msg)
 
-			instr := state.instrumentData
-			if update.SeqNum <= instr.lastUpdateID {
-				break
+	case huobi.WSMarketByPriceTick:
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		update := msg.Message.(huobi.WSMarketByPriceTick)
+
+		instr := state.instrumentData
+		if update.SeqNum <= instr.lastUpdateID {
+			break
+		}
+
+		// This, implies that instr.lastUpdateID > seqNum
+		// We want update.SeqNum > instr.lastUpdateID
+		if instr.lastUpdateID < update.PrevSeqNum {
+			state.logger.Info("error processing ob update for "+update.Symbol, log.Error(fmt.Errorf("out of order sequence")))
+			return state.subscribeOrderBook(context)
+		}
+
+		obDelta := &models.OBL2Update{
+			Levels:    nil,
+			Timestamp: utils.MilliToTimestamp(ts),
+			Trade:     false,
+		}
+
+		for _, bid := range update.Bids {
+			level := gorderbook.OrderBookLevel{
+				Price:    bid.Price,
+				Quantity: bid.Quantity,
+				Bid:      true,
 			}
+			instr.orderBook.UpdateOrderBookLevel(level)
+			obDelta.Levels = append(obDelta.Levels, level)
+		}
+		for _, ask := range update.Asks {
+			level := gorderbook.OrderBookLevel{
+				Price:    ask.Price,
+				Quantity: ask.Quantity,
+				Bid:      false,
+			}
+			instr.orderBook.UpdateOrderBookLevel(level)
+			obDelta.Levels = append(obDelta.Levels, level)
+		}
 
-			// This, implies that instr.lastUpdateID > seqNum
-			// We want update.SeqNum > instr.lastUpdateID
-			if instr.lastUpdateID < update.PrevSeqNum {
-				state.logger.Info("error processing ob update for "+update.Symbol, log.Error(fmt.Errorf("out of order sequence")))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
+		if state.instrumentData.orderBook.Crossed() {
+			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			return state.subscribeOrderBook(context)
+		}
+
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			UpdateL2: obDelta,
+			SeqNum:   state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+
+		instr.lastUpdateTime = ts
+		instr.lastUpdateID = update.SeqNum
+
+		//state.postSnapshot(context)
+
+	case huobi.WSMarketTradeDetailTick:
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		trades := msg.Message.(huobi.WSMarketTradeDetailTick)
+		if len(trades.Data) == 0 {
+			break
+		}
+
+		sort.Slice(trades.Data, func(i, j int) bool {
+			return trades.Data[i].TradeId < trades.Data[j].TradeId
+		})
+
+		var aggTrade *models.AggregatedTrade
+		for _, trade := range trades.Data {
+			aggID := trade.Ts * 10
+			// do that so new agg trade if side changes
+			if trade.Direction == "sell" {
+				aggID += 1
+			}
+			if aggTrade == nil || aggTrade.AggregateID != aggID {
+
+				if aggTrade != nil {
+					// Send aggregate trade
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Trades: []*models.AggregatedTrade{aggTrade},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+					state.instrumentData.lastAggTradeTs = ts
 				}
-				break
-			}
 
-			obDelta := &models.OBL2Update{
-				Levels:    nil,
-				Timestamp: utils.MilliToTimestamp(ts),
-				Trade:     false,
-			}
-
-			for _, bid := range update.Bids {
-				level := gorderbook.OrderBookLevel{
-					Price:    bid.Price,
-					Quantity: bid.Quantity,
-					Bid:      true,
+				if ts <= state.instrumentData.lastAggTradeTs {
+					ts = state.instrumentData.lastAggTradeTs + 1
 				}
-				instr.orderBook.UpdateOrderBookLevel(level)
-				obDelta.Levels = append(obDelta.Levels, level)
-			}
-			for _, ask := range update.Asks {
-				level := gorderbook.OrderBookLevel{
-					Price:    ask.Price,
-					Quantity: ask.Quantity,
-					Bid:      false,
+				aggTrade = &models.AggregatedTrade{
+					Bid:         trade.Direction == "sell",
+					Timestamp:   utils.MilliToTimestamp(ts),
+					AggregateID: aggID,
+					Trades:      nil,
 				}
-				instr.orderBook.UpdateOrderBookLevel(level)
-				obDelta.Levels = append(obDelta.Levels, level)
 			}
 
-			if state.instrumentData.orderBook.Crossed() {
-				state.logger.Info("crossed order book")
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
-				break
+			trd := models.Trade{
+				Price:    trade.Price,
+				Quantity: trade.Amount,
+				ID:       trade.TradeId,
 			}
 
+			aggTrade.Trades = append(aggTrade.Trades, trd)
+		}
+		if aggTrade != nil {
+			// Send aggregate trade
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				UpdateL2: obDelta,
-				SeqNum:   state.instrumentData.seqNum + 1,
+				Trades: []*models.AggregatedTrade{aggTrade},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
 			state.instrumentData.seqNum += 1
-
-			instr.lastUpdateTime = ts
-			instr.lastUpdateID = update.SeqNum
-
-			//state.postSnapshot(context)
-
-		case huobi.WSSubscribeResponse:
-			// pass
-
-		case huobi.WSPing:
-			msg := msg.Message.(huobi.WSPing)
-			if err := state.tradeWs.Pong(msg.Ping); err != nil {
-				return fmt.Errorf("error sending pong to websocket")
-			}
-
-		case huobi.WSError:
-			msg := msg.Message.(huobi.WSError)
-			state.logger.Info("got WSError message",
-				log.String("message", msg.ErrMsg),
-				log.String("code", msg.ErrCode))
-
-		default:
-			state.logger.Info("received unknown message",
-				log.String("message_type",
-					reflect.TypeOf(msg.Message).String()))
+			state.instrumentData.lastAggTradeTs = ts
 		}
 
-		state.postHeartBeat(context)
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		context.Send(context.Self(), &readSocket{})
-		return nil
+	case huobi.WSSubscribeResponse:
+		// pass
 
-	case msg := <-state.tradeWsChan:
-		switch msg.Message.(type) {
-
-		case error:
-			return fmt.Errorf("trade socket error: %v", msg)
-
-		case huobi.WSMarketTradeDetailTick:
-			ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-			trades := msg.Message.(huobi.WSMarketTradeDetailTick)
-			if len(trades.Data) == 0 {
-				break
-			}
-
-			sort.Slice(trades.Data, func(i, j int) bool {
-				return trades.Data[i].TradeId < trades.Data[j].TradeId
-			})
-
-			var aggTrade *models.AggregatedTrade
-			for _, trade := range trades.Data {
-				aggID := trade.Ts * 10
-				// do that so new agg trade if side changes
-				if trade.Direction == "sell" {
-					aggID += 1
-				}
-				if aggTrade == nil || aggTrade.AggregateID != aggID {
-
-					if aggTrade != nil {
-						// Send aggregate trade
-						context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-							Trades: []*models.AggregatedTrade{aggTrade},
-							SeqNum: state.instrumentData.seqNum + 1,
-						})
-						state.instrumentData.seqNum += 1
-						state.instrumentData.lastAggTradeTs = ts
-					}
-
-					if ts <= state.instrumentData.lastAggTradeTs {
-						ts = state.instrumentData.lastAggTradeTs + 1
-					}
-					aggTrade = &models.AggregatedTrade{
-						Bid:         trade.Direction == "sell",
-						Timestamp:   utils.MilliToTimestamp(ts),
-						AggregateID: aggID,
-						Trades:      nil,
-					}
-				}
-
-				trd := models.Trade{
-					Price:    trade.Price,
-					Quantity: trade.Amount,
-					ID:       trade.TradeId,
-				}
-
-				aggTrade.Trades = append(aggTrade.Trades, trd)
-			}
-			if aggTrade != nil {
-				// Send aggregate trade
-				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-					Trades: []*models.AggregatedTrade{aggTrade},
-					SeqNum: state.instrumentData.seqNum + 1,
-				})
-				state.instrumentData.seqNum += 1
-				state.instrumentData.lastAggTradeTs = ts
-			}
-
-		case huobi.WSSubscribeResponse:
-			// pass
-
-		case huobi.WSPing:
-			msg := msg.Message.(huobi.WSPing)
-			if err := state.tradeWs.Pong(msg.Ping); err != nil {
-				return fmt.Errorf("error sending pong to websocket")
-			}
-
-		case huobi.WSError:
-			msg := msg.Message.(huobi.WSError)
-			state.logger.Info("got WSError message",
-				log.String("message", msg.ErrMsg),
-				log.String("code", msg.ErrCode))
-
-		default:
-			state.logger.Info("received unknown message",
-				log.String("message_type",
-					reflect.TypeOf(msg.Message).String()))
+	case huobi.WSPing:
+		msg := msg.Message.(huobi.WSPing)
+		if err := state.tradeWs.Pong(msg.Ping); err != nil {
+			return fmt.Errorf("error sending pong to websocket")
 		}
 
-		state.postHeartBeat(context)
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		context.Send(context.Self(), &readSocket{})
-		return nil
+	case huobi.WSError:
+		msg := msg.Message.(huobi.WSError)
+		state.logger.Info("got WSError message",
+			log.String("message", msg.ErrMsg),
+			log.String("code", msg.ErrCode))
 
-	case <-time.After(1 * time.Second):
-		state.postHeartBeat(context)
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		context.Send(context.Self(), &readSocket{})
-		return nil
+	default:
+		state.logger.Info("received unknown message",
+			log.String("message_type",
+				reflect.TypeOf(msg.Message).String()))
 	}
+
+	return nil
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHBTime = time.Now()
+	}
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		_ = state.obWs.SubscribeMarketByPrice(state.security.Symbol, huobi.WSOBLevel150)
@@ -496,16 +469,4 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	return nil
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			SeqNum: state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
-		state.instrumentData.lastHBTime = time.Now()
-	}
 }

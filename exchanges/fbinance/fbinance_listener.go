@@ -1,6 +1,7 @@
 package fbinance
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -17,7 +18,7 @@ import (
 	"time"
 )
 
-type readSocket struct{}
+type checkSockets struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -31,11 +32,11 @@ type InstrumentData struct {
 type Listener struct {
 	obWs             *fbinance.Websocket
 	tradeWs          *fbinance.Websocket
-	wsChan           chan *fbinance.WebsocketMessage
 	security         *models.Security
 	instrumentData   *InstrumentData
 	fbinanceExecutor *actor.PID
 	logger           *log.Logger
+	socketTicker     *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -48,11 +49,11 @@ func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		obWs:             nil,
 		tradeWs:          nil,
-		wsChan:           nil,
 		security:         security,
 		instrumentData:   nil,
 		fbinanceExecutor: nil,
 		logger:           nil,
+		socketTicker:     nil,
 	}
 }
 
@@ -88,9 +89,15 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *fbinance.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
+			panic(err)
+		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
 	}
@@ -106,7 +113,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.fbinanceExecutor = actor.NewLocalPID("executor/" + constants.FBINANCE.Name + "_executor")
-	state.wsChan = make(chan *fbinance.WebsocketMessage, 10000)
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
@@ -123,7 +129,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
-	context.Send(context.Self(), &readSocket{})
+
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -138,6 +157,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -242,11 +265,11 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 
-	go func(ws *fbinance.Websocket) {
+	go func(ws *fbinance.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(state.obWs)
+	}(obWs, context.Self())
 
 	return nil
 }
@@ -265,11 +288,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	}
 	state.tradeWs = tradeWs
 
-	go func(ws *fbinance.Websocket) {
+	go func(ws *fbinance.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(state.tradeWs)
+	}(tradeWs, context.Self())
 
 	return nil
 }
@@ -296,68 +319,52 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*fbinance.WebsocketMessage)
+	switch msg.Message.(type) {
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+	case fbinance.WSDepthData:
+		depthData := msg.Message.(fbinance.WSDepthData)
 
-		case fbinance.WSDepthData:
-			depthData := msg.Message.(fbinance.WSDepthData)
-
-			// change event time
-			depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
-			err := state.onDepthData(context, depthData)
-			if err != nil {
-				state.logger.Info("error processing depth data for "+depthData.Symbol,
-					log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
+		// change event time
+		depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
+		err := state.onDepthData(context, depthData)
+		if err != nil {
+			state.logger.Info("error processing depth data for "+depthData.Symbol,
+				log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.obWs.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
 			}
-
-		case fbinance.WSAggregatedTradeData:
-			tradeData := msg.Message.(fbinance.WSAggregatedTradeData)
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-			if ts <= state.instrumentData.lastAggTradeTs {
-				ts = state.instrumentData.lastAggTradeTs + 1
-			}
-			trade := &models.AggregatedTrade{
-				Bid:         tradeData.MarketSell,
-				Timestamp:   utils.MilliToTimestamp(ts),
-				AggregateID: uint64(tradeData.AggregateTradeID),
-				Trades: []models.Trade{{
-					Price:    tradeData.Price,
-					Quantity: tradeData.Quantity,
-					ID:       uint64(tradeData.AggregateTradeID),
-				}},
-			}
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				Trades: []*models.AggregatedTrade{trade},
-				SeqNum: state.instrumentData.seqNum + 1,
-			})
-			state.instrumentData.seqNum += 1
-			state.instrumentData.lastAggTradeTs = ts
 		}
 
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+	case fbinance.WSAggregatedTradeData:
+		tradeData := msg.Message.(fbinance.WSAggregatedTradeData)
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+		if ts <= state.instrumentData.lastAggTradeTs {
+			ts = state.instrumentData.lastAggTradeTs + 1
 		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
-
-	case <-time.After(1 * time.Second):
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+		trade := &models.AggregatedTrade{
+			Bid:         tradeData.MarketSell,
+			Timestamp:   utils.MilliToTimestamp(ts),
+			AggregateID: uint64(tradeData.AggregateTradeID),
+			Trades: []models.Trade{{
+				Price:    tradeData.Price,
+				Quantity: tradeData.Quantity,
+				ID:       uint64(tradeData.AggregateTradeID),
+			}},
 		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			Trades: []*models.AggregatedTrade{trade},
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastAggTradeTs = ts
 	}
+
+	return nil
 }
 
 func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSDepthData) error {
@@ -404,7 +411,8 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	}
 
 	if state.instrumentData.orderBook.Crossed() {
-		return fmt.Errorf("crossed order book")
+		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		return state.subscribeOrderBook(context)
 	}
 
 	state.instrumentData.lastUpdateID = depthData.FinalUpdateID - 1
@@ -437,10 +445,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
-	return nil
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
@@ -450,4 +454,6 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
+
+	return nil
 }

@@ -1,6 +1,7 @@
 package okcoin
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -14,7 +15,7 @@ import (
 	"time"
 )
 
-type readSocket struct{}
+type checkSockets struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -27,11 +28,11 @@ type InstrumentData struct {
 type Listener struct {
 	obWs           *okcoin.Websocket
 	tradeWs        *okcoin.Websocket
-	wsChan         chan *okcoin.WebsocketMessage
 	security       *models.Security
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
+	socketTicker   *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -44,10 +45,10 @@ func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		obWs:           nil,
 		tradeWs:        nil,
-		wsChan:         nil,
 		security:       security,
 		instrumentData: nil,
 		logger:         nil,
+		socketTicker:   nil,
 	}
 }
 
@@ -83,9 +84,15 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *okcoin.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
+			panic(err)
+		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
 	}
@@ -100,7 +107,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.wsChan = make(chan *okcoin.WebsocketMessage, 10000)
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -117,7 +123,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
-	context.Send(context.Self(), &readSocket{})
+
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -132,6 +151,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -184,11 +207,11 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	state.obWs = ws
 
-	go func(ws *okcoin.Websocket) {
+	go func(ws *okcoin.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -209,11 +232,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 
 	state.tradeWs = ws
 
-	go func(ws *okcoin.Websocket) {
+	go func(ws *okcoin.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -240,136 +263,117 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*okcoin.WebsocketMessage)
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+	switch msg.Message.(type) {
 
-		case okcoin.WSSpotDepthUpdate:
-			obData := msg.Message.(okcoin.WSSpotDepthUpdate)
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
 
-			instr := state.instrumentData
+	case okcoin.WSSpotDepthUpdate:
+		obData := msg.Message.(okcoin.WSSpotDepthUpdate)
 
-			bids, asks := obData.ToBidAsk()
-			levels := append(bids, asks...)
+		instr := state.instrumentData
 
-			for _, l := range levels {
-				instr.orderBook.UpdateOrderBookLevel(l)
+		bids, asks := obData.ToBidAsk()
+		levels := append(bids, asks...)
+
+		for _, l := range levels {
+			instr.orderBook.UpdateOrderBookLevel(l)
+		}
+
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+
+		obDelta := &models.OBL2Update{
+			Levels:    levels,
+			Timestamp: utils.MilliToTimestamp(ts),
+			Trade:     false,
+		}
+
+		instr.lastUpdateTime = uint64(msg.Time.UnixNano() / 1000000)
+
+		if state.instrumentData.orderBook.Crossed() {
+			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			return state.subscribeOrderBook(context)
+		}
+
+		// Send OBData
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			UpdateL2: obDelta,
+			SeqNum:   state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+
+	case []okcoin.WSSpotTrade:
+		trades := msg.Message.([]okcoin.WSSpotTrade)
+		// order trade by timestamps
+		// if trades are on same side, aggregate. We aggregate because otherwise
+		// we will have two trades on the same side with the same timestamp as
+		// we use same current timestamp for timestamp of all the trades in the array
+		// the timestamp of the first trade is going to be the aggregateID and each
+		// trade in the aggregate will have as ID aggregateID + index of trade in aggregate
+
+		if len(trades) == 0 {
+			break
+		}
+
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+		var aggTrade *models.AggregatedTrade
+		for _, t := range trades {
+			aggID := uint64(t.Timestamp.UnixNano()/1000) * 10
+			// do that so new agg trade if side changes
+			if t.Side == "sell" {
+				aggID += 1
 			}
 
-			ts := uint64(msg.Time.UnixNano() / 1000000)
+			if aggTrade == nil || aggTrade.AggregateID != aggID {
 
-			obDelta := &models.OBL2Update{
-				Levels:    levels,
-				Timestamp: utils.MilliToTimestamp(ts),
-				Trade:     false,
-			}
-
-			instr.lastUpdateTime = uint64(msg.Time.UnixNano() / 1000000)
-
-			if state.instrumentData.orderBook.Crossed() {
-				state.logger.Info("crossed order book")
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
+				if aggTrade != nil {
+					// Send aggregate trade
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Trades: []*models.AggregatedTrade{aggTrade},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+					state.instrumentData.lastAggTradeTs = ts
 				}
-				break
+
+				if ts <= state.instrumentData.lastAggTradeTs {
+					ts = state.instrumentData.lastAggTradeTs + 1
+				}
+				aggTrade = &models.AggregatedTrade{
+					Bid:         t.Side == "sell",
+					Timestamp:   utils.MilliToTimestamp(ts),
+					AggregateID: aggID,
+					Trades:      nil,
+				}
 			}
 
-			// Send OBData
+			trd := models.Trade{
+				Price:    t.Price,
+				Quantity: t.Size,
+				ID:       uint64(t.TradeID),
+			}
+
+			aggTrade.Trades = append(aggTrade.Trades, trd)
+		}
+
+		if aggTrade != nil {
+			// Send aggregate trade
 			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				UpdateL2: obDelta,
-				SeqNum:   state.instrumentData.seqNum + 1,
+				Trades: []*models.AggregatedTrade{aggTrade},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
 			state.instrumentData.seqNum += 1
-
-		case []okcoin.WSSpotTrade:
-			trades := msg.Message.([]okcoin.WSSpotTrade)
-			// order trade by timestamps
-			// if trades are on same side, aggregate. We aggregate because otherwise
-			// we will have two trades on the same side with the same timestamp as
-			// we use same current timestamp for timestamp of all the trades in the array
-			// the timestamp of the first trade is going to be the aggregateID and each
-			// trade in the aggregate will have as ID aggregateID + index of trade in aggregate
-
-			if len(trades) == 0 {
-				break
-			}
-
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-			var aggTrade *models.AggregatedTrade
-			for _, t := range trades {
-				aggID := uint64(t.Timestamp.UnixNano()/1000) * 10
-				// do that so new agg trade if side changes
-				if t.Side == "sell" {
-					aggID += 1
-				}
-
-				if aggTrade == nil || aggTrade.AggregateID != aggID {
-
-					if aggTrade != nil {
-						// Send aggregate trade
-						context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-							Trades: []*models.AggregatedTrade{aggTrade},
-							SeqNum: state.instrumentData.seqNum + 1,
-						})
-						state.instrumentData.seqNum += 1
-						state.instrumentData.lastAggTradeTs = ts
-					}
-
-					if ts <= state.instrumentData.lastAggTradeTs {
-						ts = state.instrumentData.lastAggTradeTs + 1
-					}
-					aggTrade = &models.AggregatedTrade{
-						Bid:         t.Side == "sell",
-						Timestamp:   utils.MilliToTimestamp(ts),
-						AggregateID: aggID,
-						Trades:      nil,
-					}
-				}
-
-				trd := models.Trade{
-					Price:    t.Price,
-					Quantity: t.Size,
-					ID:       uint64(t.TradeID),
-				}
-
-				aggTrade.Trades = append(aggTrade.Trades, trd)
-			}
-
-			if aggTrade != nil {
-				// Send aggregate trade
-				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-					Trades: []*models.AggregatedTrade{aggTrade},
-					SeqNum: state.instrumentData.seqNum + 1,
-				})
-				state.instrumentData.seqNum += 1
-				state.instrumentData.lastAggTradeTs = ts
-			}
+			state.instrumentData.lastAggTradeTs = ts
 		}
-
-		state.postHeartBeat(context)
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		context.Send(context.Self(), &readSocket{})
-		return nil
-
-	case <-time.After(1 * time.Second):
-		state.postHeartBeat(context)
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		context.Send(context.Self(), &readSocket{})
-		return nil
 	}
+
+	return nil
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		// "Ping" by resubscribing to the topic
 		symbol := state.security.Symbol
@@ -396,10 +400,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
-	return nil
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
@@ -409,4 +409,6 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
+
+	return nil
 }

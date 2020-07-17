@@ -1,6 +1,7 @@
 package kraken
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -15,7 +16,7 @@ import (
 	"time"
 )
 
-type readSocket struct{}
+type checkSockets struct{}
 
 type OBL2Request struct {
 	requester *actor.PID
@@ -24,8 +25,6 @@ type OBL2Request struct {
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
-	obDelta        *models.OBL2Update
-	nCrossed       int
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
@@ -43,11 +42,11 @@ type InstrumentData struct {
 type Listener struct {
 	obWs           *kraken.Websocket
 	tradeWs        *kraken.Websocket
-	wsChan         chan *kraken.WebsocketMessage
 	security       *models.Security
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
+	socketTicker   *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -60,10 +59,10 @@ func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		obWs:           nil,
 		tradeWs:        nil,
-		wsChan:         nil,
 		security:       security,
 		instrumentData: nil,
 		logger:         nil,
+		socketTicker:   nil,
 	}
 }
 
@@ -99,9 +98,15 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *kraken.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
+			panic(err)
+		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
 	}
@@ -116,7 +121,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.wsChan = make(chan *kraken.WebsocketMessage, 10000)
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -125,8 +129,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastUpdateTime: 0,
 		lastHBTime:     time.Now(),
 		lastAggTradeTs: 0,
-		obDelta:        nil,
-		nCrossed:       0,
 	}
 
 	if err := state.subscribeOrderBook(context); err != nil {
@@ -135,7 +137,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeTrades(context); err != nil {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
-	context.Send(context.Self(), &readSocket{})
+
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -150,6 +165,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -227,15 +246,13 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
-	state.instrumentData.obDelta = nil
-	state.instrumentData.nCrossed = 0
 	state.obWs = ws
 
-	go func(ws *kraken.Websocket) {
+	go func(ws *kraken.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -256,11 +273,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 
 	state.tradeWs = ws
 
-	go func(ws *kraken.Websocket) {
+	go func(ws *kraken.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(ws)
+	}(ws, context.Self())
 
 	return nil
 
@@ -287,182 +304,155 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*kraken.WebsocketMessage)
+	switch msg.Message.(type) {
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
 
-		case kraken.WSOrderBookL2Update:
-			obData := msg.Message.(kraken.WSOrderBookL2Update)
+	case kraken.WSOrderBookL2Update:
+		obData := msg.Message.(kraken.WSOrderBookL2Update)
 
-			nLevels := len(obData.Bids) + len(obData.Asks)
+		nLevels := len(obData.Bids) + len(obData.Asks)
 
-			if nLevels == 0 {
-				break
+		if nLevels == 0 {
+			break
+		}
+		instr := state.instrumentData
+
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+
+		obDelta := &models.OBL2Update{
+			Levels:    []gorderbook.OrderBookLevel{},
+			Timestamp: utils.MilliToTimestamp(ts),
+			Trade:     false,
+		}
+
+		lvlIdx := 0
+		for _, bid := range obData.Bids {
+			level := gorderbook.OrderBookLevel{
+				Price:    bid.Price,
+				Quantity: bid.Amount,
+				Bid:      true,
 			}
-			instr := state.instrumentData
+			lvlIdx += 1
+			instr.orderBook.UpdateOrderBookLevel(level)
+			obDelta.Levels = append(obDelta.Levels, level)
+		}
 
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-
-			if state.instrumentData.obDelta == nil {
-				state.instrumentData.obDelta = &models.OBL2Update{
-					Levels:    []gorderbook.OrderBookLevel{},
-					Timestamp: utils.MilliToTimestamp(ts),
-					Trade:     false,
-				}
+		for _, ask := range obData.Asks {
+			level := gorderbook.OrderBookLevel{
+				Price:    ask.Price,
+				Quantity: ask.Amount,
+				Bid:      false,
 			}
+			lvlIdx += 1
+			instr.orderBook.UpdateOrderBookLevel(level)
+			obDelta.Levels = append(obDelta.Levels, level)
+		}
 
-			lvlIdx := 0
-			for _, bid := range obData.Bids {
-				level := gorderbook.OrderBookLevel{
-					Price:    bid.Price,
-					Quantity: bid.Amount,
-					Bid:      true,
-				}
-				lvlIdx += 1
-				instr.orderBook.UpdateOrderBookLevel(level)
-				state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, level)
-			}
+		if state.instrumentData.orderBook.Crossed() {
+			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			return state.subscribeOrderBook(context)
+		}
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			UpdateL2: obDelta,
+			SeqNum:   state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastUpdateTime = utils.TimestampToMilli(obDelta.Timestamp)
 
-			for _, ask := range obData.Asks {
-				level := gorderbook.OrderBookLevel{
-					Price:    ask.Price,
-					Quantity: ask.Amount,
-					Bid:      false,
-				}
-				lvlIdx += 1
-				instr.orderBook.UpdateOrderBookLevel(level)
-				state.instrumentData.obDelta.Levels = append(state.instrumentData.obDelta.Levels, level)
-			}
+	case kraken.WSTradeUpdate:
+		tradeUpdate := msg.Message.(kraken.WSTradeUpdate)
+		// order trade by timestamps
+		// if trades are on same side, aggregate. We aggregate because otherwise
+		// we will have two trades on the same side with the same timestamp as
+		// we use same current timestamp for timestamp of all the trades in the array
+		// the timestamp of the first trade is going to be the aggregateID and each
+		// trade in the aggregate will have as ID aggregateID + index of trade in aggregate
 
-			if state.instrumentData.orderBook.Crossed() {
-				state.instrumentData.nCrossed += 1
-				fmt.Println(state.instrumentData.nCrossed)
-				if state.instrumentData.nCrossed > 5 {
-					// Stop the socket, we will restart instrument at the end
-					if err := state.obWs.Disconnect(); err != nil {
-						state.logger.Info("error disconnecting from socket", log.Error(err))
-					}
-					break
-				}
+		if len(tradeUpdate.Trades) == 0 {
+			break
+		}
+
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+
+		sort.Slice(tradeUpdate.Trades, func(i, j int) bool {
+			return tradeUpdate.Trades[i].Time < tradeUpdate.Trades[j].Time
+		})
+		tradeID := tradeUpdate.Trades[0].Time
+
+		var buyTrades []kraken.WSTrade
+		var sellTrades []kraken.WSTrade
+
+		for _, t := range tradeUpdate.Trades {
+			if t.Side == "s" {
+				sellTrades = append(sellTrades, t)
 			} else {
-				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-					UpdateL2: state.instrumentData.obDelta,
-					SeqNum:   state.instrumentData.seqNum + 1,
-				})
-				state.instrumentData.seqNum += 1
-				state.instrumentData.lastUpdateTime = utils.TimestampToMilli(state.instrumentData.obDelta.Timestamp)
-				state.instrumentData.obDelta = nil
+				buyTrades = append(buyTrades, t)
 			}
+		}
 
-		case kraken.WSTradeUpdate:
-			tradeUpdate := msg.Message.(kraken.WSTradeUpdate)
-			// order trade by timestamps
-			// if trades are on same side, aggregate. We aggregate because otherwise
-			// we will have two trades on the same side with the same timestamp as
-			// we use same current timestamp for timestamp of all the trades in the array
-			// the timestamp of the first trade is going to be the aggregateID and each
-			// trade in the aggregate will have as ID aggregateID + index of trade in aggregate
-
-			if len(tradeUpdate.Trades) == 0 {
-				break
+		if len(buyTrades) > 0 {
+			if ts <= state.instrumentData.lastAggTradeTs {
+				ts = state.instrumentData.lastAggTradeTs + 1
 			}
-
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-
-			sort.Slice(tradeUpdate.Trades, func(i, j int) bool {
-				return tradeUpdate.Trades[i].Time < tradeUpdate.Trades[j].Time
+			aggBuyTrade := &models.AggregatedTrade{
+				Bid:         false,
+				Timestamp:   utils.MilliToTimestamp(ts),
+				AggregateID: tradeID,
+				Trades:      nil,
+			}
+			for _, trade := range buyTrades {
+				trd := models.Trade{
+					Price:    trade.Price,
+					Quantity: trade.Volume,
+					ID:       tradeID,
+				}
+				tradeID += 1
+				aggBuyTrade.Trades = append(aggBuyTrade.Trades, trd)
+			}
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Trades: []*models.AggregatedTrade{aggBuyTrade},
+				SeqNum: state.instrumentData.seqNum + 1,
 			})
-			tradeID := tradeUpdate.Trades[0].Time
-
-			var buyTrades []kraken.WSTrade
-			var sellTrades []kraken.WSTrade
-
-			for _, t := range tradeUpdate.Trades {
-				if t.Side == "s" {
-					sellTrades = append(sellTrades, t)
-				} else {
-					buyTrades = append(buyTrades, t)
-				}
-			}
-
-			if len(buyTrades) > 0 {
-				if ts <= state.instrumentData.lastAggTradeTs {
-					ts = state.instrumentData.lastAggTradeTs + 1
-				}
-				aggBuyTrade := &models.AggregatedTrade{
-					Bid:         false,
-					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: tradeID,
-					Trades:      nil,
-				}
-				for _, trade := range buyTrades {
-					trd := models.Trade{
-						Price:    trade.Price,
-						Quantity: trade.Volume,
-						ID:       tradeID,
-					}
-					tradeID += 1
-					aggBuyTrade.Trades = append(aggBuyTrade.Trades, trd)
-				}
-				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-					Trades: []*models.AggregatedTrade{aggBuyTrade},
-					SeqNum: state.instrumentData.seqNum + 1,
-				})
-				state.instrumentData.seqNum += 1
-				state.instrumentData.lastAggTradeTs = ts
-			}
-
-			if len(sellTrades) > 0 {
-				if ts <= state.instrumentData.lastAggTradeTs {
-					ts = state.instrumentData.lastAggTradeTs + 1
-				}
-				aggSellTrade := &models.AggregatedTrade{
-					Bid:         true,
-					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: tradeID,
-					Trades:      nil,
-				}
-				for _, trade := range sellTrades {
-					trd := models.Trade{
-						Price:    trade.Price,
-						Quantity: trade.Volume,
-						ID:       tradeID,
-					}
-					tradeID += 1
-					aggSellTrade.Trades = append(aggSellTrade.Trades, trd)
-				}
-				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-					Trades: []*models.AggregatedTrade{aggSellTrade},
-					SeqNum: state.instrumentData.seqNum + 1,
-				})
-				state.instrumentData.seqNum += 1
-				state.instrumentData.lastAggTradeTs = ts
-			}
+			state.instrumentData.seqNum += 1
+			state.instrumentData.lastAggTradeTs = ts
 		}
 
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+		if len(sellTrades) > 0 {
+			if ts <= state.instrumentData.lastAggTradeTs {
+				ts = state.instrumentData.lastAggTradeTs + 1
+			}
+			aggSellTrade := &models.AggregatedTrade{
+				Bid:         true,
+				Timestamp:   utils.MilliToTimestamp(ts),
+				AggregateID: tradeID,
+				Trades:      nil,
+			}
+			for _, trade := range sellTrades {
+				trd := models.Trade{
+					Price:    trade.Price,
+					Quantity: trade.Volume,
+					ID:       tradeID,
+				}
+				tradeID += 1
+				aggSellTrade.Trades = append(aggSellTrade.Trades, trd)
+			}
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Trades: []*models.AggregatedTrade{aggSellTrade},
+				SeqNum: state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
+			state.instrumentData.lastAggTradeTs = ts
 		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
-
-	case <-time.After(1 * time.Second):
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
-		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
 	}
+
+	return nil
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		// "Ping" by resubscribing to the topic
 		_ = state.obWs.Ping()
@@ -488,10 +478,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
-	return nil
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
 	// If haven't sent anything for 2 seconds, send heartbeat
 	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
@@ -501,4 +487,6 @@ func (state *Listener) postHeartBeat(context actor.Context) {
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
+
+	return nil
 }

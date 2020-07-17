@@ -2,6 +2,7 @@ package binance
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -22,8 +23,8 @@ import (
 // OBL2 Timestamps: ordered & consistent with sequence ID
 // Trades: Impossible to infer from deltas
 // Status: ready
-type readSocket struct{}
 type postAggTrade struct{}
+type checkSockets struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -38,12 +39,12 @@ type InstrumentData struct {
 type Listener struct {
 	obWs            *binance.Websocket
 	tradeWs         *binance.Websocket
-	wsChan          chan *binance.WebsocketMessage
 	security        *models.Security
 	instrumentData  *InstrumentData
 	binanceExecutor *actor.PID
 	logger          *log.Logger
 	stashedTrades   *list.List
+	socketTicker    *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -56,12 +57,12 @@ func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		obWs:            nil,
 		tradeWs:         nil,
-		wsChan:          nil,
 		security:        security,
 		instrumentData:  nil,
 		binanceExecutor: nil,
 		logger:          nil,
 		stashedTrades:   nil,
+		socketTicker:    nil,
 	}
 }
 
@@ -97,11 +98,18 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *binance.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
 		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+
 	case *postAggTrade:
 		state.postAggTrade(context)
 	}
@@ -117,7 +125,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.binanceExecutor = actor.NewLocalPID("executor/" + constants.BINANCE.Name + "_executor")
-	state.wsChan = make(chan *binance.WebsocketMessage, 10000)
 	state.stashedTrades = list.New()
 
 	state.instrumentData = &InstrumentData{
@@ -137,7 +144,19 @@ func (state *Listener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
 
-	context.Send(context.Self(), &readSocket{})
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -152,6 +171,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -256,11 +279,11 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 
-	go func(ws *binance.Websocket) {
+	go func(ws *binance.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(state.obWs)
+	}(obWs, context.Self())
 
 	return nil
 }
@@ -277,13 +300,14 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	if err != nil {
 		return err
 	}
+
 	state.tradeWs = tradeWs
 
-	go func(ws *binance.Websocket) {
+	go func(ws *binance.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(state.tradeWs)
+	}(tradeWs, context.Self())
 
 	return nil
 }
@@ -309,86 +333,71 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*binance.WebsocketMessage)
+	switch msg.Message.(type) {
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
 
-		case binance.WSDepthData:
-			depthData := msg.Message.(binance.WSDepthData)
+	case binance.WSDepthData:
+		depthData := msg.Message.(binance.WSDepthData)
 
-			// change event time
-			depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
-			err := state.onDepthData(context, depthData)
-			if err != nil {
-				state.logger.Info("error processing depth data for "+depthData.Symbol,
-					log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.obWs.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
+		// change event time
+		depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
+		err := state.onDepthData(context, depthData)
+		if err != nil {
+			state.logger.Info("error processing depth data for "+depthData.Symbol,
+				log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.obWs.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
 			}
-
-		case binance.WSTradeData:
-			tradeData := msg.Message.(binance.WSTradeData)
-			var aggregateID uint64
-			if tradeData.MarketSell {
-				aggregateID = uint64(tradeData.SellerOrderID)
-			} else {
-				aggregateID = uint64(tradeData.BuyerOrderID)
-			}
-
-			ts := uint64(msg.Time.UnixNano() / 1000000)
-
-			if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
-				if state.instrumentData.lastAggTradeTs >= ts {
-					ts = state.instrumentData.lastAggTradeTs + 1
-				}
-				aggTrade := &models.AggregatedTrade{
-					Bid:         tradeData.MarketSell,
-					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: aggregateID,
-					Trades:      nil,
-				}
-				state.instrumentData.aggTrade = aggTrade
-				state.instrumentData.lastAggTradeTs = ts
-
-				// Stash the aggTrade
-				state.stashedTrades.PushBack(aggTrade)
-				// start the timer on trade creation, it will publish the trade in 20 ms
-				go func(pid *actor.PID) {
-					time.Sleep(21 * time.Millisecond)
-					context.Send(pid, &postAggTrade{})
-				}(context.Self())
-			}
-
-			state.instrumentData.aggTrade.Trades = append(
-				state.instrumentData.aggTrade.Trades,
-				models.Trade{
-					Price:    tradeData.Price,
-					Quantity: tradeData.Quantity,
-					ID:       uint64(tradeData.TradeID),
-				})
 		}
 
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+	case binance.WSTradeData:
+		tradeData := msg.Message.(binance.WSTradeData)
+		var aggregateID uint64
+		if tradeData.MarketSell {
+			aggregateID = uint64(tradeData.SellerOrderID)
+		} else {
+			aggregateID = uint64(tradeData.BuyerOrderID)
 		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
 
-	case <-time.After(1 * time.Second):
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+
+		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
+			if state.instrumentData.lastAggTradeTs >= ts {
+				ts = state.instrumentData.lastAggTradeTs + 1
+			}
+			aggTrade := &models.AggregatedTrade{
+				Bid:         tradeData.MarketSell,
+				Timestamp:   utils.MilliToTimestamp(ts),
+				AggregateID: aggregateID,
+				Trades:      nil,
+			}
+			state.instrumentData.aggTrade = aggTrade
+			state.instrumentData.lastAggTradeTs = ts
+
+			// Stash the aggTrade
+			state.stashedTrades.PushBack(aggTrade)
+			// start the timer on trade creation, it will publish the trade in 20 ms
+			go func(pid *actor.PID) {
+				time.Sleep(21 * time.Millisecond)
+				context.Send(pid, &postAggTrade{})
+			}(context.Self())
 		}
-		state.postHeartBeat(context)
-		context.Send(context.Self(), &readSocket{})
-		return nil
+
+		state.instrumentData.aggTrade.Trades = append(
+			state.instrumentData.aggTrade.Trades,
+			models.Trade{
+				Price:    tradeData.Price,
+				Quantity: tradeData.Quantity,
+				ID:       uint64(tradeData.TradeID),
+			})
 	}
+
+	return nil
 }
 
 func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDepthData) error {
@@ -434,8 +443,8 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 	}
 
 	if state.instrumentData.orderBook.Crossed() {
-		fmt.Println("CROSSED")
-		return fmt.Errorf("crossed order book")
+		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		return state.subscribeOrderBook(context)
 	}
 
 	state.instrumentData.lastUpdateID = depthData.FinalUpdateID
@@ -469,6 +478,16 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHBTime = time.Now()
+	}
+
 	return nil
 }
 
@@ -492,17 +511,5 @@ func (state *Listener) postAggTrade(context actor.Context) {
 		} else {
 			break
 		}
-	}
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			SeqNum: state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
-		state.instrumentData.lastHBTime = time.Now()
 	}
 }

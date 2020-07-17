@@ -2,6 +2,7 @@ package coinbasepro
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -18,7 +19,7 @@ import (
 	"time"
 )
 
-type readSocket struct{}
+type checkSockets struct{}
 
 type OBL2Request struct {
 	requester *actor.PID
@@ -43,11 +44,11 @@ type InstrumentData struct {
 
 type Listener struct {
 	ws                  *coinbasepro.Websocket
-	wsChan              chan *coinbasepro.WebsocketMessage
 	security            *models.Security
 	instrumentData      *InstrumentData
 	coinbaseproExecutor *actor.PID
 	logger              *log.Logger
+	socketTicker        *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security) actor.Producer {
@@ -59,7 +60,6 @@ func NewListenerProducer(security *models.Security) actor.Producer {
 func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
 		ws:                  nil,
-		wsChan:              nil,
 		security:            security,
 		instrumentData:      nil,
 		coinbaseproExecutor: nil,
@@ -99,9 +99,15 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *readSocket:
-		if err := state.readSocket(context); err != nil {
-			state.logger.Error("error processing readSocket", log.Error(err))
+	case *coinbasepro.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing websocket message", log.Error(err))
+			panic(err)
+		}
+
+	case *checkSockets:
+		if err := state.checkSockets(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
 	}
@@ -117,7 +123,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.coinbaseproExecutor = actor.NewLocalPID("executor/" + constants.COINBASEPRO.Name + "_executor")
-	state.wsChan = make(chan *coinbasepro.WebsocketMessage, 10000)
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
@@ -131,7 +136,19 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
 	}
-	context.Send(context.Self(), &readSocket{})
+	socketTicker := time.NewTicker(5 * time.Second)
+	state.socketTicker = socketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
 
 	return nil
 }
@@ -141,6 +158,10 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
 	}
 
 	return nil
@@ -270,11 +291,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 	}
 
-	go func(ws *coinbasepro.Websocket) {
+	go func(ws *coinbasepro.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			state.wsChan <- ws.Msg
+			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
-	}(state.ws)
+	}(ws, context.Self())
 
 	return nil
 }
@@ -301,100 +322,83 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) readSocket(context actor.Context) error {
-	select {
-	case msg := <-state.wsChan:
-		switch msg.Message.(type) {
+func (state *Listener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*coinbasepro.WebsocketMessage)
+	switch msg.Message.(type) {
 
-		case error:
-			return fmt.Errorf("socket error: %v", msg)
+	case error:
+		return fmt.Errorf("socket error: %v", msg)
 
-		case coinbasepro.WSOpenOrder:
-			order := msg.Message.(coinbasepro.WSOpenOrder)
-			// Replace time with local one
+	case coinbasepro.WSOpenOrder:
+		order := msg.Message.(coinbasepro.WSOpenOrder)
+		// Replace time with local one
 
-			order.Time = msg.Time
-			if err := state.onOpenOrder(order, context); err != nil {
-				state.logger.Info("error processing OpenOrder", log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.ws.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
+		order.Time = msg.Time
+		if err := state.onOpenOrder(order, context); err != nil {
+			state.logger.Info("error processing OpenOrder", log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
 			}
-
-		case coinbasepro.WSChangeOrder:
-			order := msg.Message.(coinbasepro.WSChangeOrder)
-
-			order.Time = msg.Time
-			err := state.onChangeOrder(order, context)
-			if err != nil {
-				state.logger.Info("error processing ChangeOrder", log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.ws.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
-			}
-
-		case coinbasepro.WSMatchOrder:
-			order := msg.Message.(coinbasepro.WSMatchOrder)
-			order.Time = msg.Time
-			err := state.onMatchOrder(order, context)
-			if err != nil {
-				state.logger.Info("error processing MatchOrder", log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.ws.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
-			}
-
-		case coinbasepro.WSDoneOrder:
-			order := msg.Message.(coinbasepro.WSDoneOrder)
-			order.Time = msg.Time
-			err := state.onDoneOrder(order, context)
-			if err != nil {
-				state.logger.Info("error processing DoneOrder", log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.ws.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
-			}
-
-		case coinbasepro.WSReceivedOrder:
-			order := msg.Message.(coinbasepro.WSReceivedOrder)
-			order.Time = msg.Time
-			err := state.onReceivedOrder(order, context)
-			if err != nil {
-				state.logger.Info("error processing ReceivedOrder", log.Error(err))
-				// Stop the socket, we will restart instrument at the end
-				if err := state.ws.Disconnect(); err != nil {
-					state.logger.Info("error disconnecting from socket", log.Error(err))
-				}
-			}
-
-		case coinbasepro.WSSubscriptions:
-			break
-
-		case coinbasepro.WSError:
-			// TODO handle error, skip unsubscribe error
-			fmt.Println("ERROR MESSAGE:", msg)
 		}
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+
+	case coinbasepro.WSChangeOrder:
+		order := msg.Message.(coinbasepro.WSChangeOrder)
+
+		order.Time = msg.Time
+		err := state.onChangeOrder(order, context)
+		if err != nil {
+			state.logger.Info("error processing ChangeOrder", log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
+			}
 		}
-		state.postHeartBeat(context)
 
-		context.Send(context.Self(), &readSocket{})
-		return nil
-
-	case <-time.After(1 * time.Second):
-		if err := state.checkSockets(context); err != nil {
-			return fmt.Errorf("error checking sockets: %v", err)
+	case coinbasepro.WSMatchOrder:
+		order := msg.Message.(coinbasepro.WSMatchOrder)
+		order.Time = msg.Time
+		err := state.onMatchOrder(order, context)
+		if err != nil {
+			state.logger.Info("error processing MatchOrder", log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
+			}
 		}
-		state.postHeartBeat(context)
 
-		context.Send(context.Self(), &readSocket{})
-		return nil
+	case coinbasepro.WSDoneOrder:
+		order := msg.Message.(coinbasepro.WSDoneOrder)
+		order.Time = msg.Time
+		err := state.onDoneOrder(order, context)
+		if err != nil {
+			state.logger.Info("error processing DoneOrder", log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
+			}
+		}
+
+	case coinbasepro.WSReceivedOrder:
+		order := msg.Message.(coinbasepro.WSReceivedOrder)
+		order.Time = msg.Time
+		err := state.onReceivedOrder(order, context)
+		if err != nil {
+			state.logger.Info("error processing ReceivedOrder", log.Error(err))
+			// Stop the socket, we will restart instrument at the end
+			if err := state.ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting from socket", log.Error(err))
+			}
+		}
+
+	case coinbasepro.WSSubscriptions:
+		break
+
+	case coinbasepro.WSError:
+		// TODO handle error, skip unsubscribe error
+		fmt.Println("ERROR MESSAGE:", msg)
 	}
+	return nil
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
@@ -407,7 +411,15 @@ func (state *Listener) checkSockets(context actor.Context) error {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
 	}
-
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHBTime = time.Now()
+	}
 	return nil
 }
 
@@ -455,7 +467,8 @@ func (state *Listener) onOpenOrder(order coinbasepro.WSOpenOrder, context actor.
 	ts := uint64(order.Time.UnixNano()) / 1000000
 
 	if state.instrumentData.orderBook.Crossed() {
-		return fmt.Errorf("crossed order book")
+		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		return state.subscribeInstrument(context)
 	}
 
 	// SEND DELTA //
@@ -738,18 +751,6 @@ func (state *Listener) onReceivedOrder(order coinbasepro.WSReceivedOrder, contex
 	instr.lastSequence = order.Sequence
 
 	return nil
-}
-
-func (state *Listener) postHeartBeat(context actor.Context) {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			SeqNum: state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
-		state.instrumentData.lastHBTime = time.Now()
-	}
 }
 
 // Note, here we don't do the delay 20ms trick like in other exchanges
