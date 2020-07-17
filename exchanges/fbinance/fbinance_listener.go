@@ -334,10 +334,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		if err != nil {
 			state.logger.Info("error processing depth data for "+depthData.Symbol,
 				log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.obWs.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeOrderBook(context)
 		}
 
 	case fbinance.WSAggregatedTradeData:

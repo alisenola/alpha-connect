@@ -336,10 +336,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		order.Time = msg.Time
 		if err := state.onOpenOrder(order, context); err != nil {
 			state.logger.Info("error processing OpenOrder", log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeInstrument(context)
 		}
 
 	case coinbasepro.WSChangeOrder:
@@ -349,10 +346,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		err := state.onChangeOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing ChangeOrder", log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeInstrument(context)
 		}
 
 	case coinbasepro.WSMatchOrder:
@@ -361,10 +355,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		err := state.onMatchOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing MatchOrder", log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeInstrument(context)
 		}
 
 	case coinbasepro.WSDoneOrder:
@@ -373,10 +364,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		err := state.onDoneOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing DoneOrder", log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeInstrument(context)
 		}
 
 	case coinbasepro.WSReceivedOrder:
@@ -385,10 +373,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		err := state.onReceivedOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing ReceivedOrder", log.Error(err))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeInstrument(context)
 		}
 
 	case coinbasepro.WSSubscriptions:

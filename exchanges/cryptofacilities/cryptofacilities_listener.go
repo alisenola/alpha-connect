@@ -340,10 +340,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		if obData.Seq != instr.lastUpdateID+1 {
 			state.logger.Info("got inconsistent sequence")
-			// Stop the socket, we will restart instrument at the end
-			if err := state.obWs.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
+			return state.subscribeOrderBook(context)
 		}
 		instr.lastUpdateID = obData.Seq
 
