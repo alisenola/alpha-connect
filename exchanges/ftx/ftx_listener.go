@@ -27,8 +27,7 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	obWs           *ftx.Websocket
-	tradeWs        *ftx.Websocket
+	ws             *ftx.Websocket
 	security       *models.Security
 	instrumentData *InstrumentData
 	logger         *log.Logger
@@ -44,8 +43,7 @@ func NewListenerProducer(security *models.Security) actor.Producer {
 
 func NewListener(security *models.Security) actor.Actor {
 	return &Listener{
-		obWs:           nil,
-		tradeWs:        nil,
+		ws:             nil,
 		security:       security,
 		instrumentData: nil,
 		logger:         nil,
@@ -118,11 +116,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastAggTradeTs: 0,
 	}
 
-	if err := state.subscribeOrderBook(context); err != nil {
+	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
-	}
-	if err := state.subscribeTrades(context); err != nil {
-		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -142,16 +137,12 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) Clean(context actor.Context) error {
-	if state.tradeWs != nil {
-		if err := state.tradeWs.Disconnect(); err != nil {
+	if state.ws != nil {
+		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
 	}
-	if state.obWs != nil {
-		if err := state.obWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
-	}
+
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
@@ -160,39 +151,39 @@ func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeOrderBook(context actor.Context) error {
-	if state.obWs != nil {
-		_ = state.obWs.Disconnect()
+func (state *Listener) subscribeInstrument(context actor.Context) error {
+	if state.ws != nil {
+		_ = state.ws.Disconnect()
 	}
 
-	obWs := ftx.NewWebsocket()
-	err := obWs.Connect()
+	ws := ftx.NewWebsocket()
+	err := ws.Connect()
 	if err != nil {
 		return err
 	}
 
-	if err := obWs.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
+	if err := ws.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
 		return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 	}
 
-	if !obWs.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", obWs.Err)
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
-	_, ok := obWs.Msg.Message.(ftx.WSSubscribeResponse)
+	_, ok := ws.Msg.Message.(ftx.WSSubscribeResponse)
 	if !ok {
-		if err, ok := obWs.Msg.Message.(ftx.WSError); ok {
+		if err, ok := ws.Msg.Message.(ftx.WSError); ok {
 			return fmt.Errorf("got WSError trying to subscribe to ob: %d: %s", err.Msg, err.Code)
 		} else {
-			return fmt.Errorf("was expecting WSSubscribeResponse, got %s", reflect.TypeOf(obWs.Msg.Message).String())
+			return fmt.Errorf("was expecting WSSubscribeResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
 		}
 	}
 
-	if !obWs.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", obWs.Err)
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
-	obUpdate, ok := obWs.Msg.Message.(ftx.WSOrderBookUpdate)
+	obUpdate, ok := ws.Msg.Message.(ftx.WSOrderBookUpdate)
 	if !ok {
-		return fmt.Errorf("was expecting WSOrderBookUpdate, got %s", reflect.TypeOf(obWs.Msg.Message).String())
+		return fmt.Errorf("was expecting WSOrderBookUpdate, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
 	var bids, asks []gorderbook.OrderBookLevel
@@ -221,7 +212,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		depth = 10000
 	}
 
-	ts := uint64(obWs.Msg.Time.UnixNano()) / 1000000
+	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
 
 	ob := gorderbook.NewOrderBookL2(
 		tickPrecision,
@@ -234,32 +225,11 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
 
-	state.obWs = obWs
-
-	go func(ws *ftx.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
-		}
-	}(obWs, context.Self())
-
-	return nil
-}
-
-func (state *Listener) subscribeTrades(context actor.Context) error {
-	if state.tradeWs != nil {
-		_ = state.tradeWs.Disconnect()
-	}
-
-	ws := ftx.NewWebsocket()
-	if err := ws.Connect(); err != nil {
-		return fmt.Errorf("error connecting to websocket: %v", err)
-	}
-
 	if err := ws.Subscribe(state.security.Symbol, ftx.WSTradeChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
-	state.tradeWs = ws
+	state.ws = ws
 
 	go func(ws *ftx.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
@@ -338,7 +308,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		if state.instrumentData.orderBook.Crossed() {
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
-			return state.subscribeOrderBook(context)
+			return state.subscribeInstrument(context)
 		}
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			UpdateL2: obDelta,
@@ -407,25 +377,15 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
-		_ = state.tradeWs.Ping()
-		_ = state.obWs.Ping()
+		_ = state.ws.Ping()
 		state.lastPingTime = time.Now()
 	}
 
-	if state.obWs.Err != nil || !state.obWs.Connected {
-		if state.obWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.obWs.Err))
+	if state.ws.Err != nil || !state.ws.Connected {
+		if state.ws.Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws.Err))
 		}
-		if err := state.subscribeOrderBook(context); err != nil {
-			return fmt.Errorf("error subscribing to instrument: %v", err)
-		}
-	}
-
-	if state.tradeWs.Err != nil || !state.tradeWs.Connected {
-		if state.tradeWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.tradeWs.Err))
-		}
-		if err := state.subscribeTrades(context); err != nil {
+		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
 	}

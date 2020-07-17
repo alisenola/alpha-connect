@@ -376,7 +376,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-	fmt.Println("CHECK SOKCET")
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		// "Ping" by resubscribing to the topic
 		_ = state.obWs.Subscribe(state.security.Symbol, []string{bitz.WSDepthTopic})
