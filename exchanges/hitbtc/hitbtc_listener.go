@@ -1,6 +1,7 @@
 package hitbtc
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -281,11 +282,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		if update.Sequence != instr.lastUpdateSequence+1 {
 			state.logger.Info("error processing ob update for "+update.Symbol, log.Error(fmt.Errorf("out of order sequence")))
-			// Stop the socket, we will restart instrument at the end
-			if err := state.obWs.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
-			break
+			return state.subscribeOrderBook(context)
 		}
 
 		obDelta := &models.OBL2Update{
@@ -314,12 +311,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		if state.instrumentData.orderBook.Crossed() {
-			state.logger.Info("crossed order book")
-			// Stop the socket, we will restart instrument at the end
-			if err := state.obWs.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
-			}
-			break
+			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			return state.subscribeOrderBook(context)
 		}
 
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
