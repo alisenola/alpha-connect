@@ -72,7 +72,7 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewListener(security) }
 	case constants.BITSTAMP.ID:
-		return func() actor.Actor { return bitstamp.NewListener(security) }
+		return func() actor.Actor { return bitstamp.NewListenerL3(security) }
 	case constants.BITZ.ID:
 		return func() actor.Actor { return bitz.NewListener(security) }
 	case constants.COINBASEPRO.ID:

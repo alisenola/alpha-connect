@@ -28,7 +28,6 @@ type InstrumentData struct {
 	tickPrecision  uint64
 	lotPrecision   uint64
 	orderBook      *gorderbook.OrderBookL2
-	nCrossed       int
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
@@ -139,7 +138,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastHBTime:     time.Now(),
 		aggTrade:       nil,
 		lastAggTradeTs: 0,
-		nCrossed:       0,
 	}
 
 	if err := state.subscribeInstrument(context); err != nil {
@@ -237,7 +235,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
-	state.instrumentData.nCrossed = 0
 
 	if err := ws.SubscribeTrades(state.security.Symbol); err != nil {
 		return err

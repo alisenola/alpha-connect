@@ -387,7 +387,6 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, constants.DOLLAR.ID, time, N)
 	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
 	securityPrice := model.GetPrice(sec.SecurityID)
-
 	mul := sec.Multiplier.Value
 	makerFee := sec.makerFee
 

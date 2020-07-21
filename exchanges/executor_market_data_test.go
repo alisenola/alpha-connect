@@ -102,7 +102,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
 		}
-		if (math.Round(rawQty) - rawQty) > 0.0001 {
+		if (math.Round(rawQty) - rawQty) > 0.01 {
 			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
 		}
 	}
@@ -112,7 +112,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
 		}
-		if (math.Round(rawQty) - rawQty) > 0.0001 {
+		if (math.Round(rawQty) - rawQty) > 0.01 {
 			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
 		}
 	}
@@ -154,6 +154,10 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 			state.orderbook.UpdateOrderBookLevel(l)
 		}
 		if state.orderbook.Crossed() {
+			fmt.Println("CROSSED")
+			for _, l := range refresh.UpdateL2.Levels {
+				fmt.Println(l)
+			}
 			return fmt.Errorf("crossed OB \n" + state.orderbook.String())
 		}
 		state.OBUpdates += 1

@@ -177,7 +177,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.MarketDataRequest)
 	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -195,173 +194,157 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	symbol := msg.Instrument.Symbol.Value
-	// Get http request and the expected response
-	request, weight, err := bitstamp.GetOrderBook(
-		symbol,
-		bitstamp.OrderBookL2Group)
-	if err != nil {
-		return err
-	}
 
-	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-
-	state.rateLimit.Request(weight)
-
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	if msg.Aggregation == models.L2 {
+		var snapshot *models.OBL2Snapshot
+		// Get http request and the expected response
+		request, weight, err := bitstamp.GetOrderBook(
+			symbol,
+			bitstamp.OrderBookL2Group)
 		if err != nil {
-			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
-			context.Respond(response)
-			return
+			return err
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
 
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
-				context.Respond(response)
-				return
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RateLimitExceeded
+			context.Respond(response)
+			return nil
+		}
+
+		state.rateLimit.Request(weight)
+
+		future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+		context.AwaitFuture(future, func(res interface{}, err error) {
+			if err != nil {
 				state.logger.Info("http client error", log.Error(err))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return
 			}
-			return
-		}
+			queryResponse := res.(*jobs.PerformQueryResponse)
 
-		var obData bitstamp.OrderBookL2
-		err = json.Unmarshal(queryResponse.Response, &obData)
-		if err != nil {
-			err = fmt.Errorf("error decoding query response: %v", err)
-			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
+			if queryResponse.StatusCode != 200 {
+				if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return
+				} else if queryResponse.StatusCode >= 500 {
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return
+				}
+				return
+			}
+
+			var obData bitstamp.OrderBookL2
+			err = json.Unmarshal(queryResponse.Response, &obData)
+			if err != nil {
+				err = fmt.Errorf("error decoding query response: %v", err)
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+
+			bids, asks := obData.ToBidAsk()
+			snapshot = &models.OBL2Snapshot{
+				Bids:      bids,
+				Asks:      asks,
+				Timestamp: utils.MicroToTimestamp(obData.MicroTimestamp),
+			}
+			response.SnapshotL2 = snapshot
+			response.SeqNum = obData.MicroTimestamp
+			response.Success = true
 			context.Respond(response)
-			return
+		})
+	} else {
+		var snapshot *models.OBL3Snapshot
+		// Get http request and the expected response
+		request, weight, err := bitstamp.GetOrderBook(
+			symbol,
+			bitstamp.OrderBookL3Group)
+		if err != nil {
+			return err
 		}
 
-		bids, asks := obData.ToBidAsk()
-		snapshot = &models.OBL2Snapshot{
-			Bids:      bids,
-			Asks:      asks,
-			Timestamp: utils.MicroToTimestamp(obData.MicroTimestamp),
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RateLimitExceeded
+			context.Respond(response)
+			return nil
 		}
-		response.SnapshotL2 = snapshot
-		response.SeqNum = obData.MicroTimestamp
-		response.Success = true
-		context.Respond(response)
-	})
-	return nil
-}
 
-// TODO depth parameter in MarketDataRequest
-/*
-func (state *Executor) GetOrderBookL3Request(context actor.Context) error {
-	var snapshot *models.OBL3Snapshot
-	msg := context.Message().(*executor.GetOrderBookL3Request)
-	// Get http request and the expected response
-	request, weight, err := bitstamp.GetOrderBook(
-		msg.Instrument.Format(bitstamp.SymbolFormat),
-		bitstamp.OrderBookL3Group)
-	if err != nil {
-		return err
+		state.rateLimit.Request(weight)
+
+		future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+		context.AwaitFuture(future, func(res interface{}, err error) {
+			if err != nil {
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
+			}
+			queryResponse := res.(*jobs.PerformQueryResponse)
+
+			if queryResponse.StatusCode != 200 {
+				if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return
+				} else if queryResponse.StatusCode >= 500 {
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return
+				}
+				return
+			}
+
+			var obData bitstamp.OrderBookL3
+			err = json.Unmarshal(queryResponse.Response, &obData)
+			if err != nil {
+				err = fmt.Errorf("error decoding query response: %v", err)
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+
+			bids, asks := obData.ToBidAsk()
+			snapshot = &models.OBL3Snapshot{
+				Bids:      bids,
+				Asks:      asks,
+				Timestamp: utils.MicroToTimestamp(obData.MicroTimestamp),
+			}
+			response.SnapshotL3 = snapshot
+			response.SeqNum = obData.MicroTimestamp
+			response.Success = true
+			context.Respond(response)
+		})
 	}
 
-	if state.rateLimit.IsRateLimited() {
-		time.Sleep(state.rateLimit.DurationBeforeNextRequest(weight))
-	}
-
-	state.rateLimit.Request(weight)
-
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			context.Respond(&executor.GetOrderBookL3Response{
-				RequestID: msg.RequestID,
-				Error:     err,
-				Snapshot:  nil})
-			return
-		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&executor.GetOrderBookL3Response{
-					RequestID: msg.RequestID,
-					Error:     err,
-					Snapshot:  nil})
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				context.Respond(&executor.GetOrderBookL3Response{
-					RequestID: msg.RequestID,
-					Error:     err,
-					Snapshot:  nil})
-			}
-			return
-		}
-		var obData bitstamp.OrderBookL3
-		err = json.Unmarshal(queryResponse.Response, &obData)
-		if err != nil {
-			err = fmt.Errorf("error decoding query response: %v", err)
-			context.Respond(&executor.GetOrderBookL3Response{
-				RequestID: msg.RequestID,
-				Error:     err,
-				Snapshot:  nil})
-			return
-		}
-		var maxSequence uint64 = 0
-		for _, bid := range obData.Bids {
-			if bid.OrderID > maxSequence {
-				maxSequence = bid.OrderID
-			}
-		}
-		for _, ask := range obData.Asks {
-			if ask.OrderID > maxSequence {
-				maxSequence = ask.OrderID
-			}
-		}
-
-		bids, asks := obData.ToBidAsk()
-
-		snapshot = &models.OBL3Snapshot{
-			Bids:       bids,
-			Asks:       asks,
-			Timestamp:  utils.MicroToTimestamp(obData.MicroTimestamp),
-			SeqNum:     maxSequence * 1000,
-		}
-
-		context.Respond(&messages.MarketDataSnapshot{
-			RequestID:  msg.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			SnapshotL3: snapshot})
-	})
 	return nil
 }
-
-*/
 
 func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
