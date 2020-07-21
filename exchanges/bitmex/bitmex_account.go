@@ -2,6 +2,7 @@ package bitmex
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -1128,20 +1129,25 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	}, 10*time.Second).Result()
 
 	if err != nil {
-		return fmt.Errorf("error getting balances from executor: %v", err)
+		state.logger.Info("error getting balances from executor", log.Error(err))
+		return nil
 	}
 
 	balanceList, ok := res.(*messages.BalanceList)
 	if !ok {
-		return fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
+		err := fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
+		state.logger.Info("error getting balances from executor", log.Error(err))
+		return nil
 	}
 
 	if !balanceList.Success {
-		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+		state.logger.Info("error getting balances from executor", log.Error(errors.New(balanceList.RejectionReason.String())))
+		return nil
 	}
 
 	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+		state.logger.Info("error getting balances from executor", log.Error(errors.New("was expecting one balance")))
+		return nil
 	}
 
 	// Fetch positions
@@ -1151,16 +1157,21 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	}, 10*time.Second).Result()
 
 	if err != nil {
-		return fmt.Errorf("error getting positions from executor: %v", err)
+		state.logger.Info("error getting position from executor", log.Error(err))
+		return nil
 	}
 
 	positionList, ok := res.(*messages.PositionList)
 	if !ok {
-		return fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
+		err := fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
+		state.logger.Info("error getting position from executor", log.Error(err))
+		return nil
 	}
 
 	if !positionList.Success {
-		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
+		err := fmt.Errorf("%s", positionList.RejectionReason.String())
+		state.logger.Info("error getting position from executor", log.Error(err))
+		return nil
 	}
 
 	rawMargin1 := int(math.Round(state.account.GetMargin() * state.account.MarginPrecision))
