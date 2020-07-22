@@ -413,11 +413,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			} else {
 				if !state.instrumentData.matching {
 					state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
-					fmt.Println(state.instrumentData.orderBook)
 					return state.subscribeInstrument(context)
-				} else {
-					fmt.Println("MATCHING")
-					fmt.Println(state.instrumentData.orderBook)
 				}
 			}
 		}
