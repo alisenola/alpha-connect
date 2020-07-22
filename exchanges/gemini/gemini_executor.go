@@ -151,13 +151,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if tickPrecision, ok := gemini.SYMBOL_TO_TICK_PRECISION[symbol]; ok {
 			security.MinPriceIncrement = 1. / float64(tickPrecision)
 		} else {
-			state.logger.Info(fmt.Sprintf("unknown tick precision for %s", symbol))
+			//state.logger.Info(fmt.Sprintf("unknown tick precision for %s", symbol))
 			continue
 		}
 		if lotPrecision, ok := gemini.SYMBOL_TO_LOT_PRECISION[symbol]; ok {
 			security.RoundLot = 1. / float64(lotPrecision)
 		} else {
-			state.logger.Info(fmt.Sprintf("unknown lot precision for %s", symbol))
+			//state.logger.Info(fmt.Sprintf("unknown lot precision for %s", symbol))
 			continue
 		}
 
