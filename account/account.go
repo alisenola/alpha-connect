@@ -11,10 +11,12 @@ import (
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"
+	"time"
 )
 
 type Order struct {
 	*models.Order
+	lastEventTime     time.Time
 	previousStatus    models.OrderStatus
 	pendingAmendPrice *types.DoubleValue
 	pendingAmendQty   *types.DoubleValue
@@ -201,6 +203,7 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	}
 	accnt.ordersClID[order.ClientOrderID] = &Order{
 		Order:          order,
+		lastEventTime:  time.Now(),
 		previousStatus: order.OrderStatus,
 	}
 	return &messages.ExecutionReport{
@@ -229,6 +232,7 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	}
 	order.OrderID = ID
 	order.OrderStatus = models.New
+	order.lastEventTime = time.Now()
 	accnt.ordersID[ID] = order
 
 	if order.OrderType == models.Limit {
@@ -297,6 +301,8 @@ func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity
 	order.pendingAmendQty = quantity
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.PendingReplace
+	order.lastEventTime = time.Now()
+
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
@@ -325,6 +331,8 @@ func (accnt *Account) ConfirmReplaceOrder(ID string) (*messages.ExecutionReport,
 		return nil, ErrNotPendingReplace
 	}
 	order.OrderStatus = order.previousStatus
+	order.lastEventTime = time.Now()
+
 	if order.pendingAmendQty != nil {
 		order.LeavesQuantity = order.pendingAmendQty.Value
 		order.pendingAmendQty = nil
@@ -372,6 +380,7 @@ func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionRea
 
 	if order.OrderStatus == models.PendingReplace {
 		order.OrderStatus = order.previousStatus
+		order.lastEventTime = time.Now()
 	}
 
 	return &messages.ExecutionReport{
@@ -412,6 +421,7 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 	// Save current order status in case cancel gets rejected
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.PendingCancel
+	order.lastEventTime = time.Now()
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -442,6 +452,7 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	}
 
 	order.OrderStatus = models.Canceled
+	order.lastEventTime = time.Now()
 	order.LeavesQuantity = 0.
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
@@ -477,6 +488,7 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	}
 	if order.OrderStatus == models.PendingCancel {
 		order.OrderStatus = order.previousStatus
+		order.lastEventTime = time.Now()
 	}
 
 	return &messages.ExecutionReport{
@@ -522,6 +534,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	} else {
 		order.OrderStatus = models.PartiallyFilled
 	}
+	order.lastEventTime = time.Now()
 
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
@@ -684,12 +697,12 @@ func (accnt *Account) CleanOrders() {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
-		if o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled {
+		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
 		}
 	}
 	for k, o := range accnt.ordersID {
-		if o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled {
+		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
 		}
 	}
