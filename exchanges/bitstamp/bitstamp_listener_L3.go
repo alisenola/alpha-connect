@@ -28,6 +28,7 @@ type InstrumentDataL3 struct {
 	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
 	levelDeltas    []gorderbook.OrderBookLevel
+	matching       bool
 }
 
 // OBType: OBL3
@@ -259,6 +260,7 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.orderBook = ob
 	state.instrumentData.levelDeltas = nil
+	state.instrumentData.matching = false
 
 	if err := ws.Subscribe(state.security.Symbol, bitstamp.WSLiveTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream for symbol %s", state.security.Symbol)
@@ -329,7 +331,10 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		if !state.instrumentData.orderBook.Crossed() {
 			// Send the deltas
 			ts := uint64(msg.Time.UnixNano()) / 1000000
+			state.instrumentData.matching = false
 			state.postDelta(context, ts)
+		} else {
+			state.instrumentData.matching = true
 		}
 
 	case bitstamp.WSChangedOrder:
@@ -377,6 +382,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		if !state.instrumentData.orderBook.Crossed() {
 			// Send the deltas
 			ts := uint64(msg.Time.UnixNano()) / 1000000
+			state.instrumentData.matching = false
 			state.postDelta(context, ts)
 		}
 
@@ -400,10 +406,17 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 			if !state.instrumentData.orderBook.Crossed() {
 				ts := uint64(msg.Time.UnixNano()) / 1000000
+				state.instrumentData.matching = false
 				state.postDelta(context, ts)
 			} else {
-				state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
-				return state.subscribeInstrument(context)
+				if !state.instrumentData.matching {
+					state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+					fmt.Println(state.instrumentData.orderBook)
+					return state.subscribeInstrument(context)
+				} else {
+					//fmt.Println("MATCHING")
+					//fmt.Println(state.instrumentData.orderBook)
+				}
 			}
 		}
 
