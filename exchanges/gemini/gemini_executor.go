@@ -132,12 +132,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		quoteStr := strings.ToUpper(symbol[3:])
 		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
 		if !ok {
-			state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
+			///state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
 		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
 		if !ok {
-			state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
 			continue
 		}
 		security := models.Security{}
