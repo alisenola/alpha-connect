@@ -384,6 +384,8 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			ts := uint64(msg.Time.UnixNano()) / 1000000
 			state.instrumentData.matching = false
 			state.postDelta(context, ts)
+		} else {
+			state.instrumentData.matching = true
 		}
 
 	case bitstamp.WSDeletedOrder:
@@ -414,8 +416,8 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 					fmt.Println(state.instrumentData.orderBook)
 					return state.subscribeInstrument(context)
 				} else {
-					//fmt.Println("MATCHING")
-					//fmt.Println(state.instrumentData.orderBook)
+					fmt.Println("MATCHING")
+					fmt.Println(state.instrumentData.orderBook)
 				}
 			}
 		}
