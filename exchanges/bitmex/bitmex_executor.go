@@ -65,6 +65,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
 			TLSHandshakeTimeout: 10 * time.Second,
+			IdleConnTimeout:     0,
 		},
 		Timeout: 10 * time.Second,
 	}
