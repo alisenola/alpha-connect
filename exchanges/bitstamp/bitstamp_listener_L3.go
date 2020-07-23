@@ -467,7 +467,7 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
-		_ = state.ws.Subscribe(state.security.Symbol, bitstamp.WSOrderBookChannel)
+		_ = state.ws.Subscribe(state.security.Symbol, bitstamp.WSLiveOrdersChannel)
 		state.lastPingTime = time.Now()
 	}
 
