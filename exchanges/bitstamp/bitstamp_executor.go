@@ -142,8 +142,14 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Enabled = pair.Trading == "Enabled"
 		baseName := strings.Split(pair.Name, "/")[0]
 		quoteName := strings.Split(pair.Name, "/")[1]
-		baseCurrency := constants.SYMBOL_TO_ASSET[baseName]
-		quoteCurrency := constants.SYMBOL_TO_ASSET[quoteName]
+		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseName]
+		if !ok {
+			continue
+		}
+		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteName]
+		if !ok {
+			continue
+		}
 		security.Symbol = pair.URLSymbol
 		security.Underlying = &baseCurrency
 		security.QuoteCurrency = &quoteCurrency

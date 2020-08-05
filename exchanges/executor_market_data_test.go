@@ -19,6 +19,7 @@ import (
 type GetStat struct {
 	Error     error
 	Trades    int
+	AggTrades int
 	OBUpdates int
 }
 
@@ -28,6 +29,7 @@ type OBChecker struct {
 	seqNum    uint64
 	synced    bool
 	trades    int
+	aggTrades int
 	OBUpdates int
 	err       error
 }
@@ -45,6 +47,7 @@ func NewOBChecker(security *models.Security) actor.Actor {
 		seqNum:    0,
 		synced:    false,
 		trades:    0,
+		aggTrades: 0,
 		OBUpdates: 0,
 		err:       nil,
 	}
@@ -68,6 +71,7 @@ func (state *OBChecker) Receive(context actor.Context) {
 		context.Respond(&GetStat{
 			Error:     state.err,
 			Trades:    state.trades,
+			AggTrades: state.aggTrades,
 			OBUpdates: state.OBUpdates,
 		})
 	}
@@ -164,6 +168,7 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 	}
 
 	for _, aggT := range refresh.Trades {
+		state.aggTrades += 1
 		for _, t := range aggT.Trades {
 			rawPrice := t.Price * float64(tickPrecision)
 			rawQty := t.Quantity * float64(lotPrecision)
@@ -1288,6 +1293,86 @@ func TestOKCoin(t *testing.T) {
 	}
 	stats := res.(*GetStat)
 	t.Logf("Trades: %d | OBUpdates: %d", stats.Trades, stats.OBUpdates)
+	if stats.Error != nil {
+		t.Fatal(stats.Error)
+	}
+}
+
+func TestDeribit(t *testing.T) {
+	defer clean()
+	exchanges := []*xchangerModels.Exchange{&constants.DERIBIT}
+	securityID := []uint64{
+		2206542817128348325,
+	}
+	testedSecurities := make(map[uint64]*models.Security)
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
+
+	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
+	}
+	for _, s := range securityList.Securities {
+		fmt.Println(s)
+		tested := false
+		for _, secID := range securityID {
+			if secID == s.SecurityID {
+				tested = true
+				break
+			}
+		}
+		if tested {
+			testedSecurities[s.SecurityID] = s
+		}
+	}
+
+	// Test
+	sec, ok := testedSecurities[2206542817128348325]
+	if !ok {
+		t.Fatalf("security not found")
+	}
+	if sec.Symbol != "BTC-PERPETUAL" {
+		t.Fatalf("was expecting symbol BTC-PERPETUAL, got %s", sec.Symbol)
+	}
+	if sec.SecurityType != enum.SecurityType_CRYPTO_PERP {
+		t.Fatalf("was expecting CRPERP type, got %s", sec.SecurityType)
+	}
+	if sec.Exchange.Name != constants.DERIBIT.Name {
+		t.Fatalf("was expecting DERIBIT exchange, got %s", sec.Exchange.Name)
+	}
+	if sec.Underlying.ID != constants.BITCOIN.ID {
+		t.Fatalf("was expecting bitcoin underlying, got %d", sec.Underlying.ID)
+	}
+	if sec.QuoteCurrency.ID != constants.DOLLAR.ID {
+		t.Fatalf("was expecting USD quote, got %d", sec.QuoteCurrency.ID)
+	}
+	if !sec.IsInverse {
+		t.Fatalf("was expecting inverse, got non inverse")
+	}
+	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	}
+	if math.Abs(sec.RoundLot-10.) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	}
+	if sec.MaturityDate != nil {
+		t.Fatalf("was expecting nil maturity date")
+	}
+
+	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
+	time.Sleep(20 * time.Second)
+	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := res.(*GetStat)
+	t.Logf("Agg Trades: %d | Trades: %d | OBUpdates: %d", stats.AggTrades, stats.Trades, stats.OBUpdates)
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
 	}

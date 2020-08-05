@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alphac/exchanges/bitz"
 	"gitlab.com/alphaticks/alphac/exchanges/coinbasepro"
 	"gitlab.com/alphaticks/alphac/exchanges/cryptofacilities"
+	"gitlab.com/alphaticks/alphac/exchanges/deribit"
 	"gitlab.com/alphaticks/alphac/exchanges/fbinance"
 	"gitlab.com/alphaticks/alphac/exchanges/ftx"
 	"gitlab.com/alphaticks/alphac/exchanges/gemini"
@@ -93,6 +94,8 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		return func() actor.Actor { return kraken.NewListener(security) }
 	case constants.OKCOIN.ID:
 		return func() actor.Actor { return okcoin.NewListener(security) }
+	case constants.DERIBIT.ID:
+		return func() actor.Actor { return deribit.NewListener(security) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -132,7 +135,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return kraken.NewExecutor() }
 	case constants.OKCOIN.ID:
 		return func() actor.Actor { return okcoin.NewExecutor() }
-
+	case constants.DERIBIT.ID:
+		return func() actor.Actor { return deribit.NewExecutor() }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }
