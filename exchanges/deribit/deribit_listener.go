@@ -201,7 +201,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			Bid:      false,
 		}
 	}
-
+	if len(update.Asks) == 0 || len(update.Bids) == 0 {
+		return fmt.Errorf("empty bid or ask")
+	}
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
 	bestAsk := update.Asks[0].Price
@@ -220,6 +222,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	)
 
 	ob.Sync(bids, asks)
+	fmt.Println(ob)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -324,12 +327,18 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		})
 
 		var aggTrade *models.AggregatedTrade
+		var aggHelpR uint64 = 0
+
 		for _, trade := range tradeData {
-			aggID := trade.Timestamp
+			aggHelp := trade.Timestamp
 			if trade.Direction == "buy" {
-				aggID += 1
+				aggHelp += 1
 			}
-			if aggTrade == nil || aggTrade.AggregateID != aggID {
+			tradeID, err := strconv.ParseInt(trade.TradeID, 10, 64)
+			if err != nil {
+				return fmt.Errorf("error parsing trade ID: %s %v", trade.TradeID, err)
+			}
+			if aggTrade == nil || aggHelpR != aggHelp {
 				if aggTrade != nil {
 					// Send aggregate trade
 					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
@@ -346,14 +355,12 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				aggTrade = &models.AggregatedTrade{
 					Bid:         trade.Direction == "sell",
 					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: aggID,
+					AggregateID: uint64(tradeID),
 					Trades:      nil,
 				}
+				aggHelpR = aggHelp
 			}
-			tradeID, err := strconv.ParseInt(trade.TradeID, 10, 64)
-			if err != nil {
-				return fmt.Errorf("error parsing trade ID: %s %v", trade.TradeID, err)
-			}
+
 			trade := models.Trade{
 				Price:    trade.Price,
 				Quantity: trade.Amount,

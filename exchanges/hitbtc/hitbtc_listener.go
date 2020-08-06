@@ -302,13 +302,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			return trades.Data[i].ID < trades.Data[j].ID
 		})
 		var aggTrade *models.AggregatedTrade
+		var aggHelpR uint64 = 0
 		for _, trade := range trades.Data {
-			aggID := uint64(trade.Timestamp.UnixNano()/1000000) * 10
+			aggHelp := uint64(trade.Timestamp.UnixNano()/1000000) * 10
 			// do that so new agg trade if side changes
 			if trade.Side == "sell" {
-				aggID += 1
+				aggHelp += 1
 			}
-			if aggTrade == nil || aggTrade.AggregateID != aggID {
+			if aggTrade == nil || aggHelpR != aggHelp {
 
 				if aggTrade != nil {
 					// Send aggregate trade
@@ -326,9 +327,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				aggTrade = &models.AggregatedTrade{
 					Bid:         trade.Side == "sell",
 					Timestamp:   utils.MilliToTimestamp(ts),
-					AggregateID: aggID,
+					AggregateID: trade.ID,
 					Trades:      nil,
 				}
+				aggHelpR = aggHelp
 			}
 
 			trd := models.Trade{

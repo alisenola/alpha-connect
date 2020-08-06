@@ -340,7 +340,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			aggTrade := &models.AggregatedTrade{
 				Bid:         tradeData.MarketSell,
 				Timestamp:   utils.MilliToTimestamp(ts),
-				AggregateID: aggregateID,
+				AggregateID: uint64(tradeData.TradeID),
 				Trades:      nil,
 			}
 			state.instrumentData.aggTrade = aggTrade
