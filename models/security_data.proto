@@ -65,6 +65,7 @@ message Security {
     google.protobuf.DoubleValue taker_fee = 12;
     google.protobuf.DoubleValue multiplier = 13;
     google.protobuf.Timestamp maturity_date = 14;
+    google.protobuf.StringValue securitySubType = 15;
 }
 
 message Order {
