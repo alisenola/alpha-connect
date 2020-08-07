@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alphac/exchanges/bitmex"
 	"gitlab.com/alphaticks/alphac/exchanges/bitstamp"
 	"gitlab.com/alphaticks/alphac/exchanges/bitz"
+	"gitlab.com/alphaticks/alphac/exchanges/bybit"
 	"gitlab.com/alphaticks/alphac/exchanges/coinbasepro"
 	"gitlab.com/alphaticks/alphac/exchanges/cryptofacilities"
 	"gitlab.com/alphaticks/alphac/exchanges/deribit"
@@ -86,8 +87,6 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		return func() actor.Actor { return fbinance.NewListener(security) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewListener(security) }
-	case constants.HUOBI.ID:
-		return func() actor.Actor { return huobi.NewListener(security) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewListener(security) }
 	case constants.HITBTC.ID:
@@ -98,10 +97,14 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		return func() actor.Actor { return okcoin.NewListener(security) }
 	case constants.DERIBIT.ID:
 		return func() actor.Actor { return deribit.NewListener(security) }
+	case constants.HUOBI.ID:
+		return func() actor.Actor { return huobi.NewListener(security) }
 	case constants.HUOBIP.ID:
 		return func() actor.Actor { return huobip.NewListener(security) }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewListener(security) }
+	case constants.BYBIT.ID:
+		return func() actor.Actor { return bybit.NewListener(security) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -131,8 +134,6 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return fbinance.NewExecutor() }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewExecutor() }
-	case constants.HUOBI.ID:
-		return func() actor.Actor { return huobi.NewExecutor() }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewExecutor() }
 	case constants.HITBTC.ID:
@@ -143,10 +144,14 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return okcoin.NewExecutor() }
 	case constants.DERIBIT.ID:
 		return func() actor.Actor { return deribit.NewExecutor() }
+	case constants.HUOBI.ID:
+		return func() actor.Actor { return huobi.NewExecutor() }
 	case constants.HUOBIP.ID:
 		return func() actor.Actor { return huobip.NewExecutor() }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewExecutor() }
+	case constants.BYBIT.ID:
+		return func() actor.Actor { return bybit.NewExecutor() }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }
