@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
 	seqNum         uint64
 	lastUpdateTime uint64
+	lastUpdateID   uint64
 	lastHBTime     time.Time
 	lastAggTradeTs uint64
 }
@@ -222,10 +224,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	)
 
 	ob.Sync(bids, asks)
-	fmt.Println(ob)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.lastUpdateID = update.ChangeID
 
 	if err, _ := ws.SubscribeTrade(state.security.Symbol, deribit.Interval0ms); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
@@ -275,6 +277,16 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case deribit.OrderBookUpdate:
 		obData := msg.Message.(deribit.OrderBookUpdate)
 		instr := state.instrumentData
+
+		if obData.ChangeID <= instr.lastUpdateID {
+			break
+		}
+
+		if obData.PreviousChangeID != instr.lastUpdateID {
+			state.logger.Info("error processing ob update", log.Error(fmt.Errorf("out of order sequence")))
+			return state.subscribeInstrument(context)
+		}
+
 		nLevels := len(obData.Bids) + len(obData.Asks)
 
 		ts := uint64(msg.Time.UnixNano()) / 1000000
@@ -306,9 +318,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			instr.orderBook.UpdateOrderBookLevel(level)
 		}
 
-		instr.lastUpdateTime = ts
-
 		if state.instrumentData.orderBook.Crossed() {
+			fmt.Println(state.instrumentData.orderBook)
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeInstrument(context)
 		}
@@ -317,6 +328,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			SeqNum:   state.instrumentData.seqNum + 1,
 		})
 		state.instrumentData.seqNum += 1
+		state.instrumentData.lastUpdateID = obData.ChangeID
+		state.instrumentData.lastUpdateTime = ts
 
 	case deribit.TradeUpdate:
 		tradeData := msg.Message.(deribit.TradeUpdate)
@@ -334,7 +347,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			if trade.Direction == "buy" {
 				aggHelp += 1
 			}
-			tradeID, err := strconv.ParseInt(trade.TradeID, 10, 64)
+			splits := strings.Split(trade.TradeID, "-")
+			tradeID, err := strconv.ParseInt(splits[len(splits)-1], 10, 64)
 			if err != nil {
 				return fmt.Errorf("error parsing trade ID: %s %v", trade.TradeID, err)
 			}
