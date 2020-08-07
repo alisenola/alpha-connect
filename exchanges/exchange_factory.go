@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/alphac/exchanges/gemini"
 	"gitlab.com/alphaticks/alphac/exchanges/hitbtc"
 	"gitlab.com/alphaticks/alphac/exchanges/huobi"
+	"gitlab.com/alphaticks/alphac/exchanges/huobif"
 	"gitlab.com/alphaticks/alphac/exchanges/huobip"
 	"gitlab.com/alphaticks/alphac/exchanges/kraken"
 	"gitlab.com/alphaticks/alphac/exchanges/okcoin"
@@ -99,6 +100,8 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		return func() actor.Actor { return deribit.NewListener(security) }
 	case constants.HUOBIP.ID:
 		return func() actor.Actor { return huobip.NewListener(security) }
+	case constants.HUOBIF.ID:
+		return func() actor.Actor { return huobif.NewListener(security) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -142,6 +145,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return deribit.NewExecutor() }
 	case constants.HUOBIP.ID:
 		return func() actor.Actor { return huobip.NewExecutor() }
+	case constants.HUOBIF.ID:
+		return func() actor.Actor { return huobif.NewExecutor() }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }
