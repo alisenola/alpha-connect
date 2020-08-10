@@ -1,4 +1,4 @@
-package bybit
+package bybitl
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/bybit"
+	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -74,7 +74,7 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	request, weight, err := bybit.GetSymbols()
+	request, weight, err := bybiti.GetSymbols()
 	if err != nil {
 		return err
 	}
@@ -119,11 +119,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	type Res struct {
-		ReturnCode    int            `json:"ret_code"`
-		ReturnMessage string         `json:"ret_msg"`
-		ExitCode      string         `json:"ext_code"`
-		ExitInfo      string         `json:"ext_info"`
-		Result        []bybit.Symbol `json:"result"`
+		ReturnCode    int             `json:"ret_code"`
+		ReturnMessage string          `json:"ret_msg"`
+		ExitCode      string          `json:"ext_code"`
+		ExitInfo      string          `json:"ext_info"`
+		Result        []bybiti.Symbol `json:"result"`
 	}
 	var data Res
 	err = json.Unmarshal(response, &data)
@@ -142,6 +142,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, symbol := range data.Result {
+		// Only linear
+		if symbol.QuoteCurrency == "USD" {
+			continue
+		}
 		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseCurrency]
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
@@ -156,13 +160,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Name
 		security.Underlying = &baseCurrency
 		security.QuoteCurrency = &quoteCurrency
-		security.Enabled = true
-		security.Exchange = &constants.BYBIT
+		security.Enabled = false
+		security.Exchange = &constants.BYBITL
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		security.MinPriceIncrement = symbol.PriceFilter.TickSize
 		security.RoundLot = symbol.LotSizeFilter.QuantityStep
-		security.IsInverse = symbol.QuoteCurrency == "USD"
+		security.IsInverse = true
 		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}
 

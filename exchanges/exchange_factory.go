@@ -8,7 +8,8 @@ import (
 	"gitlab.com/alphaticks/alphac/exchanges/bitmex"
 	"gitlab.com/alphaticks/alphac/exchanges/bitstamp"
 	"gitlab.com/alphaticks/alphac/exchanges/bitz"
-	"gitlab.com/alphaticks/alphac/exchanges/bybit"
+	"gitlab.com/alphaticks/alphac/exchanges/bybiti"
+	"gitlab.com/alphaticks/alphac/exchanges/bybitl"
 	"gitlab.com/alphaticks/alphac/exchanges/coinbasepro"
 	"gitlab.com/alphaticks/alphac/exchanges/cryptofacilities"
 	"gitlab.com/alphaticks/alphac/exchanges/deribit"
@@ -103,8 +104,10 @@ func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
 		return func() actor.Actor { return huobip.NewListener(security) }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewListener(security) }
-	case constants.BYBIT.ID:
-		return func() actor.Actor { return bybit.NewListener(security) }
+	case constants.BYBITI.ID:
+		return func() actor.Actor { return bybiti.NewListener(security) }
+	case constants.BYBITL.ID:
+		return func() actor.Actor { return bybitl.NewListener(security) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -150,8 +153,10 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return huobip.NewExecutor() }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewExecutor() }
-	case constants.BYBIT.ID:
-		return func() actor.Actor { return bybit.NewExecutor() }
+	case constants.BYBITI.ID:
+		return func() actor.Actor { return bybiti.NewExecutor() }
+	case constants.BYBITL.ID:
+		return func() actor.Actor { return bybitl.NewExecutor() }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }

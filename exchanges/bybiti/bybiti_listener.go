@@ -1,4 +1,4 @@
-package bybit
+package bybiti
 
 import (
 	"encoding/binary"
@@ -11,7 +11,7 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/exchanges/bybit"
+	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
 	"math"
 	"reflect"
 	"sort"
@@ -30,7 +30,7 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws              *bybit.Websocket
+	ws              *bybiti.Websocket
 	security        *models.Security
 	instrumentData  *InstrumentData
 	executorManager *actor.PID
@@ -90,7 +90,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bybit.WebsocketMessage:
+	case *bybiti.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -166,12 +166,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := bybit.NewWebsocket()
+	ws := bybiti.NewWebsocket()
 	if err := ws.Connect(); err != nil {
 		return fmt.Errorf("error connecting to bybit websocket: %v", err)
 	}
 
-	if err := ws.SubscribeOrderBook(state.security.Symbol, bybit.WSOrderBookDepth200, bybit.WS100ms); err != nil {
+	if err := ws.SubscribeOrderBook(state.security.Symbol, bybiti.WSOrderBookDepth200, bybiti.WS100ms); err != nil {
 		return fmt.Errorf("error subscribing to orderbook for %s", state.security.Symbol)
 	}
 
@@ -183,8 +183,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 
 		switch ws.Msg.Message.(type) {
-		case bybit.OrderBookSnapshot:
-			res := ws.Msg.Message.(bybit.OrderBookSnapshot)
+		case bybiti.OrderBookSnapshot:
+			res := ws.Msg.Message.(bybiti.OrderBookSnapshot)
 			bids, asks := res.ToBidAsk()
 			tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
 			lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
@@ -200,8 +200,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 			nTries = 100
 
-		case bybit.WSResponse:
-			res := ws.Msg.Message.(bybit.WSResponse)
+		case bybiti.WSResponse:
+			res := ws.Msg.Message.(bybiti.WSResponse)
 			if !res.Success {
 				err := fmt.Errorf("error getting orderbook: %s", res.ReturnMessage)
 				return err
@@ -220,7 +220,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	state.ws = ws
 
-	go func(ws *bybit.Websocket, pid *actor.PID) {
+	go func(ws *bybiti.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			actor.EmptyRootContext.Send(pid, ws.Msg)
 		}
@@ -251,15 +251,15 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*bybit.WebsocketMessage)
+	msg := context.Message().(*bybiti.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
 		return fmt.Errorf("OB socket error: %v", msg)
 
-	case bybit.OrderBookDelta:
+	case bybiti.OrderBookDelta:
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-		update := msg.Message.(bybit.OrderBookDelta)
+		update := msg.Message.(bybiti.OrderBookDelta)
 
 		instr := state.instrumentData
 		if update.Sequence <= instr.lastUpdateID {
@@ -315,9 +315,9 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr.lastUpdateID = update.Sequence
 		//state.postSnapshot(context)
 
-	case bybit.TradeDelta:
+	case bybiti.TradeDelta:
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-		trades := msg.Message.(bybit.TradeDelta)
+		trades := msg.Message.(bybiti.TradeDelta)
 		if len(trades) == 0 {
 			break
 		}
@@ -380,7 +380,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
-	case bybit.WSResponse:
+	case bybiti.WSResponse:
 
 	default:
 		state.logger.Info("received unknown message",
