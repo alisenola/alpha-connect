@@ -7,7 +7,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20200703081116-690c4dda7a71
-	gitlab.com/alphaticks/xchanger v0.0.0-20200808114521-3f0f2ca2041e
+	gitlab.com/alphaticks/xchanger v0.0.0-20200810090601-93c0489c3de7
 	gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 // indirect
 )
 
