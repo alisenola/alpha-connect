@@ -308,7 +308,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		o := msg.Message.(bitstamp.WSCreatedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
-			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) * float64(state.instrumentData.lotPrecision),
+			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
 			ID:       o.ID,
 		}
@@ -340,7 +340,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		o := msg.Message.(bitstamp.WSChangedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
-			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) * float64(state.instrumentData.lotPrecision),
+			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
 			ID:       o.ID,
 		}
