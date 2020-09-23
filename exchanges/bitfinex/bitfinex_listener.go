@@ -249,7 +249,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
 
 	ob.Sync(bids, asks)
-	fmt.Println(ob)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
