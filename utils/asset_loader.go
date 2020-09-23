@@ -117,7 +117,6 @@ func (state *AssetLoader) onReady(context actor.Context) error {
 }
 
 func (state *AssetLoader) checkAsset(context actor.Context) error {
-	fmt.Println("CHECK")
 	var data []byte
 	if state.assetFile[0:5] == "gs://" {
 		ctx := goContext.Background()
