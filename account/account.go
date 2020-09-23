@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"
@@ -62,9 +63,11 @@ type Account struct {
 	margin          int64
 	MarginCurrency  *xchangerModels.Asset
 	MarginPrecision float64
+	quoteCurrency   *xchangerModels.Asset
 }
 
-func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, marginPrecision float64) *Account {
+func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, marginPrecision float64) (*Account, error) {
+	quoteCurrency := &constants.DOLLAR
 	accnt := &Account{
 		Account:         account,
 		ordersID:        make(map[string]*Order),
@@ -76,18 +79,23 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 		margin:          0,
 		MarginCurrency:  marginCurrency,
 		MarginPrecision: marginPrecision,
+		quoteCurrency:   quoteCurrency,
 	}
 
-	return accnt
+	return accnt, nil
 }
 
 func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64, makerFee, takerFee *float64) error {
 	accnt.Lock()
 	defer accnt.Unlock()
+	var err error
 	for _, s := range securities {
 		switch s.SecurityType {
 		case enum.SecurityType_CRYPTO_PERP, enum.SecurityType_CRYPTO_FUT:
-			accnt.securities[s.SecurityID] = NewMarginSecurity(s, accnt.MarginCurrency, makerFee, takerFee)
+			accnt.securities[s.SecurityID], err = NewMarginSecurity(s, accnt.MarginCurrency, accnt.quoteCurrency, makerFee, takerFee)
+			if err != nil {
+				return err
+			}
 			posMakerFee := s.MakerFee.Value
 			if makerFee != nil {
 				posMakerFee = *makerFee
@@ -96,17 +104,23 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 			if takerFee != nil {
 				posTakerFee = *takerFee
 			}
+			if s.MinPriceIncrement == nil || s.RoundLot == nil {
+				return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+			}
 			accnt.positions[s.SecurityID] = &Position{
 				inverse:         s.IsInverse,
-				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement),
-				lotPrecision:    math.Ceil(1. / s.RoundLot),
+				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement.Value),
+				lotPrecision:    math.Ceil(1. / s.RoundLot.Value),
 				marginPrecision: accnt.MarginPrecision,
 				multiplier:      s.Multiplier.Value,
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
 		case enum.SecurityType_CRYPTO_SPOT:
-			accnt.securities[s.SecurityID] = NewSpotSecurity(s, makerFee, takerFee)
+			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
+			if err != nil {
+				return err
+			}
 			accnt.assets[s.Underlying.ID] = s.Underlying
 			accnt.assets[s.QuoteCurrency.ID] = s.QuoteCurrency
 		}

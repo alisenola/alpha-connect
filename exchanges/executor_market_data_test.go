@@ -24,15 +24,17 @@ type GetStat struct {
 }
 
 type OBChecker struct {
-	security    *models.Security
-	orderbook   *gorderbook.OrderBookL2
-	seqNum      uint64
-	synced      bool
-	trades      int
-	aggTrades   int
-	aggTradeIDs map[uint64]bool
-	OBUpdates   int
-	err         error
+	security      *models.Security
+	orderbook     *gorderbook.OrderBookL2
+	tickPrecision uint64
+	lotPrecision  uint64
+	seqNum        uint64
+	synced        bool
+	trades        int
+	aggTrades     int
+	aggTradeIDs   map[uint64]bool
+	OBUpdates     int
+	err           error
 }
 
 func NewOBCheckerProducer(security *models.Security) actor.Producer {
@@ -100,8 +102,27 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 		return fmt.Errorf("was expecting market data snapshot, got %s", reflect.TypeOf(res).String())
 	}
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	var tickPrecision uint64
+	if response.SnapshotL2.TickPrecision != nil {
+		tickPrecision = response.SnapshotL2.TickPrecision.Value
+	} else if state.security.MinPriceIncrement != nil {
+		tickPrecision = uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	} else {
+		return fmt.Errorf("unable to get tick precision")
+	}
+
+	var lotPrecision uint64
+	if response.SnapshotL2.LotPrecision != nil {
+		lotPrecision = response.SnapshotL2.LotPrecision.Value
+	} else if state.security.RoundLot != nil {
+		lotPrecision = uint64(math.Ceil(1. / state.security.RoundLot.Value))
+	} else {
+		return fmt.Errorf("unable to get lo precision")
+	}
+
+	state.tickPrecision = tickPrecision
+	state.lotPrecision = lotPrecision
+
 	for _, b := range response.SnapshotL2.Bids {
 		rawPrice := b.Price * float64(tickPrecision)
 		rawQty := b.Quantity * float64(lotPrecision)
@@ -123,7 +144,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 		}
 	}
 	state.OBUpdates += 1
-	state.orderbook = gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
+	state.orderbook = gorderbook.NewOrderBookL2(uint64(tickPrecision), uint64(lotPrecision), 10000)
 	state.orderbook.Sync(response.SnapshotL2.Bids, response.SnapshotL2.Asks)
 	state.seqNum = response.SeqNum
 	if state.orderbook.Crossed() {
@@ -133,8 +154,6 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 }
 
 func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) error {
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
 
 	if !state.synced && refresh.SeqNum <= state.seqNum {
@@ -149,8 +168,8 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 
 	if refresh.UpdateL2 != nil {
 		for _, l := range refresh.UpdateL2.Levels {
-			rawPrice := l.Price * float64(tickPrecision)
-			rawQty := l.Quantity * float64(lotPrecision)
+			rawPrice := l.Price * float64(state.tickPrecision)
+			rawQty := l.Quantity * float64(state.lotPrecision)
 			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 				return fmt.Errorf("residue in ob price: %f %f", rawPrice, math.Round(rawPrice))
 			}
@@ -176,8 +195,8 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 		state.aggTradeIDs[aggT.AggregateID] = true
 		state.aggTrades += 1
 		for _, t := range aggT.Trades {
-			rawPrice := t.Price * float64(tickPrecision)
-			rawQty := t.Quantity * float64(lotPrecision)
+			rawPrice := t.Price * float64(state.tickPrecision)
+			rawQty := t.Quantity * float64(state.lotPrecision)
 			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
 				return fmt.Errorf("residue in trade price: %f %f", rawPrice, math.Round(rawPrice))
 			}
@@ -199,8 +218,12 @@ var obChecker *actor.PID
 var executor *actor.PID
 
 func clean() {
-	_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
-	_ = actor.EmptyRootContext.PoisonFuture(executor).Wait()
+	if obChecker != nil {
+		_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+	}
+	if executor != nil {
+		_ = actor.EmptyRootContext.PoisonFuture(executor).Wait()
+	}
 }
 
 func TestBinance(t *testing.T) {
@@ -261,11 +284,14 @@ func TestBinance(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %f", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.000001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %f", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.000001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -338,11 +364,16 @@ func TestBitfinex(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.1) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %f", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1./100000000.) > 0.0000000001 {
-		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot)
+	/*
+		if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
+			t.Fatalf("was expecting 0.1 min price increment, got %f", sec.MinPriceIncrement.Value)
+		}
+	*/
+	if math.Abs(sec.RoundLot.Value-1./100000000.) > 0.0000000001 {
+		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -415,11 +446,14 @@ func TestBitmex(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got noninverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1.) > 0.0000000001 {
-		t.Fatalf("was expecting 1. round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1.) > 0.0000000001 {
+		t.Fatalf("was expecting 1. round lot increment, got %g", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -492,11 +526,14 @@ func TestBitstamp(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.00000001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.00000001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.00000001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.00000001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -569,11 +606,14 @@ func TestBitz(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.0001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.0001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -646,11 +686,14 @@ func TestCoinbasePro(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.00000001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.00000001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
 	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
@@ -722,11 +765,14 @@ func TestCryptofacilities(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1.) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1.) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -801,11 +847,14 @@ func TestFBinance(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -880,11 +929,14 @@ func TestFTX(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.0001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.0001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -965,11 +1017,14 @@ func TestHuobi(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1e-6) > 0.0000000001 {
-		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1e-6) > 0.0000000001 {
+		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1044,11 +1099,14 @@ func TestGemini(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1e-08) > 0.0000000001 {
-		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1e-08) > 0.0000000001 {
+		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1123,11 +1181,14 @@ func TestHitbtc(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1e-05) > 0.0000000001 {
-		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.01 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1e-05) > 0.0000000001 {
+		t.Fatalf("was expecting 1e-6 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1202,11 +1263,14 @@ func TestKraken(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.1) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1e-08) > 0.0000000001 {
-		t.Fatalf("was expecting 1e-8 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1e-08) > 0.0000000001 {
+		t.Fatalf("was expecting 1e-8 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1281,11 +1345,14 @@ func TestOKCoin(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.1) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.0001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.0001) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1361,11 +1428,14 @@ func TestDeribit(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-10.) > 0.0000000001 {
-		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-10.) > 0.0000000001 {
+		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1441,11 +1511,14 @@ func TestHuobip(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.1) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1.) > 0.0000000001 {
-		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1.) > 0.0000000001 {
+		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was expecting nil maturity date")
@@ -1521,11 +1594,14 @@ func TestHuobif(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.01) > 0.000001 {
-		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1.) > 0.0000000001 {
-		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1.) > 0.0000000001 {
+		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate == nil {
 		t.Fatalf("was expecting maturity date")
@@ -1601,11 +1677,14 @@ func TestBybiti(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-1.) > 0.0000000001 {
-		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1.) > 0.0000000001 {
+		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was not expecting maturity date")
@@ -1681,11 +1760,14 @@ func TestBybitl(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if math.Abs(sec.MinPriceIncrement-0.5) > 0.000001 {
-		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement)
+	if !sec.Enabled {
+		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.RoundLot-0.001) > 0.0000000001 {
-		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot)
+	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-0.001) > 0.0000000001 {
+		t.Fatalf("was expecting 1 round lot increment, got %g", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was not expecting maturity date")

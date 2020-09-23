@@ -119,6 +119,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -227,8 +230,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			maxID = bid.Time
 		}
 	}
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	ob := gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
 
 	ob.Sync(bids, asks)

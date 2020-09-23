@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -140,7 +141,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := kraken.KRAKEN_SYMBOL_TO_GLOBAL_SYMBOL[baseName]; ok {
 			baseName = sym
 		}
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseName]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseName)
 		if !ok {
 			//state.logger.Info("unknown symbol " + baseName)
 			continue
@@ -149,21 +150,21 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := kraken.KRAKEN_SYMBOL_TO_GLOBAL_SYMBOL[quoteName]; ok {
 			quoteName = sym
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteName]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteName)
 		if !ok {
 			//state.logger.Info("unknown symbol " + quoteName)
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = pair.WSName
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = true
 		security.Exchange = &constants.KRAKEN
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = 1. / math.Pow10(pair.PairDecimals)
-		security.RoundLot = 1. / math.Pow10(pair.LotDecimals)
+		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(pair.PairDecimals)}
+		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(pair.LotDecimals)}
 
 		securities = append(securities, &security)
 	}

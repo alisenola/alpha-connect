@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -142,22 +143,22 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Enabled = pair.Trading == "Enabled"
 		baseName := strings.Split(pair.Name, "/")[0]
 		quoteName := strings.Split(pair.Name, "/")[1]
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseName]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseName)
 		if !ok {
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteName]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteName)
 		if !ok {
 			continue
 		}
 		security.Symbol = pair.URLSymbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Exchange = &constants.BITSTAMP
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.RoundLot = 1. / math.Pow10(pair.BaseDecimals)
-		security.MinPriceIncrement = 1. / math.Pow10(pair.CounterDecimals)
+		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(pair.BaseDecimals)}
+		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(pair.CounterDecimals)}
 		securities = append(securities, &security)
 	}
 

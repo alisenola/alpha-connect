@@ -6,6 +6,7 @@ import (
 	grpc2 "gitlab.com/alphaticks/alphac/api/grpc"
 	"gitlab.com/alphaticks/alphac/data/live"
 	"gitlab.com/alphaticks/alphac/exchanges"
+	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
@@ -22,6 +23,7 @@ var done = make(chan os.Signal, 1)
 
 var liveStoreActor *actor.PID
 var executorActor *actor.PID
+var assetLoader *actor.PID
 
 type GuardActor struct{}
 
@@ -30,6 +32,7 @@ func (state *GuardActor) Receive(context actor.Context) {
 	case *actor.Started:
 		context.Watch(liveStoreActor)
 		context.Watch(executorActor)
+		context.Watch(assetLoader)
 
 	case *actor.Terminated:
 		done <- os.Signal(syscall.SIGTERM)
@@ -63,6 +66,11 @@ func main() {
 		&constants.BYBITL,
 	}
 	// EXECUTOR //
+	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
+	_, err := actor.EmptyRootContext.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	if err != nil {
+		panic(err)
+	}
 	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false)), "executor")
 	liveStoreActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(live.NewLiveStoreProducer(0)), "live_store")
 

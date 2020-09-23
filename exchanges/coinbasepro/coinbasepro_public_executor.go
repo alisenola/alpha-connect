@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	_interface "gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -149,24 +150,24 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 
 	var securities []*models.Security
 	for _, product := range products {
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[product.BaseCurrency]
+		baseCurrency, ok := constants.GetAssetBySymbol(product.BaseCurrency)
 		if !ok {
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[product.QuoteCurrency]
+		quoteCurrency, ok := constants.GetAssetBySymbol(product.QuoteCurrency)
 		if !ok {
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = product.ID
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = true
 		security.Exchange = &constants.COINBASEPRO
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = product.QuoteIncrement
-		security.RoundLot = 1. / 100000000.
+		security.MinPriceIncrement = &types.DoubleValue{Value: product.QuoteIncrement}
+		security.RoundLot = &types.DoubleValue{Value: 1. / 100000000.}
 		securities = append(securities, &security)
 	}
 

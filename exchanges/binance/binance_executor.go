@@ -194,27 +194,28 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, symbol := range exchangeInfo.Symbols {
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
+		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
+			//fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
+		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
 		if !ok {
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol.Symbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = symbol.Status == "TRADING"
 		security.Exchange = &constants.BINANCE
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		for _, filter := range symbol.Filters {
 			if filter.FilterType == "PRICE_FILTER" {
-				security.MinPriceIncrement = filter.TickSize
+				security.MinPriceIncrement = &types.DoubleValue{Value: filter.TickSize}
 			} else if filter.FilterType == "LOT_SIZE" {
-				security.RoundLot = filter.StepSize
+				security.RoundLot = &types.DoubleValue{Value: filter.StepSize}
 			}
 		}
 		securities = append(securities, &security)

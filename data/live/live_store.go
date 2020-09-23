@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
@@ -12,15 +13,16 @@ import (
 	storeMessages "gitlab.com/tachikoma.ai/tickstore/actors/messages"
 	"gitlab.com/tachikoma.ai/tickstore/db"
 	"gitlab.com/tachikoma.ai/tickstore/parsing"
-	"math"
 	"reflect"
 	"time"
 )
 
 type SecurityInfo struct {
-	securityID    uint64
-	tickPrecision float64
-	lotPrecision  float64
+	securityID        uint64
+	minPriceIncrement *types.DoubleValue
+	roundLot          *types.DoubleValue
+	tickPrecision     uint64
+	lotPrecision      uint64
 }
 
 type Feed struct {
@@ -185,9 +187,9 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 			groupID:   groupID,
 		}
 		feed.security = &SecurityInfo{
-			securityID:    sec.SecurityID,
-			tickPrecision: math.Ceil(1. / sec.MinPriceIncrement),
-			lotPrecision:  math.Ceil(1. / sec.RoundLot),
+			securityID:        sec.SecurityID,
+			minPriceIncrement: sec.MinPriceIncrement,
+			roundLot:          sec.RoundLot,
 		}
 		feeds[sec.SecurityID] = feed
 	}

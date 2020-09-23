@@ -1,10 +1,10 @@
 package account
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
-	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"
@@ -20,9 +20,9 @@ type COrder struct {
 type MarginSecurity struct {
 	sync.RWMutex
 	*models.Security
-	tickPrecision       float64
 	lotPrecision        float64
 	marginCurrency      *xchangerModels.Asset
+	modelCurrency       *xchangerModels.Asset
 	openBidOrders       map[string]*COrder
 	openAskOrders       map[string]*COrder
 	size                float64
@@ -36,12 +36,14 @@ type MarginSecurity struct {
 	sampleTime          uint64
 }
 
-func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asset, makerFee, takerFee *float64) *MarginSecurity {
+func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asset, modelCurrency *xchangerModels.Asset, makerFee, takerFee *float64) (*MarginSecurity, error) {
+	if sec.RoundLot == nil {
+		return nil, fmt.Errorf("security is missing RoundLot")
+	}
 	m := &MarginSecurity{
 		RWMutex:             sync.RWMutex{},
 		Security:            sec,
-		tickPrecision:       math.Ceil(1. / sec.MinPriceIncrement),
-		lotPrecision:        math.Ceil(1. / sec.RoundLot),
+		lotPrecision:        math.Ceil(1. / sec.RoundLot.Value),
 		marginCurrency:      marginCurrency,
 		openBidOrders:       make(map[string]*COrder),
 		openAskOrders:       make(map[string]*COrder),
@@ -65,7 +67,7 @@ func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asse
 		m.takerFee = sec.TakerFee.Value
 	}
 
-	return m
+	return m, nil
 }
 
 func (sec *MarginSecurity) AddBidOrder(ID string, price, quantity, queue float64) {
@@ -384,7 +386,7 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, constants.DOLLAR.ID, time, N)
+	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, sec.modelCurrency.ID, time, N)
 	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
 	securityPrice := model.GetPrice(sec.SecurityID)
 	mul := sec.Multiplier.Value

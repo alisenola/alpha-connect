@@ -146,26 +146,26 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if symbol.QuoteCurrency == "USD" {
 			continue
 		}
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseCurrency]
+		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseCurrency)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteCurrency]
+		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteCurrency)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol.Name
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
-		security.Enabled = false
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
+		security.Enabled = true
 		security.Exchange = &constants.BYBITL
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = symbol.PriceFilter.TickSize
-		security.RoundLot = symbol.LotSizeFilter.QuantityStep
+		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceFilter.TickSize}
+		security.RoundLot = &types.DoubleValue{Value: symbol.LotSizeFilter.QuantityStep}
 		security.IsInverse = true
 		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}

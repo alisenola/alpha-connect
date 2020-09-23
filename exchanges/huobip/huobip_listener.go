@@ -111,6 +111,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
 	state.mediator = actor.NewLocalPID("data_broker")
 	state.executorManager = actor.NewLocalPID("exchange_executor_manager")
 	state.lastPingTime = time.Now()
@@ -187,8 +190,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 				return fmt.Errorf("was expecting snapshot as first event, got %s", res.Event)
 			}
 			bids, asks := res.ToBidAsk()
-			tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-			lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+			tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+			lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 			ob = gorderbook.NewOrderBookL2(
 				tickPrecision,
 				lotPrecision,

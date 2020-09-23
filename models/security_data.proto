@@ -55,17 +55,17 @@ message Security {
     string securityType = 2;
     models.Exchange exchange = 3;
     string symbol = 4;
-    double min_price_increment = 5;
-    double round_lot = 6;
     models.Asset underlying = 7;
     models.Asset quote_currency = 8;
     bool enabled = 9;
     bool is_inverse = 10;
-    google.protobuf.DoubleValue maker_fee = 11;
-    google.protobuf.DoubleValue taker_fee = 12;
-    google.protobuf.DoubleValue multiplier = 13;
-    google.protobuf.Timestamp maturity_date = 14;
-    google.protobuf.StringValue securitySubType = 15;
+    google.protobuf.DoubleValue min_price_increment = 11;
+    google.protobuf.DoubleValue round_lot = 12;
+    google.protobuf.DoubleValue maker_fee = 13;
+    google.protobuf.DoubleValue taker_fee = 14;
+    google.protobuf.DoubleValue multiplier = 15;
+    google.protobuf.Timestamp maturity_date = 16;
+    google.protobuf.StringValue securitySubType = 17;
 }
 
 message Order {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
@@ -25,15 +26,16 @@ type OBL2Request struct {
 }
 
 type InstrumentData struct {
-	tickPrecision  uint64
-	lotPrecision   uint64
-	orderBook      *gorderbook.OrderBookL2
-	seqNum         uint64
-	lastUpdateTime uint64
-	lastHBTime     time.Time
-	lastSequence   uint64
-	aggTrade       *models.AggregatedTrade
-	lastAggTradeTs uint64
+	minPriceIncrement float64
+	tickPrecision     uint64
+	lotPrecision      uint64
+	orderBook         *gorderbook.OrderBookL2
+	seqNum            uint64
+	lastUpdateTime    uint64
+	lastHBTime        time.Time
+	lastSequence      uint64
+	aggTrade          *models.AggregatedTrade
+	lastAggTradeTs    uint64
 }
 
 // OBType: OBL3
@@ -126,11 +128,12 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 	state.stashedTrades = list.New()
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	if state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing RoundLot")
+	}
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 
 	state.instrumentData = &InstrumentData{
-		tickPrecision:  tickPrecision,
 		lotPrecision:   lotPrecision,
 		orderBook:      nil,
 		seqNum:         uint64(time.Now().UnixNano()),
@@ -213,25 +216,40 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	state.instrumentData.lastSequence = snapshot.Sequence
 
-	bids, asks := snapshot.ToBidAsk(state.instrumentData.tickPrecision, state.instrumentData.lotPrecision)
+	bids, asks := snapshot.ToBidAsk()
 
-	bestAsk := float64(asks[0].Price) / float64(state.instrumentData.tickPrecision)
+	maxTickPrecisionF := 1.
+	for i := 0; i < 25 && i < len(bids); i++ {
+		tickPrecisionF := 1.
+		price := bids[i].Price
+		for price*tickPrecisionF-math.Floor(price*tickPrecisionF) > 0. {
+			tickPrecisionF *= 10
+		}
+
+		if tickPrecisionF > maxTickPrecisionF {
+			maxTickPrecisionF = tickPrecisionF
+		}
+	}
+
+	state.instrumentData.tickPrecision = uint64(maxTickPrecisionF)
+
+	bestAsk := asks[0].Price
 	//Allow a 10% price variation
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(state.instrumentData.tickPrecision))
+	depth := int(((bestAsk * 1.1) - bestAsk) * maxTickPrecisionF)
 	if depth > 10000 {
 		depth = 10000
 	}
 
 	ob := gorderbook.NewOrderBookL2(
-		state.instrumentData.tickPrecision,
+		uint64(maxTickPrecisionF),
 		state.instrumentData.lotPrecision,
 		depth,
 	)
 
 	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
 
-	ob.RawSync(bids, asks)
-
+	ob.Sync(bids, asks)
+	fmt.Println(ob)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -254,9 +272,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 	snapshot := &models.OBL2Snapshot{
-		Bids:      state.instrumentData.orderBook.GetBids(0),
-		Asks:      state.instrumentData.orderBook.GetAsks(0),
-		Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
+		Bids:          state.instrumentData.orderBook.GetBids(0),
+		Asks:          state.instrumentData.orderBook.GetAsks(0),
+		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
+		TickPrecision: &types.UInt64Value{Value: state.instrumentData.tickPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,

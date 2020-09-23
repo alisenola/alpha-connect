@@ -234,11 +234,31 @@ func (state *QueryReader) ReadQueryEventBatchRequest(context actor.Context) erro
 			feed := state.subscriptions[msg.RequestID]
 			if state.measurement == "orderbook" {
 
+				var tickPrecision uint64
+				if msg.SnapshotL2.TickPrecision != nil {
+					tickPrecision = msg.SnapshotL2.TickPrecision.Value
+				} else if feed.security.minPriceIncrement != nil {
+					tickPrecision = uint64(math.Ceil(1. / feed.security.minPriceIncrement.Value))
+				} else {
+					return fmt.Errorf("unable to get tick precision")
+				}
+				feed.security.tickPrecision = tickPrecision
+
+				var lotPrecision uint64
+				if msg.SnapshotL2.LotPrecision != nil {
+					lotPrecision = msg.SnapshotL2.LotPrecision.Value
+				} else if feed.security.roundLot != nil {
+					lotPrecision = uint64(math.Ceil(1. / feed.security.roundLot.Value))
+				} else {
+					return fmt.Errorf("unable to get lo precision")
+				}
+				feed.security.lotPrecision = lotPrecision
+
 				var event *tickstore_grpc.QueryEvent
 
 				ob := gorderbook.NewOrderBookL2(
-					uint64(feed.security.tickPrecision),
-					uint64(feed.security.lotPrecision),
+					tickPrecision,
+					lotPrecision,
 					10000)
 				ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
 
@@ -298,11 +318,16 @@ func (state *QueryReader) ReadQueryEventBatchRequest(context actor.Context) erro
 				var event *tickstore_grpc.QueryEvent
 				ts := utils.TimestampToMilli(msg.UpdateL2.Timestamp)
 
+				var err error
 				slice := make([]market.RawOrderBookDelta, len(msg.UpdateL2.Levels))
+				// TODO check, not sure about that, do tests
 				for i, l := range msg.UpdateL2.Levels {
-					rawPrice := uint64(math.Round(l.Price * feed.security.tickPrecision))
-					rawQty := uint64(math.Round(l.Quantity * feed.security.lotPrecision))
-					slice[i] = market.NewRawOrderBookDelta(rawPrice, rawQty, l.Bid, false)
+					rawPrice := uint64(math.Round(l.Price * float64(feed.security.tickPrecision)))
+					rawQty := uint64(math.Round(l.Quantity * float64(feed.security.lotPrecision)))
+					slice[i], err = market.NewRawOrderBookDelta(rawPrice, rawQty, l.Bid, false)
+					if err != nil {
+						return fmt.Errorf("error building delta: %v", err)
+					}
 				}
 				feed.lastDeltaTime = ts
 				deltas := gotickfile.TickDeltas{

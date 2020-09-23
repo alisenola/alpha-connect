@@ -172,7 +172,11 @@ func TestBitmexAccount(t *testing.T) {
 	}
 
 	exchanges := []*xchangerModels.Exchange{&constants.BITMEX}
-	accounts := []*account.Account{NewAccount(accnt)}
+	acnt, err := NewAccount(accnt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accounts := []*account.Account{acnt}
 	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, accounts, false)), "executor")
 
 	accntChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(NewAccountCheckerProducer(accnt, instrument)))

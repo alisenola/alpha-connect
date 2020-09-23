@@ -157,29 +157,29 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 		switch market.Type {
 		case "spot":
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[market.BaseCurrency]
+			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)
 			if !ok {
 				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
 				continue
 			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[market.QuoteCurrency]
+			quoteCurrency, ok := constants.GetAssetBySymbol(market.QuoteCurrency)
 			if !ok {
 				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
 				continue
 			}
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
+			security.Underlying = baseCurrency
+			security.QuoteCurrency = quoteCurrency
 			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 
 		case "future":
 			splits := strings.Split(market.Name, "-")
 			if len(splits) == 2 {
-				underlying, ok := constants.SYMBOL_TO_ASSET[market.Underlying]
+				underlying, ok := constants.GetAssetBySymbol(market.Underlying)
 				if !ok {
 					//fmt.Printf("unknown currency symbol %s \n", market.Underlying)
 					continue
 				}
-				security.Underlying = &underlying
+				security.Underlying = underlying
 				security.QuoteCurrency = &constants.DOLLAR
 				if splits[1] == "PERP" {
 					security.SecurityType = enum.SecurityType_CRYPTO_PERP
@@ -203,8 +203,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			continue
 		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = market.PriceIncrement
-		security.RoundLot = market.SizeIncrement
+		security.MinPriceIncrement = &types.DoubleValue{Value: market.PriceIncrement}
+		security.RoundLot = &types.DoubleValue{Value: market.SizeIncrement}
+		security.Enabled = true
 
 		securities = append(securities, &security)
 	}

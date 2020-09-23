@@ -1,6 +1,7 @@
 package exchanges
 
 import (
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/exchanges/binance"
@@ -30,21 +31,27 @@ import (
 // TODO sample size config
 var Portfolio = account.NewPortfolio(300)
 
-func NewAccount(accountInfo *models.Account) *account.Account {
+func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	if accnt := Portfolio.GetAccount(accountInfo.AccountID); accnt != nil {
-		return accnt
+		return accnt, nil
 	}
 	switch accountInfo.Exchange.ID {
 	case constants.BITMEX.ID:
-		accnt := account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
+		accnt, err := account.NewAccount(accountInfo, &constants.BITCOIN, 1./0.00000001)
+		if err != nil {
+			return nil, err
+		}
 		Portfolio.AddAccount(accnt)
-		return accnt
+		return accnt, nil
 	case constants.FBINANCE.ID:
-		accnt := account.NewAccount(accountInfo, &constants.TETHER, 100000000)
+		accnt, err := account.NewAccount(accountInfo, &constants.TETHER, 100000000)
+		if err != nil {
+			return nil, err
+		}
 		Portfolio.AddAccount(accnt)
-		return accnt
+		return accnt, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("unsupported exchange %s", accountInfo.Exchange.Name)
 	}
 }
 

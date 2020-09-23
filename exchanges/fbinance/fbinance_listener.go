@@ -110,6 +110,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
 	state.fbinanceExecutor = actor.NewLocalPID("executor/" + constants.FBINANCE.Name + "_executor")
 
 	state.instrumentData = &InstrumentData{
@@ -202,8 +205,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("market data snapshot has no OBL2")
 	}
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	bestAsk := msg.SnapshotL2.Asks[0].Price
 	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
 

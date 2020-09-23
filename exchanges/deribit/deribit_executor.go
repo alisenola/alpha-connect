@@ -201,16 +201,16 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security := models.Security{}
 			security.Enabled = i.IsActive
 			security.Symbol = i.InstrumentName
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[i.BaseCurrency]
+			baseCurrency, ok := constants.GetAssetBySymbol(i.BaseCurrency)
 			if !ok {
 				continue
 			}
-			security.Underlying = &baseCurrency
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[i.QuoteCurrency]
+			security.Underlying = baseCurrency
+			quoteCurrency, ok := constants.GetAssetBySymbol(i.QuoteCurrency)
 			if !ok {
 				continue
 			}
-			security.QuoteCurrency = &quoteCurrency
+			security.QuoteCurrency = quoteCurrency
 			security.Exchange = &constants.DERIBIT
 			if i.SettlementPeriod == "perpetual" {
 				security.SecurityType = enum.SecurityType_CRYPTO_PERP
@@ -222,8 +222,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.TakerFee = &types.DoubleValue{Value: i.TakerCommission}
 
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-			security.MinPriceIncrement = i.TickSize
-			security.RoundLot = i.ContractSize
+			security.MinPriceIncrement = &types.DoubleValue{Value: i.TickSize}
+			security.RoundLot = &types.DoubleValue{Value: i.ContractSize}
 			security.IsInverse = true
 
 			securities = append(securities, &security)

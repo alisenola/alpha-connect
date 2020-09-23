@@ -123,8 +123,11 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 	state.stashedTrades = list.New()
 	state.bitstampExecutor = actor.NewLocalPID("executor/" + constants.BITSTAMP.Name + "_executor")
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 
 	state.instrumentData = &InstrumentDataL3{
 		tickPrecision:  tickPrecision,
@@ -224,9 +227,6 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("market data snapshot has no OBL3")
 	}
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
-
 	/*
 		for i := range msg.SnapshotL3.Bids {
 			msg.SnapshotL3.Bids[i] = gorderbook.Order{
@@ -248,12 +248,11 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	*/
 
 	ob := gorderbook.NewOrderBookL3(
-		tickPrecision,
-		lotPrecision,
+		state.instrumentData.tickPrecision,
+		state.instrumentData.lotPrecision,
 		10000)
 
 	ob.Sync(msg.SnapshotL3.Bids, msg.SnapshotL3.Asks)
-
 	ts := uint64(ws.Msg.Time.UnixNano()) / 1000
 
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
@@ -309,7 +308,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		o := msg.Message.(bitstamp.WSCreatedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
-			Quantity: math.Round(o.Amount/state.security.RoundLot) * state.security.RoundLot,
+			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) * float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
 			ID:       o.ID,
 		}
@@ -341,15 +340,15 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		o := msg.Message.(bitstamp.WSChangedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
-			Quantity: math.Round(o.Amount/state.security.RoundLot) * state.security.RoundLot,
+			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) * float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
 			ID:       o.ID,
 		}
 
 		if state.instrumentData.orderBook.HasOrder(o.ID) {
 			oldO := state.instrumentData.orderBook.GetOrder(o.ID)
-			oldP := uint64(math.Round(oldO.Price / state.security.MinPriceIncrement))
-			newP := uint64(math.Round(o.Price / state.security.MinPriceIncrement))
+			oldP := uint64(math.Round(oldO.Price * float64(state.instrumentData.tickPrecision)))
+			newP := uint64(math.Round(o.Price * float64(state.instrumentData.tickPrecision)))
 			state.instrumentData.orderBook.DeleteOrder(o.ID)
 			if oldP != newP {
 				var quantity float64
@@ -524,7 +523,7 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 		bids := make(map[uint64]gorderbook.OrderBookLevel)
 		asks := make(map[uint64]gorderbook.OrderBookLevel)
 		for _, l := range state.instrumentData.levelDeltas {
-			k := uint64(math.Round(l.Price / state.security.MinPriceIncrement))
+			k := uint64(math.Round(l.Price * float64(state.instrumentData.tickPrecision)))
 			if l.Bid {
 				bids[k] = l
 			} else {

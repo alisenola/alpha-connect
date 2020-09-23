@@ -154,7 +154,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if sym, ok := bitmex.BITMEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
 				symbolStr = sym
 			}
-			baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+			baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
 			if !ok {
 				continue
 			}
@@ -162,20 +162,20 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if sym, ok := bitmex.BITMEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
 				symbolStr = sym
 			}
-			quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+			quoteCurrency, ok := constants.GetAssetBySymbol(symbolStr)
 			if !ok {
 				continue
 			}
 
 			security := models.Security{}
 			security.Symbol = activeInstrument.Symbol
-			security.Underlying = &baseCurrency
-			security.QuoteCurrency = &quoteCurrency
+			security.Underlying = baseCurrency
+			security.QuoteCurrency = quoteCurrency
 			security.Enabled = activeInstrument.State == "Open"
 			security.Exchange = &constants.BITMEX
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
-			security.MinPriceIncrement = activeInstrument.TickSize
-			security.RoundLot = float64(activeInstrument.LotSize)
+			security.MinPriceIncrement = &types.DoubleValue{Value: activeInstrument.TickSize}
+			security.RoundLot = &types.DoubleValue{Value: float64(activeInstrument.LotSize)}
 			security.Multiplier = &types.DoubleValue{Value: float64(activeInstrument.Multiplier) * 0.00000001}
 			security.MakerFee = &types.DoubleValue{Value: activeInstrument.MakerFee}
 			security.TakerFee = &types.DoubleValue{Value: activeInstrument.TakerFee}

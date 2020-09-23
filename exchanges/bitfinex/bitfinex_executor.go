@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -15,7 +16,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -146,7 +146,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
 			symbolStr = sym
 		}
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+		baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
 		if !ok {
 			continue
 		}
@@ -154,29 +154,20 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
 			symbolStr = sym
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbolStr]
+		quoteCurrency, ok := constants.GetAssetBySymbol(symbolStr)
 		if !ok {
 			continue
 		}
 
-		pair := xchangerModels.Pair{
-			Base:  &baseCurrency,
-			Quote: &quoteCurrency,
-		}
 		security := models.Security{}
+		security.Enabled = true
 		security.Symbol = symbol.Pair
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Exchange = &constants.BITFINEX
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.RoundLot = 1. / 100000000.
-		tickPrecision, ok := bitfinex.TickPrecisions[pair.String()]
-		if !ok {
-			//state.logger.Warning(fmt.Sprintf("TickPrecisions not defined for %s", instrument.DefaultFormat()))
-			continue
-		}
-		security.MinPriceIncrement = 1. / float64(tickPrecision)
+		security.RoundLot = &types.DoubleValue{Value: 1. / 100000000.}
 		securities = append(securities, &security)
 	}
 

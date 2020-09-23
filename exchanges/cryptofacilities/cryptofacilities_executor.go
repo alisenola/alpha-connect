@@ -137,7 +137,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
 			baseSymbol = sym
 		}
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseSymbol]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseSymbol)
 		if !ok {
 			continue
 		}
@@ -146,14 +146,14 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
 			quoteSymbol = sym
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteSymbol]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteSymbol)
 		if !ok {
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = instrument.Symbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = instrument.Tradeable
 		security.Exchange = &constants.CRYPTOFACILITIES
 		splits := strings.Split(instrument.Symbol, "_")
@@ -194,8 +194,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			}
 		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = instrument.TickSize
-		security.RoundLot = float64(instrument.ContractSize)
+		security.MinPriceIncrement = &types.DoubleValue{Value: instrument.TickSize}
+		security.RoundLot = &types.DoubleValue{Value: float64(instrument.ContractSize)}
 		securities = append(securities, &security)
 	}
 

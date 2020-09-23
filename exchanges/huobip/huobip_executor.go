@@ -144,26 +144,26 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		baseStr := strings.ToUpper(splits[0])
 		quoteStr := strings.ToUpper(splits[1])
 
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseStr)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteStr)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol.ContractCode
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = symbol.ContractStatus == 1
 		security.Exchange = &constants.HUOBIP
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = symbol.PriceTick
-		security.RoundLot = 1
+		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceTick}
+		security.RoundLot = &types.DoubleValue{Value: 1}
 		security.IsInverse = true
 		security.Multiplier = &types.DoubleValue{Value: symbol.ContractSize}
 		securities = append(securities, &security)

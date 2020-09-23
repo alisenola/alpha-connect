@@ -1,10 +1,11 @@
 package account
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/modeling"
 	"gitlab.com/alphaticks/alphac/models"
-	"gitlab.com/alphaticks/xchanger/constants"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"
 )
@@ -16,6 +17,7 @@ type SpotSecurity struct {
 	openBidOrders map[string]*COrder
 	openAskOrders map[string]*COrder
 
+	modelCurrency     *xchangerModels.Asset
 	sampleValueChange []float64
 	sampleBasePrice   []float64
 	sampleQuotePrice  []float64
@@ -26,13 +28,17 @@ type SpotSecurity struct {
 	takerFee          float64
 }
 
-func NewSpotSecurity(sec *models.Security, makerFee, takerFee *float64) *SpotSecurity {
+func NewSpotSecurity(sec *models.Security, modelCurrency *xchangerModels.Asset, makerFee, takerFee *float64) (*SpotSecurity, error) {
+	if sec.RoundLot == nil {
+		return nil, fmt.Errorf("security is missing RoundLot")
+	}
 	spotSec := &SpotSecurity{
 		RWMutex:           sync.RWMutex{},
 		Security:          sec,
-		lotPrecision:      math.Ceil(1. / sec.RoundLot),
+		lotPrecision:      math.Ceil(1. / sec.RoundLot.Value),
 		openBidOrders:     make(map[string]*COrder),
 		openAskOrders:     make(map[string]*COrder),
+		modelCurrency:     modelCurrency,
 		sampleValueChange: nil,
 		sampleBasePrice:   nil,
 		sampleQuotePrice:  nil,
@@ -51,7 +57,7 @@ func NewSpotSecurity(sec *models.Security, makerFee, takerFee *float64) *SpotSec
 	} else {
 		spotSec.takerFee = sec.TakerFee.Value
 	}
-	return spotSec
+	return spotSec, nil
 }
 
 func (sec *SpotSecurity) AddBidOrder(ID string, price, quantity, queue float64) {
@@ -338,8 +344,8 @@ func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, tim
 	sampleValueChange := make([]float64, sampleSize, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
-	sampleBasePrice := model.GetSamplePairPrices(sec.Underlying.ID, constants.DOLLAR.ID, time, N)
-	sampleQuotePrice := model.GetSamplePairPrices(sec.QuoteCurrency.ID, constants.DOLLAR.ID, time, N)
+	sampleBasePrice := model.GetSamplePairPrices(sec.Underlying.ID, sec.modelCurrency.ID, time, N)
+	sampleQuotePrice := model.GetSamplePairPrices(sec.QuoteCurrency.ID, sec.modelCurrency.ID, time, N)
 	for i := 0; i < N; i++ {
 		sampleValueChange[i] = 0.
 	}

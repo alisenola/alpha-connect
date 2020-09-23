@@ -3,6 +3,7 @@ package models;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 import "gitlab.com/alphaticks/gorderbook/protos.proto";
 
 enum OrderBookAggregation {
@@ -20,12 +21,16 @@ message OBL2Snapshot {
     repeated gorderbook.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
     repeated gorderbook.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
+    google.protobuf.UInt64Value tick_precision = 5;
+    google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Update {
     repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
     repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
+    google.protobuf.UInt64Value tick_precision = 5;
+    google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Snapshot {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -133,12 +134,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, pair := range symbols.Data {
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[strings.ToUpper(pair.CoinFrom)]
+		baseCurrency, ok := constants.GetAssetBySymbol(strings.ToUpper(pair.CoinFrom))
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[strings.ToUpper(pair.CoinTo)]
+		quoteCurrency, ok := constants.GetAssetBySymbol(strings.ToUpper(pair.CoinTo))
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
 			continue
@@ -146,13 +147,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 		security := models.Security{}
 		security.Symbol = pair.Name
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = true
 		security.Exchange = &constants.BITZ
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.RoundLot = 1. / math.Pow(10, float64(pair.NumberFloat))
-		security.MinPriceIncrement = 1. / math.Pow(10, float64(pair.PriceFloat))
+		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.NumberFloat))}
+		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.PriceFloat))}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		securities = append(securities, &security)
 	}

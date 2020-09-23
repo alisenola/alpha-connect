@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -149,26 +150,26 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			quoteStr = sym
 		}
 
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseStr)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteStr)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol.Symbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = symbol.State == "online"
 		security.Exchange = &constants.HUOBI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = 1. / math.Pow10(int(symbol.PricePrecision))
-		security.RoundLot = 1. / math.Pow10(int(symbol.AmountPrecision))
+		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.PricePrecision))}
+		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.AmountPrecision))}
 		securities = append(securities, &security)
 	}
 	state.securities = securities

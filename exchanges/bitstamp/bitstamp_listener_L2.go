@@ -123,8 +123,11 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 
 	state.instrumentData = &InstrumentData{
 		tickPrecision:  tickPrecision,

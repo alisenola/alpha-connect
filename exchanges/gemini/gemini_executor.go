@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
 	"gitlab.com/alphaticks/alphac/exchanges/interface"
 	"gitlab.com/alphaticks/alphac/jobs"
@@ -130,32 +131,32 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, symbol := range symbols {
 		baseStr := strings.ToUpper(symbol[:3])
 		quoteStr := strings.ToUpper(symbol[3:])
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[baseStr]
+		baseCurrency, ok := constants.GetAssetBySymbol(baseStr)
 		if !ok {
 			///state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[quoteStr]
+		quoteCurrency, ok := constants.GetAssetBySymbol(quoteStr)
 		if !ok {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", quoteStr))
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = true
 		security.Exchange = &constants.GEMINI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		if tickPrecision, ok := gemini.SYMBOL_TO_TICK_PRECISION[symbol]; ok {
-			security.MinPriceIncrement = 1. / float64(tickPrecision)
+			security.MinPriceIncrement = &types.DoubleValue{Value: 1. / float64(tickPrecision)}
 		} else {
 			//state.logger.Info(fmt.Sprintf("unknown tick precision for %s", symbol))
 			continue
 		}
 		if lotPrecision, ok := gemini.SYMBOL_TO_LOT_PRECISION[symbol]; ok {
-			security.RoundLot = 1. / float64(lotPrecision)
+			security.RoundLot = &types.DoubleValue{Value: 1. / float64(lotPrecision)}
 		} else {
 			//state.logger.Info(fmt.Sprintf("unknown lot precision for %s", symbol))
 			continue

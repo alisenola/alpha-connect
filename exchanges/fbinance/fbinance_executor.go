@@ -191,24 +191,24 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, symbol := range exchangeInfo.Symbols {
-		baseCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.BaseAsset]
+		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
 			continue
 		}
-		quoteCurrency, ok := constants.SYMBOL_TO_ASSET[symbol.QuoteAsset]
+		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
 		if !ok {
 			continue
 		}
 		security := models.Security{}
 		security.Symbol = symbol.Symbol
-		security.Underlying = &baseCurrency
-		security.QuoteCurrency = &quoteCurrency
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
 		security.Enabled = symbol.Status == "TRADING"
 		security.Exchange = &constants.FBINANCE
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
-		security.MinPriceIncrement = 1. / math.Pow10(symbol.PricePrecision)
-		security.RoundLot = 1. / math.Pow10(symbol.QuantityPrecision)
+		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(symbol.PricePrecision)}
+		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(symbol.QuantityPrecision)}
 		security.IsInverse = false
 		security.Multiplier = &types.DoubleValue{Value: 1.}
 		// Default fee
@@ -733,13 +733,13 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			return
 		}
 		for _, b := range balances {
-			asset, ok := constants.SYMBOL_TO_ASSET[b.Asset]
+			asset, ok := constants.GetAssetBySymbol(b.Asset)
 			if !ok {
 				state.logger.Error("got balance for unknown asset", log.String("asset", b.Asset))
 			}
 			balanceList.Balances = append(balanceList.Balances, &models.Balance{
 				AccountID: msg.Account.AccountID,
-				Asset:     &asset,
+				Asset:     asset,
 				Quantity:  b.Balance,
 			})
 		}

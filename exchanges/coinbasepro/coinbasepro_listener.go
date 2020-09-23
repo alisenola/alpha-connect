@@ -122,6 +122,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
+	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
+		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
+	}
 	state.coinbaseproExecutor = actor.NewLocalPID("executor/" + constants.COINBASEPRO.Name + "_executor")
 
 	state.instrumentData = &InstrumentData{
@@ -212,8 +215,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("market data snapshot has no OBL3")
 	}
 
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot))
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	ob := gorderbook.NewOrderBookL3(
 		tickPrecision,
 		lotPrecision,
