@@ -1404,9 +1404,13 @@ gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200916105653-9f7a5eac8300 h
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200916105653-9f7a5eac8300/go.mod h1:Egq7JQTNyIyrkyO50sdrLec6TylBATRa1i1pxsxPQfQ=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200916105757-9464082fef2b h1:NAENNPZT+WlxbDrdv/WaRbdaNxMb9EncRr7r9eZv+Xk=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200916105757-9464082fef2b/go.mod h1:Egq7JQTNyIyrkyO50sdrLec6TylBATRa1i1pxsxPQfQ=
+gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200922092024-4090fea4ef71 h1:euICg0oM8DpWEsLthh2d1NVk334WFRIEeEZ7nCJ0uio=
+gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200922092024-4090fea4ef71/go.mod h1:Egq7JQTNyIyrkyO50sdrLec6TylBATRa1i1pxsxPQfQ=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200313084212-78eb76e8dea2/go.mod h1:AQT5SCHwRJdk0nUa8TCdlP3oCRg7kPs0y0RXuPbCSFY=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200406135554-c8e8045438c0 h1:vDxvEGm3rgfqjHFzg5mHZHUzPnkSUTutd6p24bME8Gc=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200406135554-c8e8045438c0/go.mod h1:o1ftaMjAwatR9TDLhmYP02DO4Yt/4AtW27TuVlUEwrs=
+gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200907182749-4229846f6db9 h1:IwahizjI8ESNI4xhsQcXw55UADXyMOCmv18NJCH0Pgo=
+gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200907182749-4229846f6db9/go.mod h1:o1ftaMjAwatR9TDLhmYP02DO4Yt/4AtW27TuVlUEwrs=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.5.0-alpha.5.0.20190917205325-a14579fbfb1a/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
