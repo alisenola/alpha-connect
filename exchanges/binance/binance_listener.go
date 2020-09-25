@@ -42,6 +42,7 @@ type Listener struct {
 	instrumentData  *InstrumentData
 	binanceExecutor *actor.PID
 	logger          *log.Logger
+	lastPingTime    time.Time
 	stashedTrades   *list.List
 	socketTicker    *time.Ticker
 }
@@ -127,6 +128,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	}
 	state.binanceExecutor = actor.NewLocalPID("executor/" + constants.BINANCE.Name + "_executor")
 	state.stashedTrades = list.New()
+	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
@@ -429,6 +431,12 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
+
+	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+		_ = state.ws.ListSubscriptions()
+		state.lastPingTime = time.Now()
+	}
+
 	// TODO ping or HB ?
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {

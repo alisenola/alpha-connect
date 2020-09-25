@@ -11,12 +11,12 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20200909075534-6bd84aeffd29
-	gitlab.com/alphaticks/xchanger v0.0.0-20200922144339-69bf17c971a7
+	gitlab.com/alphaticks/xchanger v0.0.0-20200925093213-e93db84c0336
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200923115315-24f9fcf51661
 	gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 // indirect
-	gitlab.com/tachikoma.ai/tickstore v0.0.0-20200916131501-b301eb95e765
-	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200916105757-9464082fef2b
-	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200406135554-c8e8045438c0
+	gitlab.com/tachikoma.ai/tickstore v0.0.0-20200901135647-78e3bedf6e58
+	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200922092024-4090fea4ef71
+	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200907182749-4229846f6db9
 	google.golang.org/grpc v1.28.0
 )
 
