@@ -225,9 +225,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		n += 1.
 	}
 	avgPrice /= n
+	if avgPrice < 0. {
+		// Use log
+	}
 
 	lg := math.Log10(avgPrice)
-	digits := int(math.Round(lg) + 1.)
+	digits := int(math.Ceil(lg))
 	maxTickPrecisionF := math.Pow10(5 - digits)
 	tickPrecision := uint64(maxTickPrecisionF)
 	if tickPrecision == 0 {
@@ -251,7 +254,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
 
 	ob.Sync(bids, asks)
-
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
