@@ -218,18 +218,17 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	bids, asks := snapshot.ToBidAsk()
 
-	maxTickPrecisionF := 1.
+	avgPrice := 0.
+	n := 0.
 	for i := 0; i < 25 && i < len(bids); i++ {
-		tickPrecisionF := 1.
-		price := bids[i].Price
-		for price*tickPrecisionF-math.Floor(price*tickPrecisionF) > 0. {
-			tickPrecisionF *= 10
-		}
-
-		if tickPrecisionF > maxTickPrecisionF {
-			maxTickPrecisionF = tickPrecisionF
-		}
+		avgPrice += bids[i].Price
+		n += 1.
 	}
+	avgPrice /= n
+
+	lg := math.Log10(avgPrice)
+	digits := int(math.Round(lg) + 1.)
+	maxTickPrecisionF := math.Pow10(5 - digits)
 
 	state.instrumentData.tickPrecision = uint64(maxTickPrecisionF)
 
@@ -249,6 +248,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
 
 	ob.Sync(bids, asks)
+
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
