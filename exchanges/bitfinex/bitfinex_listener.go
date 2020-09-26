@@ -229,18 +229,21 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	lg := math.Log10(avgPrice)
 	digits := int(math.Round(lg) + 1.)
 	maxTickPrecisionF := math.Pow10(5 - digits)
-
-	state.instrumentData.tickPrecision = uint64(maxTickPrecisionF)
+	tickPrecision := uint64(maxTickPrecisionF)
+	if tickPrecision == 0 {
+		tickPrecision = 1
+	}
+	state.instrumentData.tickPrecision = tickPrecision
 
 	bestAsk := asks[0].Price
 	//Allow a 10% price variation
-	depth := int(((bestAsk * 1.1) - bestAsk) * maxTickPrecisionF)
+	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
 	if depth > 10000 {
 		depth = 10000
 	}
 
 	ob := gorderbook.NewOrderBookL2(
-		uint64(maxTickPrecisionF),
+		tickPrecision,
 		state.instrumentData.lotPrecision,
 		depth,
 	)
