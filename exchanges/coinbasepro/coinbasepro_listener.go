@@ -185,6 +185,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return err
 	}
 
+	err = ws.SubscribeHeartBeat([]string{state.security.Symbol})
+	if err != nil {
+		return fmt.Errorf("error subscribing to ticker: %v", err)
+	}
+
 	time.Sleep(5 * time.Second)
 	fut := context.RequestFuture(
 		state.coinbaseproExecutor,
@@ -382,9 +387,12 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case coinbasepro.WSSubscriptions:
 		break
 
+	case coinbasepro.WSHeartBeat:
+		break
+
 	case coinbasepro.WSError:
 		// TODO handle error, skip unsubscribe error
-		fmt.Println("ERROR MESSAGE:", msg)
+		state.logger.Error("got WSError", log.Error(fmt.Errorf("%s", (msg.Message).(coinbasepro.WSError).Message)))
 	}
 	return nil
 }

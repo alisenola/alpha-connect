@@ -240,13 +240,23 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
 
+	hb := false
 	synced := false
 	for !synced {
+		if !hb {
+			if err := ws.ListSubscriptions(); err != nil {
+				return fmt.Errorf("error request list subscriptions: %v", err)
+			}
+			hb = true
+		}
 		if !ws.ReadMessage() {
 			return fmt.Errorf("error reading message: %v", ws.Err)
 		}
 		depthData, ok := ws.Msg.Message.(binance.WSDepthData)
 		if !ok {
+			if _, ok := ws.Msg.Message.(binance.WSResponse); ok {
+				hb = false
+			}
 			// Trade message
 			context.Send(context.Self(), ws.Msg)
 		}
