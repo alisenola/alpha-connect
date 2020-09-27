@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20200909075534-6bd84aeffd29
-	gitlab.com/alphaticks/xchanger v0.0.0-20200925093213-e93db84c0336
+	gitlab.com/alphaticks/xchanger v0.0.0-20200927085822-c2a16ce27122
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200923115315-24f9fcf51661
 	gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 // indirect
 	gitlab.com/tachikoma.ai/tickstore v0.0.0-20200901135647-78e3bedf6e58
