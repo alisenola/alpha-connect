@@ -158,6 +158,7 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+		state.ws = nil
 	}
 
 	if state.socketTicker != nil {
