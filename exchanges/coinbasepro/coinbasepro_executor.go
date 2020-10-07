@@ -39,6 +39,9 @@ func (state *Executor) Receive(context actor.Context) {
 		state.privateExecutor = context.Spawn(actor.PropsFromProducer(NewCoinbaseProPrivateExecutor))
 		state.fixExecutor = context.Spawn(actor.PropsFromProducer(NewCoinbaseProFixExecutor))
 
+	case *messages.SecurityList:
+		context.Forward(context.Parent())
+
 	case *messages.SecurityListRequest:
 		context.Forward(state.publicExecutor)
 
