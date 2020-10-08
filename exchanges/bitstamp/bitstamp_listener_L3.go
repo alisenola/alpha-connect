@@ -278,6 +278,16 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 
 func (state *ListenerL3) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
+	if state.instrumentData.orderBook.Crossed() {
+		response := &messages.MarketDataResponse{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			RejectionReason: messages.Other,
+			Success:         false,
+		}
+		context.Respond(response)
+		return nil
+	}
 	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
