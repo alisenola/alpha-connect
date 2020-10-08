@@ -1271,6 +1271,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20200703081116-690c4dda7a71 h1:hsBQByVvk
 gitlab.com/alphaticks/gorderbook v0.0.0-20200703081116-690c4dda7a71/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200909075534-6bd84aeffd29 h1:yulv6qE2l503sz4+xhx4z71Mgm5G6GR8cx3N3nGE0do=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200909075534-6bd84aeffd29/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
+gitlab.com/alphaticks/gorderbook v0.0.0-20201006121715-8a712a4dad37 h1:2czv0x3TFpnLs5Pmfp8oTRGG8gEV9DkRbQLVN46Mrag=
+gitlab.com/alphaticks/gorderbook v0.0.0-20201006121715-8a712a4dad37/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77 h1:0Naa0vI4MH0soI7fPNGFEyjeFzEEzpRGtLix8TBJNAI=
 gitlab.com/alphaticks/xchanger v0.0.0-20200505161245-c7b3c4393e77/go.mod h1:b9qVYd/SQOPyXI+MnHx5PcC/tXYhZCsKxrDe1ioEAxs=
 gitlab.com/alphaticks/xchanger v0.0.0-20200512184925-cbfffbd8d798 h1:oJHapHLAW6RJzLik5hgmQCimCPDDx7as6qnmhFxIlbY=
@@ -1367,10 +1369,14 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200925093213-e93db84c0336 h1:XM43ofm64aE
 gitlab.com/alphaticks/xchanger v0.0.0-20200925093213-e93db84c0336/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20200927085822-c2a16ce27122 h1:rUDARYlfpq5rTb1NqWa9f5sqH27TqhXtbrzgAR8Ha84=
 gitlab.com/alphaticks/xchanger v0.0.0-20200927085822-c2a16ce27122/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201008170011-b4bdb224810f h1:h/LxdEWx6p2k4rvnoK5Ea/0t+TGKKwgrmZxIRqbKVgc=
+gitlab.com/alphaticks/xchanger v0.0.0-20201008170011-b4bdb224810f/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200916101828-01aac56d703a h1:bd/MpNdYwOFmhhngBaMc646W/H5DYynqY7XSsjC/anU=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200916101828-01aac56d703a/go.mod h1:iC+3dh9CVBJ4RTrmabylIDDvVQPUaUOaXYqJNX8mYs8=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200923115315-24f9fcf51661 h1:5BH6fZKeXnaFl0ep+Yh/xQQJLWR4cpl+y12FPKOT8eg=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200923115315-24f9fcf51661/go.mod h1:iC+3dh9CVBJ4RTrmabylIDDvVQPUaUOaXYqJNX8mYs8=
+gitlab.com/tachikoma.ai/tickobjects v0.0.0-20201008165552-bd5bb722d062 h1:TWebCRecY1qp/RZDvze3yvywG5W8x3yk9AkCSzLWF48=
+gitlab.com/tachikoma.ai/tickobjects v0.0.0-20201008165552-bd5bb722d062/go.mod h1:5LepNNo226HXfmCfLN8dXLVB7xmF6nMqdC8M+n3knjc=
 gitlab.com/tachikoma.ai/tickpred v0.0.0-20200710184839-b7106d6c9d63 h1:zJdzmQSVihbWrrao9B9XyXnZuFVM+JV0zbNEfP10wpQ=
 gitlab.com/tachikoma.ai/tickpred v0.0.0-20200710184839-b7106d6c9d63/go.mod h1:BlWDTBMj1KLqzQdZ2uN2tHSW2fRbknSna1QBKV5V8Kg=
 gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 h1:+FSszu9m0VrBxHCHR8zTDCrUe5Ip/0RWcwgMnbfflbo=
