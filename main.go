@@ -9,6 +9,7 @@ import (
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
@@ -71,7 +72,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false)), "executor")
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
 	liveStoreActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(live.NewLiveStoreProducer(0)), "live_store")
 
 	// Spawn guard actor
