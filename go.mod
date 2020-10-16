@@ -6,12 +6,13 @@ require (
 	cloud.google.com/go/storage v1.0.0
 	github.com/AsynkronIT/protoactor-go v0.0.0-20200317173033-c483abfa40e2
 	github.com/gogo/protobuf v1.3.1
+	github.com/gorilla/websocket v1.4.1
 	github.com/melaurent/gotickfile/v2 v2.0.0-20200916062636-4a9b6b157075
 	github.com/melaurent/kafero v1.2.4-0.20200403144811-ea8b6e20da99
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20201006121715-8a712a4dad37
-	gitlab.com/alphaticks/xchanger v0.0.0-20201008170011-b4bdb224810f
+	gitlab.com/alphaticks/xchanger v0.0.0-20201016103925-1a1b849eb352
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20201008165552-bd5bb722d062
 	gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 // indirect
 	gitlab.com/tachikoma.ai/tickstore v0.0.0-20200901135647-78e3bedf6e58

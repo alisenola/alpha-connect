@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"sort"
@@ -29,22 +31,24 @@ type InstrumentData struct {
 type Listener struct {
 	ws             *ftx.Websocket
 	security       *models.Security
+	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
 	socketTicker   *time.Ticker
 }
 
-func NewListenerProducer(security *models.Security) actor.Producer {
+func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security)
+		return NewListener(security, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security) actor.Actor {
+func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
 		ws:             nil,
 		security:       security,
+		dialerPool:     dialerPool,
 		instrumentData: nil,
 		logger:         nil,
 		socketTicker:   nil,
@@ -160,7 +164,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := ftx.NewWebsocket()
-	err := ws.Connect()
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
+	err := ws.Connect(&dialer)
 	if err != nil {
 		return err
 	}

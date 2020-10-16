@@ -6,12 +6,14 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"strings"
@@ -32,22 +34,24 @@ type InstrumentData struct {
 type Listener struct {
 	ws               *fbinance.Websocket
 	security         *models.Security
+	dialerPool       *xchangerUtils.DialerPool
 	instrumentData   *InstrumentData
 	fbinanceExecutor *actor.PID
 	logger           *log.Logger
 	socketTicker     *time.Ticker
 }
 
-func NewListenerProducer(security *models.Security) actor.Producer {
+func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security)
+		return NewListener(security, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security) actor.Actor {
+func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
 		ws:               nil,
 		security:         security,
+		dialerPool:       dialerPool,
 		instrumentData:   nil,
 		fbinanceExecutor: nil,
 		logger:           nil,
@@ -165,10 +169,13 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := fbinance.NewWebsocket()
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
 	symbol := strings.ToLower(state.security.Symbol)
 	err := ws.Connect(
 		symbol,
-		[]string{fbinance.WSDepthStreamRealTime, fbinance.WSAggregatedTradeStream})
+		[]string{fbinance.WSDepthStreamRealTime, fbinance.WSAggregatedTradeStream},
+		&dialer)
 	if err != nil {
 		return err
 	}

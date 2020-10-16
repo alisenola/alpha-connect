@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
@@ -782,7 +783,8 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	}
 
 	ws := fbinance.NewAuthWebsocket(listenKey.ListenKey)
-	if err := ws.Connect(); err != nil {
+	// TODO Dialer
+	if err := ws.Connect(websocket.DefaultDialer); err != nil {
 		return fmt.Errorf("error connecting to fbinance websocket: %v", err)
 	}
 

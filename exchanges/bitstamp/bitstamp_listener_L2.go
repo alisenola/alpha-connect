@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"time"
@@ -32,10 +34,11 @@ type InstrumentData struct {
 
 // OBType: OBL2
 
-type Listener struct {
+type ListenerL2 struct {
 	obWs            *bitstamp.Websocket
 	tradeWs         *bitstamp.Websocket
 	security        *models.Security
+	dialerPool      *xchangerUtils.DialerPool
 	instrumentData  *InstrumentData
 	executorManager *actor.PID
 	logger          *log.Logger
@@ -44,17 +47,18 @@ type Listener struct {
 	socketTicker    *time.Ticker
 }
 
-func NewListenerProducer(security *models.Security) actor.Producer {
+func NewListenerL2Producer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security)
+		return NewListenerL2(security, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security) actor.Actor {
-	return &Listener{
+func NewListenerL2(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+	return &ListenerL2{
 		obWs:            nil,
 		tradeWs:         nil,
 		security:        security,
+		dialerPool:      dialerPool,
 		instrumentData:  nil,
 		executorManager: nil,
 		logger:          nil,
@@ -62,7 +66,7 @@ func NewListener(security *models.Security) actor.Actor {
 	}
 }
 
-func (state *Listener) Receive(context actor.Context) {
+func (state *ListenerL2) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -111,7 +115,7 @@ func (state *Listener) Receive(context actor.Context) {
 	}
 }
 
-func (state *Listener) Initialize(context actor.Context) error {
+func (state *ListenerL2) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -163,7 +167,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) Clean(context actor.Context) error {
+func (state *ListenerL2) Clean(context actor.Context) error {
 	if state.tradeWs != nil {
 		if err := state.tradeWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
@@ -182,13 +186,15 @@ func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeOrderBook(context actor.Context) error {
+func (state *ListenerL2) subscribeOrderBook(context actor.Context) error {
 	if state.obWs != nil {
 		_ = state.obWs.Disconnect()
 	}
 
 	ws := bitstamp.NewWebsocket()
-	if err := ws.Connect(); err != nil {
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
+	if err := ws.Connect(&dialer); err != nil {
 		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 
@@ -236,12 +242,14 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeTrades(context actor.Context) error {
+func (state *ListenerL2) subscribeTrades(context actor.Context) error {
 	if state.tradeWs != nil {
 		_ = state.tradeWs.Disconnect()
 	}
 	ws := bitstamp.NewWebsocket()
-	if err := ws.Connect(); err != nil {
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
+	if err := ws.Connect(&dialer); err != nil {
 		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 
@@ -260,7 +268,7 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) OnMarketDataRequest(context actor.Context) error {
+func (state *ListenerL2) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -281,7 +289,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) onWebsocketMessage(context actor.Context) error {
+func (state *ListenerL2) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*bitstamp.WebsocketMessage)
 	switch msg.Message.(type) {
 
@@ -370,7 +378,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) checkSockets(context actor.Context) error {
+func (state *ListenerL2) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
@@ -409,7 +417,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) postAggTrade(context actor.Context) {
+func (state *ListenerL2) postAggTrade(context actor.Context) {
 	nowMilli := uint64(time.Now().UnixNano() / 1000000)
 
 	for el := state.stashedTrades.Front(); el != nil; el = state.stashedTrades.Front() {

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobi"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"sort"
@@ -30,6 +32,7 @@ type InstrumentData struct {
 type Listener struct {
 	ws              *huobi.Websocket
 	security        *models.Security
+	dialerPool      *xchangerUtils.DialerPool
 	instrumentData  *InstrumentData
 	executorManager *actor.PID
 	mediator        *actor.PID
@@ -38,16 +41,17 @@ type Listener struct {
 	socketTicker    *time.Ticker
 }
 
-func NewListenerProducer(security *models.Security) actor.Producer {
+func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security)
+		return NewListener(security, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security) actor.Actor {
+func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
 		ws:              nil,
 		security:        security,
+		dialerPool:      dialerPool,
 		instrumentData:  nil,
 		executorManager: nil,
 		mediator:        nil,
@@ -168,7 +172,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := huobi.NewWebsocket()
-	if err := ws.Connect(); err != nil {
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
+	if err := ws.Connect(&dialer); err != nil {
 		return fmt.Errorf("error connecting to huobi websocket: %v", err)
 	}
 

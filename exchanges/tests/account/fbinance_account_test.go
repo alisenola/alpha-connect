@@ -1,19 +1,15 @@
-package fbinance
+package account
 
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
-	"gitlab.com/alphaticks/alphac/account"
-	"gitlab.com/alphaticks/alphac/exchanges"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -25,8 +21,8 @@ var instrument = &models.Instrument{
 	Symbol:     &types.StringValue{Value: "BTCUSDT"},
 }
 
-var testAccountInfo = &models.Account{
-	AccountID: "299210",
+var FBinanceAccount = &models.Account{
+	AccountID: "299211",
 	Exchange:  &constants.FBINANCE,
 	Credentials: &xchangerModels.APICredentials{
 		APIKey:    "74f122652da74f6e1bcc34b8c23fc91e0239b502e68440632ae9a3cb7cefa18e",
@@ -34,21 +30,9 @@ var testAccountInfo = &models.Account{
 	},
 }
 
-var testAccount = exchanges.NewAccount(testAccountInfo)
-
-var executor *actor.PID
 var fbinanceExecutor = actor.NewLocalPID("executor/fbinance_executor")
 
-func TestMain(m *testing.M) {
-	fbinance.EnableTestNet()
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer([]*xchangerModels.Exchange{&constants.FBINANCE}, []*account.Account{testAccount}, false)), "executor")
-	code := m.Run()
-	fbinance.DisableTestNet()
-	actor.EmptyRootContext.PoisonFuture(executor)
-	os.Exit(code)
-}
-
-func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestFBinanceAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Test with no account
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
@@ -78,7 +62,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 	}, 30*time.Second).Result()
 
 	if err != nil {
@@ -97,7 +81,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -125,7 +109,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Test with one order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    instrument,
@@ -154,7 +138,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -200,7 +184,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Now delete
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument,
 		},
@@ -223,7 +207,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:    &types.StringValue{Value: order.OrderID},
 			Instrument: instrument,
@@ -256,7 +240,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test Invalid account
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
@@ -281,7 +265,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test no order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -302,7 +286,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test with one order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
@@ -328,7 +312,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Delete orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument,
 		},
@@ -346,10 +330,10 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnBalancesRequest(t *testing.T) {
+func TestFBinanceAccountListener_OnBalancesRequest(t *testing.T) {
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -367,12 +351,12 @@ func TestAccountListener_OnBalancesRequest(t *testing.T) {
 	}
 }
 
-func checkBalances(t *testing.T) {
+func checkFBinanceBalances(t *testing.T) {
 	// Now check balance
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -392,7 +376,7 @@ func checkBalances(t *testing.T) {
 
 	res, err = actor.EmptyRootContext.RequestFuture(fbinanceExecutor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   FBinanceAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -415,12 +399,12 @@ func checkBalances(t *testing.T) {
 	}
 }
 
-func checkPositions(t *testing.T, instrument *models.Instrument) {
+func checkFBinancePositions(t *testing.T, instrument *models.Instrument) {
 	// Request the same from fbinance directly
 
 	res, err := actor.EmptyRootContext.RequestFuture(fbinanceExecutor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    FBinanceAccount,
 		Instrument: instrument,
 	}, 10*time.Second).Result()
 
@@ -439,7 +423,7 @@ func checkPositions(t *testing.T, instrument *models.Instrument) {
 
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    FBinanceAccount,
 		Instrument: instrument,
 	}, 10*time.Second).Result()
 
@@ -472,12 +456,12 @@ func checkPositions(t *testing.T, instrument *models.Instrument) {
 	}
 }
 
-func TestAccountListener_OnGetPositions(t *testing.T) {
+func TestFBinanceAccountListener_OnGetPositions(t *testing.T) {
 
 	// Market buy 1 contract
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    instrument,
@@ -497,12 +481,12 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkPositions(t, instrument)
-	checkBalances(t)
+	checkFBinancePositions(t, instrument)
+	checkFBinanceBalances(t)
 
 	// Market sell 1 contract
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
@@ -518,12 +502,12 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkPositions(t, instrument)
-	checkBalances(t)
+	checkFBinancePositions(t, instrument)
+	checkFBinanceBalances(t)
 
 	// Close position
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
@@ -539,6 +523,6 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument)
-	checkBalances(t)
+	checkFBinancePositions(t, instrument)
+	checkFBinanceBalances(t)
 }

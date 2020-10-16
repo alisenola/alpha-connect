@@ -1,18 +1,14 @@
-package bitmex
+package account
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
-	"gitlab.com/alphaticks/alphac/account"
-	"gitlab.com/alphaticks/alphac/exchanges"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -29,7 +25,7 @@ var instrument2 = &models.Instrument{
 	Symbol:     &types.StringValue{Value: "ETHUSD"},
 }
 
-var testAccountInfo = &models.Account{
+var BitmexAccount = &models.Account{
 	AccountID: "299210",
 	Exchange:  &constants.BITMEX,
 	Credentials: &xchangerModels.APICredentials{
@@ -38,21 +34,9 @@ var testAccountInfo = &models.Account{
 	},
 }
 
-var testAccount = exchanges.NewAccount(testAccountInfo)
-
-var executor *actor.PID
 var bitmexExecutor = actor.NewLocalPID("executor/bitmex_executor")
 
-func TestMain(m *testing.M) {
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer([]*xchangerModels.Exchange{&constants.BITMEX}, []*account.Account{testAccount}, false)), "executor")
-	bitmex.EnableTestNet()
-	code := m.Run()
-	bitmex.DisableTestNet()
-	actor.EmptyRootContext.PoisonFuture(executor)
-	os.Exit(code)
-}
-
-func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Test with no account
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
@@ -82,7 +66,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -101,7 +85,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -128,7 +112,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Test with one order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID:         uuid.NewV1().String(),
 			Instrument:            instrument1,
@@ -158,7 +142,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -204,7 +188,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Now delete
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -227,7 +211,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:    &types.StringValue{Value: order.OrderID},
 			Instrument: instrument1,
@@ -260,7 +244,7 @@ func TestAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test Invalid account
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
@@ -285,7 +269,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test no order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -306,7 +290,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test with one order
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -332,7 +316,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Delete orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -350,7 +334,7 @@ func TestAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
+func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Test Invalid account
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
@@ -375,7 +359,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Test no orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Orders:    nil,
 	}, 10*time.Second).Result()
 
@@ -393,7 +377,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Test with two orders diff symbols
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -432,7 +416,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Test with two orders same symbol diff price
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -468,7 +452,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 			Instrument:    instrument1,
@@ -513,7 +497,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order2ClID},
 			Instrument:    instrument1,
@@ -557,7 +541,7 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Delete orders
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -575,12 +559,12 @@ func TestAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnOrderReplaceRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	orderID := uuid.NewV1().String()
 	// Post one order
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    instrument1,
@@ -608,7 +592,7 @@ func TestAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	// Test replace quantity
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    BitmexAccount,
 		Instrument: instrument1,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
@@ -634,7 +618,7 @@ func TestAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: orderID},
 		},
@@ -659,12 +643,12 @@ func TestAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	order1ClID := uuid.NewV1().String()
 	order2ClID := uuid.NewV1().String()
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -699,7 +683,7 @@ func TestAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	// Test replace quantity
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderBulkReplaceRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    BitmexAccount,
 		Instrument: instrument1,
 		Updates: []*messages.OrderUpdate{
 			{
@@ -733,7 +717,7 @@ func TestAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 		},
@@ -761,7 +745,7 @@ func TestAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order2ClID},
 		},
@@ -786,10 +770,10 @@ func TestAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestAccountListener_OnBalancesRequest(t *testing.T) {
+func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -807,12 +791,12 @@ func TestAccountListener_OnBalancesRequest(t *testing.T) {
 	}
 }
 
-func checkBalances(t *testing.T) {
+func checkBitmexBalances(t *testing.T) {
 	// Now check balance
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -832,7 +816,7 @@ func checkBalances(t *testing.T) {
 
 	res, err = actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -855,12 +839,12 @@ func checkBalances(t *testing.T) {
 	}
 }
 
-func checkPositions(t *testing.T, instrument *models.Instrument) {
+func checkBitmexPositions(t *testing.T, instrument *models.Instrument) {
 	// Request the same from bitmex directly
 
 	res, err := actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    BitmexAccount,
 		Instrument: instrument,
 	}, 10*time.Second).Result()
 
@@ -879,7 +863,7 @@ func checkPositions(t *testing.T, instrument *models.Instrument) {
 
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    BitmexAccount,
 		Instrument: instrument,
 	}, 10*time.Second).Result()
 
@@ -912,11 +896,11 @@ func checkPositions(t *testing.T, instrument *models.Instrument) {
 	}
 }
 
-func TestAccountListener_OnGetPositions(t *testing.T) {
+func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 
 	// Market buy 1 contract
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -937,12 +921,12 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument2)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument2)
+	checkBitmexBalances(t)
 
 	// Market sell 1 contract
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -958,12 +942,12 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument2)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument2)
+	checkBitmexBalances(t)
 
 	// Close position
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -979,15 +963,15 @@ func TestAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument2)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument2)
+	checkBitmexBalances(t)
 }
 
-func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
+func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	// Market buy 2 contracts
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -1008,12 +992,12 @@ func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument1)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument1)
+	checkBitmexBalances(t)
 
 	// Market sell 1 contract
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -1029,12 +1013,12 @@ func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkPositions(t, instrument1)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument1)
+	checkBitmexBalances(t)
 
 	// Close position
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: testAccountInfo,
+		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -1052,17 +1036,17 @@ func TestAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	// Request the same from bitmex directly
 
-	checkPositions(t, instrument1)
-	checkBalances(t)
+	checkBitmexPositions(t, instrument1)
+	checkBitmexBalances(t)
 }
 
-func TestAccountListener_ConfirmFillReplace(t *testing.T) {
+func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 
 	order1ClID := uuid.NewV1().String()
 	// Test with two orders same symbol diff price
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -1090,7 +1074,7 @@ func TestAccountListener_ConfirmFillReplace(t *testing.T) {
 	// Send a replace right after
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
-		Account:    testAccountInfo,
+		Account:    BitmexAccount,
 		Instrument: instrument1,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
@@ -1117,7 +1101,7 @@ func TestAccountListener_ConfirmFillReplace(t *testing.T) {
 	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   testAccountInfo,
+		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 			Instrument:    instrument1,

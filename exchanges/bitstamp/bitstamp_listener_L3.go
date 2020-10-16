@@ -7,12 +7,14 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"time"
@@ -36,6 +38,7 @@ type InstrumentDataL3 struct {
 type ListenerL3 struct {
 	ws               *bitstamp.Websocket
 	security         *models.Security
+	dialerPool       *xchangerUtils.DialerPool
 	instrumentData   *InstrumentDataL3
 	bitstampExecutor *actor.PID
 	logger           *log.Logger
@@ -44,16 +47,17 @@ type ListenerL3 struct {
 	socketTicker     *time.Ticker
 }
 
-func NewListenerL3Producer(security *models.Security) actor.Producer {
+func NewListenerL3Producer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security)
+		return NewListenerL3(security, dialerPool)
 	}
 }
 
-func NewListenerL3(security *models.Security) actor.Actor {
+func NewListenerL3(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &ListenerL3{
 		ws:               nil,
 		security:         security,
+		dialerPool:       dialerPool,
 		instrumentData:   nil,
 		bitstampExecutor: nil,
 		logger:           nil,
@@ -181,7 +185,9 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := bitstamp.NewWebsocket()
-	if err := ws.Connect(); err != nil {
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
+	if err := ws.Connect(&dialer); err != nil {
 		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 

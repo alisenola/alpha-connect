@@ -1,16 +1,19 @@
-package exchanges
+package data
 
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alphac/enum"
+	"gitlab.com/alphaticks/alphac/exchanges"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -214,28 +217,50 @@ func (state *OBChecker) OnMarketDataSnapshot(context actor.Context) error {
 	return nil
 }
 
-var obChecker *actor.PID
 var executor *actor.PID
 
-func clean() {
-	if obChecker != nil {
-		_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+func TestMain(m *testing.M) {
+	exch := []*xchangerModels.Exchange{
+		&constants.BINANCE,
+		&constants.BITFINEX,
+		&constants.BITSTAMP,
+		&constants.COINBASEPRO,
+		&constants.GEMINI,
+		&constants.KRAKEN,
+		&constants.CRYPTOFACILITIES,
+		&constants.OKCOIN,
+		&constants.FBINANCE,
+		&constants.HITBTC,
+		&constants.BITZ,
+		&constants.HUOBI,
+		&constants.FTX,
+		&constants.BITMEX,
+		&constants.BITSTAMP,
+		&constants.DERIBIT,
+		&constants.HUOBIP,
+		&constants.HUOBIF,
+		&constants.BYBITI,
+		&constants.BYBITL,
 	}
-	if executor != nil {
-		_ = actor.EmptyRootContext.PoisonFuture(executor).Wait()
-	}
+	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	code := m.Run()
+	_ = actor.EmptyRootContext.PoisonFuture(executor).Wait()
+	os.Exit(code)
 }
 
 func TestBinance(t *testing.T) {
-	defer clean()
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 
-	exchanges := []*xchangerModels.Exchange{&constants.BINANCE}
 	securityID := []uint64{
 		9281941173829172773, //BTCUSDT
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
-
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -308,13 +333,18 @@ func TestBinance(t *testing.T) {
 }
 
 func TestBitfinex(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BITFINEX}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
+
 	securityID := []uint64{
 		17873758715870285590, //BTCUSDT
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -390,13 +420,17 @@ func TestBitfinex(t *testing.T) {
 }
 
 func TestBitmex(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BITMEX}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		5391998915988476130, //XBTUSD
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -470,13 +504,17 @@ func TestBitmex(t *testing.T) {
 }
 
 func TestBitstamp(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BITSTAMP}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		5279696656781449381,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -550,13 +588,17 @@ func TestBitstamp(t *testing.T) {
 }
 
 func TestBitz(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BITZ}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		243278890145991530,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -630,13 +672,17 @@ func TestBitz(t *testing.T) {
 }
 
 func TestCoinbasePro(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.COINBASEPRO}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		11630614572540763252,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -710,13 +756,17 @@ func TestCoinbasePro(t *testing.T) {
 }
 
 func TestCryptofacilities(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.CRYPTOFACILITIES}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		1416768858288349990,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -792,13 +842,17 @@ func TestCryptofacilities(t *testing.T) {
 }
 
 func TestFBinance(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.FBINANCE}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		5485975358912730733,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -874,13 +928,17 @@ func TestFBinance(t *testing.T) {
 }
 
 func TestFTX(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.FTX}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		4425198260936995601,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -953,22 +1011,20 @@ func TestFTX(t *testing.T) {
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
 	}
-	if err := actor.EmptyRootContext.PoisonFuture(obChecker).Wait(); err != nil {
-		t.Fatal(err)
-	}
-	if err := actor.EmptyRootContext.PoisonFuture(executor).Wait(); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestHuobi(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.HUOBI}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		2195469462990134438,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1044,13 +1100,17 @@ func TestHuobi(t *testing.T) {
 }
 
 func TestGemini(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.GEMINI}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		17496373742670049989,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1126,13 +1186,17 @@ func TestGemini(t *testing.T) {
 }
 
 func TestHitbtc(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.HITBTC}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		12674447834540883135,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1208,13 +1272,17 @@ func TestHitbtc(t *testing.T) {
 }
 
 func TestKraken(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.KRAKEN}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		10955098577666557860,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1290,13 +1358,17 @@ func TestKraken(t *testing.T) {
 }
 
 func TestOKCoin(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.OKCOIN}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		16235745264492357730,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1372,13 +1444,17 @@ func TestOKCoin(t *testing.T) {
 }
 
 func TestDeribit(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.DERIBIT}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		2206542817128348325,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1455,13 +1531,17 @@ func TestDeribit(t *testing.T) {
 }
 
 func TestHuobip(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.HUOBIP}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		10070367938184144403,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1538,13 +1618,17 @@ func TestHuobip(t *testing.T) {
 }
 
 func TestHuobif(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.HUOBIF}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		5362427922299651408,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1621,13 +1705,17 @@ func TestHuobif(t *testing.T) {
 }
 
 func TestBybiti(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BYBITI}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		7374647908427501521,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1704,13 +1792,17 @@ func TestBybiti(t *testing.T) {
 }
 
 func TestBybitl(t *testing.T) {
-	defer clean()
-	exchanges := []*xchangerModels.Exchange{&constants.BYBITL}
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		}
+	}()
 	securityID := []uint64{
 		6789757764526280996,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false)), "executor")
 
 	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -1724,7 +1816,6 @@ func TestBybitl(t *testing.T) {
 		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
-		fmt.Println(s)
 		tested := false
 		for _, secID := range securityID {
 			if secID == s.SecurityID {

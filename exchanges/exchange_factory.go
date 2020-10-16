@@ -26,6 +26,7 @@ import (
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
+	"gitlab.com/alphaticks/xchanger/utils"
 )
 
 // TODO sample size config
@@ -75,46 +76,46 @@ func NewPaperAccountListenerProducer(account *account.Account) actor.Producer {
 	}
 }
 
-func NewInstrumentListenerProducer(security *models.Security) actor.Producer {
+func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
 	switch security.Exchange.ID {
 	case constants.BINANCE.ID:
-		return func() actor.Actor { return binance.NewListener(security) }
+		return func() actor.Actor { return binance.NewListener(security, dialerPool) }
 	case constants.BITFINEX.ID:
-		return func() actor.Actor { return bitfinex.NewListener(security) }
+		return func() actor.Actor { return bitfinex.NewListener(security, dialerPool) }
 	case constants.BITMEX.ID:
-		return func() actor.Actor { return bitmex.NewListener(security) }
+		return func() actor.Actor { return bitmex.NewListener(security, dialerPool) }
 	case constants.BITSTAMP.ID:
-		return func() actor.Actor { return bitstamp.NewListenerL3(security) }
+		return func() actor.Actor { return bitstamp.NewListenerL3(security, dialerPool) }
 	case constants.BITZ.ID:
-		return func() actor.Actor { return bitz.NewListener(security) }
+		return func() actor.Actor { return bitz.NewListener(security, dialerPool) }
 	case constants.COINBASEPRO.ID:
-		return func() actor.Actor { return coinbasepro.NewListener(security) }
+		return func() actor.Actor { return coinbasepro.NewListener(security, dialerPool) }
 	case constants.CRYPTOFACILITIES.ID:
-		return func() actor.Actor { return cryptofacilities.NewListener(security) }
+		return func() actor.Actor { return cryptofacilities.NewListener(security, dialerPool) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewListener(security) }
+		return func() actor.Actor { return fbinance.NewListener(security, dialerPool) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewListener(security) }
+		return func() actor.Actor { return ftx.NewListener(security, dialerPool) }
 	case constants.GEMINI.ID:
-		return func() actor.Actor { return gemini.NewListener(security) }
+		return func() actor.Actor { return gemini.NewListener(security, dialerPool) }
 	case constants.HITBTC.ID:
-		return func() actor.Actor { return hitbtc.NewListener(security) }
+		return func() actor.Actor { return hitbtc.NewListener(security, dialerPool) }
 	case constants.KRAKEN.ID:
-		return func() actor.Actor { return kraken.NewListener(security) }
+		return func() actor.Actor { return kraken.NewListener(security, dialerPool) }
 	case constants.OKCOIN.ID:
-		return func() actor.Actor { return okcoin.NewListener(security) }
+		return func() actor.Actor { return okcoin.NewListener(security, dialerPool) }
 	case constants.DERIBIT.ID:
-		return func() actor.Actor { return deribit.NewListener(security) }
+		return func() actor.Actor { return deribit.NewListener(security, dialerPool) }
 	case constants.HUOBI.ID:
-		return func() actor.Actor { return huobi.NewListener(security) }
+		return func() actor.Actor { return huobi.NewListener(security, dialerPool) }
 	case constants.HUOBIP.ID:
-		return func() actor.Actor { return huobip.NewListener(security) }
+		return func() actor.Actor { return huobip.NewListener(security, dialerPool) }
 	case constants.HUOBIF.ID:
-		return func() actor.Actor { return huobif.NewListener(security) }
+		return func() actor.Actor { return huobif.NewListener(security, dialerPool) }
 	case constants.BYBITI.ID:
-		return func() actor.Actor { return bybiti.NewListener(security) }
+		return func() actor.Actor { return bybiti.NewListener(security, dialerPool) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewListener(security) }
+		return func() actor.Actor { return bybitl.NewListener(security, dialerPool) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }

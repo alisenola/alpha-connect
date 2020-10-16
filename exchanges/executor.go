@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"reflect"
 	"time"
 )
@@ -29,20 +30,22 @@ type Executor struct {
 	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
 	logger            *log.Logger
 	paperTrading      bool
+	dialerPool        *xchangerUtils.DialerPool
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges, accounts, paperTrading)
+		return NewExecutor(exchanges, accounts, paperTrading, dialerPool)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Executor{
 		exchanges:    exchanges,
 		accounts:     accounts,
 		logger:       nil,
 		paperTrading: paperTrading,
+		dialerPool:   dialerPool,
 	}
 }
 
@@ -254,7 +257,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[securityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security)).WithSupervisor(
+		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security, state.dialerPool)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[securityID] = pid

@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/xchanger/utils"
 	"reflect"
 	"time"
 )
@@ -17,19 +18,21 @@ type MarketDataManager struct {
 	subscribers map[uint64]*actor.PID
 	listener    *actor.PID
 	security    *models.Security
+	dialerPool  *utils.DialerPool
 	logger      *log.Logger
 }
 
-func NewMarketDataManagerProducer(security *models.Security) actor.Producer {
+func NewMarketDataManagerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewMarketDataManager(security)
+		return NewMarketDataManager(security, dialerPool)
 	}
 }
 
-func NewMarketDataManager(security *models.Security) actor.Actor {
+func NewMarketDataManager(security *models.Security, dialerPool *utils.DialerPool) actor.Actor {
 	return &MarketDataManager{
-		security: security,
-		logger:   nil,
+		security:   security,
+		dialerPool: dialerPool,
+		logger:     nil,
 	}
 }
 
@@ -93,7 +96,7 @@ func (state *MarketDataManager) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	state.subscribers = make(map[uint64]*actor.PID)
-	producer := NewInstrumentListenerProducer(state.security)
+	producer := NewInstrumentListenerProducer(state.security, state.dialerPool)
 	if producer == nil {
 		return fmt.Errorf("error getting instrument listener")
 	}

@@ -1371,6 +1371,16 @@ gitlab.com/alphaticks/xchanger v0.0.0-20200927085822-c2a16ce27122 h1:rUDARYlfpq5
 gitlab.com/alphaticks/xchanger v0.0.0-20200927085822-c2a16ce27122/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20201008170011-b4bdb224810f h1:h/LxdEWx6p2k4rvnoK5Ea/0t+TGKKwgrmZxIRqbKVgc=
 gitlab.com/alphaticks/xchanger v0.0.0-20201008170011-b4bdb224810f/go.mod h1:nPHKt0fa7/midw7rU20R5qy778sAdQ6jKZNQ+VxyEJQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016094657-f26416f47ee2 h1:CChV4w6wVR20tCb0lUAQTD7KtMjc6xK4f02CLW0r4A4=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016094657-f26416f47ee2/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016095534-24c76f149f2a h1:q4Fdvx4pPVLWzgJ4SXxs+F4BKOnIqGV+CXfucIVm9zY=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016095534-24c76f149f2a/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016100904-43350b587578 h1:gpr4bGJt/jzKkNLNKaQCODVpsgegaGT9WO+Xr5H2eXU=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016100904-43350b587578/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016102845-1cd298c2ef3c h1:hYxxTE5Z3iBJ/AV0GREiVRdYqXwEn8Yj6+u5fVBh+94=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016102845-1cd298c2ef3c/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016103925-1a1b849eb352 h1:b2pMHKF2KqishKR6HlOhwY/bCTz5TwWCkVX3e0JxkEs=
+gitlab.com/alphaticks/xchanger v0.0.0-20201016103925-1a1b849eb352/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200916101828-01aac56d703a h1:bd/MpNdYwOFmhhngBaMc646W/H5DYynqY7XSsjC/anU=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200916101828-01aac56d703a/go.mod h1:iC+3dh9CVBJ4RTrmabylIDDvVQPUaUOaXYqJNX8mYs8=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20200923115315-24f9fcf51661 h1:5BH6fZKeXnaFl0ep+Yh/xQQJLWR4cpl+y12FPKOT8eg=
@@ -1620,6 +1630,8 @@ golang.org/x/sys v0.0.0-20191008105621-543471e840be/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20191010194322-b09406accb47/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191118013547-6254a7c3cac6 h1:8mlr2HX+lfl0eaQcjiHfVeM2FHxWkuYQ5a2Wcy8mE1s=
 golang.org/x/sys v0.0.0-20191118013547-6254a7c3cac6/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211 h1:9UQO31fZ+0aKQOFldThf7BKPMJTiBfWycGh/u3UoO88=
+golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.0.0-20160726164857-2910a502d2bf/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
