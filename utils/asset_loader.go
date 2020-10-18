@@ -10,7 +10,9 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
+	"google.golang.org/api/option"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -120,9 +122,18 @@ func (state *AssetLoader) checkAsset(context actor.Context) error {
 	var data []byte
 	if state.assetFile[0:5] == "gs://" {
 		ctx := goContext.Background()
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			return err
+		var client *storage.Client
+		var err error
+		if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
+			client, err = storage.NewClient(ctx, option.WithoutAuthentication())
+			if err != nil {
+				return err
+			}
+		} else {
+			client, err = storage.NewClient(ctx)
+			if err != nil {
+				return err
+			}
 		}
 
 		splits := strings.Split(state.assetFile[5:], "/")
