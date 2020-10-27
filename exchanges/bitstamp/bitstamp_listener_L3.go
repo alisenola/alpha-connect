@@ -304,7 +304,7 @@ func (state *ListenerL3) OnMarketDataRequest(context actor.Context) error {
 		snapshot := &models.OBL2Snapshot{
 			Bids:      state.instrumentData.orderBook.GetBids(0),
 			Asks:      state.instrumentData.orderBook.GetAsks(0),
-			Timestamp: utils.MicroToTimestamp(state.instrumentData.lastUpdateTime),
+			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
 		}
 		response.SnapshotL2 = snapshot
 	}

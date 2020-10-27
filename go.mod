@@ -18,6 +18,7 @@ require (
 	gitlab.com/tachikoma.ai/tickstore v0.0.0-20200901135647-78e3bedf6e58
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200922092024-4090fea4ef71
 	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20200907182749-4229846f6db9
+	google.golang.org/api v0.14.0
 	google.golang.org/grpc v1.28.0
 )
 
