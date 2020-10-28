@@ -40,6 +40,16 @@ func (q *APIQuery) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *actor.Stopping:
+		if err := q.Clean(context); err != nil {
+			panic(err)
+		}
+
+	case *actor.Restarting:
+		if err := q.Clean(context); err != nil {
+			// Attention, no panic in restarting or infinite loop
+		}
+
 	case *PerformQueryRequest:
 		//Set API credentials
 		err := q.PerformQueryRequest(context)
@@ -50,6 +60,10 @@ func (q *APIQuery) Receive(context actor.Context) {
 }
 
 func (q *APIQuery) Initialize(context actor.Context) error {
+	return nil
+}
+
+func (q *APIQuery) Clean(context actor.Context) error {
 	return nil
 }
 
@@ -65,6 +79,7 @@ func (q *APIQuery) PerformQueryRequest(context actor.Context) error {
 	queryResponse.StatusCode = int64(resp.StatusCode)
 	queryResponse.Response, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
+		_ = resp.Body.Close()
 		return err
 	}
 

@@ -136,7 +136,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		for {
 			select {
 			case _ = <-socketTicker.C:
-				context.Send(pid, &checkSockets{})
+				actor.EmptyRootContext.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
