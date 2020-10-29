@@ -1,5 +1,6 @@
 package live
 
+/*
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -66,3 +67,5 @@ func TestDataProvider(t *testing.T) {
 	actor.EmptyRootContext.Poison(executor)
 	actor.EmptyRootContext.Poison(liveStore)
 }
+
+*/

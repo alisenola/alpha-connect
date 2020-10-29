@@ -1,6 +1,7 @@
 // Actor that is connected to tickstore with all the public data
 package live
 
+/*
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -208,3 +209,4 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 func (state *LiveStore) Clean(context actor.Context) error {
 	return nil
 }
+*/

@@ -1,5 +1,6 @@
 package live
 
+/*
 import (
 	"container/list"
 	"fmt"
@@ -421,3 +422,5 @@ func (state *QueryReader) CloseQueryReader(context actor.Context) error {
 
 	return nil
 }
+
+*/
