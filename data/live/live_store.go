@@ -10,7 +10,6 @@ import (
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
 	_ "gitlab.com/tachikoma.ai/tickobjects/market"
-	storeMessages "gitlab.com/tachikoma.ai/tickstore/actors/messages"
 	"gitlab.com/tachikoma.ai/tickstore/db"
 	"gitlab.com/tachikoma.ai/tickstore/parsing"
 	"reflect"

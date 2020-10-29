@@ -7,7 +7,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
-	storeMessages "gitlab.com/tachikoma.ai/tickstore/actors/messages"
 	"testing"
 	"time"
 )

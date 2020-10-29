@@ -14,7 +14,6 @@ import (
 	"gitlab.com/tachikoma.ai/tickobjects"
 	"gitlab.com/tachikoma.ai/tickobjects/market"
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
-	storeMessages "gitlab.com/tachikoma.ai/tickstore/actors/messages"
 	"gitlab.com/tachikoma.ai/tickstore/db"
 	"gitlab.com/tachikoma.ai/tickstore/parsing"
 	"math"
