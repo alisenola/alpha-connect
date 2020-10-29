@@ -355,8 +355,6 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			// Send the deltas
 			ts := uint64(msg.Time.UnixNano()) / 1000000
 			state.postDelta(context, ts)
-		} else {
-			state.logger.Info("crossed")
 		}
 
 	case bitstamp.WSChangedOrder:
