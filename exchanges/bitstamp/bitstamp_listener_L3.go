@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"math/rand"
 	"reflect"
 	"time"
 )
@@ -433,6 +434,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 				state.instrumentData.matching = false
 				state.postDelta(context, ts)
 			} else {
+				// If crossed and not matching, bug
 				if !state.instrumentData.matching {
 					state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
 					return state.subscribeInstrument(context)
@@ -495,17 +497,18 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 	}
 
 	// Shitty bitstamp silently drops the connection...
+	fmt.Println(time.Now().Sub(state.lastOrderTime))
 	if time.Now().Sub(state.lastOrderTime) > 30*time.Second {
 		state.logger.Info("silent connection drop detected, reconnecting")
 		_ = state.ws.Disconnect()
 	}
 
-	if time.Now().Sub(state.lastOrderTime) > 1*time.Minute {
+	if time.Now().Sub(state.lastTradeTime) > 1*time.Minute {
 		state.logger.Info("silent connection drop detected, reconnecting")
 		_ = state.ws.Disconnect()
 	}
 
-	if state.ws.Err != nil || !state.ws.Connected {
+	if state.ws.Err != nil || !state.ws.Connected || rand.Int()%10 == 0 {
 		if state.ws.Err != nil {
 			state.logger.Info("error on socket", log.Error(state.ws.Err))
 		}
