@@ -355,6 +355,8 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			// Send the deltas
 			ts := uint64(msg.Time.UnixNano()) / 1000000
 			state.postDelta(context, ts)
+		} else {
+			state.logger.Info("crossed")
 		}
 
 	case bitstamp.WSChangedOrder:
@@ -565,7 +567,6 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, l)
 		}
 	}
-	fmt.Println("POST DELTA", state.instrumentData.seqNum+1)
 
 	obDelta := &models.OBL2Update{
 		Levels:    state.instrumentData.levelDeltas,
