@@ -1,6 +1,7 @@
 package modeling
 
 import (
+	"gitlab.com/tachikoma.ai/tickobjects"
 	"math"
 	"math/rand"
 )
@@ -83,6 +84,7 @@ func (m *MapModel) Progress(time uint64) {
 }
 
 type Model interface {
+	SetSelectors(map[uint64]tickobjects.TickObject)
 	Progress(tick uint64)
 	Ready() bool
 }
