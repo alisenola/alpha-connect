@@ -16,7 +16,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
-	"math/rand"
 	"reflect"
 	"time"
 )
@@ -508,7 +507,7 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	if state.ws.Err != nil || !state.ws.Connected || rand.Int()%10 == 0 {
+	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
 			state.logger.Info("error on socket", log.Error(state.ws.Err))
 		}
