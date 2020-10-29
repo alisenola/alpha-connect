@@ -83,8 +83,6 @@ func (m *MapModel) Progress(time uint64) {
 }
 
 type Model interface {
-	UpdatePrice(feedID uint64, tick uint64, price float64)
-	UpdateTrade(feedID uint64, tick uint64, price, size float64)
 	Progress(tick uint64)
 	Ready() bool
 }
