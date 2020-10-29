@@ -573,7 +573,6 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, l)
 		}
 	}
-	fmt.Println("POST DELTA", state.instrumentData.seqNum+1)
 
 	obDelta := &models.OBL2Update{
 		Levels:    state.instrumentData.levelDeltas,
