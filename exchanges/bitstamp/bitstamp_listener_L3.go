@@ -42,8 +42,6 @@ type ListenerL3 struct {
 	bitstampExecutor *actor.PID
 	logger           *log.Logger
 	lastPingTime     time.Time
-	lastOrderTime    time.Time
-	lastTradeTime    time.Time
 	stashedTrades    *list.List
 	socketTicker     *time.Ticker
 }
@@ -266,8 +264,6 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.orderBook = ob
 	state.instrumentData.levelDeltas = nil
-	state.lastOrderTime = time.Now()
-	state.lastTradeTime = time.Now()
 
 	if err := ws.Subscribe(state.security.Symbol, bitstamp.WSLiveTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream for symbol %s", state.security.Symbol)
@@ -323,7 +319,6 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", msg)
 
 	case bitstamp.WSCreatedOrder:
-		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSCreatedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
@@ -358,7 +353,6 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSChangedOrder:
-		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSChangedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
@@ -407,7 +401,6 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSDeletedOrder:
-		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSDeletedOrder)
 		if state.instrumentData.orderBook.HasOrder(o.ID) {
 			oldO := state.instrumentData.orderBook.GetOrder(o.ID)
@@ -432,7 +425,6 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSTrade:
-		state.lastTradeTime = time.Now()
 		tradeData := msg.Message.(bitstamp.WSTrade)
 		tradeData.MicroTimestamp = uint64(msg.Time.UnixNano()) / 1000
 		ts := tradeData.MicroTimestamp / 1000
@@ -483,18 +475,6 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 		// "Ping" by resubscribing to the topic
 		_ = state.ws.Subscribe(state.security.Symbol, bitstamp.WSLiveOrdersChannel)
 		state.lastPingTime = time.Now()
-	}
-
-	// Shitty bitstamp silently drops the connection...
-	fmt.Println(time.Now().Sub(state.lastOrderTime))
-	if time.Now().Sub(state.lastOrderTime) > 30*time.Second {
-		state.logger.Info("silent connection drop detected, reconnecting")
-		_ = state.ws.Disconnect()
-	}
-
-	if time.Now().Sub(state.lastTradeTime) > 1*time.Minute {
-		state.logger.Info("silent connection drop detected, reconnecting")
-		_ = state.ws.Disconnect()
 	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
