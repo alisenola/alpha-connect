@@ -1,5 +1,6 @@
 package grpc
 
+/*
 import (
 	"context"
 	"fmt"
@@ -117,3 +118,4 @@ func (s *LiveStoreER) Query(query *tickstore_grpc.QueryRequest, stream tickstore
 
 	return nil
 }
+*/
