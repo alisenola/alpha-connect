@@ -43,6 +43,8 @@ type ListenerL3 struct {
 	bitstampExecutor *actor.PID
 	logger           *log.Logger
 	lastPingTime     time.Time
+	lastOrderTime    time.Time
+	lastTradeTime    time.Time
 	stashedTrades    *list.List
 	socketTicker     *time.Ticker
 }
@@ -200,7 +202,7 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	}
 	_, ok := ws.Msg.Message.(bitstamp.WSSubscribedMessage)
 	if !ok {
-		return fmt.Errorf("was expecting WSSubsribed message, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		return fmt.Errorf("was expecting WSSubscribed message, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
 	time.Sleep(5 * time.Second)
@@ -266,6 +268,8 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.orderBook = ob
 	state.instrumentData.levelDeltas = nil
 	state.instrumentData.matching = false
+	state.lastOrderTime = time.Now()
+	state.lastTradeTime = time.Now()
 
 	if err := ws.Subscribe(state.security.Symbol, bitstamp.WSLiveTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream for symbol %s", state.security.Symbol)
@@ -321,6 +325,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", msg)
 
 	case bitstamp.WSCreatedOrder:
+		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSCreatedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
@@ -353,6 +358,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSChangedOrder:
+		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSChangedOrder)
 		order := gorderbook.Order{
 			Price:    o.Price,
@@ -404,6 +410,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSDeletedOrder:
+		state.lastOrderTime = time.Now()
 		o := msg.Message.(bitstamp.WSDeletedOrder)
 		if state.instrumentData.orderBook.HasOrder(o.ID) {
 			oldO := state.instrumentData.orderBook.GetOrder(o.ID)
@@ -434,6 +441,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bitstamp.WSTrade:
+		state.lastTradeTime = time.Now()
 		tradeData := msg.Message.(bitstamp.WSTrade)
 		tradeData.MicroTimestamp = uint64(msg.Time.UnixNano()) / 1000
 		ts := tradeData.MicroTimestamp / 1000
@@ -484,6 +492,17 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 		// "Ping" by resubscribing to the topic
 		_ = state.ws.Subscribe(state.security.Symbol, bitstamp.WSLiveOrdersChannel)
 		state.lastPingTime = time.Now()
+	}
+
+	// Shitty bitstamp silently drops the connection...
+	if time.Now().Sub(state.lastOrderTime) > 30*time.Second {
+		state.logger.Info("silent connection drop detected, reconnecting")
+		_ = state.ws.Disconnect()
+	}
+
+	if time.Now().Sub(state.lastOrderTime) > 1*time.Minute {
+		state.logger.Info("silent connection drop detected, reconnecting")
+		_ = state.ws.Disconnect()
 	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -554,6 +573,7 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, l)
 		}
 	}
+	fmt.Println("POST DELTA", state.instrumentData.seqNum+1)
 
 	obDelta := &models.OBL2Update{
 		Levels:    state.instrumentData.levelDeltas,
