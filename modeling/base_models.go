@@ -16,7 +16,6 @@ type MarketModel interface {
 	SetPriceModel(ID uint64, model PriceModel)
 	SetBuyTradeModel(ID uint64, model BuyTradeModel)
 	SetSellTradeModel(ID uint64, model SellTradeModel)
-	Progress(time uint64)
 }
 
 type MapModel struct {
@@ -71,6 +70,7 @@ func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
 	m.sellTradeModels[securityID] = model
 }
 
+/*
 func (m *MapModel) Progress(time uint64) {
 	for _, m := range m.priceModels {
 		m.Progress(time)
@@ -82,16 +82,18 @@ func (m *MapModel) Progress(time uint64) {
 		m.Progress(time)
 	}
 }
+*/
 
 type Model interface {
 	SetSelectors(map[uint64]tickobjects.TickObject)
-	Progress(tick uint64)
+	Forward(tick uint64)
+	Backward()
 	Ready() bool
+	Frequency() uint64
 }
 
 type PriceModel interface {
 	Model
-	Frequency() uint64
 	GetPrice(feedID uint64) float64
 	GetSamplePrices(feedID uint64, time uint64, sampleSize int) []float64
 }
@@ -118,15 +120,15 @@ func NewConstantPriceModel(price float64) *ConstantPriceModel {
 	}
 }
 
-func (m *ConstantPriceModel) UpdatePrice(_ uint64, _ uint64, _ float64) {
+func (m *ConstantPriceModel) SetSelectors(_ map[uint64]tickobjects.TickObject) {
 
 }
 
-func (m *ConstantPriceModel) UpdateTrade(_ uint64, _ uint64, _ float64, _ float64) {
+func (m *ConstantPriceModel) Forward(_ uint64) {
 
 }
 
-func (m *ConstantPriceModel) Progress(_ uint64) {
+func (m *ConstantPriceModel) Backward() {
 
 }
 
