@@ -85,7 +85,7 @@ func (m *MapModel) Progress(time uint64) {
 */
 
 type Model interface {
-	SetSelectors(map[uint64]tickobjects.TickObject)
+	SetSelectors([]tickobjects.TickObject)
 	Forward(tick uint64)
 	Backward()
 	Ready() bool
@@ -120,7 +120,7 @@ func NewConstantPriceModel(price float64) *ConstantPriceModel {
 	}
 }
 
-func (m *ConstantPriceModel) SetSelectors(_ map[uint64]tickobjects.TickObject) {
+func (m *ConstantPriceModel) SetSelectors(_ []tickobjects.TickObject) {
 
 }
 
