@@ -49,13 +49,17 @@ func NewSpotSecurity(sec *models.Security, modelCurrency *xchangerModels.Asset, 
 
 	if makerFee != nil {
 		spotSec.makerFee = *makerFee
-	} else {
+	} else if sec.MakerFee != nil {
 		spotSec.makerFee = sec.MakerFee.Value
+	} else {
+		return nil, fmt.Errorf("no maker fee specified for security")
 	}
 	if takerFee != nil {
 		spotSec.takerFee = *takerFee
-	} else {
+	} else if spotSec.TakerFee != nil {
 		spotSec.takerFee = sec.TakerFee.Value
+	} else {
+		return nil, fmt.Errorf("no taker fee specified for security")
 	}
 	return spotSec, nil
 }
