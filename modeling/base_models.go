@@ -1,6 +1,7 @@
 package modeling
 
 import (
+	"fmt"
 	"gitlab.com/tachikoma.ai/tickobjects"
 	"math"
 	"math/rand"
@@ -33,6 +34,7 @@ func NewMapModel() *MapModel {
 }
 
 func (m *MapModel) GetPrice(ID uint64) float64 {
+	fmt.Println(ID, m.priceModels)
 	return m.priceModels[ID].GetPrice(ID)
 }
 
@@ -86,7 +88,7 @@ func (m *MapModel) Progress(time uint64) {
 
 type Model interface {
 	SetSelectors([]tickobjects.TickObject)
-	Forward(tick uint64)
+	Forward(tick uint64, selector int)
 	Backward()
 	Ready() bool
 	Frequency() uint64
@@ -124,7 +126,7 @@ func (m *ConstantPriceModel) SetSelectors(_ []tickobjects.TickObject) {
 
 }
 
-func (m *ConstantPriceModel) Forward(_ uint64) {
+func (m *ConstantPriceModel) Forward(_ uint64, _ int) {
 
 }
 

@@ -21,7 +21,7 @@ import (
 func TestMemoryLeak(t *testing.T) {
 
 	exch := []*xchangerModels.Exchange{
-		&constants.BITFINEX,
+		&constants.COINBASEPRO,
 	}
 	executor, _ := actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
 
@@ -32,7 +32,7 @@ func TestMemoryLeak(t *testing.T) {
 	defer f.Close() // error handling omitted for example
 
 	securityID := []uint64{
-		17873758715870285590, //BTCUSDT
+		11630614572540763252,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
@@ -62,13 +62,14 @@ func TestMemoryLeak(t *testing.T) {
 	}
 
 	// Test BTCEUR
-	sec, ok := testedSecurities[17873758715870285590]
+	sec, ok := testedSecurities[11630614572540763252]
 	if !ok {
 		t.Fatalf("BTCUSD not found")
 	}
 
 	for i := 0; i < 10; i++ {
 		obChecker := actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+		time.Sleep(5 * time.Second)
 		err = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
 		if err != nil {
 			t.Fatal(err)
