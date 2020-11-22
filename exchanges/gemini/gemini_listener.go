@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
@@ -170,9 +169,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := gemini.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	if err := ws.Connect(&dialer); err != nil {
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to gemini websocket: %v", err)
 	}
 

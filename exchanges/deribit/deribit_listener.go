@@ -167,9 +167,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := deribit.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	err := ws.Connect(&dialer)
+	err := ws.Connect(state.dialerPool.GetDialer())
 	if err != nil {
 		return err
 	}

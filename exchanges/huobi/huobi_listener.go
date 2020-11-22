@@ -172,9 +172,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := huobi.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	if err := ws.Connect(&dialer); err != nil {
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to huobi websocket: %v", err)
 	}
 

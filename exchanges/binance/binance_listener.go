@@ -7,7 +7,6 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
-	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/alphac/utils"
@@ -186,12 +185,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	ws := binance.NewWebsocket()
 	symbol := strings.ToLower(state.security.Symbol)
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
 	err := ws.Connect(
 		symbol,
 		[]string{binance.WSDepthStream100ms, binance.WSTradeStream},
-		&dialer)
+		state.dialerPool.GetDialer())
 	if err != nil {
 		return err
 	}

@@ -169,13 +169,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := fbinance.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
 	symbol := strings.ToLower(state.security.Symbol)
 	err := ws.Connect(
 		symbol,
 		[]string{fbinance.WSDepthStreamRealTime, fbinance.WSAggregatedTradeStream},
-		&dialer)
+		state.dialerPool.GetDialer())
 	if err != nil {
 		return err
 	}

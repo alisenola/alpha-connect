@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
@@ -175,9 +174,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := bybitl.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	if err := ws.Connect(&dialer); err != nil {
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to bybit websocket: %v", err)
 	}
 

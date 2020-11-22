@@ -192,9 +192,7 @@ func (state *ListenerL2) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := bitstamp.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	if err := ws.Connect(&dialer); err != nil {
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 
@@ -247,9 +245,7 @@ func (state *ListenerL2) subscribeTrades(context actor.Context) error {
 		_ = state.tradeWs.Disconnect()
 	}
 	ws := bitstamp.NewWebsocket()
-	dialer := *websocket.DefaultDialer
-	dialer.NetDialContext = (state.dialerPool.GetDialer()).DialContext
-	if err := ws.Connect(&dialer); err != nil {
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to bitstamp websocket: %v", err)
 	}
 
