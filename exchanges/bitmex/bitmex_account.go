@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gorilla/websocket"
 	"gitlab.com/alphaticks/alphac/account"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	"math"
+	"net"
 	"reflect"
 	"sort"
 	"time"
@@ -1054,7 +1054,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 	ws := bitmex.NewWebsocket()
 	// TODO Dialer
-	if err := ws.Connect(websocket.DefaultDialer); err != nil {
+	if err := ws.Connect(&net.Dialer{}); err != nil {
 		return fmt.Errorf("error connecting to bitmex websocket: %v", err)
 	}
 
