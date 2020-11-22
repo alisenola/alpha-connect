@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alphac/models"
 	"gitlab.com/alphaticks/alphac/models/messages"
