@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"gitlab.com/alphaticks/alphac/exchanges"
-	"gitlab.com/alphaticks/alphac/utils"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"

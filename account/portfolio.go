@@ -1,7 +1,7 @@
 package account
 
 import (
-	"gitlab.com/alphaticks/alphac/modeling"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"math"
 )
 

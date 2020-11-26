@@ -1258,7 +1258,8 @@ github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q
 github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca/go.mod h1:ce1O1j6UtZfjr22oyGxGLbauSBp2YVXpARAosm7dHBg=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
-gitlab.com/alphaticks/alphac v0.0.0-20200611192500-e53236725eb1/go.mod h1:s79WggAqtpCrj2sSNmb2L3dvVOi8YLM5mVnbaUXCdC4=
+gitlab.com/alphaticks/alpha-connect v0.0.0-20200611192500-e53236725eb1 h1:O19UnB6sBk8lVxvK3foIMSG9FYxVdqq9VCoj6EU29Dw=
+gitlab.com/alphaticks/alpha-connect v0.0.0-20200611192500-e53236725eb1/go.mod h1:s79WggAqtpCrj2sSNmb2L3dvVOi8YLM5mVnbaUXCdC4=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200212205819-71a1f714d269/go.mod h1:UmSqgP4LvpVz4rLWmL2HzIV0PglnDc4TT67jc1cv240=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200219145956-352654c82287 h1:wCZBWQ/VjBNQj/4D9Y9yjNXx0zMK2L7jTrsb6j9/kyo=
 gitlab.com/alphaticks/gorderbook v0.0.0-20200219145956-352654c82287/go.mod h1:UmSqgP4LvpVz4rLWmL2HzIV0PglnDc4TT67jc1cv240=

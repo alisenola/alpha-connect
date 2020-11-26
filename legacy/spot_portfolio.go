@@ -2,8 +2,8 @@ package legacy
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alphac/modeling"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"math"
 	"sync"
 )

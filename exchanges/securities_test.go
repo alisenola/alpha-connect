@@ -3,7 +3,7 @@ package exchanges
 import (
 	"encoding/json"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"

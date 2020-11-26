@@ -9,7 +9,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/alphac/utils"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"

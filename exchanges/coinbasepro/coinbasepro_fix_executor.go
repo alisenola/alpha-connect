@@ -3,7 +3,7 @@ package coinbasepro
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alphac/exchanges/interface"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"reflect"
 	"time"

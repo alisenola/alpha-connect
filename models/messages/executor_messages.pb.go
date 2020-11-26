@@ -9,7 +9,7 @@ import (
 	actor "github.com/AsynkronIT/protoactor-go/actor"
 	proto "github.com/gogo/protobuf/proto"
 	types "github.com/gogo/protobuf/types"
-	models "gitlab.com/alphaticks/alphac/models"
+	models "gitlab.com/alphaticks/alpha-connect/models"
 	models1 "gitlab.com/alphaticks/xchanger/models"
 	io "io"
 	math "math"

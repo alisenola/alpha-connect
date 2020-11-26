@@ -3,7 +3,7 @@ package _interface
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
 type ExchangeListener interface {

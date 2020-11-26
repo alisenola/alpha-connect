@@ -4,7 +4,7 @@ package live
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	exchanges2 "gitlab.com/alphaticks/alphac/exchanges"
+	exchanges2 "gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"

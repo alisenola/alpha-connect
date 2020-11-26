@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alphac/account"
-	"gitlab.com/alphaticks/alphac/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"reflect"
 )
 

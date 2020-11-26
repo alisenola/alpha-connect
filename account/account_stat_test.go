@@ -2,8 +2,8 @@ package account
 
 import (
 	"github.com/gogo/protobuf/types"
-	"gitlab.com/alphaticks/alphac/modeling"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"os"

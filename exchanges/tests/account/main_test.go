@@ -2,9 +2,9 @@ package account
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"gitlab.com/alphaticks/alphac/account"
-	"gitlab.com/alphaticks/alphac/exchanges"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"

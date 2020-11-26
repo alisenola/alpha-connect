@@ -2,8 +2,8 @@ package account
 
 import (
 	"github.com/gogo/protobuf/types"
-	"gitlab.com/alphaticks/alphac/enum"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/enum"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"testing"

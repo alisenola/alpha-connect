@@ -3,8 +3,8 @@ package account
 import (
 	"fmt"
 	"github.com/gogo/protobuf/types"
-	"gitlab.com/alphaticks/alphac/modeling"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"

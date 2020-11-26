@@ -7,10 +7,10 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"fmt"
 	"time"
-	exchangeModels "gitlab.com/alphaticks/alphac/models/exchanges"
+	exchangeModels "gitlab.com/alphaticks/alpha-connect/models/exchanges"
 	"gitlab.com/alphaticks/xchanger/orderbook"
 	"math"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 )
 
