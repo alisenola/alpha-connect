@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	cloud.google.com/go/storage v1.0.0
-	github.com/AsynkronIT/protoactor-go v0.0.0-20200317173033-c483abfa40e2
+	github.com/AsynkronIT/protoactor-go v0.0.0-20201121081743-27a5e6684be6
 	github.com/gogo/protobuf v1.3.1
 	github.com/gorilla/websocket v1.4.1
 	github.com/melaurent/gotickfile/v2 v2.0.0-20200916062636-4a9b6b157075

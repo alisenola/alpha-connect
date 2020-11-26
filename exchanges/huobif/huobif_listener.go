@@ -34,7 +34,6 @@ type Listener struct {
 	dialerPool      *xchangerUtils.DialerPool
 	instrumentData  *InstrumentData
 	executorManager *actor.PID
-	mediator        *actor.PID
 	logger          *log.Logger
 	lastPingTime    time.Time
 	socketTicker    *time.Ticker
@@ -53,7 +52,6 @@ func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool
 		dialerPool:      dialerPool,
 		instrumentData:  nil,
 		executorManager: nil,
-		mediator:        nil,
 		logger:          nil,
 		socketTicker:    nil,
 	}
@@ -117,8 +115,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.mediator = actor.NewLocalPID("data_broker")
-	state.executorManager = actor.NewLocalPID("exchange_executor_manager")
+	state.executorManager = actor.NewPID(context.ActorSystem().Address(), "exchange_executor_manager")
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -139,7 +136,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		for {
 			select {
 			case _ = <-socketTicker.C:
-				actor.EmptyRootContext.Send(pid, &checkSockets{})
+				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
@@ -246,7 +243,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	go func(ws *huobif.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
+			context.Send(pid, ws.Msg)
 		}
 	}(ws, context.Self())
 

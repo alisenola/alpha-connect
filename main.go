@@ -38,7 +38,8 @@ func (state *GuardActor) Receive(context actor.Context) {
 }
 
 func main() {
-	ctx := actor.EmptyRootContext
+	as := actor.NewActorSystem()
+	ctx := actor.NewRootContext(as, nil)
 
 	// Start actors
 	exch := []*models.Exchange{
@@ -65,7 +66,7 @@ func main() {
 	}
 	// EXECUTOR //
 	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
-	_, err := actor.EmptyRootContext.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	_, err := ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}

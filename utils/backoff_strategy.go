@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"math/rand"
 	"time"
@@ -21,13 +20,12 @@ type exponentialBackoffStrategy struct {
 	noise          time.Duration
 }
 
-func (strategy *exponentialBackoffStrategy) HandleFailure(supervisor actor.Supervisor, child *actor.PID, rs *actor.RestartStatistics, reason interface{}, message interface{}) {
+func (strategy *exponentialBackoffStrategy) HandleFailure(as *actor.ActorSystem, supervisor actor.Supervisor, child *actor.PID, rs *actor.RestartStatistics, reason interface{}, message interface{}) {
 	strategy.setFailureCount(rs)
 
 	backoff := rs.FailureCount() * int(strategy.initialBackoff.Nanoseconds())
 	noise := rand.Intn(int(strategy.noise.Nanoseconds()))
 	dur := time.Duration(backoff + noise)
-	fmt.Println("BACKOFF OF ", dur)
 	time.AfterFunc(dur, func() {
 		supervisor.RestartChildren(child)
 	})

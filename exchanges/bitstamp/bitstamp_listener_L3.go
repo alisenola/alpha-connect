@@ -123,7 +123,7 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
-	state.bitstampExecutor = actor.NewLocalPID("executor/" + constants.BITSTAMP.Name + "_executor")
+	state.bitstampExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITSTAMP.Name+"_executor")
 
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
@@ -153,7 +153,7 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 		for {
 			select {
 			case _ = <-socketTicker.C:
-				actor.EmptyRootContext.Send(pid, &checkSockets{})
+				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
@@ -270,7 +270,7 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 
 	go func(ws *bitstamp.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
+			context.Send(pid, ws.Msg)
 		}
 	}(ws, context.Self())
 

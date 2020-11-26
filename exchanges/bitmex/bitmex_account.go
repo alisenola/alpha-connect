@@ -161,11 +161,11 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.bitmexExecutor = actor.NewLocalPID("executor/" + constants.BITMEX.Name + "_executor")
+	state.bitmexExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITMEX.Name+"_executor")
 
 	// Request securities
-	executor := actor.NewLocalPID("executor")
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
+	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error getting securities: %v", err)
 	}
@@ -1098,7 +1098,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 	go func(ws *bitmex.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
+			context.Send(pid, ws.Msg)
 		}
 	}(ws, context.Self())
 	state.ws = ws

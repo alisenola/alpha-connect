@@ -135,7 +135,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		for {
 			select {
 			case _ = <-socketTicker.C:
-				actor.EmptyRootContext.Send(pid, &checkSockets{})
+				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
@@ -243,7 +243,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	go func(ws *deribit.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
-			actor.EmptyRootContext.Send(pid, ws.Msg)
+			context.Send(pid, ws.Msg)
 		}
 	}(ws, context.Self())
 
