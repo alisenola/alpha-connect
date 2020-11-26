@@ -11,7 +11,6 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20200403144811-ea8b6e20da99
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/alpha-connect v0.0.0-20200611192500-e53236725eb1
 	gitlab.com/alphaticks/gorderbook v0.0.0-20201006121715-8a712a4dad37
 	gitlab.com/alphaticks/xchanger v0.0.0-20201122183926-7bac393e073e
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20201008165552-bd5bb722d062
