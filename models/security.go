@@ -1,7 +1,7 @@
 package models
 
 import (
-	"gitlab.com/alphaticks/alphac/enum"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"strings"
 )
 

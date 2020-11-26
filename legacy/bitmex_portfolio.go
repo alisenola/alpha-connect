@@ -2,7 +2,7 @@ package legacy
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"sync"

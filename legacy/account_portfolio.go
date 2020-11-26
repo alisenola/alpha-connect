@@ -2,8 +2,8 @@ package legacy
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alphac/enum"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/enum"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"math"
 	"sync"

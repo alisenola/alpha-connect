@@ -6,9 +6,9 @@ import "google/protobuf/wrappers.proto";
 
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 
-import "gitlab.com/alphaticks/alphac/models/market_data.proto";
-import "gitlab.com/alphaticks/alphac/models/security_data.proto";
-import "gitlab.com/alphaticks/alphac/models/account.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/account.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 

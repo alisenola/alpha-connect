@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
-	"gitlab.com/alphaticks/alphac/models"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"regexp"
 	"sort"
 	"sync"
