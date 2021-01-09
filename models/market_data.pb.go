@@ -28,22 +28,143 @@ const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 type OrderBookAggregation int32
 
 const (
-	L2 OrderBookAggregation = 0
-	L3 OrderBookAggregation = 1
+	L1 OrderBookAggregation = 0
+	L2 OrderBookAggregation = 1
+	L3 OrderBookAggregation = 2
 )
 
 var OrderBookAggregation_name = map[int32]string{
-	0: "L2",
-	1: "L3",
+	0: "L1",
+	1: "L2",
+	2: "L3",
 }
 
 var OrderBookAggregation_value = map[string]int32{
-	"L2": 0,
-	"L3": 1,
+	"L1": 0,
+	"L2": 1,
+	"L3": 2,
 }
 
 func (OrderBookAggregation) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_fe080a1ca5f6ba79, []int{0}
+}
+
+type OBL1Update struct {
+	BestBid   float64          `protobuf:"fixed64,1,opt,name=best_bid,json=bestBid,proto3" json:"best_bid,omitempty"`
+	BestAsk   float64          `protobuf:"fixed64,2,opt,name=best_ask,json=bestAsk,proto3" json:"best_ask,omitempty"`
+	Timestamp *types.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+}
+
+func (m *OBL1Update) Reset()      { *m = OBL1Update{} }
+func (*OBL1Update) ProtoMessage() {}
+func (*OBL1Update) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fe080a1ca5f6ba79, []int{0}
+}
+func (m *OBL1Update) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *OBL1Update) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_OBL1Update.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *OBL1Update) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OBL1Update.Merge(m, src)
+}
+func (m *OBL1Update) XXX_Size() int {
+	return m.Size()
+}
+func (m *OBL1Update) XXX_DiscardUnknown() {
+	xxx_messageInfo_OBL1Update.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_OBL1Update proto.InternalMessageInfo
+
+func (m *OBL1Update) GetBestBid() float64 {
+	if m != nil {
+		return m.BestBid
+	}
+	return 0
+}
+
+func (m *OBL1Update) GetBestAsk() float64 {
+	if m != nil {
+		return m.BestAsk
+	}
+	return 0
+}
+
+func (m *OBL1Update) GetTimestamp() *types.Timestamp {
+	if m != nil {
+		return m.Timestamp
+	}
+	return nil
+}
+
+type OBL1Snapshot struct {
+	BestBid   float64          `protobuf:"fixed64,1,opt,name=best_bid,json=bestBid,proto3" json:"best_bid,omitempty"`
+	BestAsk   float64          `protobuf:"fixed64,2,opt,name=best_ask,json=bestAsk,proto3" json:"best_ask,omitempty"`
+	Timestamp *types.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+}
+
+func (m *OBL1Snapshot) Reset()      { *m = OBL1Snapshot{} }
+func (*OBL1Snapshot) ProtoMessage() {}
+func (*OBL1Snapshot) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fe080a1ca5f6ba79, []int{1}
+}
+func (m *OBL1Snapshot) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *OBL1Snapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_OBL1Snapshot.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *OBL1Snapshot) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_OBL1Snapshot.Merge(m, src)
+}
+func (m *OBL1Snapshot) XXX_Size() int {
+	return m.Size()
+}
+func (m *OBL1Snapshot) XXX_DiscardUnknown() {
+	xxx_messageInfo_OBL1Snapshot.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_OBL1Snapshot proto.InternalMessageInfo
+
+func (m *OBL1Snapshot) GetBestBid() float64 {
+	if m != nil {
+		return m.BestBid
+	}
+	return 0
+}
+
+func (m *OBL1Snapshot) GetBestAsk() float64 {
+	if m != nil {
+		return m.BestAsk
+	}
+	return 0
+}
+
+func (m *OBL1Snapshot) GetTimestamp() *types.Timestamp {
+	if m != nil {
+		return m.Timestamp
+	}
+	return nil
 }
 
 type OBL2Update struct {
@@ -55,7 +176,7 @@ type OBL2Update struct {
 func (m *OBL2Update) Reset()      { *m = OBL2Update{} }
 func (*OBL2Update) ProtoMessage() {}
 func (*OBL2Update) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{0}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{2}
 }
 func (m *OBL2Update) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -116,7 +237,7 @@ type OBL2Snapshot struct {
 func (m *OBL2Snapshot) Reset()      { *m = OBL2Snapshot{} }
 func (*OBL2Snapshot) ProtoMessage() {}
 func (*OBL2Snapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{1}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{3}
 }
 func (m *OBL2Snapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -191,7 +312,7 @@ type OBL3Update struct {
 func (m *OBL3Update) Reset()      { *m = OBL3Update{} }
 func (*OBL3Update) ProtoMessage() {}
 func (*OBL3Update) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{2}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{4}
 }
 func (m *OBL3Update) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -264,7 +385,7 @@ type OBL3Snapshot struct {
 func (m *OBL3Snapshot) Reset()      { *m = OBL3Snapshot{} }
 func (*OBL3Snapshot) ProtoMessage() {}
 func (*OBL3Snapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{3}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{5}
 }
 func (m *OBL3Snapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -323,7 +444,7 @@ type Trade struct {
 func (m *Trade) Reset()      { *m = Trade{} }
 func (*Trade) ProtoMessage() {}
 func (*Trade) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{4}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{6}
 }
 func (m *Trade) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -383,7 +504,7 @@ type AggregatedTrade struct {
 func (m *AggregatedTrade) Reset()      { *m = AggregatedTrade{} }
 func (*AggregatedTrade) ProtoMessage() {}
 func (*AggregatedTrade) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fe080a1ca5f6ba79, []int{5}
+	return fileDescriptor_fe080a1ca5f6ba79, []int{7}
 }
 func (m *AggregatedTrade) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -442,6 +563,8 @@ func (m *AggregatedTrade) GetTrades() []Trade {
 
 func init() {
 	proto.RegisterEnum("models.OrderBookAggregation", OrderBookAggregation_name, OrderBookAggregation_value)
+	proto.RegisterType((*OBL1Update)(nil), "models.OBL1Update")
+	proto.RegisterType((*OBL1Snapshot)(nil), "models.OBL1Snapshot")
 	proto.RegisterType((*OBL2Update)(nil), "models.OBL2Update")
 	proto.RegisterType((*OBL2Snapshot)(nil), "models.OBL2Snapshot")
 	proto.RegisterType((*OBL3Update)(nil), "models.OBL3Update")
@@ -453,43 +576,46 @@ func init() {
 func init() { proto.RegisterFile("market_data.proto", fileDescriptor_fe080a1ca5f6ba79) }
 
 var fileDescriptor_fe080a1ca5f6ba79 = []byte{
-	// 573 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xdc, 0x54, 0xcf, 0x6e, 0xd3, 0x30,
-	0x1c, 0x8e, 0xd3, 0x34, 0x2a, 0xde, 0x3a, 0xba, 0x68, 0x87, 0xa8, 0x42, 0x5e, 0xd4, 0x03, 0xaa,
-	0xa8, 0x48, 0xa5, 0xb6, 0x42, 0xbb, 0xae, 0xec, 0x52, 0xa9, 0xd2, 0x50, 0xd8, 0xb8, 0x4e, 0x4e,
-	0x63, 0xd2, 0xa8, 0x69, 0x1d, 0x62, 0x17, 0xc4, 0x8d, 0x47, 0xe0, 0xc4, 0x03, 0x70, 0xda, 0x81,
-	0x47, 0xe0, 0x01, 0x76, 0xec, 0x71, 0x27, 0x44, 0xd3, 0x0b, 0xc7, 0x3d, 0x02, 0xb2, 0xf3, 0xa7,
-	0x2d, 0x13, 0x52, 0x11, 0x17, 0xc4, 0x29, 0xfe, 0xc5, 0xdf, 0xf7, 0xf3, 0xe7, 0xcf, 0xfe, 0x0c,
-	0x0f, 0xa7, 0x38, 0x9e, 0x10, 0x7e, 0xe5, 0x61, 0x8e, 0xed, 0x28, 0xa6, 0x9c, 0x1a, 0xfa, 0x94,
-	0x7a, 0x24, 0x64, 0xf5, 0xa7, 0x7e, 0xc0, 0xc7, 0x73, 0xd7, 0x1e, 0xd1, 0x69, 0xdb, 0xa7, 0x3e,
-	0x6d, 0xcb, 0x69, 0x77, 0xfe, 0x5a, 0x56, 0xb2, 0x90, 0xa3, 0x94, 0x56, 0x3f, 0xf6, 0x29, 0xf5,
-	0x43, 0xb2, 0x46, 0xf1, 0x60, 0x4a, 0x18, 0xc7, 0xd3, 0x28, 0x03, 0xa0, 0x5f, 0x01, 0xef, 0x62,
-	0x1c, 0x45, 0x24, 0x66, 0xd9, 0xbc, 0x58, 0x2f, 0xc4, 0xe9, 0x7a, 0x38, 0x8c, 0xc6, 0x98, 0x07,
-	0xa3, 0x09, 0x6b, 0xfb, 0x34, 0xf6, 0x48, 0xec, 0x52, 0x3a, 0x49, 0x99, 0x19, 0xbc, 0xf1, 0x09,
-	0x40, 0x78, 0xde, 0x1f, 0x76, 0x2e, 0x23, 0x0f, 0x73, 0x62, 0x9c, 0x40, 0x3d, 0x24, 0x6f, 0x49,
-	0xc8, 0x4c, 0x60, 0x95, 0x9a, 0x7b, 0x9d, 0xba, 0xbd, 0x26, 0xda, 0xe7, 0x62, 0xd4, 0xa7, 0x74,
-	0x32, 0x14, 0x90, 0xbe, 0x76, 0xf3, 0xed, 0x58, 0x71, 0x32, 0xbc, 0x71, 0x02, 0x1f, 0x14, 0x52,
-	0x4d, 0xd5, 0x02, 0x19, 0x59, 0x68, 0xb5, 0x73, 0xad, 0xf6, 0x45, 0x8e, 0x70, 0xd6, 0x60, 0xe3,
-	0x08, 0x96, 0x79, 0x8c, 0x3d, 0x62, 0x6a, 0x16, 0x68, 0x56, 0x9c, 0xb4, 0x68, 0x7c, 0x55, 0xe1,
-	0xbe, 0x10, 0xf6, 0x72, 0x86, 0x23, 0x36, 0xa6, 0xdc, 0xe8, 0x41, 0xcd, 0x0d, 0x3c, 0x66, 0xaa,
-	0x3b, 0x0a, 0x93, 0x68, 0xc1, 0xc2, 0x6c, 0xc2, 0xcc, 0xd2, 0xae, 0x2c, 0x81, 0xde, 0xde, 0x8c,
-	0xf6, 0x27, 0x9b, 0x79, 0x0e, 0x0f, 0x84, 0xe1, 0x57, 0x51, 0x4c, 0x46, 0x01, 0x0b, 0xe8, 0xcc,
-	0x2c, 0x4b, 0xfa, 0xa3, 0x7b, 0xf4, 0xcb, 0xc1, 0x8c, 0x3f, 0xeb, 0xbd, 0xc2, 0xe1, 0x9c, 0x38,
-	0x55, 0xc1, 0x79, 0x91, 0x53, 0x8c, 0x53, 0x58, 0x0d, 0x29, 0xdf, 0xe8, 0xa1, 0xef, 0xd0, 0x63,
-	0x3f, 0xa4, 0xbc, 0x68, 0xd1, 0xb8, 0x56, 0xe5, 0xb9, 0x76, 0xb3, 0x73, 0x6d, 0x6d, 0x99, 0x77,
-	0x78, 0xdf, 0x86, 0x4d, 0xcf, 0x5a, 0x5b, 0x9e, 0xfd, 0x1e, 0xfc, 0x9f, 0x58, 0xf5, 0x19, 0xc8,
-	0x9b, 0xd6, 0x2d, 0x6e, 0xda, 0x3f, 0x68, 0x56, 0x63, 0x00, 0xcb, 0x17, 0x22, 0x17, 0x22, 0x2d,
-	0x51, 0x1c, 0x8c, 0x88, 0x09, 0x2c, 0xd0, 0x04, 0x4e, 0x5a, 0x18, 0x75, 0x58, 0x79, 0x33, 0xc7,
-	0x33, 0x1e, 0xf0, 0xf7, 0x32, 0x7c, 0xc0, 0x29, 0x6a, 0xe3, 0x00, 0xaa, 0x83, 0x33, 0xb3, 0x64,
-	0x81, 0xa6, 0xe6, 0xa8, 0x83, 0xb3, 0xc6, 0x17, 0x00, 0x1f, 0x9e, 0xfa, 0x7e, 0x4c, 0x7c, 0xcc,
-	0x89, 0x97, 0x76, 0xad, 0xc1, 0x92, 0x1b, 0x78, 0xb2, 0x67, 0xc5, 0x11, 0xc3, 0xbf, 0xc8, 0xb3,
-	0x05, 0xf7, 0x70, 0xde, 0xbe, 0x58, 0x78, 0xf3, 0x97, 0xd1, 0x82, 0xba, 0x0c, 0x39, 0x33, 0x35,
-	0xe9, 0x5a, 0xd5, 0x4e, 0x1f, 0x4b, 0x5b, 0x8a, 0xc9, 0x1f, 0x96, 0x14, 0xf2, 0xe4, 0x31, 0x3c,
-	0x2a, 0x92, 0x9a, 0xcb, 0x16, 0x27, 0xaf, 0x43, 0x75, 0xd8, 0xa9, 0x29, 0xf2, 0xdb, 0xad, 0x81,
-	0x7e, 0x6f, 0xb1, 0x44, 0xca, 0xed, 0x12, 0x29, 0x77, 0x4b, 0x04, 0x3e, 0x24, 0x08, 0x5c, 0x27,
-	0x08, 0xdc, 0x24, 0x08, 0x2c, 0x12, 0x04, 0xbe, 0x27, 0x08, 0xfc, 0x48, 0x90, 0x72, 0x97, 0x20,
-	0xf0, 0x71, 0x85, 0x94, 0xc5, 0x0a, 0x29, 0xb7, 0x2b, 0xa4, 0xb8, 0xba, 0xdc, 0x4b, 0xf7, 0x67,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0x09, 0x1d, 0x7c, 0xa8, 0xc2, 0x05, 0x00, 0x00,
+	// 624 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xdc, 0x55, 0xcf, 0x6e, 0xd3, 0x4e,
+	0x10, 0xf6, 0x3a, 0xae, 0x7f, 0xf9, 0x6d, 0xff, 0x90, 0x5a, 0x3d, 0x98, 0x08, 0x6d, 0x23, 0x9f,
+	0x2a, 0x2a, 0x5c, 0x35, 0xa9, 0x50, 0xaf, 0x0d, 0xbd, 0x44, 0x8a, 0x54, 0x64, 0x5a, 0xae, 0xd1,
+	0x3a, 0x5e, 0x1c, 0xcb, 0x4e, 0xd6, 0x78, 0x37, 0x20, 0x24, 0x84, 0x78, 0x04, 0x4e, 0x3c, 0x00,
+	0xa7, 0x1e, 0x78, 0x04, 0x1e, 0xa0, 0xc7, 0x1c, 0x7b, 0x42, 0xc4, 0xb9, 0x70, 0xec, 0x23, 0xa0,
+	0x5d, 0xff, 0x49, 0x42, 0x85, 0x94, 0x0a, 0x09, 0x21, 0x4e, 0xde, 0xc9, 0x7c, 0x33, 0xf3, 0xcd,
+	0xb7, 0x3b, 0x13, 0xb8, 0x3d, 0xc4, 0x49, 0x48, 0x78, 0xcf, 0xc3, 0x1c, 0xdb, 0x71, 0x42, 0x39,
+	0x35, 0xf4, 0x21, 0xf5, 0x48, 0xc4, 0xea, 0x8f, 0xfc, 0x80, 0x0f, 0xc6, 0xae, 0xdd, 0xa7, 0xc3,
+	0x03, 0x9f, 0xfa, 0xf4, 0x40, 0xba, 0xdd, 0xf1, 0x0b, 0x69, 0x49, 0x43, 0x9e, 0xb2, 0xb0, 0xfa,
+	0xae, 0x4f, 0xa9, 0x1f, 0x91, 0x39, 0x8a, 0x07, 0x43, 0xc2, 0x38, 0x1e, 0xc6, 0x39, 0x00, 0xfd,
+	0x0c, 0x78, 0x9d, 0xe0, 0x38, 0x26, 0x09, 0xcb, 0xfd, 0xa2, 0x5e, 0x84, 0xb3, 0x7a, 0x38, 0x8a,
+	0x07, 0x98, 0x07, 0xfd, 0x90, 0x1d, 0xf8, 0x34, 0xf1, 0x48, 0xe2, 0x52, 0x1a, 0x66, 0x91, 0x39,
+	0xdc, 0x7a, 0x0b, 0xe1, 0x59, 0xbb, 0x7b, 0x78, 0x11, 0x7b, 0x98, 0x13, 0xe3, 0x3e, 0xac, 0xba,
+	0x84, 0xf1, 0x9e, 0x1b, 0x78, 0x26, 0x68, 0x80, 0x3d, 0xe0, 0xfc, 0x27, 0xec, 0x76, 0xe0, 0x95,
+	0x2e, 0xcc, 0x42, 0x53, 0x9d, 0xbb, 0x4e, 0x58, 0x68, 0x1c, 0xc3, 0xff, 0x4b, 0x96, 0x66, 0xa5,
+	0x01, 0xf6, 0xd6, 0x9b, 0x75, 0x3b, 0xa3, 0x69, 0x17, 0x34, 0xed, 0xf3, 0x02, 0xe1, 0xcc, 0xc1,
+	0xd6, 0x3b, 0xb8, 0x21, 0xaa, 0x3f, 0x1b, 0xe1, 0x98, 0x0d, 0x28, 0xff, 0xe3, 0xf5, 0x3f, 0x02,
+	0xd9, 0x7e, 0x33, 0x6f, 0xff, 0x18, 0xea, 0x11, 0x79, 0x45, 0x22, 0x66, 0x82, 0x46, 0x25, 0xcf,
+	0x52, 0xc8, 0x66, 0x9f, 0x89, 0x53, 0x9b, 0xd2, 0xb0, 0x2b, 0x20, 0x6d, 0xed, 0xea, 0xeb, 0xae,
+	0xe2, 0xe4, 0xf8, 0x65, 0x0a, 0xea, 0x1d, 0x28, 0x18, 0x3b, 0x70, 0x8d, 0x27, 0xd8, 0x23, 0xa6,
+	0xd6, 0x00, 0x7b, 0x55, 0x27, 0x33, 0xac, 0x2f, 0xaa, 0x54, 0xa6, 0x59, 0x2a, 0x73, 0x04, 0x35,
+	0x37, 0xf0, 0x98, 0xa9, 0xae, 0x48, 0x4c, 0xa2, 0x45, 0x14, 0x66, 0x21, 0x33, 0x2b, 0xab, 0x46,
+	0x09, 0xf4, 0x72, 0x33, 0xda, 0x5d, 0x9a, 0x79, 0x02, 0xb7, 0xc4, 0x73, 0xeb, 0xc5, 0x09, 0xe9,
+	0x07, 0x2c, 0xa0, 0x23, 0x73, 0x4d, 0x86, 0x3f, 0xb8, 0x15, 0x7e, 0xd1, 0x19, 0xf1, 0xc7, 0x47,
+	0xcf, 0x71, 0x34, 0x26, 0xce, 0xa6, 0x88, 0x79, 0x5a, 0x84, 0x18, 0x27, 0x70, 0x33, 0xa2, 0x7c,
+	0x21, 0x87, 0xbe, 0x42, 0x8e, 0x8d, 0x88, 0xf2, 0x32, 0x85, 0x75, 0xa9, 0xca, 0x7b, 0x6d, 0xe5,
+	0xf7, 0xba, 0xbf, 0x24, 0xde, 0xf6, 0x6d, 0x19, 0x16, 0x35, 0xdb, 0x5f, 0xd2, 0xec, 0xd7, 0xe0,
+	0x7f, 0x44, 0xaa, 0x4f, 0x40, 0xbe, 0xb4, 0x56, 0xf9, 0xd2, 0xfe, 0x42, 0xb1, 0xac, 0x0e, 0x5c,
+	0x3b, 0x17, 0x73, 0x21, 0xa6, 0x25, 0x4e, 0x82, 0x3e, 0xc9, 0xb7, 0x43, 0x66, 0x18, 0x75, 0x58,
+	0x7d, 0x39, 0xc6, 0x23, 0x1e, 0xf0, 0x37, 0xf9, 0x6e, 0x28, 0x6d, 0x63, 0x0b, 0xaa, 0x9d, 0x53,
+	0xb9, 0x15, 0x34, 0x47, 0xed, 0x9c, 0x5a, 0x9f, 0x01, 0xbc, 0x77, 0xe2, 0xfb, 0x09, 0xf1, 0x31,
+	0x27, 0x5e, 0x96, 0xb5, 0x06, 0x2b, 0xc5, 0xc6, 0xa9, 0x3a, 0xe2, 0xf8, 0x1b, 0xf3, 0xdc, 0x80,
+	0xeb, 0xb8, 0x48, 0x5f, 0x16, 0x5e, 0xfc, 0xc9, 0xd8, 0x87, 0xba, 0x1c, 0x72, 0x66, 0x6a, 0x52,
+	0xb5, 0x4d, 0x3b, 0xfb, 0xab, 0xb0, 0x25, 0x99, 0x62, 0xb1, 0x64, 0x90, 0x87, 0x36, 0xdc, 0x29,
+	0x27, 0xb5, 0xa0, 0x2d, 0x6e, 0x5e, 0x87, 0x6a, 0xf7, 0xb0, 0xa6, 0xc8, 0x6f, 0xb3, 0x06, 0xe4,
+	0xb7, 0x55, 0x53, 0xdb, 0x47, 0x93, 0x29, 0x52, 0xae, 0xa7, 0x48, 0xb9, 0x99, 0x22, 0xf0, 0x3e,
+	0x45, 0xe0, 0x32, 0x45, 0xe0, 0x2a, 0x45, 0x60, 0x92, 0x22, 0xf0, 0x2d, 0x45, 0xe0, 0x7b, 0x8a,
+	0x94, 0x9b, 0x14, 0x81, 0x0f, 0x33, 0xa4, 0x4c, 0x66, 0x48, 0xb9, 0x9e, 0x21, 0xc5, 0xd5, 0x65,
+	0x4f, 0xad, 0x1f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x7a, 0xd5, 0xbd, 0x9e, 0xc8, 0x06, 0x00, 0x00,
 }
 
 func (x OrderBookAggregation) String() string {
@@ -498,6 +624,66 @@ func (x OrderBookAggregation) String() string {
 		return s
 	}
 	return strconv.Itoa(int(x))
+}
+func (this *OBL1Update) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*OBL1Update)
+	if !ok {
+		that2, ok := that.(OBL1Update)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.BestBid != that1.BestBid {
+		return false
+	}
+	if this.BestAsk != that1.BestAsk {
+		return false
+	}
+	if !this.Timestamp.Equal(that1.Timestamp) {
+		return false
+	}
+	return true
+}
+func (this *OBL1Snapshot) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*OBL1Snapshot)
+	if !ok {
+		that2, ok := that.(OBL1Snapshot)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.BestBid != that1.BestBid {
+		return false
+	}
+	if this.BestAsk != that1.BestAsk {
+		return false
+	}
+	if !this.Timestamp.Equal(that1.Timestamp) {
+		return false
+	}
+	return true
 }
 func (this *OBL2Update) Equal(that interface{}) bool {
 	if that == nil {
@@ -734,6 +920,34 @@ func (this *AggregatedTrade) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *OBL1Update) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&models.OBL1Update{")
+	s = append(s, "BestBid: "+fmt.Sprintf("%#v", this.BestBid)+",\n")
+	s = append(s, "BestAsk: "+fmt.Sprintf("%#v", this.BestAsk)+",\n")
+	if this.Timestamp != nil {
+		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *OBL1Snapshot) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&models.OBL1Snapshot{")
+	s = append(s, "BestBid: "+fmt.Sprintf("%#v", this.BestBid)+",\n")
+	s = append(s, "BestAsk: "+fmt.Sprintf("%#v", this.BestAsk)+",\n")
+	if this.Timestamp != nil {
+		s = append(s, "Timestamp: "+fmt.Sprintf("%#v", this.Timestamp)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func (this *OBL2Update) GoString() string {
 	if this == nil {
 		return "nil"
@@ -885,6 +1099,86 @@ func valueToGoStringMarketData(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
+func (m *OBL1Update) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *OBL1Update) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.BestBid != 0 {
+		dAtA[i] = 0x9
+		i++
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.BestBid))))
+		i += 8
+	}
+	if m.BestAsk != 0 {
+		dAtA[i] = 0x11
+		i++
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.BestAsk))))
+		i += 8
+	}
+	if m.Timestamp != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
+		n1, err := m.Timestamp.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
+	}
+	return i, nil
+}
+
+func (m *OBL1Snapshot) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *OBL1Snapshot) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.BestBid != 0 {
+		dAtA[i] = 0x9
+		i++
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.BestBid))))
+		i += 8
+	}
+	if m.BestAsk != 0 {
+		dAtA[i] = 0x11
+		i++
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.BestAsk))))
+		i += 8
+	}
+	if m.Timestamp != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
+		n2, err := m.Timestamp.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	return i, nil
+}
+
 func (m *OBL2Update) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -916,11 +1210,11 @@ func (m *OBL2Update) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
-		n1, err := m.Timestamp.MarshalTo(dAtA[i:])
+		n3, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n1
+		i += n3
 	}
 	if m.Trade {
 		dAtA[i] = 0x20
@@ -978,31 +1272,31 @@ func (m *OBL2Snapshot) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x22
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
-		n2, err := m.Timestamp.MarshalTo(dAtA[i:])
+		n4, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n2
+		i += n4
 	}
 	if m.TickPrecision != nil {
 		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.TickPrecision.Size()))
-		n3, err := m.TickPrecision.MarshalTo(dAtA[i:])
+		n5, err := m.TickPrecision.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n3
+		i += n5
 	}
 	if m.LotPrecision != nil {
 		dAtA[i] = 0x32
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.LotPrecision.Size()))
-		n4, err := m.LotPrecision.MarshalTo(dAtA[i:])
+		n6, err := m.LotPrecision.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n4
+		i += n6
 	}
 	return i, nil
 }
@@ -1050,31 +1344,31 @@ func (m *OBL3Update) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x22
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
-		n5, err := m.Timestamp.MarshalTo(dAtA[i:])
+		n7, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n7
 	}
 	if m.TickPrecision != nil {
 		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.TickPrecision.Size()))
-		n6, err := m.TickPrecision.MarshalTo(dAtA[i:])
+		n8, err := m.TickPrecision.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n8
 	}
 	if m.LotPrecision != nil {
 		dAtA[i] = 0x32
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.LotPrecision.Size()))
-		n7, err := m.LotPrecision.MarshalTo(dAtA[i:])
+		n9, err := m.LotPrecision.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n9
 	}
 	return i, nil
 }
@@ -1122,11 +1416,11 @@ func (m *OBL3Snapshot) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x22
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
-		n8, err := m.Timestamp.MarshalTo(dAtA[i:])
+		n10, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n8
+		i += n10
 	}
 	return i, nil
 }
@@ -1195,11 +1489,11 @@ func (m *AggregatedTrade) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintMarketData(dAtA, i, uint64(m.Timestamp.Size()))
-		n9, err := m.Timestamp.MarshalTo(dAtA[i:])
+		n11, err := m.Timestamp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n9
+		i += n11
 	}
 	if m.AggregateID != 0 {
 		dAtA[i] = 0x18
@@ -1230,6 +1524,44 @@ func encodeVarintMarketData(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *OBL1Update) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.BestBid != 0 {
+		n += 9
+	}
+	if m.BestAsk != 0 {
+		n += 9
+	}
+	if m.Timestamp != nil {
+		l = m.Timestamp.Size()
+		n += 1 + l + sovMarketData(uint64(l))
+	}
+	return n
+}
+
+func (m *OBL1Snapshot) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.BestBid != 0 {
+		n += 9
+	}
+	if m.BestAsk != 0 {
+		n += 9
+	}
+	if m.Timestamp != nil {
+		l = m.Timestamp.Size()
+		n += 1 + l + sovMarketData(uint64(l))
+	}
+	return n
+}
+
 func (m *OBL2Update) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1399,6 +1731,30 @@ func sovMarketData(x uint64) (n int) {
 func sozMarketData(x uint64) (n int) {
 	return sovMarketData(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *OBL1Update) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&OBL1Update{`,
+		`BestBid:` + fmt.Sprintf("%v", this.BestBid) + `,`,
+		`BestAsk:` + fmt.Sprintf("%v", this.BestAsk) + `,`,
+		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *OBL1Snapshot) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&OBL1Snapshot{`,
+		`BestBid:` + fmt.Sprintf("%v", this.BestBid) + `,`,
+		`BestAsk:` + fmt.Sprintf("%v", this.BestAsk) + `,`,
+		`Timestamp:` + strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Timestamp", "types.Timestamp", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *OBL2Update) String() string {
 	if this == nil {
 		return "nil"
@@ -1483,6 +1839,228 @@ func valueToStringMarketData(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *OBL1Update) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMarketData
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: OBL1Update: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: OBL1Update: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BestBid", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.BestBid = float64(math.Float64frombits(v))
+		case 2:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BestAsk", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.BestAsk = float64(math.Float64frombits(v))
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Timestamp == nil {
+				m.Timestamp = &types.Timestamp{}
+			}
+			if err := m.Timestamp.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMarketData(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *OBL1Snapshot) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMarketData
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: OBL1Snapshot: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: OBL1Snapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BestBid", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.BestBid = float64(math.Float64frombits(v))
+		case 2:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BestAsk", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.BestAsk = float64(math.Float64frombits(v))
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMarketData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Timestamp == nil {
+				m.Timestamp = &types.Timestamp{}
+			}
+			if err := m.Timestamp.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMarketData(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthMarketData
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *OBL2Update) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)

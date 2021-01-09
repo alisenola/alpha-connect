@@ -1,7 +1,6 @@
 // Actor that is connected to tickstore with all the public data
 package live
 
-/*
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -11,7 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	_ "gitlab.com/tachikoma.ai/tickobjects/market"
-	"gitlab.com/tachikoma.ai/tickstore/db"
+	"gitlab.com/tachikoma.ai/tickstore/actors/messages/remote/store"
 	"gitlab.com/tachikoma.ai/tickstore/parsing"
 	"reflect"
 	"time"
@@ -81,7 +80,13 @@ func (state *LiveStore) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *storeMessages.GetQueryReaderRequest:
+	case *messages.SecurityList:
+		if err := state.OnSecurityList(context); err != nil {
+			state.logger.Error("error processing OnSecurityList", log.Error(err))
+			panic(err)
+		}
+
+	case *store.GetQueryReaderRequest:
 		if err := state.GetQueryReaderRequest(context); err != nil {
 			state.logger.Error("error processing GetQueryReaderRequest", log.Error(err))
 		}
@@ -95,11 +100,7 @@ func (state *LiveStore) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	state.executor = actor.NewLocalPID("executor")
-	if err := db.RegisterMeasurement("orderbook", "RawOrderBook"); err != nil {
-		return fmt.Errorf("error registering measurement: %v", err)
-	}
-
+	state.executor = context.ActorSystem().NewLocalPID("executor")
 	// Populate index
 	res, err := context.RequestFuture(state.executor, &messages.SecurityListRequest{
 		RequestID:  state.ID,
@@ -123,11 +124,21 @@ func (state *LiveStore) Initialize(context actor.Context) error {
 	return nil
 }
 
+func (state *LiveStore) OnSecurityList(context actor.Context) error {
+	msg := context.Message().(*messages.SecurityList)
+	state.index = utils.NewTagIndex(msg.Securities)
+	state.securities = make(map[uint64]*models.Security)
+	for _, sec := range msg.Securities {
+		state.securities[sec.SecurityID] = sec
+	}
+	return nil
+}
+
 func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 	// Need to hash the query, get firstEventTime and lastEventTime,
 	// If missing, fetch from client
 	// Launch a query reader actor which will ingest the data from alphaC listeners
-	msg := context.Message().(*storeMessages.GetQueryReaderRequest)
+	msg := context.Message().(*store.GetQueryReaderRequest)
 	selector := msg.Query.Selector
 	feeds := make(map[uint64]*Feed)
 	sel := parsing.Selector{}
@@ -180,7 +191,7 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 				return fmt.Errorf("group by unknown tag %s", t)
 			}
 		}
-		groupID := db.HashTags(groupTags)
+		groupID := utils.HashTags(groupTags)
 		feed := &Feed{
 			requestID: uint64(time.Now().UnixNano()),
 			tags:      groupTags,
@@ -197,10 +208,10 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 	prop := actor.PropsFromProducer(NewQueryReaderProducer(feeds, sel.TickSelector.Functor))
 	pid := context.Spawn(prop)
 
-	context.Respond(&storeMessages.GetQueryReaderResponse{
-		nil,
-		msg.RequestID,
-		pid,
+	context.Respond(&store.GetQueryReaderResponse{
+		RequestID: msg.RequestID,
+		Error:     "",
+		Reader:    pid,
 	})
 
 	return nil
@@ -209,4 +220,3 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 func (state *LiveStore) Clean(context actor.Context) error {
 	return nil
 }
-*/

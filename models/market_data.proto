@@ -7,8 +7,21 @@ import "google/protobuf/wrappers.proto";
 import "gitlab.com/alphaticks/gorderbook/protos.proto";
 
 enum OrderBookAggregation {
-    L2 = 0;
-    L3 = 1;
+    L1 = 0;
+    L2 = 1;
+    L3 = 2;
+}
+
+message OBL1Update {
+    double best_bid = 1;
+    double best_ask = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message OBL1Snapshot {
+    double best_bid = 1;
+    double best_ask = 2;
+    google.protobuf.Timestamp timestamp = 3;
 }
 
 message OBL2Update {

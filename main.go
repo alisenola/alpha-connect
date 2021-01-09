@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"gitlab.com/alphaticks/alpha-connect/data/live"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/rpc"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
 	"net"
@@ -19,7 +22,7 @@ import (
 
 var done = make(chan os.Signal, 1)
 
-//var liveStoreActor *actor.PID
+var liveStoreActor *actor.PID
 var executorActor *actor.PID
 var assetLoader *actor.PID
 
@@ -28,7 +31,7 @@ type GuardActor struct{}
 func (state *GuardActor) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
-		//context.Watch(liveStoreActor)
+		context.Watch(liveStoreActor)
 		context.Watch(executorActor)
 		context.Watch(assetLoader)
 
@@ -71,7 +74,7 @@ func main() {
 		panic(err)
 	}
 	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
-	//liveStoreActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(live.NewLiveStoreProducer(0)), "live_store")
+	liveStoreActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(live.NewLiveStoreProducer(0)), "live_store")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(
@@ -89,11 +92,9 @@ func main() {
 		panic(err)
 	}
 	server := grpc.NewServer()
-	/*
-		eReader := &grpc2.LiveStoreER{
-			StoreActor: actor.NewLocalPID("live_store"),
-		}
-	*/
+
+	liveER := rpc.NewLiveER(ctx, as.NewLocalPID("live_store"))
+
 	go func() {
 		err := server.Serve(lis)
 		if err != nil {
@@ -102,7 +103,7 @@ func main() {
 		done <- os.Signal(syscall.SIGTERM)
 	}()
 
-	//tickstore_grpc.RegisterRemotingServer(server, eReader)
+	tickstore_grpc.RegisterStoreServer(server, liveER)
 
 	// If interrupt or terminate signal is received, stop
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -125,18 +126,6 @@ func main() {
 	// Stop guard actor first
 	_ = ctx.PoisonFuture(guardActor).Wait()
 
-	/*
-		tries := 0
-		for {
-			if err := ctx.PoisonFuture(liveStoreActor).Wait(); err == nil {
-				break
-			}
-			tries += 1
-			if tries > 80 {
-				panic("error shutting down live store actor")
-			}
-		}
-	*/
 	tries := 0
 	for {
 		if err := ctx.PoisonFuture(executorActor).Wait(); err == nil {

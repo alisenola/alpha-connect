@@ -23,21 +23,23 @@ message MarketDataRequest {
 message MarketDataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    models.OBL2Snapshot snapshotL2 = 3;
-    models.OBL3Snapshot snapshotL3 = 4;
-    repeated models.AggregatedTrade trades = 5;
-    uint64 seq_num = 6;
-    bool success = 7;
-    RejectionReason rejection_reason = 8;
+    models.OBL1Snapshot snapshotL1 = 3;
+    models.OBL2Snapshot snapshotL2 = 4;
+    models.OBL3Snapshot snapshotL3 = 5;
+    repeated models.AggregatedTrade trades = 6;
+    uint64 seq_num = 7;
+    bool success = 8;
+    RejectionReason rejection_reason = 9;
 }
 
 message MarketDataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    models.OBL2Update updateL2 = 3;
-    models.OBL3Update updateL3 = 4;
-    repeated models.AggregatedTrade trades = 5;
-    uint64 seq_num = 6;
+    models.OBL1Update updateL1 = 3;
+    models.OBL2Update updateL2 = 4;
+    models.OBL3Update updateL3 = 5;
+    repeated models.AggregatedTrade trades = 6;
+    uint64 seq_num = 7;
 }
 
 message SecurityDefinitionRequest {
