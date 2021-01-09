@@ -215,7 +215,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 	snapshot, ok := ws.Msg.Message.(bitfinex.WSSpotDepthSnapshot)
 	if !ok {
-		return fmt.Errorf("was expecting WSSpotDepthL3Snapshot, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		return fmt.Errorf("was expecting WSSpotDepthSnapshot, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
 	state.instrumentData.lastSequence = snapshot.Sequence

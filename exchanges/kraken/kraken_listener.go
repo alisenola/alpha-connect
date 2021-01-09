@@ -186,35 +186,52 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error subscribing to depth stream")
 	}
 
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	s, ok := ws.Msg.Message.(kraken.WSSystemStatus)
-	if !ok {
-		return fmt.Errorf("was expecting WSOrderBookL2, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-	if s.Status != "online" {
-		return fmt.Errorf("was expecting online status, got %s", s.Status)
-	}
-
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	su, ok := ws.Msg.Message.(kraken.WSSubscriptionStatus)
-	if !ok {
-		return fmt.Errorf("was expecting WSOrderBookL2, got %s", reflect.TypeOf(ws.Msg.Message).String())
+	for true {
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
+		}
+		if _, ok := ws.Msg.Message.(kraken.WSHeartBeat); ok {
+			continue
+		}
+		s, ok := ws.Msg.Message.(kraken.WSSystemStatus)
+		if !ok {
+			return fmt.Errorf("was expecting WSSystemStatus, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		}
+		if s.Status != "online" {
+			return fmt.Errorf("was expecting online status, got %s", s.Status)
+		}
+		break
 	}
 
-	if su.Status != "subscribed" {
-		return fmt.Errorf("was expecting subscribed status, got %s", su.Status)
+	for true {
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
+		}
+		if _, ok := ws.Msg.Message.(kraken.WSHeartBeat); ok {
+			continue
+		}
+		su, ok := ws.Msg.Message.(kraken.WSSubscriptionStatus)
+		if !ok {
+			return fmt.Errorf("was expecting WSSubscriptionStatus, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		}
+		if su.Status != "subscribed" {
+			return fmt.Errorf("was expecting subscribed status, got %s", su.Status)
+		}
 	}
 
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	obData, ok := ws.Msg.Message.(kraken.WSOrderBookL2)
-	if !ok {
-		return fmt.Errorf("was expecting WSOrderBookL2, got %s", reflect.TypeOf(ws.Msg.Message).String())
+	var obData kraken.WSOrderBookL2
+	for true {
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
+		}
+		if _, ok := ws.Msg.Message.(kraken.WSHeartBeat); ok {
+			continue
+		}
+		var ok bool
+		obData, ok = ws.Msg.Message.(kraken.WSOrderBookL2)
+		if !ok {
+			return fmt.Errorf("was expecting WSOrderBookL2, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		}
 	}
 
 	bids, asks := obData.ToBidAsk()
