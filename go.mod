@@ -13,7 +13,7 @@ require (
 	gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210105110910-04829fb3f735
 	gitlab.com/tachikoma.ai/tickpred v0.0.0-20200722192355-60349c3e5530 // indirect
-	gitlab.com/tachikoma.ai/tickstore v0.0.0-20201130132500-5507936c8c68
+	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210109101144-b8bb705c8ba9
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20200922092024-4090fea4ef71 // indirect
 	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20201231105511-28cbcc209d89
 	google.golang.org/api v0.14.0
