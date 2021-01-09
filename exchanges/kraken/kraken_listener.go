@@ -217,6 +217,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if su.Status != "subscribed" {
 			return fmt.Errorf("was expecting subscribed status, got %s", su.Status)
 		}
+		break
 	}
 
 	var obData kraken.WSOrderBookL2
@@ -232,6 +233,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if !ok {
 			return fmt.Errorf("was expecting WSOrderBookL2, got %s", reflect.TypeOf(ws.Msg.Message).String())
 		}
+		break
 	}
 
 	bids, asks := obData.ToBidAsk()
