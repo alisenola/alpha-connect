@@ -158,7 +158,7 @@ func (state *MarketDataManager) OnTerminated(context actor.Context) error {
 	// Handle subscriber krash
 	msg := context.Message().(*actor.Terminated)
 	for k, v := range state.subscribers {
-		if v.Id == msg.Who.Id {
+		if v.String() == msg.Who.String() {
 			delete(state.subscribers, k)
 		}
 	}
