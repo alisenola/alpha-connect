@@ -207,7 +207,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 	_, ok := ws.Msg.Message.(bitfinex.WSSubscribeDepthResponse)
 	if !ok {
-		return fmt.Errorf("was expecting WSSubscribeDepthResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		if errMsg, ok := ws.Msg.Message.(bitfinex.WSErrorMessage); ok {
+			return fmt.Errorf("error subscribing to depth: %s", errMsg.Msg)
+		} else {
+			return fmt.Errorf("was expecting WSSubscribeDepthResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		}
 	}
 
 	if !ws.ReadMessage() {
