@@ -15,6 +15,7 @@ import (
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -193,8 +194,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error connecting to bitfinex websocket: %v", err)
 	}
 
+	symbol := "t" + strings.ToUpper(state.security.Symbol)
 	err := ws.SubscribeDepth(
-		state.security.Symbol,
+		symbol,
 		bitfinex.WSDepthPrecisionP0,
 		bitfinex.WSDepthFrequency0,
 		bitfinex.WSDepthLength100)
@@ -266,7 +268,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
 
-	if err := ws.SubscribeTrades(state.security.Symbol); err != nil {
+	if err := ws.SubscribeTrades(symbol); err != nil {
 		return err
 	}
 
