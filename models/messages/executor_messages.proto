@@ -42,6 +42,28 @@ message MarketDataIncrementalRefresh {
     uint64 seq_num = 7;
 }
 
+message AccountDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Account account = 4;
+}
+
+message AccountDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    OrderList orders = 3;
+    PositionList positions = 4;
+    BalanceList balances = 5;
+    uint64 seq_num = 6;
+}
+
+message AccountDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    ExecutionReport report = 3;
+}
+
 message SecurityDefinitionRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
@@ -151,8 +173,6 @@ message ExecutionReport {
     FeeBasis fee_basis = 18;
     RejectionReason rejection_reason = 19;
 }
-
-
 
 message SideValue {
     models.Side value = 1;
@@ -317,4 +337,20 @@ message OrderMassCancelResponse {
     uint64 responseID = 2;
     bool success = 3;
     RejectionReason rejection_reason = 4;
+}
+
+service Executor {
+    rpc MarketData (MarketDataRequest) returns (stream MarketDataIncrementalRefresh) {}
+    rpc AccountData (AccountDataRequest) returns (stream AccountDataIncrementalRefresh) {}
+    rpc SecurityDefinition(SecurityDefinitionRequest) returns (SecurityDefinitionResponse) {}
+    rpc Securities(SecurityListRequest) returns (SecurityList) {}
+    rpc Orders(OrderStatusRequest) returns (OrderList) {}
+    rpc Positions(PositionsRequest) returns (PositionList) {}
+    rpc Balances(BalancesRequest) returns (BalanceList) {}
+    rpc NewOrderSingle(NewOrderSingleRequest) returns (NewOrderSingleResponse) {}
+    rpc NewOrderBulk(NewOrderBulkRequest) returns (NewOrderBulkResponse) {}
+    rpc OrderReplace(OrderReplaceRequest) returns (OrderReplaceResponse) {}
+    rpc OrderBulkReplace(OrderBulkReplaceRequest) returns (OrderBulkReplaceResponse) {}
+    rpc OrderCancel(OrderCancelRequest) returns (OrderCancelResponse) {}
+    rpc OrderMassCancel(OrderMassCancelRequest) returns (OrderMassCancelResponse) {}
 }
