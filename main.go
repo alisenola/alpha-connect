@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/data/live"
+	"github.com/AsynkronIT/protoactor-go/remote"
+	"gitlab.com/alphaticks/alpha-connect/data"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/rpc"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -13,6 +14,7 @@ import (
 	tickstore_grpc "gitlab.com/tachikoma.ai/tickstore-grpc"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
+	"math"
 	"net"
 	"os"
 	"os/signal"
@@ -22,7 +24,6 @@ import (
 
 var done = make(chan os.Signal, 1)
 
-var liveStoreActor *actor.PID
 var executorActor *actor.PID
 var assetLoader *actor.PID
 
@@ -31,7 +32,6 @@ type GuardActor struct{}
 func (state *GuardActor) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
-		context.Watch(liveStoreActor)
 		context.Watch(executorActor)
 		context.Watch(assetLoader)
 
@@ -41,6 +41,7 @@ func (state *GuardActor) Receive(context actor.Context) {
 }
 
 func main() {
+
 	as := actor.NewActorSystem()
 	ctx := actor.NewRootContext(as, nil)
 
@@ -68,13 +69,12 @@ func main() {
 		&constants.BYBITL,
 	}
 	// EXECUTOR //
-	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
+	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assets.json")))
 	_, err := ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}
 	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
-	liveStoreActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(live.NewLiveStoreProducer(0)), "live_store")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(
@@ -84,43 +84,58 @@ func main() {
 		panic(err)
 	}
 
-	// TODO only if in config
+	// Start remote actor system
+	conf := remote.Configure("localhost", 7960)
+	conf = conf.WithServerOptions(grpc.MaxRecvMsgSize(math.MaxInt32))
+	rem := remote.NewRemote(as, conf)
+	rem.Start()
+
+	var dataServer *grpc.Server
 	// Start live store gRPC server
-	address := "127.0.0.1:7965"
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		panic(err)
-	}
-	server := grpc.NewServer()
-
-	liveER := rpc.NewLiveER(ctx, as.NewLocalPID("live_store"))
-
-	go func() {
-		err := server.Serve(lis)
+	if address := os.Getenv("DATA_STORE_ADDRESS"); address != "" {
+		lis, err := net.Listen("tcp", address)
 		if err != nil {
-			fmt.Println("ERROR", err)
+			panic(err)
 		}
-		done <- os.Signal(syscall.SIGTERM)
-	}()
+		dataServer = grpc.NewServer()
 
-	tickstore_grpc.RegisterStoreServer(server, liveER)
+		serverAddress := os.Getenv("DATA_SERVER_ADDRESS")
+		if serverAddress == "" {
+			panic("DATA_SERVER_ADDRESS undefined")
+		}
+
+		str, err := data.NewStore(serverAddress)
+		dataER := rpc.NewDataER(ctx, str)
+
+		go func() {
+			err := dataServer.Serve(lis)
+			if err != nil {
+				fmt.Println("ERROR", err)
+			}
+			done <- os.Signal(syscall.SIGTERM)
+		}()
+
+		tickstore_grpc.RegisterStoreServer(dataServer, dataER)
+	}
 
 	// If interrupt or terminate signal is received, stop
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	<-done
 
-	// Stop gRPC server
-	c := make(chan bool, 1)
-	go func() {
-		server.GracefulStop()
-		c <- true
-	}()
+	if dataServer != nil {
+		// Stop gRPC server
+		c := make(chan bool, 1)
+		go func() {
+			dataServer.GracefulStop()
+			c <- true
+		}()
 
-	select {
-	case <-c:
-	case <-time.After(time.Second * 10):
-		server.Stop()
+		select {
+		case <-c:
+		case <-time.After(time.Second * 10):
+			dataServer.Stop()
+		}
 	}
 
 	// Stop guard actor first
