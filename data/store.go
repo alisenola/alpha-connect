@@ -53,6 +53,35 @@ func NewStorageClient(address string, opts ...grpc.DialOption) (*StorageClient, 
 	return s, nil
 }
 
+func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
+	var minScore int64 = math.MaxInt64
+	var cfreq int64
+	for f := range s.stores {
+		if f <= freq {
+			score := freq - f
+			if score < minScore {
+				minScore = score
+				cfreq = f
+			}
+		}
+	}
+	if s.stores[cfreq] == nil {
+		// Construct store
+		strg, err := storage.NewClientStorage(s.address+":"+ports[cfreq], s.opts...)
+		if err != nil {
+			return nil, err
+		}
+
+		// Build store
+		str, err := store.NewStore(strg)
+		if err != nil {
+			return nil, fmt.Errorf("error building store: %v", err)
+		}
+		s.stores[cfreq] = str
+	}
+	return s.stores[cfreq], nil
+}
+
 func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64

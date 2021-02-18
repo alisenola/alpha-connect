@@ -17,11 +17,11 @@ import (
 
 type DataER struct {
 	ctx    *actor.RootContext
-	store  *data.Store
+	store  *data.StorageClient
 	Logger *log.Logger
 }
 
-func NewDataER(ctx *actor.RootContext, store *data.Store) *DataER {
+func NewDataER(ctx *actor.RootContext, store *data.StorageClient) *DataER {
 	return &DataER{
 		ctx:    ctx,
 		store:  store,
@@ -126,7 +126,7 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 		q.SetNextDeadline(endTime)
 		for uint64(len(events)) < qr.BatchSize && time.Now().Before(endTime) && q.Next() {
 			var event *tickstore_grpc.StoreQueryTick
-			tick, deltas, groupID := q.Read()
+			tick, deltas, groupID := q.ReadDeltas()
 			// The first event has to be a snapshot. So send snapshot if not seen objectID yet
 			if _, ok := objects[groupID]; !ok {
 				objects[groupID] = true
