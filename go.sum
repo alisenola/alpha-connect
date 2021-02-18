@@ -373,10 +373,16 @@ gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112 h1:y6Gueg
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112/go.mod h1:xCMeAUQhBW3lLo+hF5F3MQuI3PoU0hcDtOpP383yltE=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210215095711-9f735352d81a h1:KzaYszjvf+wQKDaQkW4eYfDm9KRHlNEkI8c6oFmDb30=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210215095711-9f735352d81a/go.mod h1:VmePqfmwkaWRyR3LRxLLu0Xv4eKJMVVDQaiMqASWSPA=
+gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218110320-7e0c5e5fbb37 h1:QZnAS3r/ED0ntBuJsJ2T1SprSlL2Y0yqbzbyTeX86Tg=
+gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218110320-7e0c5e5fbb37/go.mod h1:ceLaBnRw21XmkaQpXH7n4cQ4wbLENQaN8G++Vq+d+LE=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215102401-33cbb52815a8 h1:zmlFKMYSOwAHTOOyKFp1yAklvEe54a/aotx8PT2zXxU=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215102401-33cbb52815a8/go.mod h1:+2l3L6YbsaHGpAnK/zPRSk4SecF99KEV3ULEYiz75Xs=
+gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451 h1:qZ1VU4+p6iMCsENliTOjqsu3QkEVnLLQB0j3PKTTFZo=
+gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451/go.mod h1:+2l3L6YbsaHGpAnK/zPRSk4SecF99KEV3ULEYiz75Xs=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210125120535-c168ee502a87 h1:sMVm5g0R1Xs0vNuzSS3MWbLn+OEkWjxarAZ4t5+OwoQ=
 gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210125120535-c168ee502a87/go.mod h1:IcWqq89OsDT4PWSaEfA5mk4klLp9m6wIAtUdWs0bfGM=
+gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210215115203-7e5346636185 h1:1Y0hGOzkBAnwpSrRKF8s6jcIV18v8Wfr5Sfwk+xo9ms=
+gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210215115203-7e5346636185/go.mod h1:TxmIUVIjmw1Sl8JoJ5smhFBOdPvEDoakJcAApXwLbaY=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
