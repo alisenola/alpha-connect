@@ -104,7 +104,7 @@ func main() {
 			panic("DATA_SERVER_ADDRESS undefined")
 		}
 
-		str, err := data.NewStore(serverAddress)
+		str, err := data.NewStorageClient("", serverAddress)
 		dataER := rpc.NewDataER(ctx, str)
 
 		go func() {

@@ -2,11 +2,13 @@ package data
 
 import (
 	"fmt"
+	"github.com/melaurent/kafero"
 	tickstore_go_client "gitlab.com/tachikoma.ai/tickstore-go-client"
 	"gitlab.com/tachikoma.ai/tickstore/storage"
 	"gitlab.com/tachikoma.ai/tickstore/store"
 	"google.golang.org/grpc"
 	"math"
+	"time"
 )
 
 const (
@@ -29,20 +31,38 @@ var ports = map[int64]string{
 	DATA_CLIENT_1D:   "4554",
 }
 
+var names = map[int64]string{
+	DATA_CLIENT_LIVE: "live",
+	DATA_CLIENT_1S:   "1s",
+	DATA_CLIENT_1M:   "1m",
+	DATA_CLIENT_1H:   "1h",
+	DATA_CLIENT_1D:   "1d",
+}
+
+var durations = map[int64]uint64{
+	DATA_CLIENT_LIVE: 10000000,
+	DATA_CLIENT_1S:   100000000,
+	DATA_CLIENT_1M:   10000000000,
+	DATA_CLIENT_1H:   100000000000,
+	DATA_CLIENT_1D:   1000000000000,
+}
+
 type StorageClient struct {
 	stores       map[int64]*store.Store
 	address      string
 	opts         []grpc.DialOption
 	measurements map[string]string
+	cacheDir     string
 }
 
 // Lazy loading
-func NewStorageClient(address string, opts ...grpc.DialOption) (*StorageClient, error) {
+func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) (*StorageClient, error) {
 	s := &StorageClient{
 		stores:       make(map[int64]*store.Store),
 		address:      address,
 		opts:         opts,
 		measurements: make(map[string]string),
+		cacheDir:     cacheDir,
 	}
 	s.stores[DATA_CLIENT_LIVE] = nil
 	s.stores[DATA_CLIENT_1S] = nil
@@ -67,7 +87,20 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
 	}
 	if s.stores[cfreq] == nil {
 		// Construct store
-		strg, err := storage.NewClientStorage(s.address+":"+ports[cfreq], s.opts...)
+		// Construct cache storage
+		cacheStrg, err := storage.NewFsStorage(
+			kafero.NewBasePathFs(kafero.NewOsFs(), s.cacheDir),
+			names[cfreq],
+			3,
+			durations[cfreq],
+			10*time.Minute,
+			500,
+			false,
+			true)
+		if err != nil {
+			return nil, fmt.Errorf("error starting cache storage: %v", err)
+		}
+		strg, err := storage.NewClientStorage(cacheStrg, s.address+":"+ports[cfreq], s.opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -83,32 +116,11 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
 }
 
 func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, error) {
-	var minScore int64 = math.MaxInt64
-	var cfreq int64
-	for f := range s.stores {
-		if f <= freq {
-			score := freq - f
-			if score < minScore {
-				minScore = score
-				cfreq = f
-			}
-		}
+	str, err := s.GetStore(freq)
+	if err != nil {
+		return nil, err
 	}
-	if s.stores[cfreq] == nil {
-		// Construct store
-		strg, err := storage.NewClientStorage(s.address+":"+ports[cfreq], s.opts...)
-		if err != nil {
-			return nil, err
-		}
-
-		// Build store
-		str, err := store.NewStore(strg)
-		if err != nil {
-			return nil, fmt.Errorf("error building store: %v", err)
-		}
-		s.stores[cfreq] = str
-	}
-	return store.NewLocalClient(s.stores[cfreq]), nil
+	return store.NewLocalClient(str), nil
 }
 
 type StoreClient struct {

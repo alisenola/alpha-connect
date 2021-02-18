@@ -8,14 +8,15 @@ require (
 	github.com/alecthomas/participle v0.4.4 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/melaurent/gotickfile/v2 v2.0.0-20210211100912-d0aaa88652e7
+	github.com/melaurent/kafero v1.2.4-0.20210129172623-380493ff2067
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20201219125519-1a8189af89db
 	gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112
-	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218110320-7e0c5e5fbb37
+	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218145346-8683fd50cb18
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451
-	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210215115203-7e5346636185
+	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210218135731-d0ae4f13ef30
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.35.0
 )
