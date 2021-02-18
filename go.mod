@@ -14,7 +14,7 @@ require (
 	gitlab.com/alphaticks/gorderbook v0.0.0-20201219125519-1a8189af89db
 	gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112
-	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218151239-6d51e0eef93e
+	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218151454-92cf89065788
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451
 	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210218135731-d0ae4f13ef30
 	google.golang.org/api v0.36.0
