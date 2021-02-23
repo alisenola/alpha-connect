@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"github.com/AsynkronIT/protoactor-go/log"
 	"reflect"
 	"time"
 )
@@ -60,4 +61,8 @@ func (me MapEncoder) EncodeObject(key string, val interface{}) {
 func (me MapEncoder) EncodeType(key string, val reflect.Type) {
 	me.M[key] = val
 	//me.M[key] = fmt.Sprintf("%v", val)
+}
+
+func (me MapEncoder) EncodeCaller(key string, val log.CallerInfo) {
+	me.M[key] = val
 }

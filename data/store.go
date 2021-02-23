@@ -47,6 +47,15 @@ var durations = map[int64]uint64{
 	DATA_CLIENT_1D:   1000000000000,
 }
 
+/*
+var durations = map[int64]uint64{
+	DATA_CLIENT_LIVE: 100000,
+	DATA_CLIENT_1S:   100000,
+	DATA_CLIENT_1M:   100000,
+	DATA_CLIENT_1H:   100000,
+	DATA_CLIENT_1D:   100000,
+}
+*/
 type StorageClient struct {
 	stores       map[int64]*store.Store
 	address      string
