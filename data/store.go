@@ -137,11 +137,12 @@ func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClie
 
 func (s *StorageClient) Close() error {
 	errs := utils.NewErrorSet()
-	for _, str := range s.stores {
+	for freq, str := range s.stores {
 		if str != nil {
 			if err := str.Close(); err != nil {
 				errs.Push(err)
 			}
+			s.stores[freq] = nil
 		}
 	}
 	if errs.Len() > 0 {
