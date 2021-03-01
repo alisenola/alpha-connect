@@ -6,6 +6,7 @@ import (
 	tickstore_go_client "gitlab.com/tachikoma.ai/tickstore-go-client"
 	"gitlab.com/tachikoma.ai/tickstore/storage"
 	"gitlab.com/tachikoma.ai/tickstore/store"
+	"gitlab.com/tachikoma.ai/tickstore/utils"
 	"google.golang.org/grpc"
 	"math"
 	"time"
@@ -21,6 +22,7 @@ const (
 
 type DataClient interface {
 	GetClient(freq int64) (tickstore_go_client.TickstoreClient, error)
+	Close() error
 }
 
 var ports = map[int64]string{
@@ -133,6 +135,20 @@ func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClie
 	return store.NewLocalClient(str), nil
 }
 
+func (s *StorageClient) Close() error {
+	errs := utils.NewErrorSet()
+	for _, str := range s.stores {
+		if err := str.Close(); err != nil {
+			errs.Push(err)
+		}
+	}
+	if errs.Len() > 0 {
+		return errs
+	} else {
+		return nil
+	}
+}
+
 type StoreClient struct {
 	stores       map[int64]*tickstore_go_client.RemoteClient
 	address      string
@@ -179,4 +195,8 @@ func (s *StoreClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient
 		s.stores[cfreq] = str
 	}
 	return s.stores[cfreq], nil
+}
+
+func (s *StoreClient) Close() error {
+	return nil
 }
