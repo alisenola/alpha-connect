@@ -291,6 +291,10 @@ github.com/melaurent/gotickfile/v2 v2.0.0-20210129172650-373dcaf72b18 h1:amb7EZy
 github.com/melaurent/gotickfile/v2 v2.0.0-20210129172650-373dcaf72b18/go.mod h1:TVXV+oIuvBxf8A+DpHD1LWq2L9bp/pRba2gYR+N6eNQ=
 github.com/melaurent/gotickfile/v2 v2.0.0-20210211100912-d0aaa88652e7 h1:1j/s+0I7+gyEMsWD0KGl9XywN1hrzHo5HhBCSqDfHzY=
 github.com/melaurent/gotickfile/v2 v2.0.0-20210211100912-d0aaa88652e7/go.mod h1:Dt5mccSJGQUKF379dP5t7LsB77P3XU2eQ/vtwbpFjQ0=
+github.com/melaurent/gotickfile/v2 v2.0.0-20210301103544-7ead84a33b8c/go.mod h1:Dt5mccSJGQUKF379dP5t7LsB77P3XU2eQ/vtwbpFjQ0=
+github.com/melaurent/gotickfile/v2 v2.0.0-20210302090111-8118208a962a/go.mod h1:Dt5mccSJGQUKF379dP5t7LsB77P3XU2eQ/vtwbpFjQ0=
+github.com/melaurent/gotickfile/v2 v2.0.0-20210302121230-18c0a7f174e1 h1:YTX6xo5IIOn4Vw/Nbkm2qtPS9JqiN9RC6Lm0+UIvKaU=
+github.com/melaurent/gotickfile/v2 v2.0.0-20210302121230-18c0a7f174e1/go.mod h1:Dt5mccSJGQUKF379dP5t7LsB77P3XU2eQ/vtwbpFjQ0=
 github.com/melaurent/kafero v1.2.4-0.20200218222929-17fb17df7ed1/go.mod h1:m6A5SX8eAQhkEBq7ZdqEAJEKHaO+FDnVnYB6OeO9/lw=
 github.com/melaurent/kafero v1.2.4-0.20210125122917-160a7190f8fd h1:+EpUcenNi4+keBYBSolSMzXIhHa/GWHXmnQt6OXz53o=
 github.com/melaurent/kafero v1.2.4-0.20210125122917-160a7190f8fd/go.mod h1:T5jJUANsvMOb+JH0vV0YYtENC9/2hLp5OybymXa5gY0=
@@ -426,6 +430,8 @@ gitlab.com/tachikoma.ai/tickstore v0.0.0-20210223133038-76e2f709a3d6 h1:dmjvKbY7
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210223133038-76e2f709a3d6/go.mod h1:QtKvXLfgrYJwftxE4F2DugnOeCar/qED9BCoQLzcH7Q=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210226125624-07311764bc03 h1:tpG8LQA5QInYfuzBauFsfYkg4EH+RmkQ6cQtMYNfA5k=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210226125624-07311764bc03/go.mod h1:4gTO3GOD4qg8mWkSkfgu7U4Ln5AAbycUa1CbwzzQhGc=
+gitlab.com/tachikoma.ai/tickstore v0.0.0-20210302121624-0b7fd44f2ec6 h1:xJstOnsin3CEyEfy10w2su2N4JcPMKO+S6ac5Zc1Gs4=
+gitlab.com/tachikoma.ai/tickstore v0.0.0-20210302121624-0b7fd44f2ec6/go.mod h1:sJnq3mtLN4V0EXvVmknj8pxKy8wy0XvmwKwlpyw27NA=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215102401-33cbb52815a8 h1:zmlFKMYSOwAHTOOyKFp1yAklvEe54a/aotx8PT2zXxU=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215102401-33cbb52815a8/go.mod h1:+2l3L6YbsaHGpAnK/zPRSk4SecF99KEV3ULEYiz75Xs=
 gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451 h1:qZ1VU4+p6iMCsENliTOjqsu3QkEVnLLQB0j3PKTTFZo=
