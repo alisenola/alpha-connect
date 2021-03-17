@@ -41,12 +41,12 @@ var names = map[int64]string{
 	DATA_CLIENT_1D:   "1d",
 }
 
-var durations = map[int64]uint64{
+var shardDurations = map[int64]uint64{
 	DATA_CLIENT_LIVE: 10000000,
-	DATA_CLIENT_1S:   100000000,
-	DATA_CLIENT_1M:   10000000000,
-	DATA_CLIENT_1H:   100000000000,
-	DATA_CLIENT_1D:   1000000000000,
+	DATA_CLIENT_1S:   10000000,
+	DATA_CLIENT_1M:   100000000,
+	DATA_CLIENT_1H:   1000000000,
+	DATA_CLIENT_1D:   10000000000,
 }
 
 /*
@@ -104,7 +104,7 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
 			kafero.NewBasePathFs(kafero.NewOsFs(), s.cacheDir),
 			names[cfreq],
 			3,
-			durations[cfreq],
+			shardDurations[cfreq],
 			10*time.Minute,
 			500,
 			false,
