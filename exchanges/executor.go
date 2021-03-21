@@ -171,6 +171,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.instruments = make(map[uint64]*actor.PID)
 	state.slSubscribers = make(map[uint64]*actor.PID)
 
+	if state.dialerPool == nil {
+		state.dialerPool = xchangerUtils.DefaultDialerPool
+	}
+
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.exchanges {
