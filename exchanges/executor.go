@@ -279,6 +279,7 @@ func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error 
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Security:        nil,
 			RejectionReason: messages.UnknownSecurityID,
+			Success:         false,
 		})
 	}
 	if sec, ok := state.securities[request.Instrument.SecurityID.Value]; ok {
@@ -286,6 +287,7 @@ func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error 
 			RequestID:  request.RequestID,
 			ResponseID: uint64(time.Now().UnixNano()),
 			Security:   sec,
+			Success:    true,
 		})
 	} else {
 		context.Respond(&messages.SecurityDefinitionResponse{
@@ -293,6 +295,7 @@ func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error 
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Security:        nil,
 			RejectionReason: messages.UnknownSecurityID,
+			Success:         false,
 		})
 	}
 	return nil
