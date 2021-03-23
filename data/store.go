@@ -118,6 +118,7 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
 			10*time.Minute,
 			500,
 			false,
+			true,
 			true)
 		if err != nil {
 			return nil, fmt.Errorf("error starting cache storage: %v", err)
