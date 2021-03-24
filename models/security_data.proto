@@ -5,6 +5,17 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/timestamp.proto";
 
+enum InstrumentStatus {
+    PreTrading = 0;
+    Trading = 1;
+    PostTrading = 2;
+    EndOfDay = 3;
+    Halt = 4;
+    AuctionMatch = 5;
+    Break = 6;
+    Disabled = 7;
+}
+
 enum Side {
     Buy = 0;
     Sell = 1;
@@ -57,7 +68,7 @@ message Security {
     string symbol = 4;
     models.Asset underlying = 7;
     models.Asset quote_currency = 8;
-    bool enabled = 9;
+    InstrumentStatus status = 9;
     bool is_inverse = 10;
     google.protobuf.DoubleValue min_price_increment = 11;
     google.protobuf.DoubleValue round_lot = 12;

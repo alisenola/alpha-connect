@@ -140,7 +140,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	var securities []*models.Security
 	for _, pair := range tradingPairs {
 		security := models.Security{}
-		security.Enabled = pair.Trading == "Enabled"
+		if pair.Trading == "Enabled" {
+			security.Status = models.Trading
+		} else {
+			security.Status = models.Disabled
+		}
 		baseName := strings.Split(pair.Name, "/")[0]
 		quoteName := strings.Split(pair.Name, "/")[1]
 		baseCurrency, ok := constants.GetAssetBySymbol(baseName)

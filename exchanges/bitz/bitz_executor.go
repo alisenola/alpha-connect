@@ -149,7 +149,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.Name
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = true
+		security.Status = models.Trading
 		security.Exchange = &constants.BITZ
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.NumberFloat))}

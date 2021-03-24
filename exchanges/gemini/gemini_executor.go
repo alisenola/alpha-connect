@@ -145,7 +145,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = true
+		security.Status = models.Trading
 		security.Exchange = &constants.GEMINI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

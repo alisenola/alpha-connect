@@ -171,7 +171,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.Symbol = activeInstrument.Symbol
 			security.Underlying = baseCurrency
 			security.QuoteCurrency = quoteCurrency
-			security.Enabled = activeInstrument.State == "Open"
+			switch activeInstrument.State {
+			case "Open":
+				security.Status = models.Trading
+			default:
+				security.Status = models.Disabled
+			}
 			security.Exchange = &constants.BITMEX
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.MinPriceIncrement = &types.DoubleValue{Value: activeInstrument.TickSize}

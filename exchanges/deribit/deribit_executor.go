@@ -199,7 +199,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 			security := models.Security{}
-			security.Enabled = i.IsActive
+			if i.IsActive {
+				security.Status = models.Trading
+			} else {
+				security.Status = models.Disabled
+			}
 			security.Symbol = i.InstrumentName
 			baseCurrency, ok := constants.GetAssetBySymbol(i.BaseCurrency)
 			if !ok {

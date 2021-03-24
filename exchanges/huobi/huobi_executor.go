@@ -164,7 +164,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Symbol
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = symbol.State == "online"
+		if symbol.State == "online" {
+			security.Status = models.Trading
+		} else {
+			security.Status = models.Disabled
+		}
 		security.Exchange = &constants.HUOBI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

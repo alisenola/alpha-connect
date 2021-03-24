@@ -154,7 +154,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = instrument.Symbol
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = instrument.Tradeable
+		if instrument.Tradeable {
+			security.Status = models.Trading
+		} else {
+			security.Status = models.Disabled
+		}
 		security.Exchange = &constants.CRYPTOFACILITIES
 		splits := strings.Split(instrument.Symbol, "_")
 		switch splits[0] {

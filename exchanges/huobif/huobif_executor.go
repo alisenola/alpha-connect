@@ -144,12 +144,26 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
 			continue
 		}
+		/*
+			0: Delisting,1: Listing,2: Pending Listing,3: Suspension,4: Suspending of Listing,5: In Settlement,6: Delivering,7: Settlement Completed,8: Delivered,9: Suspending of Trade
+		*/
 		quoteCurrency := &constants.DOLLAR
 		security := models.Security{}
 		security.Symbol = symbol.ContractCode
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = symbol.ContractStatus == 1
+		switch symbol.ContractStatus {
+		case 0:
+			security.Status = models.Disabled
+		case 1:
+			security.Status = models.Trading
+		case 2:
+			security.Status = models.PreTrading
+		case 3:
+			security.Status = models.Break
+		default:
+			security.Status = models.Disabled
+		}
 		security.Exchange = &constants.HUOBIF
 		security.SecurityType = enum.SecurityType_CRYPTO_FUT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

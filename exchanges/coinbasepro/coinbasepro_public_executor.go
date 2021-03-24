@@ -162,7 +162,7 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 		security.Symbol = product.ID
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = true
+		security.Status = models.Trading
 		security.Exchange = &constants.COINBASEPRO
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

@@ -205,7 +205,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		security.MinPriceIncrement = &types.DoubleValue{Value: market.PriceIncrement}
 		security.RoundLot = &types.DoubleValue{Value: market.SizeIncrement}
-		security.Enabled = true
+		security.Status = models.Trading
 
 		securities = append(securities, &security)
 	}

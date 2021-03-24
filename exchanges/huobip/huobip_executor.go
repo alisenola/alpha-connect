@@ -158,7 +158,18 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.ContractCode
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = symbol.ContractStatus == 1
+		switch symbol.ContractStatus {
+		case 0:
+			security.Status = models.Disabled
+		case 1:
+			security.Status = models.Trading
+		case 2:
+			security.Status = models.PreTrading
+		case 3:
+			security.Status = models.Break
+		default:
+			security.Status = models.Disabled
+		}
 		security.Exchange = &constants.HUOBIP
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

@@ -203,7 +203,24 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Symbol
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Enabled = symbol.Status == "TRADING"
+		switch symbol.Status {
+		case "PRE_TRADING":
+			security.Status = models.PreTrading
+		case "TRADING":
+			security.Status = models.Trading
+		case "POST_TRADING":
+			security.Status = models.PostTrading
+		case "END_OF_DAY":
+			security.Status = models.EndOfDay
+		case "HALT":
+			security.Status = models.Halt
+		case "AUCTION_MATCH":
+			security.Status = models.AuctionMatch
+		case "BREAK":
+			security.Status = models.Break
+		default:
+			security.Status = models.Disabled
+		}
 		security.Exchange = &constants.FBINANCE
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)

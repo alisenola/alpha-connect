@@ -160,7 +160,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 
 		security := models.Security{}
-		security.Enabled = true
+		security.Status = models.Trading
 		security.Symbol = symbol.Pair
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
