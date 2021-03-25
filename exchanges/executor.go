@@ -340,6 +340,7 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 		state.securities[s.SecurityID] = s
 	}
 
+	// build the updated list
 	var securities []*models.Security
 	for _, v := range state.securities {
 		securities = append(securities, v)
