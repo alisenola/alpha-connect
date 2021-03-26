@@ -222,7 +222,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.Status = models.Disabled
 		}
 		security.Exchange = &constants.FBINANCE
-		security.SecurityType = enum.SecurityType_CRYPTO_PERP
+		switch symbol.ContractType {
+		case "PERPETUAL":
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+		default:
+			continue
+		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(symbol.PricePrecision)}
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(symbol.QuantityPrecision)}
