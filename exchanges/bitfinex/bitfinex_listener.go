@@ -289,7 +289,8 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:          state.instrumentData.orderBook.GetBids(0),
 		Asks:          state.instrumentData.orderBook.GetAsks(0),
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		TickPrecision: &types.UInt64Value{Value: state.instrumentData.tickPrecision},
+		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,

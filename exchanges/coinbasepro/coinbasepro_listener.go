@@ -321,9 +321,11 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	}
 	if msg.Aggregation == models.L2 {
 		snapshot := &models.OBL2Snapshot{
-			Bids:      state.instrumentData.orderBook.GetBids(0),
-			Asks:      state.instrumentData.orderBook.GetAsks(0),
-			Timestamp: utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
+			Bids:          state.instrumentData.orderBook.GetBids(0),
+			Asks:          state.instrumentData.orderBook.GetAsks(0),
+			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
+			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
