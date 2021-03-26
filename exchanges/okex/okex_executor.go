@@ -66,7 +66,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	fmt.Println("UPDATE SEC LISTT")
 	return state.UpdateSecurityList(context)
 }
 
@@ -124,8 +123,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	fmt.Println("RES", kResponse)
-
 	var securities []*models.Security
 	for _, pair := range kResponse {
 		baseCurrency, ok := constants.GetAssetBySymbol(pair.BaseCurrency)
@@ -150,7 +147,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.MinPriceIncrement = &types.DoubleValue{Value: pair.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: pair.SizeIncrement}
 		securities = append(securities, &security)
-		fmt.Println(security)
 	}
 	state.securities = securities
 
