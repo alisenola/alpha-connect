@@ -19,6 +19,7 @@ import (
 )
 
 var executor *actor.PID
+var as *actor.ActorSystem
 
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
@@ -30,6 +31,7 @@ func TestMain(m *testing.M) {
 		&constants.KRAKEN,
 		&constants.CRYPTOFACILITIES,
 		&constants.OKCOIN,
+		&constants.OKEX,
 		&constants.FBINANCE,
 		&constants.HITBTC,
 		&constants.BITZ,
@@ -43,9 +45,10 @@ func TestMain(m *testing.M) {
 		&constants.BYBITI,
 		&constants.BYBITL,
 	}
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	as = actor.NewActorSystem()
+	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
 	code := m.Run()
-	_ = actor.EmptyRootContext.PoisonFuture(executor).Wait()
+	_ = as.Root.PoisonFuture(executor).Wait()
 	os.Exit(code)
 }
 
@@ -54,7 +57,7 @@ func TestBinance(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 
@@ -62,7 +65,7 @@ func TestBinance(t *testing.T) {
 		9281941173829172773, //BTCUSDT
 	}
 	testedSecurities := make(map[uint64]*models.Security)
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +113,7 @@ func TestBinance(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -120,9 +123,9 @@ func TestBinance(t *testing.T) {
 		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +141,7 @@ func TestBitfinex(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 
@@ -147,7 +150,7 @@ func TestBitfinex(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +198,7 @@ func TestBitfinex(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	/*
@@ -207,9 +210,9 @@ func TestBitfinex(t *testing.T) {
 		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +228,7 @@ func TestBitmex(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -233,7 +236,7 @@ func TestBitmex(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +284,7 @@ func TestBitmex(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got noninverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -291,9 +294,9 @@ func TestBitmex(t *testing.T) {
 		t.Fatalf("was expecting 1. round lot increment, got %g", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +312,7 @@ func TestBitstamp(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -317,7 +320,7 @@ func TestBitstamp(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +368,7 @@ func TestBitstamp(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -375,9 +378,9 @@ func TestBitstamp(t *testing.T) {
 		t.Fatalf("was expecting 0.00000001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +396,7 @@ func TestBitz(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -401,7 +404,7 @@ func TestBitz(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +452,7 @@ func TestBitz(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -459,9 +462,9 @@ func TestBitz(t *testing.T) {
 		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +480,7 @@ func TestCoinbasePro(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -485,7 +488,7 @@ func TestCoinbasePro(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,7 +536,7 @@ func TestCoinbasePro(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -543,9 +546,9 @@ func TestCoinbasePro(t *testing.T) {
 		t.Fatalf("was expecting 0.0001 round lot increment, got %g", sec.RoundLot.Value)
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +564,7 @@ func TestCryptofacilities(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -569,7 +572,7 @@ func TestCryptofacilities(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -616,7 +619,7 @@ func TestCryptofacilities(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -629,9 +632,9 @@ func TestCryptofacilities(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +650,7 @@ func TestFBinance(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -655,7 +658,7 @@ func TestFBinance(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -702,7 +705,7 @@ func TestFBinance(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -715,9 +718,9 @@ func TestFBinance(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -733,7 +736,7 @@ func TestFTX(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -741,7 +744,7 @@ func TestFTX(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -788,7 +791,7 @@ func TestFTX(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -801,9 +804,9 @@ func TestFTX(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -819,7 +822,7 @@ func TestHuobi(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -827,7 +830,7 @@ func TestHuobi(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,7 +877,7 @@ func TestHuobi(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -887,9 +890,9 @@ func TestHuobi(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -905,7 +908,7 @@ func TestGemini(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -913,7 +916,7 @@ func TestGemini(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -960,7 +963,7 @@ func TestGemini(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -973,9 +976,9 @@ func TestGemini(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -991,7 +994,7 @@ func TestHitbtc(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -999,7 +1002,7 @@ func TestHitbtc(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1046,7 +1049,7 @@ func TestHitbtc(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -1059,9 +1062,9 @@ func TestHitbtc(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1077,7 +1080,7 @@ func TestKraken(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1085,7 +1088,7 @@ func TestKraken(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1132,7 +1135,7 @@ func TestKraken(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
@@ -1145,9 +1148,9 @@ func TestKraken(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1163,7 +1166,7 @@ func TestOKCoin(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1171,7 +1174,7 @@ func TestOKCoin(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1218,7 +1221,7 @@ func TestOKCoin(t *testing.T) {
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
@@ -1231,9 +1234,95 @@ func TestOKCoin(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := res.(*tests.GetStat)
+	t.Logf("Trades: %d | OBUpdates: %d", stats.Trades, stats.OBUpdates)
+	if stats.Error != nil {
+		t.Fatal(stats.Error)
+	}
+}
+
+func TestOKex(t *testing.T) {
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = as.Root.PoisonFuture(obChecker).Wait()
+		}
+	}()
+	securityID := []uint64{
+		945944519923594006,
+	}
+	testedSecurities := make(map[uint64]*models.Security)
+
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
+	}
+	for _, s := range securityList.Securities {
+		tested := false
+		for _, secID := range securityID {
+			if secID == s.SecurityID {
+				tested = true
+				break
+			}
+		}
+		if tested {
+			testedSecurities[s.SecurityID] = s
+		}
+	}
+
+	// Test
+	sec, ok := testedSecurities[945944519923594006]
+	if !ok {
+		t.Fatalf("security not found")
+	}
+	if sec.Symbol != "BTC-USDT" {
+		t.Fatalf("was expecting symbol BTC-USDT, got %s", sec.Symbol)
+	}
+	if sec.SecurityType != enum.SecurityType_CRYPTO_SPOT {
+		t.Fatalf("was expecting CRSPOT type, got %s", sec.SecurityType)
+	}
+	if sec.Exchange.Name != constants.OKEX.Name {
+		t.Fatalf("was expecting OKEX exchange, got %s", sec.Exchange.Name)
+	}
+	if sec.Underlying.ID != constants.BITCOIN.ID {
+		t.Fatalf("was expecting bitcoin underlying, got %d", sec.Underlying.ID)
+	}
+	if sec.QuoteCurrency.ID != constants.TETHER.ID {
+		t.Fatalf("was expecting USDT quote, got %d", sec.QuoteCurrency.ID)
+	}
+	if sec.IsInverse {
+		t.Fatalf("was expecting non inverse, got inverse")
+	}
+	if sec.Status != models.Trading {
+		t.Fatal("was expecting enabled security")
+	}
+	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
+		t.Fatalf("was expecting 0.1 min price increment, got %g", sec.MinPriceIncrement.Value)
+	}
+	if math.Abs(sec.RoundLot.Value-1e-08) > 0.0000000001 {
+		t.Fatalf("was expecting 1e-08 round lot increment, got %g", sec.RoundLot.Value)
+	}
+	if sec.MaturityDate != nil {
+		t.Fatalf("was expecting nil maturity date")
+	}
+
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	time.Sleep(20 * time.Second)
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1249,7 +1338,7 @@ func TestDeribit(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1257,7 +1346,7 @@ func TestDeribit(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1305,7 +1394,7 @@ func TestDeribit(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -1318,9 +1407,9 @@ func TestDeribit(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1336,7 +1425,7 @@ func TestHuobip(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1344,7 +1433,7 @@ func TestHuobip(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1392,7 +1481,7 @@ func TestHuobip(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.1) > 0.000001 {
@@ -1405,9 +1494,9 @@ func TestHuobip(t *testing.T) {
 		t.Fatalf("was expecting nil maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1423,7 +1512,7 @@ func TestHuobif(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1431,7 +1520,7 @@ func TestHuobif(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1479,7 +1568,7 @@ func TestHuobif(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
@@ -1492,9 +1581,9 @@ func TestHuobif(t *testing.T) {
 		t.Fatalf("was expecting maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1510,7 +1599,7 @@ func TestBybiti(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1518,7 +1607,7 @@ func TestBybiti(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1566,7 +1655,7 @@ func TestBybiti(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -1579,9 +1668,9 @@ func TestBybiti(t *testing.T) {
 		t.Fatalf("was not expecting maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1597,7 +1686,7 @@ func TestBybitl(t *testing.T) {
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
-			_ = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+			_ = as.Root.PoisonFuture(obChecker).Wait()
 		}
 	}()
 	securityID := []uint64{
@@ -1605,7 +1694,7 @@ func TestBybitl(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1652,7 +1741,7 @@ func TestBybitl(t *testing.T) {
 	if !sec.IsInverse {
 		t.Fatalf("was expecting inverse, got non inverse")
 	}
-	if !sec.Enabled {
+	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
 	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
@@ -1665,9 +1754,9 @@ func TestBybitl(t *testing.T) {
 		t.Fatalf("was not expecting maturity date")
 	}
 
-	obChecker = actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = actor.EmptyRootContext.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}

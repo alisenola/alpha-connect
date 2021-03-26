@@ -23,6 +23,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobip"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/kraken"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okcoin"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/okex"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
@@ -104,6 +105,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return kraken.NewListener(security, dialerPool) }
 	case constants.OKCOIN.ID:
 		return func() actor.Actor { return okcoin.NewListener(security, dialerPool) }
+	case constants.OKEX.ID:
+		return func() actor.Actor { return okex.NewListener(security, dialerPool) }
 	case constants.DERIBIT.ID:
 		return func() actor.Actor { return deribit.NewListener(security, dialerPool) }
 	case constants.HUOBI.ID:
@@ -153,6 +156,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
 		return func() actor.Actor { return kraken.NewExecutor() }
 	case constants.OKCOIN.ID:
 		return func() actor.Actor { return okcoin.NewExecutor() }
+	case constants.OKEX.ID:
+		return func() actor.Actor { return okex.NewExecutor() }
 	case constants.DERIBIT.ID:
 		return func() actor.Actor { return deribit.NewExecutor() }
 	case constants.HUOBI.ID:

@@ -80,8 +80,8 @@ func (state *OBChecker) Receive(context actor.Context) {
 }
 
 func (state *OBChecker) Initialize(context actor.Context) error {
-	executor := actor.NewLocalPID("executor")
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.MarketDataRequest{
+	executor := context.ActorSystem().NewLocalPID("executor")
+	res, err := context.RequestFuture(executor, &messages.MarketDataRequest{
 		RequestID:  0,
 		Subscribe:  true,
 		Subscriber: context.Self(),
