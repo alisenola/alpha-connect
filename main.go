@@ -67,6 +67,7 @@ func main() {
 		&constants.HUOBIF,
 		&constants.BYBITI,
 		&constants.BYBITL,
+		&constants.UPBIT,
 	}
 	// EXECUTOR //
 	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assetss.json")))
