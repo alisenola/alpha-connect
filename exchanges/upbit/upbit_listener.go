@@ -33,16 +33,17 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	obWs            *upbit.Websocket
-	tradeWs         *upbit.Websocket
-	security        *models.Security
-	dialerPool      *xchangerUtils.DialerPool
-	instrumentData  *InstrumentData
-	executorManager *actor.PID
-	logger          *log.Logger
-	lastPingTime    time.Time
-	stashedTrades   *list.List
-	socketTicker    *time.Ticker
+	obWs              *upbit.Websocket
+	tradeWs           *upbit.Websocket
+	security          *models.Security
+	dialerPool        *xchangerUtils.DialerPool
+	instrumentData    *InstrumentData
+	executorManager   *actor.PID
+	logger            *log.Logger
+	lastOBPingTime    time.Time
+	lastTradePingTime time.Time
+	stashedTrades     *list.List
+	socketTicker      *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -124,7 +125,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.executorManager = actor.NewPID(context.ActorSystem().Address(), "exchange_executor_manager")
-	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
 
 	state.instrumentData = &InstrumentData{
@@ -182,6 +182,7 @@ func (state *Listener) subscribeOrderbook(context actor.Context) error {
 	if state.obWs != nil {
 		_ = state.obWs.Disconnect()
 	}
+	state.lastOBPingTime = time.Now()
 
 	obWs := upbit.NewWebsocket()
 	if err := obWs.Connect(state.dialerPool.GetDialer()); err != nil {
@@ -281,6 +282,7 @@ func (state *Listener) subscribeTrade(context actor.Context) error {
 	if state.tradeWs != nil {
 		_ = state.tradeWs.Disconnect()
 	}
+	state.lastTradePingTime = time.Now()
 
 	tradeWs := upbit.NewWebsocket()
 	if err := tradeWs.Connect(state.dialerPool.GetDialer()); err != nil {
@@ -417,14 +419,16 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			SeqNum: state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
-		state.instrumentData.lastHBTime = time.Now()
+	if time.Now().Sub(state.lastOBPingTime) > 10*time.Second {
+		// "Ping" by resubscribing to the topic
+		_ = state.obWs.Ping()
+		state.lastOBPingTime = time.Now()
+	}
+
+	if time.Now().Sub(state.lastTradePingTime) > 10*time.Second {
+		// "Ping" by resubscribing to the topic
+		_ = state.tradeWs.Ping()
+		state.lastTradePingTime = time.Now()
 	}
 
 	if state.obWs.Err != nil || !state.obWs.Connected {
@@ -443,6 +447,16 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		if err := state.subscribeTrade(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
+	}
+
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHBTime = time.Now()
 	}
 
 	return nil
