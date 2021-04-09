@@ -165,7 +165,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.IsInverse = false
 		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[0]))}
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[1]))}
-		fmt.Println(security)
 		securities = append(securities, &security)
 	}
 	state.securities = make(map[uint64]*models.Security)
