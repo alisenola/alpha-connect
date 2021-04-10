@@ -138,34 +138,65 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, symbol := range symbolDetails {
-		if len(symbol.Pair) != 6 {
-			//state.logger.Warning(fmt.Sprintf("unknown symbol type: %s", symbol.Pair))
-			continue
-		}
-		symbolStr := strings.ToUpper(symbol.Pair[:3])
-		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
-			symbolStr = sym
-		}
-		baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
-		if !ok {
-			continue
-		}
-		symbolStr = strings.ToUpper(symbol.Pair[3:])
-		if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
-			symbolStr = sym
-		}
-		quoteCurrency, ok := constants.GetAssetBySymbol(symbolStr)
-		if !ok {
-			continue
+		security := models.Security{}
+		if len(symbol.Pair) == 6 {
+			symbolStr := strings.ToUpper(symbol.Pair[:3])
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
+			if !ok {
+				continue
+			}
+			symbolStr = strings.ToUpper(symbol.Pair[3:])
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			quoteCurrency, ok := constants.GetAssetBySymbol(symbolStr)
+			if !ok {
+				continue
+			}
+			security.Underlying = baseCurrency
+			security.QuoteCurrency = quoteCurrency
+			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		} else {
+			splits := strings.Split(symbol.Pair, ":")
+			if len(splits) != 2 {
+				continue
+			}
+			base := splits[0]
+			quote := splits[1]
+			if quote[len(quote)-2:] == "f0" {
+				base = base[:len(base)-2]
+				quote = quote[:len(quote)-2]
+				security.SecurityType = enum.SecurityType_CRYPTO_PERP
+				security.IsInverse = false
+			} else {
+				security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+			}
+			symbolStr := strings.ToUpper(base)
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
+			if !ok {
+				continue
+			}
+			symbolStr = strings.ToUpper(quote)
+			if sym, ok := bitfinex.BITFINEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
+				symbolStr = sym
+			}
+			quoteCurrency, ok := constants.GetAssetBySymbol(symbolStr)
+			if !ok {
+				continue
+			}
+			security.Underlying = baseCurrency
+			security.QuoteCurrency = quoteCurrency
 		}
 
-		security := models.Security{}
 		security.Status = models.Trading
 		security.Symbol = symbol.Pair
-		security.Underlying = baseCurrency
-		security.QuoteCurrency = quoteCurrency
 		security.Exchange = &constants.BITFINEX
-		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
 		security.RoundLot = &types.DoubleValue{Value: 1. / 100000000.}
 		securities = append(securities, &security)
