@@ -23,8 +23,7 @@ var as *actor.ActorSystem
 
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
-		&constants.BITHUMB,
-		&constants.BITHUMBG,
+		&constants.DYDX,
 	}
 	as = actor.NewActorSystem()
 	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
@@ -1988,6 +1987,92 @@ func TestBithumbg(t *testing.T) {
 	}
 	if sec.RoundLot == nil || sec.RoundLot.Value != 0.000001 {
 		t.Fatalf("was expecting round lot of 0.000001")
+	}
+	if sec.MaturityDate != nil {
+		t.Fatalf("was not expecting maturity date")
+	}
+
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	time.Sleep(20 * time.Second)
+	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := res.(*tests.GetStat)
+	t.Logf("Agg Trades: %d | Trades: %d | OBUpdates: %d", stats.AggTrades, stats.Trades, stats.OBUpdates)
+	if stats.Error != nil {
+		t.Fatal(stats.Error)
+	}
+}
+
+func TestDydx(t *testing.T) {
+	t.Parallel()
+	var obChecker *actor.PID
+	defer func() {
+		if obChecker != nil {
+			_ = as.Root.PoisonFuture(obChecker).Wait()
+		}
+	}()
+	securityID := []uint64{
+		5390294902314234278,
+	}
+	testedSecurities := make(map[uint64]*models.Security)
+
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
+	}
+	for _, s := range securityList.Securities {
+		tested := false
+		for _, secID := range securityID {
+			if secID == s.SecurityID {
+				tested = true
+				break
+			}
+		}
+		if tested {
+			testedSecurities[s.SecurityID] = s
+		}
+	}
+
+	// Test
+	sec, ok := testedSecurities[5390294902314234278]
+	if !ok {
+		t.Fatalf("security not found")
+	}
+	if sec.Symbol != "BTC-USD" {
+		t.Fatalf("was expecting symbol BTCUSD, got %s", sec.Symbol)
+	}
+	if sec.SecurityType != enum.SecurityType_CRYPTO_PERP {
+		t.Fatalf("was expecting CRPERP type, got %s", sec.SecurityType)
+	}
+	if sec.Exchange.Name != constants.DYDX.Name {
+		t.Fatalf("was expecting BITHUMBG exchange, got %s", sec.Exchange.Name)
+	}
+	if sec.Underlying.ID != constants.BITCOIN.ID {
+		t.Fatalf("was expecting BTC underlying, got %d", sec.Underlying.ID)
+	}
+	if sec.QuoteCurrency.ID != constants.USDC.ID {
+		t.Fatalf("was expecting USDC quote, got %d", sec.QuoteCurrency.ID)
+	}
+	if sec.IsInverse {
+		t.Fatalf("was expecting non inverse, got inverse")
+	}
+	if sec.Status != models.Trading {
+		t.Fatal("was expecting enabled security")
+	}
+	if sec.MinPriceIncrement == nil || sec.MinPriceIncrement.Value != 1 {
+		t.Fatalf("was expecting min price increment of 0.01")
+	}
+	if sec.RoundLot == nil || sec.RoundLot.Value != 0.0001 {
+		t.Fatalf("was expecting round lot of 0.0001")
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was not expecting maturity date")
