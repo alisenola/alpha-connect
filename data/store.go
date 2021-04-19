@@ -21,7 +21,7 @@ const (
 )
 
 type DataClient interface {
-	GetClient(freq int64) (tickstore_go_client.TickstoreClient, error)
+	GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error)
 	Close() error
 }
 
@@ -95,7 +95,7 @@ func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) 
 	return s, nil
 }
 
-func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
+func (s *StorageClient) GetStore(freq int64) (*store.Store, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
 	for f := range s.stores {
@@ -121,29 +121,29 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, error) {
 			true,
 			true)
 		if err != nil {
-			return nil, fmt.Errorf("error starting cache storage: %v", err)
+			return nil, 0, fmt.Errorf("error starting cache storage: %v", err)
 		}
 		strg, err := storage.NewClientStorage(cacheStrg, s.address+":"+ports[cfreq], s.opts...)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		// Build store
 		str, err := store.NewStore(strg)
 		if err != nil {
-			return nil, fmt.Errorf("error building store: %v", err)
+			return nil, 0, fmt.Errorf("error building store: %v", err)
 		}
 		s.stores[cfreq] = str
 	}
-	return s.stores[cfreq], nil
+	return s.stores[cfreq], cfreq, nil
 }
 
-func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, error) {
-	str, err := s.GetStore(freq)
+func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error) {
+	str, cfreq, err := s.GetStore(freq)
 	if err != nil {
-		return nil, err
+		return nil, cfreq, err
 	}
-	return store.NewLocalClient(str), nil
+	return store.NewLocalClient(str), cfreq, nil
 }
 
 func (s *StorageClient) Close() error {
@@ -187,7 +187,7 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 	return s, nil
 }
 
-func (s *StoreClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, error) {
+func (s *StoreClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
 	for f := range s.stores {
@@ -203,12 +203,12 @@ func (s *StoreClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient
 		// Construct store
 		str, err := tickstore_go_client.NewRemoteClient(s.address+":"+ports[cfreq], s.opts...)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		s.stores[cfreq] = str
 	}
-	return s.stores[cfreq], nil
+	return s.stores[cfreq], cfreq, nil
 }
 
 func (s *StoreClient) Close() error {

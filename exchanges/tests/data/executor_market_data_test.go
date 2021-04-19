@@ -23,7 +23,7 @@ var as *actor.ActorSystem
 
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
-		&constants.DYDX,
+		&constants.BITHUMB,
 	}
 	as = actor.NewActorSystem()
 	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
@@ -1842,7 +1842,7 @@ func TestBithumb(t *testing.T) {
 		}
 	}()
 	securityID := []uint64{
-		13756244204587166659,
+		3580725199953192415,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
@@ -1871,15 +1871,15 @@ func TestBithumb(t *testing.T) {
 	}
 
 	// Test
-	sec, ok := testedSecurities[13756244204587166659]
+	sec, ok := testedSecurities[3580725199953192415]
 	if !ok {
 		t.Fatalf("security not found")
 	}
-	if sec.Symbol != "BTC-USDT" {
+	if sec.Symbol != "BTC_KRW" {
 		t.Fatalf("was expecting symbol BTCUSDT, got %s", sec.Symbol)
 	}
 	if sec.SecurityType != enum.SecurityType_CRYPTO_SPOT {
-		t.Fatalf("was expecting CRPERP type, got %s", sec.SecurityType)
+		t.Fatalf("was expecting CRSPOT type, got %s", sec.SecurityType)
 	}
 	if sec.Exchange.Name != constants.BITHUMB.Name {
 		t.Fatalf("was expecting BITHUMB exchange, got %s", sec.Exchange.Name)
@@ -1887,8 +1887,8 @@ func TestBithumb(t *testing.T) {
 	if sec.Underlying.ID != constants.BITCOIN.ID {
 		t.Fatalf("was expecting BTC underlying, got %d", sec.Underlying.ID)
 	}
-	if sec.QuoteCurrency.ID != constants.TETHER.ID {
-		t.Fatalf("was expecting USDT quote, got %d", sec.QuoteCurrency.ID)
+	if sec.QuoteCurrency.ID != constants.SOUTH_KOREAN_WON.ID {
+		t.Fatalf("was expecting SOUTH_KOREAN_WON quote, got %s", sec.QuoteCurrency.Name)
 	}
 	if sec.IsInverse {
 		t.Fatalf("was expecting non inverse, got inverse")
@@ -1896,11 +1896,11 @@ func TestBithumb(t *testing.T) {
 	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
-	if sec.MinPriceIncrement == nil || sec.MinPriceIncrement.Value != 0.01 {
-		t.Fatalf("was expecting min price increment of 0.01")
+	if sec.MinPriceIncrement != nil {
+		t.Fatalf("was expecting nil min price increment")
 	}
-	if sec.RoundLot == nil || sec.RoundLot.Value != 0.000001 {
-		t.Fatalf("was expecting round lot of 0.000001")
+	if sec.RoundLot != nil {
+		t.Fatalf("was expecting nil round lot")
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was not expecting maturity date")
