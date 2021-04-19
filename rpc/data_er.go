@@ -81,7 +81,7 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 		freq = int64(sampler.Interval)
 	}
 
-	str, err := s.store.GetStore(freq)
+	str, _, err := s.store.GetStore(freq)
 	if err != nil {
 		return fmt.Errorf("error getting store: %v", err)
 	}
