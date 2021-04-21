@@ -145,11 +145,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			continue
 		}
 		switch activeInstrument.Typ {
-		/*
-			case "FFCCSX":
-				instr.Type = exchanges.FUTURE
-		*/
-		case "FFWCSX":
+		case "FFWCSX", "FFCCSX":
 			symbolStr := strings.ToUpper(activeInstrument.Underlying)
 			if sym, ok := bitmex.BITMEX_SYMBOL_TO_GLOBAL_SYMBOL[symbolStr]; ok {
 				symbolStr = sym
@@ -178,7 +174,15 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				security.Status = models.Disabled
 			}
 			security.Exchange = &constants.BITMEX
-			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+			if activeInstrument.Typ == "FFCCSX" {
+				security.SecurityType = enum.SecurityType_CRYPTO_FUT
+				security.MaturityDate, err = types.TimestampProto(activeInstrument.Settle)
+				if err != nil {
+					continue
+				}
+			} else {
+				security.SecurityType = enum.SecurityType_CRYPTO_PERP
+			}
 			security.MinPriceIncrement = &types.DoubleValue{Value: activeInstrument.TickSize}
 			security.RoundLot = &types.DoubleValue{Value: float64(activeInstrument.LotSize)}
 			security.Multiplier = &types.DoubleValue{Value: float64(activeInstrument.Multiplier) * 0.00000001}
