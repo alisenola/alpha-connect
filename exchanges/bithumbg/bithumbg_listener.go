@@ -294,6 +294,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		instr := state.instrumentData
 
+		if uint64(res.Version) <= state.instrumentData.lastSequence {
+			return nil
+		}
+
 		if uint64(res.Version) != state.instrumentData.lastSequence+1 {
 			return fmt.Errorf("order book inconsistent sequence: %d, %d",
 				res.Version,
