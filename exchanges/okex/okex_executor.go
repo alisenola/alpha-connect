@@ -143,7 +143,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Status = models.Trading
 		security.Exchange = &constants.OKEX
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: pair.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: pair.SizeIncrement}
 		securities = append(securities, &security)

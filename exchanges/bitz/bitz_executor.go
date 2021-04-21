@@ -154,7 +154,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.NumberFloat))}
 		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.PriceFloat))}
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		securities = append(securities, &security)
 	}
 	state.securities = securities

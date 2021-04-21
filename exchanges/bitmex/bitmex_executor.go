@@ -185,7 +185,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.MakerFee = &types.DoubleValue{Value: activeInstrument.MakerFee}
 			security.TakerFee = &types.DoubleValue{Value: activeInstrument.TakerFee}
 			security.IsInverse = activeInstrument.IsInverse
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 			securities = append(securities, &security)
 
 		default:

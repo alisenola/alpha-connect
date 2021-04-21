@@ -336,46 +336,47 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		instr.lastUpdateTime = ts
 
-	case bithumb.WSTrade:
+	case bithumb.WSTrades:
 		//ts := uint64(msg.Time.UnixNano() / 1000000)
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		for _, trd := range res.Trades {
+			ts := uint64(msg.Time.UnixNano() / 1000000)
 
-		tradeTs := uint64(((time.Time)(res.ContDtm)).UnixNano() / 1000000)
+			tradeTs := uint64(((time.Time)(trd.ContDtm)).UnixNano() / 1000000)
 
-		aggID := tradeTs * 10
-		if res.BuySellGb == 1 {
-			aggID += 1
-		}
-		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggID {
-			// Create new agg trade
-			if state.instrumentData.lastAggTradeTs >= ts {
-				ts = state.instrumentData.lastAggTradeTs + 1
+			aggID := tradeTs * 10
+			if trd.BuySellGb == 1 {
+				aggID += 1
 			}
-			aggTrade := &models.AggregatedTrade{
-				Bid:         res.BuySellGb == 1,
-				Timestamp:   utils.MilliToTimestamp(ts),
-				AggregateID: aggID,
-				Trades:      nil,
+			if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggID {
+				// Create new agg trade
+				if state.instrumentData.lastAggTradeTs >= ts {
+					ts = state.instrumentData.lastAggTradeTs + 1
+				}
+				aggTrade := &models.AggregatedTrade{
+					Bid:         trd.BuySellGb == 1,
+					Timestamp:   utils.MilliToTimestamp(ts),
+					AggregateID: aggID,
+					Trades:      nil,
+				}
+				state.instrumentData.aggTrade = aggTrade
+				state.instrumentData.lastAggTradeTs = ts
+
+				// Stash the aggTrade
+				state.stashedTrades.PushBack(aggTrade)
+				// start the timer on trade creation, it will publish the trade in 20 ms
+				go func(pid *actor.PID) {
+					time.Sleep(time.Duration(TRADE_DELAY_MS) * time.Millisecond)
+					context.Send(pid, &postAggTrade{})
+				}(context.Self())
 			}
-			state.instrumentData.aggTrade = aggTrade
-			state.instrumentData.lastAggTradeTs = ts
-
-			// Stash the aggTrade
-			state.stashedTrades.PushBack(aggTrade)
-			// start the timer on trade creation, it will publish the trade in 20 ms
-			go func(pid *actor.PID) {
-				time.Sleep(time.Duration(TRADE_DELAY_MS) * time.Millisecond)
-				context.Send(pid, &postAggTrade{})
-			}(context.Self())
+			state.instrumentData.aggTrade.Trades = append(
+				state.instrumentData.aggTrade.Trades,
+				models.Trade{
+					Price:    trd.ContPrice,
+					Quantity: trd.ContQty,
+					ID:       tradeTs,
+				})
 		}
-
-		state.instrumentData.aggTrade.Trades = append(
-			state.instrumentData.aggTrade.Trades,
-			models.Trade{
-				Price:    res.ContPrice,
-				Quantity: res.ContQty,
-				ID:       tradeTs,
-			})
 
 	case bithumb.WSStatus:
 		// pass

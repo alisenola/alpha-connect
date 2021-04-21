@@ -161,7 +161,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.QuoteCurrency = quoteCurrency
 		security.Exchange = &constants.DYDX
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: m.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: m.StepSize}
 		security.IsInverse = false

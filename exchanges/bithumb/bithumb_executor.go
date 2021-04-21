@@ -1,21 +1,32 @@
 package bithumb
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/utils"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
+	"gitlab.com/alphaticks/xchanger/exchanges/bithumb"
+	xmodels "gitlab.com/alphaticks/xchanger/models"
+	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 )
 
+var pairs = []string{"BTC_KRW"}
+
 type Executor struct {
 	client      *http.Client
-	securities  []*models.Security
+	securities  map[uint64]*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -69,11 +80,97 @@ func (state *Executor) Clean(context actor.Context) error {
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	// TODO
 	state.securities = nil
+	request, weight, err := bithumb.GetTicker("all")
+	if err != nil {
+		return err
+	}
+
+	if state.rateLimit.IsRateLimited() {
+		return fmt.Errorf("rate limited")
+	}
+	state.rateLimit.Request(weight)
+
+	resp, err := state.client.Do(request)
+	if err != nil {
+		return err
+	}
+	response, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			err := fmt.Errorf(
+				"http client error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else if resp.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"http server error: %d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		} else {
+			err := fmt.Errorf("%d %s",
+				resp.StatusCode,
+				string(response))
+			return err
+		}
+	}
+
+	var res bithumb.Response
+	if err := json.Unmarshal(response, &res); err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+		return err
+	}
+
+	var tickers bithumb.TickerSet
+	if err := json.Unmarshal(res.Data, &tickers); err != nil {
+		err = fmt.Errorf(
+			"error unmarshaling tickers: %v",
+			err)
+		return err
+	}
+
+	var securities []*models.Security
+	for k := range tickers.Tickers {
+		baseStr := strings.ToUpper(k)
+		quoteCurrency := &constants.SOUTH_KOREAN_WON
+
+		baseCurrency, ok := constants.GetAssetBySymbol(baseStr)
+		if !ok {
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", baseStr))
+			continue
+		}
+		pair := xmodels.NewPair(baseCurrency, quoteCurrency)
+		security := models.Security{}
+		security.Symbol = pair.Format(bithumb.SYMBOL_FORMAT)
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
+		security.Status = models.Trading
+		security.Exchange = &constants.BITHUMB
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
+		security.IsInverse = false
+		securities = append(securities, &security)
+	}
+	state.securities = make(map[uint64]*models.Security)
+	for _, sec := range securities {
+		state.securities[sec.SecurityID] = sec
+	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }
@@ -81,12 +178,17 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
-
+	securities := make([]*models.Security, len(state.securities))
+	i := 0
+	for _, v := range state.securities {
+		securities[i] = v
+		i += 1
+	}
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }

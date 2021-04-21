@@ -228,7 +228,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		security.Exchange = &constants.BINANCE
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		for _, filter := range symbol.Filters {
 			if filter.FilterType == "PRICE_FILTER" {
 				security.MinPriceIncrement = &types.DoubleValue{Value: filter.TickSize}

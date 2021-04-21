@@ -162,7 +162,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Status = models.Trading
 		security.Exchange = &constants.BITHUMBG
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.IsInverse = false
 		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[0]))}
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[1]))}

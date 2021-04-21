@@ -150,7 +150,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Status = models.Trading
 		security.Exchange = &constants.UPBIT
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.IsInverse = false
 		securities = append(securities, &security)
 	}

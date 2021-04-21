@@ -197,7 +197,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Status = models.Trading
 		security.Symbol = symbol.Pair
 		security.Exchange = &constants.BITFINEX
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.RoundLot = &types.DoubleValue{Value: 1. / 100000000.}
 		securities = append(securities, &security)
 	}

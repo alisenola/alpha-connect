@@ -197,7 +197,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 		}
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: instrument.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: float64(instrument.ContractSize)}
 		securities = append(securities, &security)

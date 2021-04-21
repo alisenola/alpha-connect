@@ -171,7 +171,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		security.Exchange = &constants.HUOBI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.PricePrecision))}
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.AmountPrecision))}
 		securities = append(securities, &security)

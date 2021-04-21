@@ -148,7 +148,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Status = models.Trading
 		security.Exchange = &constants.GEMINI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name)
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		if tickPrecision, ok := gemini.SYMBOL_TO_TICK_PRECISION[symbol]; ok {
 			security.MinPriceIncrement = &types.DoubleValue{Value: 1. / float64(tickPrecision)}
 		} else {
