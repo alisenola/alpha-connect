@@ -203,68 +203,55 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		return fmt.Errorf("error subscribing to WSHeartBeatFeed stream: %v", err)
 	}
 
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	_, ok := ws.Msg.Message.(cryptofacilities.WSInfo)
-	if !ok {
-		return fmt.Errorf("was expecting WSInfo, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	_, ok = ws.Msg.Message.(cryptofacilities.WSSubscribeResponse)
-	if !ok {
-		return fmt.Errorf("was expecting WSSubscribeResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	_, ok = ws.Msg.Message.(cryptofacilities.WSSubscribeResponse)
-	if !ok {
-		return fmt.Errorf("was expecting WSSubscribeResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-	obData, ok := ws.Msg.Message.(cryptofacilities.WSBookSnapshot)
-	if !ok {
-		return fmt.Errorf("was expecting WSBookSnapshot, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-
-	var bids, asks []gorderbook.OrderBookLevel
-	bids = make([]gorderbook.OrderBookLevel, len(obData.Bids), len(obData.Bids))
-	for i, bid := range obData.Bids {
-		bids[i] = gorderbook.OrderBookLevel{
-			Price:    bid.Price,
-			Quantity: bid.Qty,
-			Bid:      true,
+	trials := 0
+	synced := false
+	for !synced && trials < 4 {
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
 		}
-	}
-	asks = make([]gorderbook.OrderBookLevel, len(obData.Asks), len(obData.Asks))
-	for i, ask := range obData.Asks {
-		asks[i] = gorderbook.OrderBookLevel{
-			Price:    ask.Price,
-			Quantity: ask.Qty,
-			Bid:      false,
+		obData, ok := ws.Msg.Message.(cryptofacilities.WSBookSnapshot)
+		if !ok {
+			trials += 1
+			continue
 		}
+
+		var bids, asks []gorderbook.OrderBookLevel
+		bids = make([]gorderbook.OrderBookLevel, len(obData.Bids), len(obData.Bids))
+		for i, bid := range obData.Bids {
+			bids[i] = gorderbook.OrderBookLevel{
+				Price:    bid.Price,
+				Quantity: bid.Qty,
+				Bid:      true,
+			}
+		}
+		asks = make([]gorderbook.OrderBookLevel, len(obData.Asks), len(obData.Asks))
+		for i, ask := range obData.Asks {
+			asks[i] = gorderbook.OrderBookLevel{
+				Price:    ask.Price,
+				Quantity: ask.Qty,
+				Bid:      false,
+			}
+		}
+
+		ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+
+		tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+		lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
+		ob := gorderbook.NewOrderBookL2(
+			tickPrecision,
+			lotPrecision,
+			10000)
+
+		ob.Sync(bids, asks)
+		state.instrumentData.orderBook = ob
+		state.instrumentData.lastUpdateID = obData.Seq
+		state.instrumentData.lastUpdateTime = ts
+		synced = true
+	}
+	if !synced {
+		return fmt.Errorf("error getting WSBookSnapshot")
 	}
 
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
-
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	ob := gorderbook.NewOrderBookL2(
-		tickPrecision,
-		lotPrecision,
-		10000)
-
-	ob.Sync(bids, asks)
-	state.instrumentData.orderBook = ob
-	state.instrumentData.lastUpdateID = obData.Seq
-	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 
 	state.obWs = ws

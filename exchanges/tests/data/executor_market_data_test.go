@@ -23,7 +23,7 @@ var as *actor.ActorSystem
 
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
-		&constants.BITMEX,
+		&constants.CRYPTOFACILITIES,
 	}
 	as = actor.NewActorSystem()
 	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
