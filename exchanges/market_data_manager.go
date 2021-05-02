@@ -142,12 +142,14 @@ func (state *MarketDataManager) OnMarketDataIncrementalRefresh(context actor.Con
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
 	for k, v := range state.subscribers {
 		forward := &messages.MarketDataIncrementalRefresh{
-			RequestID:  k,
-			ResponseID: uint64(time.Now().UnixNano()),
-			UpdateL2:   refresh.UpdateL2,
-			UpdateL3:   refresh.UpdateL3,
-			Trades:     refresh.Trades,
-			SeqNum:     refresh.SeqNum,
+			RequestID:   k,
+			ResponseID:  uint64(time.Now().UnixNano()),
+			UpdateL2:    refresh.UpdateL2,
+			UpdateL3:    refresh.UpdateL3,
+			Trades:      refresh.Trades,
+			Funding:     refresh.Funding,
+			Liquidation: refresh.Liquidation,
+			SeqNum:      refresh.SeqNum,
 		}
 		context.Send(v, forward)
 	}
