@@ -35,11 +35,13 @@ message MarketDataResponse {
 message MarketDataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    models.OBL1Update updateL1 = 3;
-    models.OBL2Update updateL2 = 4;
-    models.OBL3Update updateL3 = 5;
-    repeated models.AggregatedTrade trades = 6;
-    uint64 seq_num = 7;
+    uint64 seq_num = 3;
+    models.OBL1Update updateL1 = 4;
+    models.OBL2Update updateL2 = 5;
+    models.OBL3Update updateL3 = 6;
+    repeated models.AggregatedTrade trades = 7;
+    models.Liquidation liquidation = 8;
+    models.Funding funding = 9;
 }
 
 message AccountDataRequest {

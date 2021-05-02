@@ -8,6 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -132,7 +133,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	}
 
 	if err := state.subscribeInstrument(context); err != nil {
-		return fmt.Errorf("error subscribing to order book: %v", err)
+		return fmt.Errorf("error subscribing to instrument: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -240,7 +241,15 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSTradeStreamName); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
+	if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSLiquidationStreamName); err != nil {
+		return fmt.Errorf("error subscribing to liquidation stream: %v", err)
+	}
 
+	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+		if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSFundingStreamName); err != nil {
+			return fmt.Errorf("error subscribing to funding stream: %v", err)
+		}
+	}
 	state.ws = ws
 
 	go func(ws *bitmex.Websocket, pid *actor.PID) {
@@ -393,6 +402,40 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			})
 			state.instrumentData.seqNum += 1
 			state.instrumentData.lastAggTradeTs = ts
+		}
+
+	case bitmex.WSLiquidationData:
+		liqData := msg.Message.(bitmex.WSLiquidationData)
+		ts := uint64(msg.Time.UnixNano()) / 1000000
+		for _, d := range liqData.Data {
+			orderID, err := uuid.FromString(d.OrderID)
+			if err != nil {
+				return fmt.Errorf("error parsing trade ID: %v", err)
+			}
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Liquidation: &models.Liquidation{
+					Bid:       d.Side == "Buy",
+					Timestamp: utils.MilliToTimestamp(ts),
+					OrderID:   binary.LittleEndian.Uint64(orderID.Bytes()[0:8]),
+					Price:     d.Price,
+					Quantity:  float64(d.LeavesQty),
+				},
+				SeqNum: state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
+		}
+
+	case bitmex.WSFundingData:
+		fundData := msg.Message.(bitmex.WSFundingData)
+		for _, f := range fundData.Data {
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Funding: &models.Funding{
+					Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
+					Rate:      f.FundingRate,
+				},
+				SeqNum: state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
 		}
 	}
 
