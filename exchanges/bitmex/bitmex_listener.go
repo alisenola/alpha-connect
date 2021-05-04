@@ -244,6 +244,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSLiquidationStreamName); err != nil {
 		return fmt.Errorf("error subscribing to liquidation stream: %v", err)
 	}
+	if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSInstrumentStreamName); err != nil {
+		return fmt.Errorf("error subscribing to instrument stream: %v", err)
+	}
 
 	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
 		if err := ws.SubscribeSymbol(state.security.Symbol, bitmex.WSFundingStreamName); err != nil {
