@@ -386,7 +386,12 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
-		_ = state.ws.Ping()
+		if err := state.ws.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
+			return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
+		}
+		if err := state.ws.Subscribe(state.security.Symbol, ftx.WSTradeChannel); err != nil {
+			return fmt.Errorf("error subscribing to trade stream: %v", err)
+		}
 		state.lastPingTime = time.Now()
 	}
 
