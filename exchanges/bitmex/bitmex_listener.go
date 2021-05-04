@@ -437,6 +437,20 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			})
 			state.instrumentData.seqNum += 1
 		}
+
+	case bitmex.WSInstrumentData:
+		instrData := msg.Message.(bitmex.WSInstrumentData)
+		for _, f := range instrData.Data {
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Stats: []*models.Stat{{
+					Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
+					StatType:  models.OpenInterest,
+					Value:     float64(f.OpenInterest),
+				}},
+				SeqNum: state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
+		}
 	}
 
 	return nil

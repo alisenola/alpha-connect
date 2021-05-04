@@ -42,6 +42,7 @@ message MarketDataIncrementalRefresh {
     repeated models.AggregatedTrade trades = 7;
     models.Liquidation liquidation = 8;
     models.Funding funding = 9;
+    repeated models.Stat stats = 10;
 }
 
 message AccountDataRequest {

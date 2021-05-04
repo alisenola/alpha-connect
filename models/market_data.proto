@@ -6,6 +6,19 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 import "gitlab.com/alphaticks/gorderbook/protos.proto";
 
+enum StatType {
+    IndexValue = 0;
+    OpeningPrice = 1;
+    ClosingPrice = 2;
+    SettlementPrice = 3;
+    TradingSessionHighPrice = 4;
+    TradingSessionLowPrice = 5;
+    TradingSessionVWAPPrice = 6;
+    Imbalance = 7;
+    TradeVolume = 8;
+    OpenInterest = 9;
+}
+
 enum OrderBookAggregation {
     L1 = 0;
     L2 = 1;
@@ -76,4 +89,10 @@ message Liquidation {
 message Funding {
     google.protobuf.Timestamp timestamp = 1;
     double rate = 2;
+}
+
+message Stat {
+    google.protobuf.Timestamp timestamp = 1;
+    StatType stat_type = 2;
+    double value = 3;
 }
