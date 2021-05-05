@@ -7,6 +7,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -34,6 +35,7 @@ type InstrumentData struct {
 	orderBook         *gorderbook.OrderBookL2
 	seqNum            uint64
 	lastUpdateTime    uint64
+	lastFundingTime   uint64
 	lastHBTime        time.Time
 	lastSequence      uint64
 	aggTrade          *models.AggregatedTrade
@@ -138,17 +140,18 @@ func (state *Listener) Initialize(context actor.Context) error {
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 
 	state.instrumentData = &InstrumentData{
-		lotPrecision:   lotPrecision,
-		orderBook:      nil,
-		seqNum:         uint64(time.Now().UnixNano()),
-		lastUpdateTime: 0,
-		lastHBTime:     time.Now(),
-		aggTrade:       nil,
-		lastAggTradeTs: 0,
+		lotPrecision:    lotPrecision,
+		orderBook:       nil,
+		seqNum:          uint64(time.Now().UnixNano()),
+		lastUpdateTime:  0,
+		lastFundingTime: 0,
+		lastHBTime:      time.Now(),
+		aggTrade:        nil,
+		lastAggTradeTs:  0,
 	}
 
 	if err := state.subscribeInstrument(context); err != nil {
-		return fmt.Errorf("error subscribing to order book: %v", err)
+		return fmt.Errorf("error subscribing to instrument: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -270,6 +273,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	if err := ws.SubscribeTrades(symbol); err != nil {
 		return err
+	}
+
+	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+		if err := ws.SubscribeStatus(symbol); err != nil {
+			return err
+		}
 	}
 
 	state.ws = ws
@@ -400,6 +409,28 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					ID:       tradeData.ID,
 				})
 		}
+
+	case bitfinex.WSStatus:
+		status := msg.Message.(bitfinex.WSStatus)
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			Stats: []*models.Stat{{
+				Timestamp: utils.MilliToTimestamp(ts),
+				StatType:  models.OpenInterest,
+				Value:     status.OpenInterest,
+			}},
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		if state.instrumentData.lastFundingTime < status.FundingEventMs {
+			refresh.Funding = &models.Funding{
+				Timestamp: utils.MilliToTimestamp(status.FundingEventMs),
+				Rate:      status.CurrentFunding,
+			}
+			state.instrumentData.lastFundingTime = status.FundingEventMs
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastSequence = status.Sequence
 
 	case bitfinex.WSSpotTradeSnapshot:
 		tradeData := msg.Message.(bitfinex.WSSpotTradeSnapshot)
