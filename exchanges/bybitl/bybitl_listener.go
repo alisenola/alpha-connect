@@ -8,6 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -223,6 +224,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
 	}
 
+	if err := ws.SubscribeInstrumentInfo(state.security.Symbol, "100ms"); err != nil {
+		return fmt.Errorf("error subscribing to instrument info for %s", state.security.Symbol)
+	}
+
 	state.ws = ws
 
 	go func(ws *bybitl.Websocket, pid *actor.PID) {
@@ -386,6 +391,50 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.seqNum += 1
 			state.instrumentData.lastAggTradeTs = ts
 		}
+
+	case bybitl.InstrumentInfoSnapshot:
+		info := msg.Message.(bybitl.InstrumentInfoSnapshot)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			Stats: []*models.Stat{{
+				Timestamp: utils.MilliToTimestamp(ts),
+				StatType:  models.OpenInterest,
+				Value:     float64(info.OpenInterestE8) / 100000000,
+			}},
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+			refresh.Funding = &models.Funding{
+				Timestamp: utils.MilliToTimestamp(uint64(info.NextFundingTime.UnixNano() / 1000000)),
+				Rate:      float64(info.FundingRateE6) / 1000000,
+			}
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
+
+	case bybitl.InstrumentInfoDelta:
+		delta := msg.Message.(bybitl.InstrumentInfoDelta)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		for _, info := range delta.Update {
+			if info.OpenInterestE8 != nil {
+				refresh.Stats = append(refresh.Stats, &models.Stat{
+					Timestamp: utils.MilliToTimestamp(ts),
+					StatType:  models.OpenInterest,
+					Value:     float64(*info.OpenInterestE8) / 100000000,
+				})
+			}
+			if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP && info.FundingRateE6 != nil && info.NextFundingTime != nil {
+				refresh.Funding = &models.Funding{
+					Timestamp: utils.MilliToTimestamp(uint64(info.NextFundingTime.UnixNano() / 1000000)),
+					Rate:      float64(*info.FundingRateE6) / 1000000,
+				}
+			}
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
 
 	case bybitl.WSResponse:
 

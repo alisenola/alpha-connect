@@ -180,12 +180,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 			year := time.Now().Year()
-			fmt.Println(symbol.Alias, month, int(time.Now().Month()))
 			if int(monthInt) < int(time.Now().Month()) {
 				year += 1
 			}
 			date := time.Date(year, time.Month(monthInt), int(dayInt), 0, 0, 0, 0, time.UTC)
-			fmt.Println(date.Format(time.ANSIC))
 			ts, err := types.TimestampProto(date)
 			if err != nil {
 				state.logger.Info(fmt.Sprintf("error converting date"))
