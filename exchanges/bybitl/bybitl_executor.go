@@ -14,11 +14,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
+	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
+	"unicode"
 )
 
 type Executor struct {
@@ -74,7 +76,7 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	request, weight, err := bybiti.GetSymbols()
+	request, weight, err := bybitl.GetSymbols()
 	if err != nil {
 		return err
 	}
@@ -123,7 +125,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		ReturnMessage string          `json:"ret_msg"`
 		ExitCode      string          `json:"ext_code"`
 		ExitInfo      string          `json:"ext_info"`
-		Result        []bybiti.Symbol `json:"result"`
+		Result        []bybitl.Symbol `json:"result"`
 	}
 	var data Res
 	err = json.Unmarshal(response, &data)
@@ -162,7 +164,37 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.QuoteCurrency = quoteCurrency
 		security.Status = models.Trading
 		security.Exchange = &constants.BYBITL
-		security.SecurityType = enum.SecurityType_CRYPTO_PERP
+		day := symbol.Alias[len(symbol.Alias)-2:]
+		if unicode.IsNumber(rune(day[0])) && unicode.IsNumber(rune(day[1])) {
+			security.SecurityType = enum.SecurityType_CRYPTO_FUT
+
+			month := symbol.Alias[len(symbol.Alias)-4 : len(symbol.Alias)-2]
+			monthInt, err := strconv.ParseInt(month, 10, 64)
+			if err != nil {
+				state.logger.Info(fmt.Sprintf("error parsing month %s", month))
+				continue
+			}
+			dayInt, err := strconv.ParseInt(day, 10, 64)
+			if err != nil {
+				state.logger.Info(fmt.Sprintf("error parsing day: %d", dayInt))
+				continue
+			}
+			year := time.Now().Year()
+			fmt.Println(symbol.Alias, month, int(time.Now().Month()))
+			if int(monthInt) < int(time.Now().Month()) {
+				year += 1
+			}
+			date := time.Date(year, time.Month(monthInt), int(dayInt), 0, 0, 0, 0, time.UTC)
+			fmt.Println(date.Format(time.ANSIC))
+			ts, err := types.TimestampProto(date)
+			if err != nil {
+				state.logger.Info(fmt.Sprintf("error converting date"))
+				continue
+			}
+			security.MaturityDate = ts
+		} else {
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceFilter.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: symbol.LotSizeFilter.QuantityStep}

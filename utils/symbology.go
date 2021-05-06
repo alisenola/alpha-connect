@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type CCYSymbol struct {
@@ -32,4 +33,35 @@ func (s CCYSymbol) Format(format string) string {
 
 func (s CCYSymbol) DefaultFormat() string {
 	return s.Base + "/" + s.Quote
+}
+
+func MonthToTimeMonth(m string) (time.Month, error) {
+	switch strings.ToLower(m) {
+	case "f":
+		return time.January, nil
+	case "g":
+		return time.February, nil
+	case "h":
+		return time.March, nil
+	case "j":
+		return time.April, nil
+	case "k":
+		return time.May, nil
+	case "m":
+		return time.June, nil
+	case "n":
+		return time.July, nil
+	case "q":
+		return time.August, nil
+	case "u":
+		return time.September, nil
+	case "v":
+		return time.October, nil
+	case "x":
+		return time.November, nil
+	case "z":
+		return time.December, nil
+	default:
+		return 0, fmt.Errorf("unknown month code: %s", m)
+	}
 }

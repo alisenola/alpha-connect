@@ -226,6 +226,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
 	}
 
+	if err := ws.SubscribeInstrumentInfo(state.security.Symbol, "100ms"); err != nil {
+		return fmt.Errorf("error subscribing to instrument info for %s", state.security.Symbol)
+	}
+
 	state.ws = ws
 
 	go func(ws *bybiti.Websocket, pid *actor.PID) {
@@ -389,6 +393,41 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.seqNum += 1
 			state.instrumentData.lastAggTradeTs = ts
 		}
+
+	case bybiti.InstrumentInfoSnapshot:
+		info := msg.Message.(bybiti.InstrumentInfoSnapshot)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			Stats: []*models.Stat{{
+				Timestamp: utils.MilliToTimestamp(ts),
+				StatType:  models.OpenInterest,
+				Value:     float64(info.OpenInterest),
+			}},
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
+
+	case bybiti.InstrumentInfoDelta:
+		delta := msg.Message.(bybiti.InstrumentInfoDelta)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		for _, info := range delta.Update {
+			if info.OpenInterest != nil {
+				refresh.Stats = append(refresh.Stats, &models.Stat{
+					Timestamp: utils.MilliToTimestamp(ts),
+					StatType:  models.OpenInterest,
+					Value:     float64(*info.OpenInterest),
+				})
+			}
+			if info.PredictedFundingRateE6 != nil {
+				fmt.Println(info.PredictedFundingRateE6, info.NextFundingTime)
+			}
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
 
 	case bybiti.WSResponse:
 
