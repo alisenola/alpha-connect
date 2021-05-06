@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -29,6 +30,8 @@ type InstrumentData struct {
 	lastUpdateID   uint64
 	lastHBTime     time.Time
 	lastAggTradeTs uint64
+	openInterest   float64
+	funding8h      float64
 }
 
 type Listener struct {
@@ -240,6 +243,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
+	if err, _ := ws.SubscribeTicker(state.security.Symbol, deribit.Interval0ms); err != nil {
+		return fmt.Errorf("error subscribing to ticker stream: %v", err)
+	}
+
 	state.ws = ws
 
 	go func(ws *deribit.Websocket, pid *actor.PID) {
@@ -401,6 +408,34 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 		state.instrumentData.lastAggTradeTs = ts
+
+	case deribit.TickerUpdate:
+		tickerData := msg.Message.(deribit.TickerUpdate)
+		ts := uint64(msg.Time.UnixNano() / 1000000)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		update := false
+		if state.instrumentData.openInterest != tickerData.OpenInterest {
+			refresh.Stats = append(refresh.Stats, &models.Stat{
+				Timestamp: utils.MilliToTimestamp(ts),
+				StatType:  models.OpenInterest,
+				Value:     tickerData.OpenInterest,
+			})
+			update = true
+			state.instrumentData.openInterest = tickerData.OpenInterest
+		}
+		if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP && state.instrumentData.funding8h != tickerData.Funding8h {
+			refresh.Funding = &models.Funding{
+				Timestamp: utils.MilliToTimestamp(ts),
+				Rate:      tickerData.Funding8h,
+			}
+			state.instrumentData.funding8h = tickerData.Funding8h
+		}
+		if update {
+			context.Send(context.Parent(), refresh)
+			state.instrumentData.seqNum += 1
+		}
 	}
 
 	return nil
