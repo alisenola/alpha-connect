@@ -1,7 +1,6 @@
 package account
 
 import (
-	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -34,11 +33,9 @@ var BitmexAccount = &models.Account{
 	},
 }
 
-var bitmexExecutor = actor.NewLocalPID("executor/bitmex_executor")
-
 func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	// Test with no account
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   nil,
@@ -63,7 +60,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with account
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -82,7 +79,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with instrument and order status
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -110,7 +107,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with one order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
@@ -121,7 +118,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 			OrderSide:             models.Buy,
 			TimeInForce:           models.Session,
 			Quantity:              1.,
-			Price:                 &types.DoubleValue{Value: 100.},
+			Price:                 &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
 
@@ -139,7 +136,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Test with instrument and order status
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -186,7 +183,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Now delete
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
@@ -208,7 +205,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order and check if got canceled
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -246,7 +243,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 
 func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test Invalid account
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   nil,
 		Order:     nil,
@@ -267,7 +264,7 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test no order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Order:     nil,
@@ -288,7 +285,7 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test with one order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
@@ -314,7 +311,7 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
@@ -336,7 +333,7 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 
 func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	// Test Invalid account
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   nil,
 		Orders:    nil,
@@ -357,7 +354,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Test no orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Orders:    nil,
@@ -375,7 +372,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Test with two orders diff symbols
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
@@ -385,7 +382,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 100.},
+			Price:         &types.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -393,7 +390,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 100.},
+			Price:         &types.DoubleValue{Value: 30000.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -414,7 +411,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	order1ClID := uuid.NewV1().String()
 	order2ClID := uuid.NewV1().String()
 	// Test with two orders same symbol diff price
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
@@ -424,7 +421,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      2,
-			Price:         &types.DoubleValue{Value: 100.},
+			Price:         &types.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: order2ClID,
 			Instrument:    instrument1,
@@ -432,7 +429,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 110.},
+			Price:         &types.DoubleValue{Value: 30010.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -449,7 +446,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -494,7 +491,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Query order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -539,7 +536,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Filter: &messages.OrderFilter{
@@ -562,7 +559,7 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	orderID := uuid.NewV1().String()
 	// Post one order
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Order: &messages.NewOrder{
@@ -572,7 +569,7 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 100.},
+			Price:         &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
 
@@ -590,7 +587,7 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderReplaceRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
 		Account:    BitmexAccount,
 		Instrument: instrument1,
@@ -615,7 +612,7 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 	// Fetch orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -646,7 +643,7 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	order1ClID := uuid.NewV1().String()
 	order2ClID := uuid.NewV1().String()
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
@@ -656,7 +653,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 100.},
+			Price:         &types.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: order2ClID,
 			Instrument:    instrument1,
@@ -664,7 +661,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 110.},
+			Price:         &types.DoubleValue{Value: 30010.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -681,7 +678,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderBulkReplaceRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderBulkReplaceRequest{
 		RequestID:  0,
 		Account:    BitmexAccount,
 		Instrument: instrument1,
@@ -714,7 +711,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Fetch orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -742,7 +739,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	}
 
 	// Fetch orders
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,
@@ -771,7 +768,7 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 }
 
 func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
@@ -793,8 +790,9 @@ func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
 
 func checkBitmexBalances(t *testing.T) {
 	// Now check balance
+	bitmexExecutor := As.NewLocalPID("executor/bitmex_executor")
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.BalancesRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
@@ -814,7 +812,7 @@ func checkBitmexBalances(t *testing.T) {
 	}
 	bal1 := balanceResponse.Balances[0]
 
-	res, err = actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.BalancesRequest{
+	res, err = As.Root.RequestFuture(bitmexExecutor, &messages.BalancesRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 	}, 10*time.Second).Result()
@@ -841,8 +839,9 @@ func checkBitmexBalances(t *testing.T) {
 
 func checkBitmexPositions(t *testing.T, instrument *models.Instrument) {
 	// Request the same from bitmex directly
+	bitmexExecutor := As.NewLocalPID("executor/bitmex_executor")
 
-	res, err := actor.EmptyRootContext.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
+	res, err := As.Root.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
 		RequestID:  0,
 		Account:    BitmexAccount,
 		Instrument: instrument,
@@ -861,7 +860,7 @@ func checkBitmexPositions(t *testing.T, instrument *models.Instrument) {
 
 	pos1 := response.Positions
 
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.PositionsRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.PositionsRequest{
 		RequestID:  0,
 		Account:    BitmexAccount,
 		Instrument: instrument,
@@ -899,7 +898,7 @@ func checkBitmexPositions(t *testing.T, instrument *models.Instrument) {
 func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 
 	// Market buy 1 contract
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -925,7 +924,7 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 	checkBitmexBalances(t)
 
 	// Market sell 1 contract
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -946,7 +945,7 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 	checkBitmexBalances(t)
 
 	// Close position
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -970,7 +969,7 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	// Market buy 2 contracts
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -996,7 +995,7 @@ func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 	checkBitmexBalances(t)
 
 	// Market sell 1 contract
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1017,7 +1016,7 @@ func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 	checkBitmexBalances(t)
 
 	// Close position
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: BitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1044,7 +1043,7 @@ func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 
 	order1ClID := uuid.NewV1().String()
 	// Test with two orders same symbol diff price
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   BitmexAccount,
 		Orders: []*messages.NewOrder{{
@@ -1072,7 +1071,7 @@ func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Send a replace right after
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderReplaceRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
 		Account:    BitmexAccount,
 		Instrument: instrument1,
@@ -1098,7 +1097,7 @@ func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order
-	res, err = actor.EmptyRootContext.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   BitmexAccount,

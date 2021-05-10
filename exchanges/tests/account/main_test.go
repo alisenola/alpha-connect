@@ -21,6 +21,8 @@ var accounts = []*models.Account{
 	FBinanceAccount,
 }
 
+var As *actor.ActorSystem
+
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
 		&constants.FBINANCE,
@@ -34,7 +36,10 @@ func TestMain(m *testing.M) {
 		}
 		accnts = append(accnts, aa)
 	}
-	executor, _ = actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, accnts, false, xchangerUtils.DefaultDialerPool)), "executor")
+
+	As = actor.NewActorSystem()
+
+	executor, _ = As.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, accnts, false, xchangerUtils.DefaultDialerPool)), "executor")
 	bitmex.EnableTestNet()
 	fbinance.EnableTestNet()
 
@@ -43,6 +48,6 @@ func TestMain(m *testing.M) {
 	bitmex.DisableTestNet()
 	fbinance.DisableTestNet()
 
-	actor.EmptyRootContext.PoisonFuture(executor)
+	As.Root.PoisonFuture(executor)
 	os.Exit(code)
 }

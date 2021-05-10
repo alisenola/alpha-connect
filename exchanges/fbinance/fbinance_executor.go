@@ -659,6 +659,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			return
 		}
 		for _, p := range positions {
+			if p.PositionAmount == 0 {
+				continue
+			}
 			if symbol != "" && p.Symbol != symbol {
 				continue
 			}
@@ -755,9 +758,13 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			return
 		}
 		for _, b := range balances {
+			if b.Balance == 0. {
+				continue
+			}
 			asset, ok := constants.GetAssetBySymbol(b.Asset)
 			if !ok {
 				state.logger.Error("got balance for unknown asset", log.String("asset", b.Asset))
+				continue
 			}
 			balanceList.Balances = append(balanceList.Balances, &models.Balance{
 				AccountID: msg.Account.AccountID,

@@ -754,6 +754,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 		}
 	case fbinance.ACCOUNT_UPDATE:
 		fmt.Println("ACCOUNT UPDATE", msg.Message.Account)
+		// TODO
 
 	case fbinance.MARGIN_CALL:
 		// TODO
