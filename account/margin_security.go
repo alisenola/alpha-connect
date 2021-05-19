@@ -45,6 +45,7 @@ func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asse
 		Security:            sec,
 		lotPrecision:        math.Ceil(1. / sec.RoundLot.Value),
 		marginCurrency:      marginCurrency,
+		modelCurrency:       modelCurrency,
 		openBidOrders:       make(map[string]*COrder),
 		openAskOrders:       make(map[string]*COrder),
 		size:                0.,

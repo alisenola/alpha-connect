@@ -1,7 +1,6 @@
 package modeling
 
 import (
-	"fmt"
 	"gitlab.com/tachikoma.ai/tickobjects"
 	"math"
 	"math/rand"
@@ -34,7 +33,6 @@ func NewMapModel() *MapModel {
 }
 
 func (m *MapModel) GetPrice(ID uint64) float64 {
-	fmt.Println(ID, m.priceModels)
 	return m.priceModels[ID].GetPrice(ID)
 }
 
