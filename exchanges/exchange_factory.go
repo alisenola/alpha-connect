@@ -140,10 +140,10 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 	}
 }
 
-func NewExchangeExecutorProducer(exchange *models2.Exchange) actor.Producer {
+func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.DialerPool) actor.Producer {
 	switch exchange.ID {
 	case constants.BINANCE.ID:
-		return func() actor.Actor { return binance.NewExecutor() }
+		return func() actor.Actor { return binance.NewExecutor(dialerPool) }
 	case constants.BITFINEX.ID:
 		return func() actor.Actor { return bitfinex.NewExecutor() }
 	case constants.BITMEX.ID:

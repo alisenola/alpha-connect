@@ -70,7 +70,7 @@ func main() {
 		&constants.UPBIT,
 	}
 	// EXECUTOR //
-	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assetss.json")))
+	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assets.json")))
 	_, err := ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
