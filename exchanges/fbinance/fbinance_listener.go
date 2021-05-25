@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -90,7 +91,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *fbinance.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -256,7 +257,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 
 		state.instrumentData.lastUpdateID = depthData.FinalUpdateID - 1
-		state.instrumentData.lastUpdateTime = uint64(ws.Msg.Time.UnixNano() / 1000000)
+		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 
 		synced = true
 	}
@@ -298,7 +299,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*fbinance.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
@@ -307,7 +308,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		depthData := msg.Message.(fbinance.WSDepthData)
 
 		// change event time
-		depthData.EventTime = uint64(msg.Time.UnixNano()) / 1000000
+		depthData.EventTime = uint64(msg.ClientTime.UnixNano()) / 1000000
 		err := state.onDepthData(context, depthData)
 		if err != nil {
 			state.logger.Info("error processing depth data for "+depthData.Symbol,
@@ -317,7 +318,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case fbinance.WSAggregatedTradeData:
 		tradeData := msg.Message.(fbinance.WSAggregatedTradeData)
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		if ts <= state.instrumentData.lastAggTradeTs {
 			ts = state.instrumentData.lastAggTradeTs + 1
 		}

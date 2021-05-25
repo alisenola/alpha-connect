@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -89,7 +90,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *hitbtc.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -199,7 +200,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		10000)
 	ob.Sync(bids, asks)
 
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
@@ -246,14 +247,14 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*hitbtc.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
 	case hitbtc.WSUpdateOrderBook:
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		update := msg.Message.(hitbtc.WSUpdateOrderBook)
 
 		instr := state.instrumentData
@@ -304,7 +305,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		//state.postSnapshot(context)
 
 	case hitbtc.WSUpdateTrades:
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		trades := msg.Message.(hitbtc.WSUpdateTrades)
 
 		sort.Slice(trades.Data, func(i, j int) bool {

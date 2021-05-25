@@ -13,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -95,7 +96,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bitmex.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -223,7 +224,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			})
 		}
 	}
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 	// TODO depth
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
@@ -286,7 +287,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*bitmex.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -322,7 +323,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				})
 			}
 		}
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 
 		limitDelta := &models.OBL2Update{
 			Levels:    []gorderbook.OrderBookLevel{},
@@ -355,7 +356,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case bitmex.WSTradeData:
 		tradeData := msg.Message.(bitmex.WSTradeData)
 		var aggTrade *models.AggregatedTrade
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		for _, trade := range tradeData.Data {
 			aggID := (uint64(trade.Timestamp.UnixNano()) / 1000) * 10
 			// Add one to aggregatedID if it's a sell so that
@@ -409,7 +410,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bitmex.WSLiquidationData:
 		liqData := msg.Message.(bitmex.WSLiquidationData)
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		for _, d := range liqData.Data {
 			orderID, err := uuid.FromString(d.OrderID)
 			if err != nil {
@@ -453,9 +454,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					}},
 					SeqNum: state.instrumentData.seqNum + 1,
 				})
+				state.instrumentData.seqNum += 1
 			}
-
-			state.instrumentData.seqNum += 1
 		}
 	}
 

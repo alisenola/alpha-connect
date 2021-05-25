@@ -12,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -106,7 +107,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bitfinex.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -264,7 +265,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
+	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 
 	ob.Sync(bids, asks)
 	state.instrumentData.orderBook = ob
@@ -277,6 +278,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
 		if err := ws.SubscribeStatus(symbol); err != nil {
+			return err
+		}
+		if err := ws.SubscribeLiquidation(symbol); err != nil {
 			return err
 		}
 	}
@@ -312,7 +316,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*bitfinex.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 
 	switch msg.Message.(type) {
 	case error:
@@ -336,7 +340,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		level := obData.Depth.ToOrderBookLevel()
 		// only allow 5 digits on price
 
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		obDelta := &models.OBL2Update{
 			Levels:    []gorderbook.OrderBookLevel{level},
 			Timestamp: utils.MilliToTimestamp(ts),
@@ -359,7 +363,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bitfinex.WSSpotTrade:
 		tradeData := msg.Message.(bitfinex.WSSpotTrade)
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		state.instrumentData.lastSequence = tradeData.Sequence
 
@@ -412,7 +416,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bitfinex.WSStatus:
 		status := msg.Message.(bitfinex.WSStatus)
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			Stats: []*models.Stat{{
 				Timestamp: utils.MilliToTimestamp(ts),

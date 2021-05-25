@@ -23,7 +23,7 @@ var as *actor.ActorSystem
 
 func TestMain(m *testing.M) {
 	exch := []*xchangerModels.Exchange{
-		&constants.BITMEX,
+		&constants.BITHUMBG,
 	}
 	as = actor.NewActorSystem()
 	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
@@ -41,6 +41,7 @@ func TestBinance(t *testing.T) {
 		}
 	}()
 
+	time.Sleep(1 * time.Second)
 	securityID := []uint64{
 		9281941173829172773, //BTCUSDT
 	}
@@ -58,6 +59,7 @@ func TestBinance(t *testing.T) {
 	}
 
 	for _, s := range securityList.Securities {
+		fmt.Println(s)
 		tested := false
 		for _, secID := range securityID {
 			if secID == s.SecurityID {
@@ -774,7 +776,7 @@ func TestFTX(t *testing.T) {
 	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
-	if math.Abs(sec.MinPriceIncrement.Value-0.5) > 0.000001 {
+	if math.Abs(sec.MinPriceIncrement.Value-1) > 0.000001 {
 		t.Fatalf("was expecting 0.5 min price increment, got %g", sec.MinPriceIncrement.Value)
 	}
 	if math.Abs(sec.RoundLot.Value-0.0001) > 0.0000000001 {
@@ -1496,7 +1498,7 @@ func TestHuobif(t *testing.T) {
 		}
 	}()
 	securityID := []uint64{
-		5362427922299651408,
+		2402007053666382556,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
@@ -1526,11 +1528,11 @@ func TestHuobif(t *testing.T) {
 	}
 
 	// Test
-	sec, ok := testedSecurities[5362427922299651408]
+	sec, ok := testedSecurities[2402007053666382556]
 	if !ok {
 		t.Fatalf("security not found")
 	}
-	if sec.Symbol != "BTC201225" {
+	if sec.Symbol != "BTC210625" {
 		t.Fatalf("was expecting symbol BTC200814, got %s", sec.Symbol)
 	}
 	if sec.SecurityType != enum.SecurityType_CRYPTO_FUT {

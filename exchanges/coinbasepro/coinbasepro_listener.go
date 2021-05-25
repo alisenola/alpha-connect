@@ -12,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/coinbasepro"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -102,7 +103,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *coinbasepro.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -336,7 +337,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*coinbasepro.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -346,7 +347,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		order := msg.Message.(coinbasepro.WSOpenOrder)
 		// Replace time with local one
 
-		order.Time = msg.Time
+		order.Time = msg.ClientTime
 		if err := state.onOpenOrder(order, context); err != nil {
 			state.logger.Info("error processing OpenOrder", log.Error(err))
 			return state.subscribeInstrument(context)
@@ -355,7 +356,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case coinbasepro.WSChangeOrder:
 		order := msg.Message.(coinbasepro.WSChangeOrder)
 
-		order.Time = msg.Time
+		order.Time = msg.ClientTime
 		err := state.onChangeOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing ChangeOrder", log.Error(err))
@@ -364,7 +365,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case coinbasepro.WSMatchOrder:
 		order := msg.Message.(coinbasepro.WSMatchOrder)
-		order.Time = msg.Time
+		order.Time = msg.ClientTime
 		err := state.onMatchOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing MatchOrder", log.Error(err))
@@ -373,7 +374,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case coinbasepro.WSDoneOrder:
 		order := msg.Message.(coinbasepro.WSDoneOrder)
-		order.Time = msg.Time
+		order.Time = msg.ClientTime
 		err := state.onDoneOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing DoneOrder", log.Error(err))
@@ -382,7 +383,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case coinbasepro.WSReceivedOrder:
 		order := msg.Message.(coinbasepro.WSReceivedOrder)
-		order.Time = msg.Time
+		order.Time = msg.ClientTime
 		err := state.onReceivedOrder(order, context)
 		if err != nil {
 			state.logger.Info("error processing ReceivedOrder", log.Error(err))

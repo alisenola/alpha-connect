@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -92,7 +93,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *okex.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -215,7 +216,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	ob := gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
 	ob.Sync(bids, asks)
 
-	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
+	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
@@ -281,7 +282,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*okex.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 
 	switch msg.Message.(type) {
 
@@ -300,7 +301,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			instr.orderBook.UpdateOrderBookLevel(l)
 		}
 
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		obDelta := &models.OBL2Update{
 			Levels:    levels,
@@ -308,7 +309,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			Trade:     false,
 		}
 
-		instr.lastUpdateTime = uint64(msg.Time.UnixNano() / 1000000)
+		instr.lastUpdateTime = uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		if state.instrumentData.orderBook.Crossed() {
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
@@ -335,7 +336,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			break
 		}
 
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		for _, t := range trades {
 			aggID := uint64(t.Timestamp.UnixNano()/1000) * 10
 			// do that so new agg trade if side changes

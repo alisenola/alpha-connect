@@ -9,6 +9,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	"math"
@@ -130,7 +131,7 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bitmex.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing onWebocketMessage", log.Error(err))
 			panic(err)
@@ -901,7 +902,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	state.lastPingTime = time.Now()
-	msg := context.Message().(*bitmex.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)

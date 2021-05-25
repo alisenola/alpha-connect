@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bithumbg"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -96,7 +97,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bithumbg.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -283,14 +284,14 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*bithumbg.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch res := msg.Message.(type) {
 
 	case error:
 		return fmt.Errorf("OB socket error: %v", msg)
 
 	case bithumbg.WSOrderBook:
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		instr := state.instrumentData
 
@@ -346,7 +347,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		break
 
 	case bithumbg.WSTrade:
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		aggTrade := &models.AggregatedTrade{
 			Bid:         res.Side == "sell",
 			Timestamp:   utils.MilliToTimestamp(ts),

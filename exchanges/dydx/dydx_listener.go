@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/dydx"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -92,7 +93,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *dydx.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -220,7 +221,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		k := uint64(math.Round(l.Price * float64(tickPrecision)))
 		state.instrumentData.levelOffset[k] = resp.Contents.Offset
 	}
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 	// TODO depth
 
 	ob := gorderbook.NewOrderBookL2(
@@ -270,7 +271,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*dydx.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch res := msg.Message.(type) {
 
 	case error:
@@ -305,7 +306,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 
 		limitDelta := &models.OBL2Update{
 			Levels:    []gorderbook.OrderBookLevel{},
@@ -341,7 +342,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case dydx.WSTradesData:
 		var aggTrade *models.AggregatedTrade
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		for _, trade := range res.Contents.Trades {
 			aggID := (uint64(trade.CreatedAt.UnixNano()) / 1000) * 10
 			// Add one to aggregatedID if it's a sell so that

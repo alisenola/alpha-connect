@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -98,7 +99,7 @@ func (state *ListenerL2) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *bitstamp.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -223,7 +224,7 @@ func (state *ListenerL2) subscribeOrderBook(context actor.Context) error {
 		1000)
 	ob.Sync(bids, asks)
 
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000
+	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000
 
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -288,7 +289,7 @@ func (state *ListenerL2) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *ListenerL2) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*bitstamp.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -308,7 +309,7 @@ func (state *ListenerL2) onWebsocketMessage(context actor.Context) error {
 
 		deltas := state.instrumentData.orderBook.Diff(newOb)
 
-		ts := uint64(msg.Time.UnixNano() / 1000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000)
 		obDelta := &models.OBL2Update{
 			Levels:    deltas,
 			Timestamp: utils.MicroToTimestamp(ts),
@@ -332,7 +333,7 @@ func (state *ListenerL2) onWebsocketMessage(context actor.Context) error {
 
 	case bitstamp.WSTrade:
 		tradeData := msg.Message.(bitstamp.WSTrade)
-		tradeData.MicroTimestamp = uint64(msg.Time.UnixNano()) / 1000
+		tradeData.MicroTimestamp = uint64(msg.ClientTime.UnixNano()) / 1000
 		ts := tradeData.MicroTimestamp / 1000
 
 		var aggID uint64

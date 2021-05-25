@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -87,7 +88,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *ftx.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -219,7 +220,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth = 10000
 	}
 
-	ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 
 	ob := gorderbook.NewOrderBookL2(
 		tickPrecision,
@@ -273,7 +274,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*ftx.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -284,7 +285,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr := state.instrumentData
 		nLevels := len(obData.Snapshot.Bids) + len(obData.Snapshot.Asks)
 
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
 			Levels:    make([]gorderbook.OrderBookLevel, nLevels, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
@@ -327,7 +328,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case ftx.WSTradeUpdate:
 		tradeData := msg.Message.(ftx.WSTradeUpdate)
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		sort.Slice(tradeData.Trades, func(i, j int) bool {
 			return tradeData.Trades[i].Time.Before(tradeData.Trades[j].Time)

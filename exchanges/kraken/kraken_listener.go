@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -100,7 +101,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *kraken.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -260,7 +261,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	ob.Sync(bids, asks)
 
-	ts := uint64(ws.Msg.Time.UnixNano() / 1000000)
+	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -304,7 +305,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*kraken.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -320,7 +321,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 		instr := state.instrumentData
 
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		obDelta := &models.OBL2Update{
 			Levels:    []gorderbook.OrderBookLevel{},
@@ -375,7 +376,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			break
 		}
 
-		ts := uint64(msg.Time.UnixNano() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		sort.Slice(tradeUpdate.Trades, func(i, j int) bool {
 			return tradeUpdate.Trades[i].Time < tradeUpdate.Trades[j].Time

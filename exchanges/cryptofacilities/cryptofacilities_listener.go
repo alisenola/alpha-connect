@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -101,7 +102,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *cryptofacilities.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -233,7 +234,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			}
 		}
 
-		ts := uint64(ws.Msg.Time.UnixNano()) / 1000000
+		ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 
 		tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 		lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
@@ -283,7 +284,6 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	}
 
 	state.tradeWs = ws
-
 	go func(ws *cryptofacilities.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
@@ -318,7 +318,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*cryptofacilities.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -329,10 +329,13 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", err)
 
 	case cryptofacilities.WSBookDelta:
+		if msg.WSID != state.obWs.ID {
+			return nil
+		}
 		obData := msg.Message.(cryptofacilities.WSBookDelta)
 		instr := state.instrumentData
 
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 
 		if obData.Seq != instr.lastUpdateID+1 {
 			state.logger.Info("got inconsistent sequence")
@@ -376,7 +379,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		if trade.Side == "sell" {
 			aggID += 1
 		}
-		ts := uint64(msg.Time.UnixNano()) / 1000000
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggID {
 			// ensure increasing timestamp
 			if ts <= state.instrumentData.lastAggTradeTs {
