@@ -222,6 +222,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 		var securities []*models.Security
 		for _, symbol := range exchangeInfo.Symbols {
+			base := symbol.BaseAsset
+			if sym, ok := binance.BINANCE_TO_GLOBAL[base]; ok {
+				base = sym
+			}
 			baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 			if !ok {
 				if symbol.Status == "TRADING" {
@@ -229,7 +233,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				}
 				continue
 			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
+			quote := symbol.QuoteAsset
+			if sym, ok := binance.BINANCE_TO_GLOBAL[quote]; ok {
+				quote = sym
+			}
+			quoteCurrency, ok := constants.GetAssetBySymbol(quote)
 			if !ok {
 				//fmt.Println("UNKNOWN QUOTE CURRENCY", symbol.QuoteAsset)
 				continue
