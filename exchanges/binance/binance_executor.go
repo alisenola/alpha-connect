@@ -179,110 +179,101 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			state.logger.Info("http client error", log.Error(err))
-			return
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("http client error: %v", err)
+	}
+	queryResponse := res.(*jobs.PerformQueryResponse)
+	if queryResponse.StatusCode != 200 {
+		if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+			return fmt.Errorf(
+				"http client error: %d %s",
+				queryResponse.StatusCode,
+				string(queryResponse.Response))
+		} else if queryResponse.StatusCode >= 500 {
+			return fmt.Errorf(
+				"http server error: %d %s",
+				queryResponse.StatusCode,
+				string(queryResponse.Response))
 		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				state.logger.Info("http client error", log.Error(err))
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				state.logger.Info("http client error", log.Error(err))
-			}
-			return
-		}
+	}
 
-		var exchangeInfo binance.ExchangeInfo
-		err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
-		if err != nil {
-			err = fmt.Errorf(
-				"error unmarshaling response: %v",
-				err)
-			state.logger.Info("http client error", log.Error(err))
-			return
-		}
-		if exchangeInfo.Code != 0 {
-			err = fmt.Errorf(
-				"binance api error: %d %s",
-				exchangeInfo.Code,
-				exchangeInfo.Msg)
-			state.logger.Info("http client error", log.Error(err))
-			return
-		}
+	var exchangeInfo binance.ExchangeInfo
+	err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
+	if err != nil {
+		return fmt.Errorf(
+			"error unmarshaling response: %v",
+			err)
+	}
+	if exchangeInfo.Code != 0 {
+		return fmt.Errorf(
+			"binance api error: %d %s",
+			exchangeInfo.Code,
+			exchangeInfo.Msg)
+	}
 
-		var securities []*models.Security
-		for _, symbol := range exchangeInfo.Symbols {
-			base := symbol.BaseAsset
-			if sym, ok := binance.BINANCE_TO_GLOBAL[base]; ok {
-				base = sym
-			}
-			baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
-			if !ok {
-				if symbol.Status == "TRADING" {
-					//fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
-				}
-				continue
-			}
-			quote := symbol.QuoteAsset
-			if sym, ok := binance.BINANCE_TO_GLOBAL[quote]; ok {
-				quote = sym
-			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(quote)
-			if !ok {
-				//fmt.Println("UNKNOWN QUOTE CURRENCY", symbol.QuoteAsset)
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = symbol.Symbol
-			security.Underlying = baseCurrency
-			security.QuoteCurrency = quoteCurrency
-			switch symbol.Status {
-			case "PRE_TRADING":
-				security.Status = models.PreTrading
-			case "TRADING":
-				security.Status = models.Trading
-			case "POST_TRADING":
-				security.Status = models.PostTrading
-			case "END_OF_DAY":
-				security.Status = models.EndOfDay
-			case "HALT":
-				security.Status = models.Halt
-			case "AUCTION_MATCH":
-				security.Status = models.AuctionMatch
-			case "BREAK":
-				security.Status = models.Break
-			default:
-				security.Status = models.Disabled
-			}
-			security.Exchange = &constants.BINANCE
-			security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			for _, filter := range symbol.Filters {
-				if filter.FilterType == "PRICE_FILTER" {
-					security.MinPriceIncrement = &types.DoubleValue{Value: filter.TickSize}
-				} else if filter.FilterType == "LOT_SIZE" {
-					security.RoundLot = &types.DoubleValue{Value: filter.StepSize}
-				}
-			}
-			securities = append(securities, &security)
+	var securities []*models.Security
+	for _, symbol := range exchangeInfo.Symbols {
+		base := symbol.BaseAsset
+		if sym, ok := binance.BINANCE_TO_GLOBAL[base]; ok {
+			base = sym
 		}
-		state.securities = securities
+		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
+		if !ok {
+			if symbol.Status == "TRADING" {
+				//fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
+			}
+			continue
+		}
+		quote := symbol.QuoteAsset
+		if sym, ok := binance.BINANCE_TO_GLOBAL[quote]; ok {
+			quote = sym
+		}
+		quoteCurrency, ok := constants.GetAssetBySymbol(quote)
+		if !ok {
+			//fmt.Println("UNKNOWN QUOTE CURRENCY", symbol.QuoteAsset)
+			continue
+		}
+		security := models.Security{}
+		security.Symbol = symbol.Symbol
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
+		switch symbol.Status {
+		case "PRE_TRADING":
+			security.Status = models.PreTrading
+		case "TRADING":
+			security.Status = models.Trading
+		case "POST_TRADING":
+			security.Status = models.PostTrading
+		case "END_OF_DAY":
+			security.Status = models.EndOfDay
+		case "HALT":
+			security.Status = models.Halt
+		case "AUCTION_MATCH":
+			security.Status = models.AuctionMatch
+		case "BREAK":
+			security.Status = models.Break
+		default:
+			security.Status = models.Disabled
+		}
+		security.Exchange = &constants.BINANCE
+		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
+		for _, filter := range symbol.Filters {
+			if filter.FilterType == "PRICE_FILTER" {
+				security.MinPriceIncrement = &types.DoubleValue{Value: filter.TickSize}
+			} else if filter.FilterType == "LOT_SIZE" {
+				security.RoundLot = &types.DoubleValue{Value: filter.StepSize}
+			}
+		}
+		securities = append(securities, &security)
+	}
+	state.securities = securities
 
-		context.Send(context.Parent(), &messages.SecurityList{
-			ResponseID: uint64(time.Now().UnixNano()),
-			Success:    true,
-			Securities: state.securities})
-	})
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Securities: state.securities})
 
 	return nil
 }
