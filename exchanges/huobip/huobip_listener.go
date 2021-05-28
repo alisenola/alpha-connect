@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobip"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -30,7 +31,7 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws              *huobip.Websocket
+	ws              *huobip.MDWebsocket
 	security        *models.Security
 	dialerPool      *xchangerUtils.DialerPool
 	instrumentData  *InstrumentData
@@ -90,7 +91,7 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *huobip.WebsocketMessage:
+	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
 			panic(err)
@@ -168,7 +169,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := huobip.NewWebsocket()
+	ws := huobip.NewMDWebsocket()
 	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to huobi websocket: %v", err)
 	}
@@ -222,7 +223,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	state.ws = ws
 
-	go func(ws *huobip.Websocket, pid *actor.PID) {
+	go func(ws *huobip.MDWebsocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -255,7 +256,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
-	msg := context.Message().(*huobip.WebsocketMessage)
+	msg := context.Message().(*xchanger.WebsocketMessage)
 	switch msg.Message.(type) {
 
 	case error:
@@ -378,7 +379,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
-	case huobip.WSSubscribeResponse:
+	case huobip.MDWSSubscribeResponse:
 		// pass
 
 	case huobip.WSPing:
