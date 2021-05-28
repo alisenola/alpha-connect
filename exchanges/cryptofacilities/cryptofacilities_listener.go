@@ -243,7 +243,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			lotPrecision,
 			10000)
 
-		ob.Sync(bids, asks)
+		if err := ob.Sync(bids, asks); err != nil {
+			return fmt.Errorf("error syncing order book: %v", err)
+		}
 		state.instrumentData.orderBook = ob
 		state.instrumentData.lastUpdateID = obData.Seq
 		state.instrumentData.lastUpdateTime = ts
@@ -329,7 +331,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", err)
 
 	case cryptofacilities.WSBookDelta:
-		if msg.WSID != state.obWs.ID {
+		if state.obWs == nil || msg.WSID != state.obWs.ID {
 			return nil
 		}
 		obData := msg.Message.(cryptofacilities.WSBookDelta)

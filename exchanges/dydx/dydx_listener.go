@@ -227,7 +227,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		lotPrecision,
 		10000)
 
-	ob.Sync(bids, asks)
+	if err := ob.Sync(bids, asks); err != nil {
+		return fmt.Errorf("error syncing order book: %v", err)
+	}
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
@@ -271,7 +273,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
-	if msg.WSID != state.ws.ID {
+	if state.ws == nil || msg.WSID != state.ws.ID {
 		return nil
 	}
 	switch res := msg.Message.(type) {
@@ -284,7 +286,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case dydx.WSOrderBookData:
 		if res.MessageID != state.lastMessageID+1 {
-			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
 			return state.subscribeInstrument(context)
 		}
 		state.lastMessageID = res.MessageID
@@ -347,7 +348,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case dydx.WSTradesSubscribed:
 		// Ignore
 		if res.MessageID != state.lastMessageID+1 {
-			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
 			return state.subscribeInstrument(context)
 		}
 		state.lastMessageID = res.MessageID
@@ -356,7 +356,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case dydx.WSTradesData:
 		if res.MessageID != state.lastMessageID+1 {
-			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
 			return state.subscribeInstrument(context)
 		}
 		state.lastMessageID = res.MessageID
