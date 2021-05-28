@@ -166,7 +166,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.RoundLot = &types.DoubleValue{Value: m.StepSize}
 		security.IsInverse = false
 
-		fmt.Println(security)
 		securities = append(securities, &security)
 	}
 
