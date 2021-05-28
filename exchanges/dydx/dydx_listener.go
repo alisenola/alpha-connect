@@ -41,6 +41,7 @@ type Listener struct {
 	logger          *log.Logger
 	lastPingTime    time.Time
 	socketTicker    *time.Ticker
+	lastMessageID   int
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -189,9 +190,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if !ok {
 		return fmt.Errorf("was expecting WSOrderBookSubscribed, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
 
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
@@ -239,6 +237,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	state.ws = ws
+	state.lastMessageID = resp.MessageID
 
 	go func(ws *dydx.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
@@ -272,6 +271,9 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
+	if msg.WSID != state.ws.ID {
+		return nil
+	}
 	switch res := msg.Message.(type) {
 
 	case error:
@@ -281,6 +283,12 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", res.Message)
 
 	case dydx.WSOrderBookData:
+		if res.MessageID != state.lastMessageID+1 {
+			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
+			return state.subscribeInstrument(context)
+		}
+		state.lastMessageID = res.MessageID
+
 		var bids, asks []gorderbook.OrderBookLevel
 
 		for _, l := range res.Contents.Bids {
@@ -338,16 +346,29 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case dydx.WSTradesSubscribed:
 		// Ignore
+		if res.MessageID != state.lastMessageID+1 {
+			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
+			return state.subscribeInstrument(context)
+		}
+		state.lastMessageID = res.MessageID
+
 		break
 
 	case dydx.WSTradesData:
+		if res.MessageID != state.lastMessageID+1 {
+			fmt.Println("OUT OF SYNC", res.MessageID, state.lastMessageID)
+			return state.subscribeInstrument(context)
+		}
+		state.lastMessageID = res.MessageID
+
 		var aggTrade *models.AggregatedTrade
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		for _, trade := range res.Contents.Trades {
+			fmt.Println(trade)
 			aggID := (uint64(trade.CreatedAt.UnixNano()) / 1000) * 10
 			// Add one to aggregatedID if it's a sell so that
 			// buy and sell happening at the same time won't have the same ID
-			if trade.Side == "Sell" {
+			if trade.Side == "SELL" {
 				aggID += 1
 			}
 
@@ -367,7 +388,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					ts = state.instrumentData.lastAggTradeTs + 1
 				}
 				aggTrade = &models.AggregatedTrade{
-					Bid:         trade.Side == "Sell",
+					Bid:         trade.Side == "SELL",
 					Timestamp:   utils.MilliToTimestamp(ts),
 					AggregateID: aggID,
 					Trades:      nil,
