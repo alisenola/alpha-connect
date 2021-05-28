@@ -12,6 +12,7 @@ type updateSecurityList struct{}
 type ExchangeExecutor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
+	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
@@ -61,6 +62,12 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 	case *messages.SecurityListRequest:
 		if err := state.OnSecurityListRequest(context); err != nil {
 			state.GetLogger().Error("error processing SecurityListRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalLiquidationsRequest:
+		if err := state.OnHistoricalLiquidationsRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnHistoricalLiquidationRequest", log.Error(err))
 			panic(err)
 		}
 

@@ -179,7 +179,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewExecutor() }
 	case constants.BYBITI.ID:
-		return func() actor.Actor { return bybiti.NewExecutor() }
+		return func() actor.Actor { return bybiti.NewExecutor(dialerPool) }
 	case constants.BYBITL.ID:
 		return func() actor.Actor { return bybitl.NewExecutor() }
 	case constants.UPBIT.ID:

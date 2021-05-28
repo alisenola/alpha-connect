@@ -267,7 +267,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 
-	ob.Sync(bids, asks)
+	if err := ob.Sync(bids, asks); err != nil {
+		return fmt.Errorf("error syncing order book: %v", err)
+	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -435,6 +437,23 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		context.Send(context.Parent(), refresh)
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastSequence = status.Sequence
+
+	case bitfinex.WSLiquidation:
+		liq := msg.Message.(bitfinex.WSLiquidation)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		fmt.Println("LIQ", liq)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			Liquidation: &models.Liquidation{
+				Bid:       liq.IsMarketSold,
+				Timestamp: utils.MilliToTimestamp(ts),
+				OrderID:   liq.PositionID,
+				Price:     liq.LiquidationPrice,
+				Quantity:  liq.Amount,
+			},
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		context.Send(context.Parent(), refresh)
+		state.instrumentData.seqNum += 1
 
 	case bitfinex.WSSpotTradeSnapshot:
 		tradeData := msg.Message.(bitfinex.WSSpotTradeSnapshot)

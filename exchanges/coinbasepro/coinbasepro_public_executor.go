@@ -202,6 +202,10 @@ func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Cont
 	return nil
 }
 
+func (state *CoinbaseProPublicExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 	response := &messages.MarketDataResponse{

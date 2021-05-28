@@ -81,6 +81,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.HistoricalLiquidationsRequest:
+		if err := state.OnHistoricalLiquidationsRequest(context); err != nil {
+			state.logger.Error("error processing OnHistoricalLiquidationsRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.SecurityDefinitionRequest:
 		if err := state.OnSecurityDefinitionRequest(context); err != nil {
 			state.logger.Error("error processing OnSecurityDefinitionRequest", log.Error(err))
@@ -267,6 +273,40 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		state.instruments[securityID] = pid
 		context.Forward(pid)
 	}
+
+	return nil
+}
+
+func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	request := context.Message().(*messages.HistoricalLiquidationsRequest)
+	if request.Instrument == nil || request.Instrument.SecurityID == nil {
+		context.Respond(&messages.HistoricalLiquidationsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSecurityID,
+		})
+		return nil
+	}
+	securityID := request.Instrument.SecurityID.Value
+	security, ok := state.securities[securityID]
+	if !ok {
+		context.Respond(&messages.HistoricalLiquidationsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSecurityID,
+		})
+		return nil
+	}
+	exchange, ok := state.executors[security.Exchange.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalLiquidationsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownSecurityID,
+		})
+		return nil
+	}
+	context.Forward(exchange)
 
 	return nil
 }

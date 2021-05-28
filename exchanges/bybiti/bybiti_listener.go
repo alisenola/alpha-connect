@@ -24,6 +24,8 @@ import (
 
 type checkSockets struct{}
 
+type updateLiquidations struct{}
+
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
 	seqNum         uint64
@@ -105,6 +107,12 @@ func (state *Listener) Receive(context actor.Context) {
 	case *checkSockets:
 		if err := state.checkSockets(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+
+	case *updateLiquidations:
+		if err := state.updateLiquidations(context); err != nil {
+			state.logger.Error("error updating liquidations", log.Error(err))
 			panic(err)
 		}
 	}
@@ -471,5 +479,10 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
+	return nil
+}
+
+func (state *Listener) updateLiquidations(context actor.Context) error {
+	context.Request(state.executorManager, &messages.HistoricalLiquidationsRequest{})
 	return nil
 }

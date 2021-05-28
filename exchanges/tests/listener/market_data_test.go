@@ -1,4 +1,4 @@
-package data
+package listener
 
 import (
 	"fmt"
@@ -12,28 +12,24 @@ import (
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 )
 
-var executor *actor.PID
-var as *actor.ActorSystem
-
-func TestMain(m *testing.M) {
+func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *actor.PID, func()) {
 	exch := []*xchangerModels.Exchange{
-		&constants.DYDX,
+		exchange,
 	}
-	as = actor.NewActorSystem()
-	executor, _ = as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
-	code := m.Run()
-	_ = as.Root.PoisonFuture(executor).Wait()
-	os.Exit(code)
+	as := actor.NewActorSystem()
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
 }
 
 func TestBinance(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BINANCE)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -120,6 +116,8 @@ func TestBinance(t *testing.T) {
 
 func TestBitfinex(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITFINEX)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -207,6 +205,8 @@ func TestBitfinex(t *testing.T) {
 
 func TestBitmex(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITMEX)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -291,6 +291,8 @@ func TestBitmex(t *testing.T) {
 
 func TestBitstamp(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITSTAMP)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -375,6 +377,8 @@ func TestBitstamp(t *testing.T) {
 
 func TestBitz(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITZ)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -459,6 +463,8 @@ func TestBitz(t *testing.T) {
 
 func TestCoinbasePro(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.COINBASEPRO)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -543,6 +549,8 @@ func TestCoinbasePro(t *testing.T) {
 
 func TestCryptofacilities(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.CRYPTOFACILITIES)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -629,6 +637,8 @@ func TestCryptofacilities(t *testing.T) {
 
 func TestFBinance(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.FBINANCE)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -715,6 +725,8 @@ func TestFBinance(t *testing.T) {
 
 func TestFTX(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.FTX)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -801,6 +813,8 @@ func TestFTX(t *testing.T) {
 
 func TestHuobi(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.HUOBI)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -887,6 +901,8 @@ func TestHuobi(t *testing.T) {
 
 func TestGemini(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.GEMINI)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -973,6 +989,8 @@ func TestGemini(t *testing.T) {
 
 func TestHitbtc(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.HITBTC)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1059,6 +1077,8 @@ func TestHitbtc(t *testing.T) {
 
 func TestKraken(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.KRAKEN)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1145,6 +1165,8 @@ func TestKraken(t *testing.T) {
 
 func TestOKCoin(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.OKCOIN)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1231,6 +1253,8 @@ func TestOKCoin(t *testing.T) {
 
 func TestOKex(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.OKEX)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1317,6 +1341,8 @@ func TestOKex(t *testing.T) {
 
 func TestDeribit(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.DERIBIT)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1404,6 +1430,8 @@ func TestDeribit(t *testing.T) {
 
 func TestHuobip(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.HUOBIP)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1491,6 +1519,8 @@ func TestHuobip(t *testing.T) {
 
 func TestHuobif(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.HUOBIF)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1578,6 +1608,8 @@ func TestHuobif(t *testing.T) {
 
 func TestBybiti(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BYBITI)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1665,6 +1697,8 @@ func TestBybiti(t *testing.T) {
 
 func TestBybitl(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BYBITL)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1751,6 +1785,8 @@ func TestBybitl(t *testing.T) {
 
 func TestUpbit(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.UPBIT)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1837,6 +1873,8 @@ func TestUpbit(t *testing.T) {
 
 func TestBithumb(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITHUMB)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -1923,6 +1961,8 @@ func TestBithumb(t *testing.T) {
 
 func TestBithumbg(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.BITHUMBG)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -2009,6 +2049,8 @@ func TestBithumbg(t *testing.T) {
 
 func TestDydx(t *testing.T) {
 	t.Parallel()
+	as, executor, clean := StartExecutor(&constants.DYDX)
+	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {

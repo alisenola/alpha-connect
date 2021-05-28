@@ -181,6 +181,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)

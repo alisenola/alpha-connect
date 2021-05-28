@@ -12,6 +12,21 @@ import "gitlab.com/alphaticks/alpha-connect/models/account.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
+message HistoricalLiquidationsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
+}
+
+message HistoricalLiquidationsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Liquidation liquidations = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;

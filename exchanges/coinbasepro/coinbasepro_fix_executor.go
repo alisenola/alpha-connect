@@ -51,6 +51,10 @@ func (state *CoinbaseProFixExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
+func (state *CoinbaseProFixExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *CoinbaseProFixExecutor) UpdateSecurityList(context actor.Context) error {
 	return nil
 }

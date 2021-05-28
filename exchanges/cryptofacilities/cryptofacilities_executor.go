@@ -224,6 +224,10 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	return nil
+}
+
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
