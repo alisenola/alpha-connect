@@ -7,10 +7,10 @@ import (
 )
 
 type LongShortModel interface {
-	ShouldLong(ID uint64) bool
-	ShouldCloseLong(ID uint64) bool
-	ShouldShort(ID uint64) bool
-	ShouldCloseShort(ID uint64) bool
+	LongScore(ID uint64) float64
+	CloseLongScore(ID uint64) float64
+	ShortScore(ID uint64) float64
+	CloseShortScore(ID uint64) float64
 }
 
 type MarketModel interface {
