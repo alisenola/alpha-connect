@@ -6,6 +6,10 @@ import (
 	"math/rand"
 )
 
+type BuySellModel interface {
+	GetAction(ID uint64) bool
+}
+
 type MarketModel interface {
 	GetPrice(ID uint64) float64
 	GetPairPrice(base uint32, quote uint32) float64
