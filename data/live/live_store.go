@@ -181,16 +181,17 @@ func (state *LiveStore) GetQueryReaderRequest(context actor.Context) error {
 		// Extract group
 		groupTags := make(map[string]string)
 		groupBy := sel.TickSelector.GroupBy
-		if len(groupBy) == 0 {
-			groupBy = []string{"ID", "type", "base", "quote", "exchange", "symbol"}
-		}
-		for _, t := range groupBy {
-			if tag, ok := tags[t]; ok {
-				groupTags[t] = tag
-			} else {
-				return fmt.Errorf("group by unknown tag %s", t)
+
+		if groupBy == nil {
+			for k, _ := range tags {
+				groupTags[k] = tags[k]
+			}
+		} else {
+			for _, k := range groupBy.Tags {
+				groupTags[k] = tags[k]
 			}
 		}
+
 		groupID := utils.HashTags(groupTags)
 		feed := &Feed{
 			requestID: uint64(time.Now().UnixNano()),

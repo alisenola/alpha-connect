@@ -6,7 +6,12 @@ import (
 	"math/rand"
 )
 
+type GlobalModel interface {
+	GetSelectors() []string
+}
+
 type LongShortModel interface {
+	GlobalModel
 	LongScore(ID uint64) float64
 	CloseLongScore(ID uint64) float64
 	ShortScore(ID uint64) float64
@@ -14,6 +19,7 @@ type LongShortModel interface {
 }
 
 type MarketModel interface {
+	GlobalModel
 	GetPrice(ID uint64) float64
 	GetPairPrice(base uint32, quote uint32) float64
 	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64
@@ -23,12 +29,14 @@ type MarketModel interface {
 	SetPriceModel(ID uint64, model PriceModel)
 	SetBuyTradeModel(ID uint64, model BuyTradeModel)
 	SetSellTradeModel(ID uint64, model SellTradeModel)
+	PushSelectors([]string)
 }
 
 type MapModel struct {
 	buyTradeModels  map[uint64]BuyTradeModel
 	sellTradeModels map[uint64]SellTradeModel
 	priceModels     map[uint64]PriceModel
+	selectors       []string
 }
 
 func NewMapModel() *MapModel {
@@ -77,6 +85,14 @@ func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
 	m.sellTradeModels[securityID] = model
 }
 
+func (m *MapModel) PushSelectors(selectors []string) {
+	m.selectors = append(m.selectors, selectors...)
+}
+
+func (m *MapModel) GetSelectors() []string {
+	return m.selectors
+}
+
 /*
 func (m *MapModel) Progress(time uint64) {
 	for _, m := range m.priceModels {
@@ -92,8 +108,7 @@ func (m *MapModel) Progress(time uint64) {
 */
 
 type Model interface {
-	SetSelectors([]tickobjects.TickObject)
-	Forward(tick uint64, selector int)
+	Forward(selector int, tick, objectID uint64, object tickobjects.TickObject)
 	Backward()
 	Ready() bool
 	Frequency() uint64
