@@ -6,8 +6,11 @@ import (
 	"math/rand"
 )
 
-type BuySellModel interface {
-	GetAction(ID uint64) bool
+type LongShortModel interface {
+	ShouldLong(ID uint64) bool
+	ShouldCloseLong(ID uint64) bool
+	ShouldShort(ID uint64) bool
+	ShouldCloseShort(ID uint64) bool
 }
 
 type MarketModel interface {
