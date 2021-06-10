@@ -32,64 +32,99 @@ type MarketModel interface {
 	PushSelectors([]string)
 }
 
-type MapModel struct {
+type MapMarketModel struct {
 	buyTradeModels  map[uint64]BuyTradeModel
 	sellTradeModels map[uint64]SellTradeModel
 	priceModels     map[uint64]PriceModel
 	selectors       []string
 }
 
-func NewMapModel() *MapModel {
-	return &MapModel{
+func NewMapMarketModel() *MapMarketModel {
+	return &MapMarketModel{
 		buyTradeModels:  make(map[uint64]BuyTradeModel),
 		sellTradeModels: make(map[uint64]SellTradeModel),
 		priceModels:     make(map[uint64]PriceModel),
 	}
 }
 
-func (m *MapModel) GetPrice(ID uint64) float64 {
+func (m *MapMarketModel) GetPrice(ID uint64) float64 {
 	return m.priceModels[ID].GetPrice(ID)
 }
 
-func (m *MapModel) GetPairPrice(base uint32, quote uint32) float64 {
+func (m *MapMarketModel) GetPairPrice(base uint32, quote uint32) float64 {
 	ID := uint64(base)<<32 | uint64(quote)
 	return m.priceModels[ID].GetPrice(ID)
 }
 
-func (m *MapModel) GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64 {
+func (m *MapMarketModel) GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64 {
 	ID := uint64(base)<<32 | uint64(quote)
 	return m.priceModels[ID].GetSamplePrices(ID, time, sampleSize)
 }
 
-func (m *MapModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
+func (m *MapMarketModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
 	return m.priceModels[ID].GetSamplePrices(ID, time, sampleSize)
 }
 
-func (m *MapModel) GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64 {
+func (m *MapMarketModel) GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64 {
 	return m.sellTradeModels[securityID].GetSampleMatchBid(securityID, time, sampleSize)
 }
 
-func (m *MapModel) GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64 {
+func (m *MapMarketModel) GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64 {
 	return m.buyTradeModels[securityID].GetSampleMatchAsk(securityID, time, sampleSize)
 }
 
-func (m *MapModel) SetPriceModel(ID uint64, model PriceModel) {
+func (m *MapMarketModel) SetPriceModel(ID uint64, model PriceModel) {
 	m.priceModels[ID] = model
 }
 
-func (m *MapModel) SetBuyTradeModel(securityID uint64, model BuyTradeModel) {
+func (m *MapMarketModel) SetBuyTradeModel(securityID uint64, model BuyTradeModel) {
 	m.buyTradeModels[securityID] = model
 }
 
-func (m *MapModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
+func (m *MapMarketModel) SetSellTradeModel(securityID uint64, model SellTradeModel) {
 	m.sellTradeModels[securityID] = model
 }
 
-func (m *MapModel) PushSelectors(selectors []string) {
+func (m *MapMarketModel) PushSelectors(selectors []string) {
 	m.selectors = append(m.selectors, selectors...)
 }
 
-func (m *MapModel) GetSelectors() []string {
+func (m *MapMarketModel) GetSelectors() []string {
+	return m.selectors
+}
+
+type MapLSModel struct {
+	models    map[uint64]LongShortModel
+	selectors []string
+}
+
+func NewMapLSModel() *MapLSModel {
+	return &MapLSModel{
+		models: make(map[uint64]LongShortModel),
+	}
+}
+
+func (m *MapLSModel) LongScore(ID uint64) float64 {
+	return m.models[ID].LongScore(ID)
+}
+
+func (m *MapLSModel) CloseLongScore(ID uint64) float64 {
+	return m.models[ID].CloseLongScore(ID)
+}
+
+func (m *MapLSModel) ShortScore(ID uint64) float64 {
+	return m.models[ID].ShortScore(ID)
+}
+
+func (m *MapLSModel) CloseShortScore(ID uint64) float64 {
+	return m.models[ID].CloseShortScore(ID)
+}
+
+func (m *MapLSModel) PushSelectors(selectors []string) {
+	m.selectors = append(m.selectors, selectors...)
+}
+
+func (m *MapLSModel) GetSelectors() []string {
 	return m.selectors
 }
 
