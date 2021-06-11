@@ -7,10 +7,10 @@ import (
 )
 
 type LongShortModel interface {
-	LongScore(ID uint64) float64
-	CloseLongScore(ID uint64) float64
-	ShortScore(ID uint64) float64
-	CloseShortScore(ID uint64) float64
+	GetEnterLongScore(ID uint64) float64
+	GetExitLongScore(ID uint64) float64
+	GetEnterShortScore(ID uint64) float64
+	GetExitShortScore(ID uint64) float64
 }
 
 type MarketModel interface {
@@ -86,39 +86,33 @@ func (m *MapMarketModel) GetSelectors() []string {
 	return m.selectors
 }
 
-type MapLSModel struct {
-	models    map[uint64]LongShortModel
-	selectors []string
+type MapLongShortModel struct {
+	longModels  map[uint64]LongModel
+	shortModels map[uint64]ShortModel
+	selectors   []string
 }
 
-func NewMapLSModel() *MapLSModel {
-	return &MapLSModel{
-		models: make(map[uint64]LongShortModel),
+func NewMapLSModel() *MapLongShortModel {
+	return &MapLongShortModel{
+		longModels:  make(map[uint64]LongModel),
+		shortModels: make(map[uint64]ShortModel),
 	}
 }
 
-func (m *MapLSModel) LongScore(ID uint64) float64 {
-	return m.models[ID].LongScore(ID)
+func (m *MapLongShortModel) GetEnterLongScore(ID uint64) float64 {
+	return m.longModels[ID].GetEnterLongScore(ID)
 }
 
-func (m *MapLSModel) CloseLongScore(ID uint64) float64 {
-	return m.models[ID].CloseLongScore(ID)
+func (m *MapLongShortModel) GetExitLongScore(ID uint64) float64 {
+	return m.longModels[ID].GetExitLongScore(ID)
 }
 
-func (m *MapLSModel) ShortScore(ID uint64) float64 {
-	return m.models[ID].ShortScore(ID)
+func (m *MapLongShortModel) GetEnterShortScore(ID uint64) float64 {
+	return m.shortModels[ID].GetEnterShortScore(ID)
 }
 
-func (m *MapLSModel) CloseShortScore(ID uint64) float64 {
-	return m.models[ID].CloseShortScore(ID)
-}
-
-func (m *MapLSModel) PushSelectors(selectors []string) {
-	m.selectors = append(m.selectors, selectors...)
-}
-
-func (m *MapLSModel) GetSelectors() []string {
-	return m.selectors
+func (m *MapLongShortModel) GetExitShortScore(ID uint64) float64 {
+	return m.shortModels[ID].GetExitShortScore(ID)
 }
 
 /*
@@ -141,6 +135,18 @@ type Model interface {
 	Ready() bool
 	Frequency() uint64
 	GetSelectors() []string
+}
+
+type LongModel interface {
+	Model
+	GetEnterLongScore(feedID uint64) float64
+	GetExitLongScore(feedID uint64) float64
+}
+
+type ShortModel interface {
+	Model
+	GetEnterShortScore(feedID uint64) float64
+	GetExitShortScore(feedID uint64) float64
 }
 
 type PriceModel interface {
