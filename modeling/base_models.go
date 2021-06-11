@@ -11,6 +11,8 @@ type LongShortModel interface {
 	GetExitLongScore(ID uint64) float64
 	GetEnterShortScore(ID uint64) float64
 	GetExitShortScore(ID uint64) float64
+	SetLongModel(ID uint64, model LongModel)
+	SetShortModel(ID uint64, model ShortModel)
 }
 
 type MarketModel interface {
@@ -97,6 +99,14 @@ func NewMapLSModel() *MapLongShortModel {
 		longModels:  make(map[uint64]LongModel),
 		shortModels: make(map[uint64]ShortModel),
 	}
+}
+
+func (m *MapLongShortModel) SetLongModel(ID uint64, lm LongModel) {
+	m.longModels[ID] = lm
+}
+
+func (m *MapLongShortModel) SetShortModel(ID uint64, sm ShortModel) {
+	m.shortModels[ID] = sm
 }
 
 func (m *MapLongShortModel) GetEnterLongScore(ID uint64) float64 {
