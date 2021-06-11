@@ -6,12 +6,7 @@ import (
 	"math/rand"
 )
 
-type GlobalModel interface {
-	GetSelectors() []string
-}
-
 type LongShortModel interface {
-	GlobalModel
 	LongScore(ID uint64) float64
 	CloseLongScore(ID uint64) float64
 	ShortScore(ID uint64) float64
@@ -19,7 +14,6 @@ type LongShortModel interface {
 }
 
 type MarketModel interface {
-	GlobalModel
 	GetPrice(ID uint64) float64
 	GetPairPrice(base uint32, quote uint32) float64
 	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64
@@ -29,7 +23,6 @@ type MarketModel interface {
 	SetPriceModel(ID uint64, model PriceModel)
 	SetBuyTradeModel(ID uint64, model BuyTradeModel)
 	SetSellTradeModel(ID uint64, model SellTradeModel)
-	PushSelectors([]string)
 }
 
 type MapMarketModel struct {
@@ -147,6 +140,7 @@ type Model interface {
 	Backward()
 	Ready() bool
 	Frequency() uint64
+	GetSelectors() []string
 }
 
 type PriceModel interface {
