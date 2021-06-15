@@ -665,6 +665,22 @@ func (accnt *Account) GetPositions() []*models.Position {
 	return positions
 }
 
+func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	var positions = make(map[uint64]*models.Position)
+	for k, pos := range accnt.positions {
+		pos := pos.GetPosition()
+		if pos != nil {
+			pos.Instrument = accnt.securities[k].GetInstrument()
+			pos.AccountID = accnt.AccountID
+			positions[k] = pos
+		}
+	}
+
+	return positions
+}
+
 func (accnt *Account) GetBalances() []*models.Balance {
 	accnt.RLock()
 	defer accnt.RUnlock()
