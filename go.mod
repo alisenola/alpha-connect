@@ -18,9 +18,9 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
-	gitlab.com/alphaticks/gorderbook v0.0.0-20210414073010-806e8b077356
+	gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774
 	gitlab.com/alphaticks/xchanger v0.0.0-20210528140106-47b033501c14
-	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210508085527-ab7f0d4712d8
+	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210528122836-d02ce1923e51
 	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210508085558-6ed77eee2a06
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451
 	gitlab.com/tachikoma.ai/tickstore-grpc v0.0.0-20210312094618-ca21c4db7965

@@ -442,6 +442,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20201219125519-1a8189af89db h1:/Njn/tKEf
 gitlab.com/alphaticks/gorderbook v0.0.0-20201219125519-1a8189af89db/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210414073010-806e8b077356 h1:N7c4c9wL8wnvldcz59yeviK/0biHqKESEwHJJwp7eZY=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210414073010-806e8b077356/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
+gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774 h1:DTcGeP+VHyZwmutBkfoWH7Jf5uNb9awJbABs8vrhcs0=
+gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda h1:dxEtlJ5OyJ4r3wXNBuwMBwz63pCjr9qHcL0Qvucb0Fs=
 gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20210325151841-fca2f5a3d9de h1:Q0O+H2zTEhwyGI70N9N5LYL3fKPCEanmGZXvPtNava8=
@@ -554,6 +556,8 @@ gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112 h1:y6Gueg
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112/go.mod h1:xCMeAUQhBW3lLo+hF5F3MQuI3PoU0hcDtOpP383yltE=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210508085527-ab7f0d4712d8 h1:G4uT1VfxXwhUBJ+aCDjjYpWbciqosAyor/0eNq3HN9g=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210508085527-ab7f0d4712d8/go.mod h1:wWU1LzQs+pIIfk2BV6kF/MCilf80Crzd6kbpND8WvWU=
+gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210528122836-d02ce1923e51 h1:VylGSuWU/uH7eL9bt+ph4CuW6D3ub8ul9fid1KFas4c=
+gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210528122836-d02ce1923e51/go.mod h1:dRXZhjXhV2Q79nK80MNFmJeBemcshOVpRIKtXqbs2JA=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210215095711-9f735352d81a h1:KzaYszjvf+wQKDaQkW4eYfDm9KRHlNEkI8c6oFmDb30=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210215095711-9f735352d81a/go.mod h1:VmePqfmwkaWRyR3LRxLLu0Xv4eKJMVVDQaiMqASWSPA=
 gitlab.com/tachikoma.ai/tickstore v0.0.0-20210218110320-7e0c5e5fbb37 h1:QZnAS3r/ED0ntBuJsJ2T1SprSlL2Y0yqbzbyTeX86Tg=
