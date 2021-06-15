@@ -6,18 +6,25 @@ import (
 	"math/rand"
 )
 
+type Market interface {
+	GetPrice(ID uint64) float64
+	GetPairPrice(base, quote uint32) float64
+}
+
 type LongShortModel interface {
+	Market
 	GetEnterLongScore(ID uint64) float64
 	GetExitLongScore(ID uint64) float64
 	GetEnterShortScore(ID uint64) float64
 	GetExitShortScore(ID uint64) float64
 	SetLongModel(ID uint64, model LongModel)
 	SetShortModel(ID uint64, model ShortModel)
+	SetPrice(ID uint64, price float64)
+	SetPairPrice(base, quote uint32, price float64)
 }
 
 type MarketModel interface {
-	GetPrice(ID uint64) float64
-	GetPairPrice(base uint32, quote uint32) float64
+	Market
 	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64
 	GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(ID uint64, time uint64, sampleSize int) []float64
@@ -92,6 +99,7 @@ type MapLongShortModel struct {
 	longModels  map[uint64]LongModel
 	shortModels map[uint64]ShortModel
 	selectors   []string
+	prices      map[uint64]float64
 }
 
 func NewMapLongShortModel() *MapLongShortModel {
@@ -107,6 +115,24 @@ func (m *MapLongShortModel) SetLongModel(ID uint64, lm LongModel) {
 
 func (m *MapLongShortModel) SetShortModel(ID uint64, sm ShortModel) {
 	m.shortModels[ID] = sm
+}
+
+func (m *MapLongShortModel) SetPrice(ID uint64, p float64) {
+	m.prices[ID] = p
+}
+
+func (m *MapLongShortModel) SetPairPrice(base, quote uint32, p float64) {
+	ID := uint64(base)<<32 | uint64(quote)
+	m.prices[ID] = p
+}
+
+func (m *MapLongShortModel) GetPrice(ID uint64) float64 {
+	return m.prices[ID]
+}
+
+func (m *MapLongShortModel) GetPairPrice(base, quote uint32) float64 {
+	ID := uint64(base)<<32 | uint64(quote)
+	return m.prices[ID]
 }
 
 func (m *MapLongShortModel) GetEnterLongScore(ID uint64) float64 {

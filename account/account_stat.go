@@ -7,7 +7,7 @@ import (
 
 // TODO what about updating securities ?
 
-func (accnt *Account) Value(model modeling.MarketModel) float64 {
+func (accnt *Account) Value(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	value := 0.
@@ -79,39 +79,39 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 	// TODO handle neg values
 }
 
-func (accnt Account) GetELROnCancelBid(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
+func (accnt *Account) GetELROnCancelBid(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	return accnt.securities[securityID].GetELROnCancelBid(orderID, model, time, values, value)
 }
 
-func (accnt Account) GetELROnCancelAsk(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
+func (accnt *Account) GetELROnCancelAsk(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64) float64 {
 	return accnt.securities[securityID].GetELROnCancelAsk(orderID, model, time, values, value)
 }
 
-func (accnt Account) GetELROnLimitBid(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
+func (accnt *Account) GetELROnLimitBid(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitBidChange("", model, time, values, value, prices, queues, maxQuote)
 }
 
-func (accnt Account) GetELROnLimitAsk(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
+func (accnt *Account) GetELROnLimitAsk(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitAskChange("", model, time, values, value, prices, queues, maxBase)
 }
 
-func (accnt Account) GetELROnLimitBidChange(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
+func (accnt *Account) GetELROnLimitBidChange(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxQuote float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitBidChange(orderID, model, time, values, value, prices, queues, maxQuote)
 }
 
-func (accnt Account) GetELROnLimitAskChange(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
+func (accnt *Account) GetELROnLimitAskChange(securityID uint64, orderID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnLimitAskChange(orderID, model, time, values, value, prices, queues, maxBase)
 }
 
-func (accnt Account) GetELROnMarketBuy(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value, price, quantity, maxQuantity float64) (float64, *COrder) {
+func (accnt *Account) GetELROnMarketBuy(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value, price, quantity, maxQuantity float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnMarketBuy(model, time, values, value, price, quantity, maxQuantity)
 }
 
-func (accnt Account) GetELROnMarketSell(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value, price, quantity, maxQuantity float64) (float64, *COrder) {
+func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value, price, quantity, maxQuantity float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnMarketSell(model, time, values, value, price, quantity, maxQuantity)
 }
 
-func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
+func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
@@ -130,7 +130,7 @@ func (accnt *Account) GetLeverage(model modeling.MarketModel) float64 {
 	return usedMargin / availableMargin
 }
 
-func (accnt *Account) GetAvailableMargin(model modeling.MarketModel, leverage float64) float64 {
+func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
