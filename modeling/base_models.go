@@ -106,6 +106,7 @@ func NewMapLongShortModel() *MapLongShortModel {
 	return &MapLongShortModel{
 		longModels:  make(map[uint64]LongModel),
 		shortModels: make(map[uint64]ShortModel),
+		prices:      make(map[uint64]float64),
 	}
 }
 

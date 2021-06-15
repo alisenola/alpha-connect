@@ -17,7 +17,6 @@ import (
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
-//
 type Executor struct {
 	exchanges         []*xchangerModels.Exchange
 	accounts          []*account.Account
