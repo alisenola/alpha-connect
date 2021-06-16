@@ -776,6 +776,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				Asset:     asset,
 				Quantity:  b.Balance,
 			})
+			fmt.Println(balanceList.Balances)
 		}
 
 		balanceList.Success = true
@@ -837,6 +838,7 @@ func buildPostOrderRequest(order *messages.NewOrder) (fbinance.NewOrderRequest, 
 		rej := messages.UnsupportedOrderCharacteristic
 		return nil, &rej
 	}
+	request.SetNewOrderResponseType(fbinance.ACK_RESPONSE_TYPE)
 
 	return request, nil
 }
@@ -866,6 +868,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return err
 	}
 
+	fmt.Println(request.URL)
 	if state.globalRateLimit.IsRateLimited() {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -908,6 +911,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		b, _ := json.Marshal(order)
+		fmt.Println("ORDER DATA", string(b))
 		response.Success = true
 		response.OrderID = fmt.Sprintf("%d", order.OrderID)
 		context.Respond(response)
@@ -920,6 +925,14 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderReplaceRequest)
+	response := &messages.OrderReplaceResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	}
+	context.Respond(response)
 	return nil
 }
 

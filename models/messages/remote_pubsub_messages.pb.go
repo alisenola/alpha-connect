@@ -10,6 +10,7 @@ import (
 	types "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
@@ -23,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type RemotePubSubMessage struct {
 	ID      uint64     `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
@@ -44,7 +45,7 @@ func (m *RemotePubSubMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 		return xxx_messageInfo_RemotePubSubMessage.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +104,7 @@ func (m *PubSubSubscribeRequest) XXX_Marshal(b []byte, deterministic bool) ([]by
 		return xxx_messageInfo_PubSubSubscribeRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +162,7 @@ func (m *PubSubSubscribeResponse) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return xxx_messageInfo_PubSubSubscribeResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +214,7 @@ func (m *PubSubUnsubscribeRequest) XXX_Marshal(b []byte, deterministic bool) ([]
 		return xxx_messageInfo_PubSubUnsubscribeRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +271,7 @@ func (m *PubSubUnsubscribeResponse) XXX_Marshal(b []byte, deterministic bool) ([
 		return xxx_messageInfo_PubSubUnsubscribeResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -313,7 +314,7 @@ func (m *PubSubUnsubscribeAll) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return xxx_messageInfo_PubSubUnsubscribeAll.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -629,7 +630,7 @@ func valueToGoStringRemotePubsubMessages(v interface{}, typ string) string {
 func (m *RemotePubSubMessage) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -637,38 +638,46 @@ func (m *RemotePubSubMessage) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *RemotePubSubMessage) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *RemotePubSubMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.ID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.ID))
+	if m.Message != nil {
+		{
+			size, err := m.Message.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.Topic) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Topic)
+		copy(dAtA[i:], m.Topic)
 		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(len(m.Topic)))
-		i += copy(dAtA[i:], m.Topic)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.Message != nil {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.Message.Size()))
-		n1, err := m.Message.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n1
+	if m.ID != 0 {
+		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.ID))
+		i--
+		dAtA[i] = 0x8
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *PubSubSubscribeRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -676,38 +685,46 @@ func (m *PubSubSubscribeRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PubSubSubscribeRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PubSubSubscribeRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+	if m.Subscriber != nil {
+		{
+			size, err := m.Subscriber.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.Pattern) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Pattern)
+		copy(dAtA[i:], m.Pattern)
 		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(len(m.Pattern)))
-		i += copy(dAtA[i:], m.Pattern)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.Subscriber != nil {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.Subscriber.Size()))
-		n2, err := m.Subscriber.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n2
+	if m.RequestID != 0 {
+		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+		i--
+		dAtA[i] = 0x8
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *PubSubSubscribeResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -715,28 +732,34 @@ func (m *PubSubSubscribeResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PubSubSubscribeResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PubSubSubscribeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
-	}
 	if len(m.Error) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Error)
+		copy(dAtA[i:], m.Error)
 		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(len(m.Error)))
-		i += copy(dAtA[i:], m.Error)
+		i--
+		dAtA[i] = 0x12
 	}
-	return i, nil
+	if m.RequestID != 0 {
+		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *PubSubUnsubscribeRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -744,38 +767,46 @@ func (m *PubSubUnsubscribeRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PubSubUnsubscribeRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PubSubUnsubscribeRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+	if m.Subscriber != nil {
+		{
+			size, err := m.Subscriber.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.Pattern) > 0 {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Pattern)
+		copy(dAtA[i:], m.Pattern)
 		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(len(m.Pattern)))
-		i += copy(dAtA[i:], m.Pattern)
+		i--
+		dAtA[i] = 0x12
 	}
-	if m.Subscriber != nil {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.Subscriber.Size()))
-		n3, err := m.Subscriber.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n3
+	if m.RequestID != 0 {
+		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+		i--
+		dAtA[i] = 0x8
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *PubSubUnsubscribeResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -783,22 +814,27 @@ func (m *PubSubUnsubscribeResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PubSubUnsubscribeResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PubSubUnsubscribeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
 	if m.RequestID != 0 {
-		dAtA[i] = 0x8
-		i++
 		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.RequestID))
+		i--
+		dAtA[i] = 0x8
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func (m *PubSubUnsubscribeAll) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -806,31 +842,40 @@ func (m *PubSubUnsubscribeAll) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *PubSubUnsubscribeAll) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PubSubUnsubscribeAll) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
 	if m.Subscriber != nil {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(m.Subscriber.Size()))
-		n4, err := m.Subscriber.MarshalTo(dAtA[i:])
-		if err != nil {
-			return 0, err
+		{
+			size, err := m.Subscriber.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRemotePubsubMessages(dAtA, i, uint64(size))
 		}
-		i += n4
+		i--
+		dAtA[i] = 0x22
 	}
-	return i, nil
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintRemotePubsubMessages(dAtA []byte, offset int, v uint64) int {
+	offset -= sovRemotePubsubMessages(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *RemotePubSubMessage) Size() (n int) {
 	if m == nil {
@@ -934,14 +979,7 @@ func (m *PubSubUnsubscribeAll) Size() (n int) {
 }
 
 func sovRemotePubsubMessages(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozRemotePubsubMessages(x uint64) (n int) {
 	return sovRemotePubsubMessages(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -1143,10 +1181,7 @@ func (m *RemotePubSubMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1283,10 +1318,7 @@ func (m *PubSubSubscribeRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1387,10 +1419,7 @@ func (m *PubSubSubscribeResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1527,10 +1556,7 @@ func (m *PubSubUnsubscribeRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1599,10 +1625,7 @@ func (m *PubSubUnsubscribeResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1688,10 +1711,7 @@ func (m *PubSubUnsubscribeAll) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRemotePubsubMessages
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRemotePubsubMessages
 			}
 			if (iNdEx + skippy) > l {
@@ -1709,6 +1729,7 @@ func (m *PubSubUnsubscribeAll) Unmarshal(dAtA []byte) error {
 func skipRemotePubsubMessages(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -1740,10 +1761,8 @@ func skipRemotePubsubMessages(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -1764,55 +1783,30 @@ func skipRemotePubsubMessages(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthRemotePubsubMessages
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthRemotePubsubMessages
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowRemotePubsubMessages
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipRemotePubsubMessages(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthRemotePubsubMessages
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupRemotePubsubMessages
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthRemotePubsubMessages
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthRemotePubsubMessages = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowRemotePubsubMessages   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthRemotePubsubMessages        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowRemotePubsubMessages          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupRemotePubsubMessages = fmt.Errorf("proto: unexpected end of group")
 )

@@ -174,6 +174,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	}
 
 	for _, b := range balances {
+		accnt.assets[b.Asset.ID] = b.Asset
 		accnt.balances[b.Asset.ID] = b.Quantity
 	}
 

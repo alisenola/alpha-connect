@@ -289,9 +289,8 @@ func (state *AccountListener) Sync(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
-	btcMargin := balanceList.Balances[0].Quantity
 	// Sync account
-	if err := state.account.Sync(state.securities, orderList.Orders, positionList.Positions, nil, btcMargin, nil, nil); err != nil {
+	if err := state.account.Sync(state.securities, orderList.Orders, positionList.Positions, balanceList.Balances, 0, nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 

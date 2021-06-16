@@ -1,6 +1,7 @@
 package fbinance
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -267,17 +268,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
-	tetherMargin := 0.
-	var filteredBalances []*models.Balance
-	for _, b := range balanceList.Balances {
-		if b.Asset.ID == constants.TETHER.ID {
-			tetherMargin = b.Quantity
-		} else {
-			filteredBalances = append(filteredBalances, b)
-		}
-	}
 	// Sync account
-	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, filteredBalances, tetherMargin, nil, nil); err != nil {
+	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, 0., nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -720,9 +712,11 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 	if msg.Message == nil {
 		return fmt.Errorf("received nil message")
 	}
+	fmt.Println(msg.Message)
 	switch msg.Message.Event {
 	case fbinance.ORDER_TRADE_UPDATE:
-		fmt.Println("EXECUTION", msg.Message.Execution)
+		b, _ := json.Marshal(msg.Message.Execution)
+		fmt.Println("EXECUTION", string(b))
 		if msg.Message.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
@@ -741,6 +735,21 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 				context.Send(context.Parent(), report)
 			}
 
+		case fbinance.ET_TRADE:
+			orderID := fmt.Sprintf("%d", exec.OrderID)
+			tradeID := fmt.Sprintf("%d", exec.TradeID)
+			fmt.Println("FILLED", exec.AveragePrice, exec.CumQuantity)
+			report, err := state.account.ConfirmFill(orderID, tradeID, exec.AveragePrice, exec.CumQuantity, !exec.Maker)
+			if err != nil {
+				return fmt.Errorf("error confirming filled order: %v", err)
+			}
+			fmt.Println("FEE", report.FeeAmount)
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
 		case fbinance.ET_CANCELED:
 			report, err := state.account.ConfirmCancelOrder(exec.ClientOrderID)
 			if err != nil {
@@ -753,7 +762,8 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 			}
 		}
 	case fbinance.ACCOUNT_UPDATE:
-		fmt.Println("ACCOUNT UPDATE", msg.Message.Account)
+		b, _ := json.Marshal(msg.Message.Account)
+		fmt.Println("ACCOUNT UPDATE", string(b))
 		// TODO
 
 	case fbinance.MARGIN_CALL:

@@ -152,6 +152,7 @@ enum RejectionReason {
     UnsupportedFilter = 21;
     UnsupportedOrderType = 22;
     UnsupportedOrderTimeInForce = 23;
+    UnsupportedRequest = 24;
 }
 
 enum FeeType {

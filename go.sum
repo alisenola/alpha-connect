@@ -431,6 +431,8 @@ github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyC
 github.com/valyala/fasttemplate v1.0.1/go.mod h1:UQGH1tvbgY+Nz5t2n7tXsz52dQxojPUpymEIMZ47gx8=
 github.com/wangjia184/sortedset v0.0.0-20160527075905-f5d03557ba30 h1:kZiWylALnUy4kzoKJemjH8eqwCl3RjW1r1ITCjjW7G8=
 github.com/wangjia184/sortedset v0.0.0-20160527075905-f5d03557ba30/go.mod h1:YkocrP2K2tcw938x9gCOmT5G5eCD6jsTz0SZuyAqwIE=
+github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2 h1:ViCftzy+iQHmxIJPZqJH3i0znSxFufq075LnMwt2/VQ=
+github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2/go.mod h1:YkocrP2K2tcw938x9gCOmT5G5eCD6jsTz0SZuyAqwIE=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
@@ -444,6 +446,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20210414073010-806e8b077356 h1:N7c4c9wL8
 gitlab.com/alphaticks/gorderbook v0.0.0-20210414073010-806e8b077356/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774 h1:DTcGeP+VHyZwmutBkfoWH7Jf5uNb9awJbABs8vrhcs0=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
+gitlab.com/alphaticks/gorderbook v0.0.0-20210616120115-89b18aade871 h1:xLq09gy5zMxMJy7l1RG+jKPTxFr6b6ZEor6CDLceTl0=
+gitlab.com/alphaticks/gorderbook v0.0.0-20210616120115-89b18aade871/go.mod h1:Q7czYSyXyw4eo76eHe+BlHzC4stXLlZ5Ap6mkGy79uE=
 gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda h1:dxEtlJ5OyJ4r3wXNBuwMBwz63pCjr9qHcL0Qvucb0Fs=
 gitlab.com/alphaticks/xchanger v0.0.0-20210103120503-5dadef341bda/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20210325151841-fca2f5a3d9de h1:Q0O+H2zTEhwyGI70N9N5LYL3fKPCEanmGZXvPtNava8=
@@ -550,6 +554,10 @@ gitlab.com/alphaticks/xchanger v0.0.0-20210528121546-ab601e203998 h1:gQAg4LQHwWI
 gitlab.com/alphaticks/xchanger v0.0.0-20210528121546-ab601e203998/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20210528140106-47b033501c14 h1:ybfi+syKXrNzQYom5s1Ik4ouhC6JfZ6BuykHahIaRSY=
 gitlab.com/alphaticks/xchanger v0.0.0-20210528140106-47b033501c14/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210616115213-31368591553c h1:bM3N1fNoRXBJ/pgfc1dKnuj/i9RQa7J7SgDa32UpnCI=
+gitlab.com/alphaticks/xchanger v0.0.0-20210616115213-31368591553c/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210616115901-0aa50b8a95de h1:7Go2gW91UvlBL0QmotwkgCI9oKXnGNXarPtrkfuTxlk=
+gitlab.com/alphaticks/xchanger v0.0.0-20210616115901-0aa50b8a95de/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210129172750-a2cbffb034bb h1:deeMUS4aGO+FLsnTihoFqYoRlYGtdQ2H/cOXxkyUSqM=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210129172750-a2cbffb034bb/go.mod h1:U7B6DYX6KRF/PCRVOOfbahz5FI6StMmscxIexPWVxvY=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112 h1:y6GuegwMntqIdC1zAL6auPA3iKHQh+Ne7xNrNYGA6dY=

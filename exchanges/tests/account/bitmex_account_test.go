@@ -117,7 +117,7 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 			ExecutionInstructions: []messages.ExecutionInstruction{messages.ParticipateDoNotInitiate},
 			OrderSide:             models.Buy,
 			TimeInForce:           models.Session,
-			Quantity:              1.,
+			Quantity:              10.,
 			Price:                 &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()

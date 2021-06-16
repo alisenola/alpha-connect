@@ -18,7 +18,7 @@ var executor *actor.PID
 
 var accounts = []*models.Account{
 	BitmexAccount,
-	FBinanceAccount,
+	FBinanceTestnetAccount,
 }
 
 var As *actor.ActorSystem
