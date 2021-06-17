@@ -171,11 +171,13 @@ type Model interface {
 
 type LongModel interface {
 	Model
+	GetPenalty() float64
 	GetLongScore(feedID uint64) float64
 }
 
 type ShortModel interface {
 	Model
+	GetPenalty() float64
 	GetShortScore(feedID uint64) float64
 }
 
