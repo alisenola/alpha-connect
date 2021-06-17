@@ -290,7 +290,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		for {
 			select {
 			case _ = <-checkSocketTicker.C:
-				context.Send(pid, &checkSockets{})
+				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
@@ -303,7 +303,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkSocketTicker.C:
+			case _ = <-refreshKeyTicker.C:
 				context.Send(pid, &refreshKey{})
 			case <-time.After(31 * time.Minute):
 				// timer stopped, we leave
@@ -750,7 +750,6 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 	if msg.Message == nil {
 		return fmt.Errorf("received nil message")
 	}
-	fmt.Println(msg.Message)
 	switch msg.Message.Event {
 	case fbinance.ORDER_TRADE_UPDATE:
 		b, _ := json.Marshal(msg.Message.Execution)
@@ -807,6 +806,8 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 
 	case fbinance.MARGIN_CALL:
 		// TODO
+	case "":
+		// skip
 	default:
 		return fmt.Errorf("received unknown event type: %s", msg.Message.Event)
 	}
@@ -832,6 +833,14 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf(listenKey.Message)
 	}
 
+	req, _, err = fbinance.RefreshListenKey(state.account.Credentials)
+	if err != nil {
+		return fmt.Errorf("error getting refresh listen key request: %v", err)
+	}
+	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+		return fmt.Errorf("error refreshing listen key: %v", err)
+	}
+
 	ws := fbinance.NewAuthWebsocket(listenKey.ListenKey)
 	// TODO Dialer
 	if err := ws.Connect(&net.Dialer{}); err != nil {
@@ -852,6 +861,7 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		_ = state.ws.Ping()
+		state.lastPingTime = time.Now()
 	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -869,7 +879,7 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 func (state *AccountListener) refreshKey(context actor.Context) error {
 	req, _, err := fbinance.RefreshListenKey(state.account.Credentials)
 	if err != nil {
-		return fmt.Errorf("error getting listen key request: %v", err)
+		return fmt.Errorf("error getting refresh listen key request: %v", err)
 	}
 	if err := utils.PerformRequest(state.client, req, nil); err != nil {
 		return fmt.Errorf("error refreshing listen key: %v", err)

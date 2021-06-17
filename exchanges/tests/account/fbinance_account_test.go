@@ -386,7 +386,7 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test no order
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FBinanceTestnetAccount,
+		Account:   FBinanceAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -407,14 +407,14 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test with one order
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FBinanceTestnetAccount,
+		Account:   FBinanceAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
-			Quantity:      0.01,
+			Quantity:      0.001,
 			Price:         &types.DoubleValue{Value: 35000.},
 		},
 	}, 10*time.Second).Result()
@@ -433,7 +433,7 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Delete orders
 	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   FBinanceTestnetAccount,
+		Account:   FBinanceAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument,
 		},
@@ -449,6 +449,10 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	if !mcResponse.Success {
 		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
+}
+
+func TestListen(t *testing.T) {
+	time.Sleep(1 * time.Minute)
 }
 
 func TestFBinanceAccountListener_OnBalancesRequest(t *testing.T) {
