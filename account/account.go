@@ -721,7 +721,7 @@ func (accnt *Account) GetPositionSize(securityID uint64) float64 {
 func (accnt *Account) GetMargin() float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	return float64(accnt.margin) / accnt.MarginPrecision
+	return (float64(accnt.margin) / accnt.MarginPrecision) + accnt.balances[accnt.MarginCurrency.ID]
 }
 
 func (accnt *Account) CleanOrders() {

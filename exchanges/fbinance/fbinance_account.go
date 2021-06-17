@@ -21,19 +21,21 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
+type refreshKey struct{}
 
 type AccountListener struct {
-	account             *account.Account
-	seqNum              uint64
-	fbinanceExecutor    *actor.PID
-	ws                  *fbinance.AuthWebsocket
-	executorManager     *actor.PID
-	logger              *log.Logger
-	checkAccountPending bool
-	checkSocketPending  bool
-	lastPingTime        time.Time
-	securities          []*models.Security
-	client              *http.Client
+	account            *account.Account
+	seqNum             uint64
+	fbinanceExecutor   *actor.PID
+	ws                 *fbinance.AuthWebsocket
+	executorManager    *actor.PID
+	logger             *log.Logger
+	checkAccountTicker *time.Ticker
+	checkSocketTicker  *time.Ticker
+	refreshKeyTicker   *time.Ticker
+	lastPingTime       time.Time
+	securities         map[uint64]*models.Security
+	client             *http.Client
 }
 
 func NewAccountListenerProducer(account *account.Account) actor.Producer {
@@ -44,13 +46,11 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 
 func NewAccountListener(account *account.Account) actor.Actor {
 	return &AccountListener{
-		account:             account,
-		seqNum:              0,
-		ws:                  nil,
-		executorManager:     nil,
-		logger:              nil,
-		checkSocketPending:  false,
-		checkAccountPending: false,
+		account:         account,
+		seqNum:          0,
+		ws:              nil,
+		executorManager: nil,
+		logger:          nil,
 	}
 }
 
@@ -141,31 +141,21 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *checkSocket:
-		state.checkSocketPending = false
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-		if !state.checkSocketPending {
-			state.checkSocketPending = true
-			go func(pid *actor.PID) {
-				time.Sleep(5 * time.Second)
-				context.Send(pid, &checkSocket{})
-			}(context.Self())
-		}
 
 	case *checkAccount:
-		state.checkAccountPending = false
 		if err := state.checkAccount(context); err != nil {
-			state.logger.Error("error checking socket", log.Error(err))
+			state.logger.Error("error checking account", log.Error(err))
 			panic(err)
 		}
-		if !state.checkAccountPending {
-			state.checkAccountPending = true
-			go func(pid *actor.PID) {
-				time.Sleep(10 * time.Minute)
-				context.Send(pid, &checkAccount{})
-			}(context.Self())
+
+	case *refreshKey:
+		if err := state.refreshKey(context); err != nil {
+			state.logger.Error("error refreshing key", log.Error(err))
+			panic(err)
 		}
 	}
 }
@@ -211,7 +201,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			filteredSecurities = append(filteredSecurities, s)
 		}
 	}
-	state.securities = filteredSecurities
 
 	// Then fetch balances
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
@@ -273,22 +262,56 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
+	securityMap := make(map[uint64]*models.Security)
+	for _, sec := range filteredSecurities {
+		securityMap[sec.SecurityID] = sec
+	}
+	state.securities = securityMap
+
 	state.seqNum = 0
 
-	if !state.checkSocketPending {
-		go func(pid *actor.PID) {
-			time.Sleep(5 * time.Second)
-			context.Send(pid, &checkSocket{})
-		}(context.Self())
-		state.checkSocketPending = true
-	}
-	if !state.checkAccountPending {
-		go func(pid *actor.PID) {
-			time.Sleep(10 * time.Minute)
-			context.Send(pid, &checkAccount{})
-		}(context.Self())
-		state.checkAccountPending = true
-	}
+	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	state.checkAccountTicker = checkAccountTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-checkAccountTicker.C:
+				context.Send(pid, &checkAccount{})
+			case <-time.After(6 * time.Minute):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	checkSocketTicker := time.NewTicker(5 * time.Second)
+	state.checkSocketTicker = checkSocketTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-checkSocketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	refreshKeyTicker := time.NewTicker(30 * time.Minute)
+	state.refreshKeyTicker = refreshKeyTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-checkSocketTicker.C:
+				context.Send(pid, &refreshKey{})
+			case <-time.After(31 * time.Minute):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -298,6 +321,21 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		if err := state.ws.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+	}
+
+	if state.checkAccountTicker != nil {
+		state.checkAccountTicker.Stop()
+		state.checkAccountTicker = nil
+	}
+
+	if state.checkSocketTicker != nil {
+		state.checkSocketTicker.Stop()
+		state.checkSocketTicker = nil
+	}
+
+	if state.refreshKeyTicker != nil {
+		state.refreshKeyTicker.Stop()
+		state.refreshKeyTicker = nil
 	}
 
 	return nil
@@ -725,6 +763,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 		case fbinance.ET_NEW:
 			// New order
 			orderID := fmt.Sprintf("%d", exec.OrderID)
+			fmt.Println("CONFIRM NEW", exec.ClientOrderID, orderID)
 			report, err := state.account.ConfirmNewOrder(exec.ClientOrderID, orderID)
 			if err != nil {
 				return fmt.Errorf("error confirming new order: %v", err)
@@ -812,7 +851,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
-		//_ = state.ws.Ping()
+		_ = state.ws.Ping()
 	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -824,6 +863,17 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 		}
 	}
 
+	return nil
+}
+
+func (state *AccountListener) refreshKey(context actor.Context) error {
+	req, _, err := fbinance.RefreshListenKey(state.account.Credentials)
+	if err != nil {
+		return fmt.Errorf("error getting listen key request: %v", err)
+	}
+	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+		return fmt.Errorf("error refreshing listen key: %v", err)
+	}
 	return nil
 }
 
@@ -897,13 +947,14 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	})
 
 	for i := range pos1 {
-		if int(pos1[i].Quantity) != int(pos2[i].Quantity) {
+		lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
+		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
 			return fmt.Errorf("position have different quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		rawCost1 := int(pos1[i].Cost * state.account.MarginPrecision)
-		rawCost2 := int(pos2[i].Cost * state.account.MarginPrecision)
+		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
+		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
 		if rawCost1 != rawCost2 {
-			return fmt.Errorf("position have different cost: %f %f", pos1[i].Cost, pos2[i].Cost)
+			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
 		}
 	}
 	return nil

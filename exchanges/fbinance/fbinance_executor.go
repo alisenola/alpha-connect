@@ -786,7 +786,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
-func buildPostOrderRequest(order *messages.NewOrder) (fbinance.NewOrderRequest, *messages.RejectionReason) {
+func buildPostOrderRequest(symbol string, order *messages.NewOrder) (fbinance.NewOrderRequest, *messages.RejectionReason) {
 	var side fbinance.OrderSide
 	var typ fbinance.OrderType
 	if order.OrderSide == models.Buy {
@@ -808,7 +808,7 @@ func buildPostOrderRequest(order *messages.NewOrder) (fbinance.NewOrderRequest, 
 		return nil, &rej
 	}
 
-	request := fbinance.NewNewOrderRequest(order.Instrument.Symbol.Value, side, typ)
+	request := fbinance.NewNewOrderRequest(symbol, side, typ)
 
 	request.SetQuantity(order.Quantity)
 	request.SetNewClientOrderID(order.ClientOrderID)
@@ -850,13 +850,26 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	if req.Order.Instrument == nil || req.Order.Instrument.Symbol == nil {
-		response.RejectionReason = messages.UnknownSymbol
+	symbol := ""
+	if req.Order.Instrument != nil {
+		if req.Order.Instrument.Symbol != nil {
+			symbol = req.Order.Instrument.Symbol.Value
+		} else if req.Order.Instrument.SecurityID != nil {
+			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			symbol = sec.Symbol
+		}
+	} else {
+		response.RejectionReason = messages.UnknownSecurityID
 		context.Respond(response)
 		return nil
 	}
 
-	params, rej := buildPostOrderRequest(req.Order)
+	params, rej := buildPostOrderRequest(symbol, req.Order)
 	if rej != nil {
 		response.RejectionReason = *rej
 		context.Respond(response)
@@ -987,6 +1000,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		return err
 	}
 
+	fmt.Println(request.URL)
 	if state.globalRateLimit.IsRateLimited() {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -1005,13 +1019,32 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		queryResponse := res.(*jobs.PerformQueryResponse)
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				response.RejectionReason = messages.HTTPError
+
+				var res fbinance.Response
+				if err := json.Unmarshal(queryResponse.Response, &res); err != nil {
+					err := fmt.Errorf(
+						"%d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					context.Respond(response)
+				}
+				if res.Code == -1020 {
+					response.RejectionReason = messages.UnsupportedRequest
+				} else if res.Code < -1100 && res.Code > -1199 {
+					response.RejectionReason = messages.InvalidRequest
+				} else if res.Code == -2011 && res.Message == "Unknown order sent." {
+					response.RejectionReason = messages.UnknownOrder
+				}
+
 				err := fmt.Errorf(
 					"%d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
+					res.Code,
+					res.Message)
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
+
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
 					"%d %s",
@@ -1024,16 +1057,11 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 			return
 		}
-		var fres fbinance.Response
-		err = json.Unmarshal(queryResponse.Response, &fres)
+		var order fbinance.OrderData
+		fmt.Println(string(queryResponse.Response))
+		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
 			state.logger.Info("error unmarshalling", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return
-		}
-		if fres.Code != 200 {
-			state.logger.Info("error unmarshalling", log.Error(errors.New(fres.Message)))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
@@ -1064,7 +1092,8 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			} else if req.Filter.Instrument.SecurityID != nil {
 				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
 				if !ok {
-					response.RejectionReason = messages.UnknownSymbol
+					fmt.Println(state.securities, req.Filter.Instrument.SecurityID.Value)
+					response.RejectionReason = messages.UnknownSecurityID
 					context.Respond(response)
 					return nil
 				}

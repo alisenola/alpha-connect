@@ -13,10 +13,9 @@ type Market interface {
 
 type LongShortModel interface {
 	Market
-	GetEnterLongScore(ID uint64) float64
-	GetExitLongScore(ID uint64) float64
-	GetEnterShortScore(ID uint64) float64
-	GetExitShortScore(ID uint64) float64
+	GetPenalty() float64
+	GetLongScore(ID uint64) float64
+	GetShortScore(ID uint64) float64
 	SetLongModel(ID uint64, model LongModel)
 	SetShortModel(ID uint64, model ShortModel)
 	SetPrice(ID uint64, price float64)
@@ -136,20 +135,16 @@ func (m *MapLongShortModel) GetPairPrice(base, quote uint32) float64 {
 	return m.prices[ID]
 }
 
-func (m *MapLongShortModel) GetEnterLongScore(ID uint64) float64 {
-	return m.longModels[ID].GetEnterLongScore(ID)
+func (m *MapLongShortModel) GetLongScore(ID uint64) float64 {
+	return m.longModels[ID].GetLongScore(ID)
 }
 
-func (m *MapLongShortModel) GetExitLongScore(ID uint64) float64 {
-	return m.longModels[ID].GetExitLongScore(ID)
+func (m *MapLongShortModel) GetShortScore(ID uint64) float64 {
+	return m.shortModels[ID].GetShortScore(ID)
 }
 
-func (m *MapLongShortModel) GetEnterShortScore(ID uint64) float64 {
-	return m.shortModels[ID].GetEnterShortScore(ID)
-}
-
-func (m *MapLongShortModel) GetExitShortScore(ID uint64) float64 {
-	return m.shortModels[ID].GetExitShortScore(ID)
+func (m *MapLongShortModel) GetPenalty() float64 {
+	return 0.007984706115722657
 }
 
 /*
@@ -176,14 +171,12 @@ type Model interface {
 
 type LongModel interface {
 	Model
-	GetEnterLongScore(feedID uint64) float64
-	GetExitLongScore(feedID uint64) float64
+	GetLongScore(feedID uint64) float64
 }
 
 type ShortModel interface {
 	Model
-	GetEnterShortScore(feedID uint64) float64
-	GetExitShortScore(feedID uint64) float64
+	GetShortScore(feedID uint64) float64
 }
 
 type PriceModel interface {
