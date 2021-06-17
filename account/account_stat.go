@@ -134,6 +134,7 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 	accnt.RLock()
 	defer accnt.RUnlock()
 	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
+	availableMargin *= leverage
 	for k, p := range accnt.positions {
 		// Entry price not defined if size = 0, division by 0 !
 		if p.rawSize == 0 {
@@ -147,13 +148,13 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 			// Cannot use unrealized profit in margin
 			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
 			// Remove leveraged entry value and add PnL
-			availableMargin = availableMargin - (math.Abs(cost) / leverage) + unrealizedPnL
+			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
 		} else {
 			unrealizedPnL := exitPrice*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
 			// Cannot use unrealized profit in margin
 			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
 			// Remove leveraged entry value and add PnL
-			availableMargin = availableMargin - (math.Abs(cost) / leverage) + unrealizedPnL
+			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
 		}
 	}
 
