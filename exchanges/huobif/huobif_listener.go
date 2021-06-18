@@ -175,26 +175,29 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	// If contract deliver in more than 7 days and less than 14 days, it's NW
-	maturityDate := time.Unix(state.security.MaturityDate.Seconds, int64(state.security.MaturityDate.Nanos))
+	/*
+		maturityDate := time.Unix(state.security.MaturityDate.Seconds, int64(state.security.MaturityDate.Nanos))
 
-	var symbol string
-	nextWeek := time.Now().AddDate(0, 0, 7)
-	nextNextWeek := time.Now().AddDate(0, 0, 14)
-	nextQuarter := time.Now().AddDate(0, 3, 0)
-	nextNextQuarter := time.Now().AddDate(0, 6, 0)
-	if maturityDate.Before(nextWeek) {
-		symbol = fmt.Sprintf("%s_CW", state.security.Underlying.Symbol)
-	} else if maturityDate.Before(nextNextWeek) {
-		symbol = fmt.Sprintf("%s_NW", state.security.Underlying.Symbol)
-	} else if maturityDate.Before(nextQuarter) {
-		symbol = fmt.Sprintf("%s_CQ", state.security.Underlying.Symbol)
-	} else if maturityDate.Before(nextNextQuarter) {
-		symbol = fmt.Sprintf("%s_NQ", state.security.Underlying.Symbol)
-	} else {
-		return fmt.Errorf("unknown delivery date %v", maturityDate)
-	}
 
-	if err := ws.SubscribeMarketDepth(symbol, huobif.WSOBLevel150, true); err != nil {
+		var symbol string
+		nextWeek := time.Now().AddDate(0, 0, 7)
+		nextNextWeek := time.Now().AddDate(0, 0, 14)
+		nextQuarter := time.Now().AddDate(0, 3, 0)
+		nextNextQuarter := time.Now().AddDate(0, 6, 0)
+		if maturityDate.Before(nextWeek) {
+			symbol = fmt.Sprintf("%s_CW", state.security.Underlying.Symbol)
+		} else if maturityDate.Before(nextNextWeek) {
+			symbol = fmt.Sprintf("%s_NW", state.security.Underlying.Symbol)
+		} else if maturityDate.Before(nextQuarter) {
+			symbol = fmt.Sprintf("%s_CQ", state.security.Underlying.Symbol)
+		} else if maturityDate.Before(nextNextQuarter) {
+			symbol = fmt.Sprintf("%s_NQ", state.security.Underlying.Symbol)
+		} else {
+			return fmt.Errorf("unknown delivery date %v", maturityDate)
+		}
+	*/
+
+	if err := ws.SubscribeMarketDepth(state.security.Symbol, huobif.WSOBLevel150, true); err != nil {
 		return fmt.Errorf("error subscribing to orderbook for %s", state.security.Symbol)
 	}
 
@@ -237,8 +240,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error getting orderbook")
 	}
 
-	if err := ws.SubscribeMarketTradeDetail(symbol); err != nil {
-		return fmt.Errorf("error subscribing to trades for %s", symbol)
+	if err := ws.SubscribeMarketTradeDetail(state.security.Symbol); err != nil {
+		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
 	}
 
 	state.ws = ws
