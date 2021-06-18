@@ -50,7 +50,7 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 		Portfolio.AddAccount(accnt)
 		return accnt, nil
 	case constants.FBINANCE.ID:
-		accnt, err := account.NewAccount(accountInfo, &constants.TETHER, 1000000)
+		accnt, err := account.NewAccount(accountInfo, &constants.TETHER, 100000000)
 		if err != nil {
 			return nil, err
 		}
