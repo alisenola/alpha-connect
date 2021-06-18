@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"gitlab.com/alphaticks/xchanger/utils"
@@ -134,9 +135,9 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *fbinance.AuthWebsocketMessage:
-		if err := state.onAuthWebsocketMessage(context); err != nil {
-			state.logger.Error("error processing AuthWebsocketMessage", log.Error(err))
+	case *xchanger.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing WebsocketMessage", log.Error(err))
 			panic(err)
 		}
 
@@ -636,6 +637,9 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 					context.Respond(response)
 
 					if !response.Success {
+						if response.RejectionReason == messages.UnknownOrder {
+							panic(fmt.Errorf("unknown order rejection"))
+						}
 						report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
 						if err != nil {
 							panic(err)
@@ -744,20 +748,25 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	return nil
 }
 
-func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) error {
+func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*xchanger.WebsocketMessage)
+	if state.ws == nil || msg.WSID != state.ws.ID {
+		return nil
+	}
 	state.lastPingTime = time.Now()
-	msg := context.Message().(*fbinance.AuthWebsocketMessage)
+
 	if msg.Message == nil {
 		return fmt.Errorf("received nil message")
 	}
-	switch msg.Message.Event {
+	udata := msg.Message.(*fbinance.UserDataUpdate)
+	switch udata.Event {
 	case fbinance.ORDER_TRADE_UPDATE:
-		b, _ := json.Marshal(msg.Message.Execution)
+		b, _ := json.Marshal(udata.Execution)
 		fmt.Println("EXECUTION", string(b))
-		if msg.Message.Execution == nil {
+		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
-		exec := msg.Message.Execution
+		exec := udata.Execution
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
 			// New order
@@ -800,7 +809,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 			}
 		}
 	case fbinance.ACCOUNT_UPDATE:
-		b, _ := json.Marshal(msg.Message.Account)
+		b, _ := json.Marshal(udata.Account)
 		fmt.Println("ACCOUNT UPDATE", string(b))
 		// TODO
 
@@ -809,7 +818,7 @@ func (state *AccountListener) onAuthWebsocketMessage(context actor.Context) erro
 	case "":
 		// skip
 	default:
-		return fmt.Errorf("received unknown event type: %s", msg.Message.Event)
+		return fmt.Errorf("received unknown event type: %s", udata.Event)
 	}
 
 	return nil

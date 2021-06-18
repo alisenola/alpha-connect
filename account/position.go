@@ -120,6 +120,11 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 	return fee, realizedCost
 }
 
+func (pos *Position) Funding(markPrice, fee float64) int64 {
+	size := float64(pos.rawSize) / pos.lotPrecision
+	return int64(math.Floor(size * markPrice * pos.marginPrecision * math.Abs(pos.multiplier) * fee))
+}
+
 func (pos *Position) GetPosition() *models.Position {
 	if pos.rawSize != 0 {
 		return &models.Position{

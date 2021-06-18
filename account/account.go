@@ -618,6 +618,18 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	return er, nil
 }
 
+func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee float64) (*messages.ExecutionReport, error) {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	if pos, ok := accnt.positions[security]; ok {
+		fee := pos.Funding(markPrice, fundingFee)
+		accnt.margin -= fee
+		return nil, nil
+	} else {
+		return nil, fmt.Errorf("no open position for the funding")
+	}
+}
+
 func (accnt *Account) Settle() {
 	accnt.balances[accnt.MarginCurrency.ID] += float64(accnt.margin) / accnt.MarginPrecision
 	// TODO check less than zero
