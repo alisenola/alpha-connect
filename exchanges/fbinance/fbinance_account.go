@@ -603,6 +603,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
 			RejectionReason: *res,
+			Success:         false,
 		})
 	} else {
 		context.Respond(&messages.OrderCancelResponse{
@@ -786,7 +787,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			orderID := fmt.Sprintf("%d", exec.OrderID)
 			tradeID := fmt.Sprintf("%d", exec.TradeID)
 			fmt.Println("FILLED", exec.AveragePrice, exec.CumQuantity)
-			report, err := state.account.ConfirmFill(orderID, tradeID, exec.AveragePrice, exec.CumQuantity, !exec.Maker)
+			report, err := state.account.ConfirmFill(orderID, tradeID, exec.LastFilledPrice, exec.LastFilledQuantity, !exec.Maker)
 			if err != nil {
 				return fmt.Errorf("error confirming filled order: %v", err)
 			}
@@ -811,7 +812,27 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	case fbinance.ACCOUNT_UPDATE:
 		b, _ := json.Marshal(udata.Account)
 		fmt.Println("ACCOUNT UPDATE", string(b))
-		// TODO
+		var reason messages.UpdateReason
+		switch udata.Account.Reason {
+		case "DEPOSIT":
+			reason = messages.Deposit
+		case "WITHDRAW":
+			reason = messages.Withdraw
+		case "FUNDING_FEE":
+			reason = messages.FundingFee
+		default:
+			// Skip
+			return nil
+		}
+		for _, b := range udata.Account.Balances {
+			asset, ok := constants.GetAssetBySymbol(b.Asset)
+			if !ok {
+				return fmt.Errorf("got update for unknown asset %s", b.Asset)
+			}
+			if _, err := state.account.UpdateBalance(asset, b.WalletBalance, reason); err != nil {
+				return fmt.Errorf("error updating account balance: %v", err)
+			}
+		}
 
 	case fbinance.MARGIN_CALL:
 		// TODO

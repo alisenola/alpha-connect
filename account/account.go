@@ -618,7 +618,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	return er, nil
 }
 
-func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee float64) (*messages.ExecutionReport, error) {
+func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee float64) (*messages.AccountUpdate, error) {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	if pos, ok := accnt.positions[security]; ok {
@@ -628,6 +628,24 @@ func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee floa
 	} else {
 		return nil, fmt.Errorf("no open position for the funding")
 	}
+}
+
+func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64, reason messages.UpdateReason) (*messages.AccountUpdate, error) {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	if _, ok := accnt.assets[asset.ID]; !ok {
+		accnt.assets[asset.ID] = asset
+	}
+	// Reset margin, as we have a fresh balance for it
+	if asset.ID == accnt.MarginCurrency.ID {
+		accnt.margin = 0
+	}
+	accnt.balances[asset.ID] = balance
+	return &messages.AccountUpdate{
+		UpdateReason: reason,
+		Asset:        accnt.assets[asset.ID],
+		Balance:      balance,
+	}, nil
 }
 
 func (accnt *Account) Settle() {

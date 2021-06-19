@@ -193,6 +193,21 @@ message ExecutionReport {
     RejectionReason rejection_reason = 19;
 }
 
+message AccountUpdate {
+    UpdateReason update_reason = 1;
+    models.Asset asset = 2;
+    double balance = 3;
+}
+
+enum UpdateReason {
+    FundingFee = 0;
+    Transfer = 1;
+    Deposit = 2;
+    Withdraw = 3;
+    Order = 4;
+    Unknown = 5;
+}
+
 message SideValue {
     models.Side value = 1;
 }
