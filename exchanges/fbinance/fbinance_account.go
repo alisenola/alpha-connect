@@ -271,14 +271,14 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	state.seqNum = 0
 
-	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	checkAccountTicker := time.NewTicker(15 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
 			case _ = <-checkAccountTicker.C:
 				context.Send(pid, &checkAccount{})
-			case <-time.After(6 * time.Minute):
+			case <-time.After(16 * time.Minute):
 				// timer stopped, we leave
 				return
 			}
