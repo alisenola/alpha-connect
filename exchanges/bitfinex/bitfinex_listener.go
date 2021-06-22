@@ -444,11 +444,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		fmt.Println("LIQ", liq)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			Liquidation: &models.Liquidation{
-				Bid:       liq.IsMarketSold,
+				Bid:       liq.Amount > 0,
 				Timestamp: utils.MilliToTimestamp(ts),
 				OrderID:   liq.PositionID,
 				Price:     liq.LiquidationPrice,
-				Quantity:  liq.Amount,
+				Quantity:  math.Abs(liq.Amount),
 			},
 			SeqNum: state.instrumentData.seqNum + 1,
 		}
