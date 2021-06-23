@@ -369,6 +369,62 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			if err != nil {
 				return fmt.Errorf("error parsing trade ID: %s %v", trade.TradeID, err)
 			}
+			if trade.Liquidation != nil {
+				if *trade.Liquidation == "MT" {
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Liquidation: &models.Liquidation{
+							Bid:       true,
+							Timestamp: utils.MilliToTimestamp(ts),
+							OrderID:   uint64(tradeID),
+							Price:     trade.Price,
+							Quantity:  trade.Amount,
+						},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Liquidation: &models.Liquidation{
+							Bid:       false,
+							Timestamp: utils.MilliToTimestamp(ts),
+							OrderID:   uint64(tradeID),
+							Price:     trade.Price,
+							Quantity:  trade.Amount,
+						},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+				} else if *trade.Liquidation == "T" {
+					// Taker side of the trade was liquidated
+					// So if direction is "buy", the liquidation
+					// was on the bid
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Liquidation: &models.Liquidation{
+							Bid:       trade.Direction == "buy",
+							Timestamp: utils.MilliToTimestamp(ts),
+							OrderID:   uint64(tradeID),
+							Price:     trade.Price,
+							Quantity:  trade.Amount,
+						},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+				} else if *trade.Liquidation == "M" {
+					// Maker side of the trade was liquidated
+					// So if direction is "sell", the liquidation
+					// was on the bid
+					context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+						Liquidation: &models.Liquidation{
+							Bid:       trade.Direction == "sell",
+							Timestamp: utils.MilliToTimestamp(ts),
+							OrderID:   uint64(tradeID),
+							Price:     trade.Price,
+							Quantity:  trade.Amount,
+						},
+						SeqNum: state.instrumentData.seqNum + 1,
+					})
+					state.instrumentData.seqNum += 1
+				}
+			}
 			if aggTrade == nil || aggHelpR != aggHelp {
 				if aggTrade != nil {
 					// Send aggregate trade
