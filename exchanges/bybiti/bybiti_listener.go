@@ -27,24 +27,26 @@ type checkSockets struct{}
 type updateLiquidations struct{}
 
 type InstrumentData struct {
-	orderBook      *gorderbook.OrderBookL2
-	seqNum         uint64
-	lastUpdateID   uint64
-	lastUpdateTime uint64
-	lastHBTime     time.Time
-	lastAggTradeTs uint64
+	orderBook           *gorderbook.OrderBookL2
+	seqNum              uint64
+	lastUpdateID        uint64
+	lastUpdateTime      uint64
+	lastHBTime          time.Time
+	lastAggTradeTs      uint64
+	lastLiquidationTime uint64
 }
 
 type Listener struct {
-	ws              *bybiti.Websocket
-	security        *models.Security
-	dialerPool      *xchangerUtils.DialerPool
-	instrumentData  *InstrumentData
-	executorManager *actor.PID
-	mediator        *actor.PID
-	logger          *log.Logger
-	lastPingTime    time.Time
-	socketTicker    *time.Ticker
+	ws                *bybiti.Websocket
+	security          *models.Security
+	dialerPool        *xchangerUtils.DialerPool
+	instrumentData    *InstrumentData
+	executor          *actor.PID
+	mediator          *actor.PID
+	logger            *log.Logger
+	lastPingTime      time.Time
+	socketTicker      *time.Ticker
+	liquidationTicker *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -55,14 +57,14 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		ws:              nil,
-		security:        security,
-		dialerPool:      dialerPool,
-		instrumentData:  nil,
-		executorManager: nil,
-		mediator:        nil,
-		logger:          nil,
-		socketTicker:    nil,
+		ws:             nil,
+		security:       security,
+		dialerPool:     dialerPool,
+		instrumentData: nil,
+		executor:       nil,
+		mediator:       nil,
+		logger:         nil,
+		socketTicker:   nil,
 	}
 }
 
@@ -138,15 +140,16 @@ func (state *Listener) Initialize(context actor.Context) error {
 	}
 
 	state.mediator = actor.NewPID(context.ActorSystem().Address(), "data_broker")
-	state.executorManager = actor.NewPID(context.ActorSystem().Address(), "exchange_executor_manager")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
-		orderBook:      nil,
-		seqNum:         uint64(time.Now().UnixNano()),
-		lastUpdateID:   0,
-		lastUpdateTime: 0,
-		lastHBTime:     time.Now(),
+		orderBook:           nil,
+		seqNum:              uint64(time.Now().UnixNano()),
+		lastUpdateID:        0,
+		lastUpdateTime:      0,
+		lastHBTime:          time.Now(),
+		lastLiquidationTime: uint64(time.Now().UnixNano()) / 1000000,
 	}
 
 	if err := state.subscribeInstrument(context); err != nil {
@@ -167,6 +170,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	liquidationTicker := time.NewTicker(10 * time.Second)
+	state.liquidationTicker = liquidationTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-liquidationTicker.C:
+				context.Send(pid, &updateLiquidations{})
+			case <-time.After(11 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -180,6 +197,11 @@ func (state *Listener) Clean(context actor.Context) error {
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
+	}
+
+	if state.liquidationTicker != nil {
+		state.liquidationTicker.Stop()
+		state.liquidationTicker = nil
 	}
 
 	return nil
@@ -282,13 +304,16 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 func (state *Listener) OnHistoricalLiquidationsResponse(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalLiquidationsResponse)
+	if !msg.Success {
+		state.logger.Info("error getting historical liquidations", log.Error(errors.New(msg.RejectionReason.String())))
+	}
 	for _, liq := range msg.Liquidations {
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			Liquidation: liq,
 			SeqNum:      state.instrumentData.seqNum + 1,
 		})
 		state.instrumentData.seqNum += 1
-		fmt.Println(liq)
+		state.instrumentData.lastLiquidationTime = utils.TimestampToMilli(liq.Timestamp)
 	}
 	return nil
 }
@@ -502,6 +527,15 @@ func (state *Listener) checkSockets(context actor.Context) error {
 }
 
 func (state *Listener) updateLiquidations(context actor.Context) error {
-	context.Request(state.executorManager, &messages.HistoricalLiquidationsRequest{})
+
+	context.Request(state.executor, &messages.HistoricalLiquidationsRequest{
+		RequestID: 0,
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+		},
+		From: utils.MilliToTimestamp(state.instrumentData.lastLiquidationTime + 1),
+		To:   nil,
+	})
+
 	return nil
 }

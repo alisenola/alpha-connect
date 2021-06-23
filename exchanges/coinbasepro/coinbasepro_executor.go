@@ -42,10 +42,9 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.SecurityList:
 		context.Forward(context.Parent())
 
-	case *messages.SecurityListRequest:
-		context.Forward(state.publicExecutor)
-
-	case *messages.MarketDataRequest:
+	case *messages.SecurityListRequest,
+		*messages.HistoricalLiquidationsRequest,
+		*messages.MarketDataRequest:
 		context.Forward(state.publicExecutor)
 	}
 }

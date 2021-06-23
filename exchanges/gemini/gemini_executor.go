@@ -188,6 +188,12 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
+	context.Respond(&messages.HistoricalLiquidationsResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
 	return nil
 }
 
