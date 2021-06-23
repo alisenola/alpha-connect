@@ -98,6 +98,12 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.HistoricalLiquidationsResponse:
+		if err := state.OnHistoricalLiquidationsResponse(context); err != nil {
+			state.logger.Error("error processing OnHistoricalLiquidationsResponse", log.Error(err))
+			panic(err)
+		}
+
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
@@ -271,6 +277,19 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	}
 
 	context.Respond(response)
+	return nil
+}
+
+func (state *Listener) OnHistoricalLiquidationsResponse(context actor.Context) error {
+	msg := context.Message().(*messages.HistoricalLiquidationsResponse)
+	for _, liq := range msg.Liquidations {
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			Liquidation: liq,
+			SeqNum:      state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		fmt.Println(liq)
+	}
 	return nil
 }
 

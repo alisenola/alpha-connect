@@ -19,6 +19,7 @@ import (
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 	"unicode"
@@ -365,6 +366,9 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 				Quantity:  l.Quantity,
 			})
 		}
+		sort.Slice(liquidations, func(i, j int) bool {
+			return utils.TimestampToMilli(liquidations[i].Timestamp) < utils.TimestampToMilli(liquidations[j].Timestamp)
+		})
 		response.Liquidations = liquidations
 		response.Success = true
 		context.Respond(response)
