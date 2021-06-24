@@ -149,15 +149,14 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 			// Cannot use unrealized profit in margin
 			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
 			// Remove leveraged entry value and add PnL
-			availableMargin -= math.Abs(cost) + unrealizedPnL
+			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
 		} else {
 			unrealizedPnL := exitPrice*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
 			// Cannot use unrealized profit in margin
 			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
 			// Remove leveraged entry value and add PnL
 			//fmt.Println("REMOVE 1", availableMargin)
-			availableMargin -= math.Abs(cost) + unrealizedPnL
-			//fmt.Println("REMOVE 2", availableMargin, math.Abs(cost) + unrealizedPnL, availableMargin - math.Abs(cost) + unrealizedPnL)
+			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
 		}
 	}
 
