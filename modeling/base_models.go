@@ -144,7 +144,13 @@ func (m *MapLongShortModel) GetShortScore(ID uint64) float64 {
 }
 
 func (m *MapLongShortModel) GetPenalty() float64 {
-	return 0.007984706115722657
+	for _, m := range m.shortModels {
+		return m.GetPenalty()
+	}
+	for _, m := range m.longModels {
+		return m.GetPenalty()
+	}
+	return 0.
 }
 
 /*
