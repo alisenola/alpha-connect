@@ -970,12 +970,12 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	var pos2 []*models.Position
 	for _, p := range positionList.Positions {
-		if p.Quantity > 0 {
+		if p.Quantity != 0 {
 			pos2 = append(pos2, p)
 		}
 	}
 	if len(pos1) != len(pos2) {
-		return fmt.Errorf("different number of positions")
+		return fmt.Errorf("different number of positions: %d %d", len(pos1), len(pos2))
 	}
 
 	// sort
