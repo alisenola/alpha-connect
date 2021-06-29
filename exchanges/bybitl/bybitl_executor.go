@@ -2,6 +2,7 @@ package bybitl
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -14,29 +15,34 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
+	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
-	"io/ioutil"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 	"unicode"
 )
 
-type Executor struct {
-	client      *http.Client
-	securities  []*models.Security
-	rateLimit   *exchanges.RateLimit
-	queryRunner *actor.PID
-	logger      *log.Logger
+type QueryRunner struct {
+	pid       *actor.PID
+	rateLimit *exchanges.RateLimit
 }
 
-func NewExecutor() actor.Actor {
+type Executor struct {
+	securities   map[uint64]*models.Security
+	queryRunners []*QueryRunner
+	dialerPool   *xutils.DialerPool
+	logger       *log.Logger
+}
+
+func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		client:      nil,
-		rateLimit:   nil,
-		queryRunner: nil,
-		logger:      nil,
+		queryRunners: nil,
+		logger:       nil,
+		dialerPool:   dialerPool,
 	}
 }
 
@@ -55,18 +61,24 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid:       context.Spawn(props),
+			rateLimit: exchanges.NewRateLimit(10, time.Second),
+		})
 	}
-	state.rateLimit = exchanges.NewRateLimit(10, time.Second)
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
-	})
-	state.queryRunner = context.Spawn(props)
 
 	return state.UpdateSecurityList(context)
 }
@@ -81,42 +93,37 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	if state.rateLimit.IsRateLimited() {
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.rateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
-	state.rateLimit.Request(weight)
 
-	resp, err := state.client.Do(request)
-	if err != nil {
-		return err
-	}
-	response, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
+	qr.rateLimit.Request(weight)
 
-	if resp.StatusCode != 200 {
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			err := fmt.Errorf(
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("http client error: %v", err)
+	}
+	queryResponse := res.(*jobs.PerformQueryResponse)
+	if queryResponse.StatusCode != 200 {
+		if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+			return fmt.Errorf(
 				"http client error: %d %s",
-				resp.StatusCode,
-				string(response))
-			return err
-		} else if resp.StatusCode >= 500 {
-			err := fmt.Errorf(
+				queryResponse.StatusCode,
+				string(queryResponse.Response))
+		} else if queryResponse.StatusCode >= 500 {
+			return fmt.Errorf(
 				"http server error: %d %s",
-				resp.StatusCode,
-				string(response))
-			return err
-		} else {
-			err := fmt.Errorf("%d %s",
-				resp.StatusCode,
-				string(response))
-			return err
+				queryResponse.StatusCode,
+				string(queryResponse.Response))
 		}
 	}
 
@@ -128,7 +135,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		Result        []bybitl.Symbol `json:"result"`
 	}
 	var data Res
-	err = json.Unmarshal(response, &data)
+	err = json.Unmarshal(queryResponse.Response, &data)
 	if err != nil {
 		err = fmt.Errorf(
 			"error unmarshaling response: %v",
@@ -202,37 +209,161 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 		securities = append(securities, &security)
 	}
-	state.securities = securities
+
+	state.securities = make(map[uint64]*models.Security)
+	for _, s := range securities {
+		state.securities[s.SecurityID] = s
+	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
-
+		Securities: securities})
 	return nil
 }
 
 func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
-
+	securities := make([]*models.Security, len(state.securities))
+	i := 0
+	for _, v := range state.securities {
+		securities[i] = v
+		i += 1
+	}
 	context.Respond(&messages.SecurityList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }
 
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	// TODO
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+	response := &messages.HistoricalLiquidationsResponse{
+		RequestID: msg.RequestID,
+		Success:   false,
+	}
+
+	// Find security
+	if msg.Instrument == nil || msg.Instrument.SecurityID == nil {
+		response.Success = false
+		response.RejectionReason = messages.UnknownSecurityID
+		context.Respond(response)
+		return nil
+	}
+	securityID := msg.Instrument.SecurityID.Value
+	security, ok := state.securities[securityID]
+	if !ok {
+		response.Success = false
+		response.RejectionReason = messages.UnknownSecurityID
+		context.Respond(response)
+		return nil
+	}
+
+	p := bybitl.NewLiquidatedOrdersParams(security.Symbol)
+	if msg.From != nil {
+		p.SetStartTime(uint64(msg.From.Seconds*1000) + uint64(msg.From.Nanos/1000000))
+	}
+	if msg.To != nil {
+		p.SetEndTime(uint64(msg.To.Seconds*1000) + uint64(msg.From.Nanos/1000000))
+	}
+
+	request, weight, err := bybitl.GetLiquidatedOrders(p)
+	if err != nil {
+		return err
+	}
+
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.rateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.rateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("request error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			}
+			return
+		}
+
+		type Res struct {
+			ReturnCode    int                  `json:"ret_code"`
+			ReturnMessage string               `json:"ret_msg"`
+			ExitCode      string               `json:"ext_code"`
+			ExitInfo      string               `json:"ext_info"`
+			Result        []bybiti.Liquidation `json:"result"`
+		}
+		var bres Res
+		err = json.Unmarshal(queryResponse.Response, &bres)
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		if bres.ReturnCode != 0 {
+			state.logger.Info("http error", log.Error(errors.New(bres.ReturnMessage)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		var liquidations []*models.Liquidation
+		for _, l := range bres.Result {
+			liquidations = append(liquidations, &models.Liquidation{
+				Bid:       l.Side == "Buy",
+				Timestamp: utils.MilliToTimestamp(l.Time),
+				OrderID:   uint64(l.ID),
+				Price:     l.Price,
+				Quantity:  l.Quantity,
+			})
+		}
+		sort.Slice(liquidations, func(i, j int) bool {
+			return utils.TimestampToMilli(liquidations[i].Timestamp) < utils.TimestampToMilli(liquidations[j].Timestamp)
+		})
+		response.Liquidations = liquidations
+		response.Success = true
+		context.Respond(response)
 	})
+
 	return nil
 }
 

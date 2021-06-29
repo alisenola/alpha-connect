@@ -104,8 +104,11 @@ func (lq *LiveQuery) SetNextDeadline(time time.Time) {
 }
 
 func (lq *LiveQuery) Next() bool {
-	el, ok := <-lq.ch
-	if !ok {
+	var el interface{}
+	select {
+	case el = <-lq.ch:
+		break
+	default:
 		return false
 	}
 	switch msg := el.(type) {

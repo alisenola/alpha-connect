@@ -31,7 +31,6 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	client       *http.Client
 	securities   map[uint64]*models.Security
 	queryRunners []*QueryRunner
 	dialerPool   *xutils.DialerPool
@@ -40,7 +39,6 @@ type Executor struct {
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		client:       nil,
 		queryRunners: nil,
 		logger:       nil,
 		dialerPool:   dialerPool,
@@ -61,14 +59,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
-	}
 
 	dialers := state.dialerPool.GetDialers()
 	for _, dialer := range dialers {

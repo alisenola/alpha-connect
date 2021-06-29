@@ -23,7 +23,6 @@ import (
 )
 
 type checkSockets struct{}
-
 type updateLiquidations struct{}
 
 type InstrumentData struct {
