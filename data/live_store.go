@@ -39,7 +39,7 @@ type LiveStore struct {
 
 func NewLiveStore(as *actor.ActorSystem) (*LiveStore, error) {
 	executor := as.NewLocalPID("executor")
-	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 20*time.Second).Result()
 	if err != nil {
 		return nil, fmt.Errorf("error fetching securities: %v", err)
 	}
