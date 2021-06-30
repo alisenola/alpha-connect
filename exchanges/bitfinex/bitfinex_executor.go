@@ -81,7 +81,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunner = context.Spawn(props)
 
 	if err := state.UpdateSecurityList(context); err != nil {
-		state.logger.Info("error updating security list: %v", err)
+		state.logger.Info("error updating security list: %v", log.Error(err))
 	}
 	return nil
 }
