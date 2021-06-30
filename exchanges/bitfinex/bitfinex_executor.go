@@ -80,7 +80,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 	})
 	state.queryRunner = context.Spawn(props)
 
-	return state.UpdateSecurityList(context)
+	if err := state.UpdateSecurityList(context); err != nil {
+		state.logger.Info("error updating security list: %v", err)
+	}
+	return nil
 }
 
 func (state *Executor) Clean(context actor.Context) error {
