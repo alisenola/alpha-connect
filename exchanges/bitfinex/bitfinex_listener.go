@@ -279,6 +279,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+		fmt.Println("SUBSCRIBING PERP")
 		if err := ws.SubscribeStatus(symbol); err != nil {
 			return err
 		}
@@ -418,6 +419,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bitfinex.WSStatus:
 		status := msg.Message.(bitfinex.WSStatus)
+		fmt.Println("STATUS", status)
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			Stats: []*models.Stat{{
