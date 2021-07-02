@@ -419,7 +419,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bitfinex.WSStatus:
 		status := msg.Message.(bitfinex.WSStatus)
-		fmt.Println("STATUS", status)
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			Stats: []*models.Stat{{
