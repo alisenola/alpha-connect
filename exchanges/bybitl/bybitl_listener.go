@@ -108,6 +108,12 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
+
+	case *updateLiquidations:
+		if err := state.updateLiquidations(context); err != nil {
+			state.logger.Error("error updating liquidations", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
