@@ -162,7 +162,7 @@ func (state *AccountListener) Receive(context actor.Context) {
 }
 
 func (state *AccountListener) Initialize(context actor.Context) error {
-	// When initialize is done, the account must be aware of all the settings / assets / portofilio
+	// When initialize is done, the account must be aware of all the settings / assets / portfolio
 	// so as to be able to answer to FIX messages
 
 	state.logger = log.New(
@@ -786,7 +786,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		case fbinance.ET_TRADE:
 			orderID := fmt.Sprintf("%d", exec.OrderID)
 			tradeID := fmt.Sprintf("%d", exec.TradeID)
-			fmt.Println("FILLED", exec.AveragePrice, exec.CumQuantity)
+			fmt.Println("FILLED", exec.LastFilledPrice, exec.LastFilledQuantity)
 			report, err := state.account.ConfirmFill(orderID, tradeID, exec.LastFilledPrice, exec.LastFilledQuantity, !exec.Maker)
 			if err != nil {
 				return fmt.Errorf("error confirming filled order: %v", err)

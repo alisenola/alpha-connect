@@ -88,6 +88,13 @@ func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, m
 func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64, makerFee, takerFee *float64) error {
 	accnt.Lock()
 	defer accnt.Unlock()
+	accnt.ordersID = make(map[string]*Order)
+	accnt.ordersClID = make(map[string]*Order)
+	accnt.securities = make(map[uint64]Security)
+	accnt.positions = make(map[uint64]*Position)
+	accnt.balances = make(map[uint32]float64)
+	accnt.assets = make(map[uint32]*xchangerModels.Asset)
+
 	var err error
 	for _, s := range securities {
 		switch s.SecurityType {

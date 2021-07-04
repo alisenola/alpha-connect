@@ -66,6 +66,7 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 		// math.Ceil doesn't work: -21581.95 -> -21581 but should have been -21582
 		// math.Round doesn't work: -21561.017 -> -21561 but should have been -21562
 		// math.Floor doesn't work: -21522.73 -> -21523 but should have been -21522
+		// Raw opened margin value
 		openedMarginValue := int64(math.Round(float64(rawFillQuantity*rawPrice) / pos.lotPrecision))
 		pos.cost += openedMarginValue
 		pos.rawSize += rawFillQuantity
