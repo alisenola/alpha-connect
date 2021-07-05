@@ -42,7 +42,7 @@ func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.AccountID] = account
 }
 
-func (p *Portfolio) Value(model modeling.MarketModel) float64 {
+func (p *Portfolio) Value(model modeling.Market) float64 {
 	value := 0.
 	for _, exch := range p.accountPortfolios {
 		value += exch.Value(model)

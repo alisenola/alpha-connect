@@ -219,7 +219,11 @@ func (m *ConstantPriceModel) SetSelectors(_ []tickobjects.TickObject) {
 
 }
 
-func (m *ConstantPriceModel) Forward(_ uint64, _ int) {
+func (m *ConstantPriceModel) GetSelectors() []string {
+	return nil
+}
+
+func (m *ConstantPriceModel) Forward(selector int, tick uint64, objectID uint64, object tickobjects.TickObject) {
 
 }
 

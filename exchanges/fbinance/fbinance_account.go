@@ -600,12 +600,14 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	}
 	report, res := state.account.CancelOrder(ID)
 	if res != nil {
+		fmt.Println("RES NOT NIL", res.String())
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
 			RejectionReason: *res,
 			Success:         false,
 		})
 	} else {
+		fmt.Println("CANCEL SUCCESSFUL PENDING SENDING RES")
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID: req.RequestID,
 			Success:   true,
@@ -622,11 +624,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 						if err != nil {
 							panic(err)
 						}
-						context.Respond(&messages.OrderCancelResponse{
-							RequestID:       req.RequestID,
-							Success:         false,
-							RejectionReason: messages.Other,
-						})
 						if report != nil {
 							report.SeqNum = state.seqNum + 1
 							state.seqNum += 1
@@ -635,7 +632,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 						return
 					}
 					response := res.(*messages.OrderCancelResponse)
-					context.Respond(response)
 
 					if !response.Success {
 						if response.RejectionReason == messages.UnknownOrder {
