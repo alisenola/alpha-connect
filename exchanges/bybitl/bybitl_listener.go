@@ -41,6 +41,7 @@ type Listener struct {
 	dialerPool        *xchangerUtils.DialerPool
 	instrumentData    *InstrumentData
 	executor          *actor.PID
+	mediator          *actor.PID
 	logger            *log.Logger
 	lastPingTime      time.Time
 	socketTicker      *time.Ticker
@@ -60,6 +61,7 @@ func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool
 		dialerPool:     dialerPool,
 		instrumentData: nil,
 		executor:       nil,
+		mediator:       nil,
 		logger:         nil,
 		socketTicker:   nil,
 	}
@@ -97,6 +99,12 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.HistoricalLiquidationsResponse:
+		if err := state.OnHistoricalLiquidationsResponse(context); err != nil {
+			state.logger.Error("error processing OnHistoricalLiquidationsResponse", log.Error(err))
+			panic(err)
+		}
+
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
@@ -130,6 +138,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
 
+	state.mediator = actor.NewPID(context.ActorSystem().Address(), "data_broker")
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
 	state.lastPingTime = time.Now()
 
