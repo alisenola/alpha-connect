@@ -179,7 +179,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
 
-	if err := ws.Subscribe(state.security.Symbol, dydx.WSOrderBookV3); err != nil {
+	if err := ws.SubscribeOrderBook(state.security.Symbol, false); err != nil {
 		return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 	}
 
@@ -230,11 +230,14 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err := ob.Sync(bids, asks); err != nil {
 		return fmt.Errorf("error syncing order book: %v", err)
 	}
+	if ob.Crossed() {
+		return fmt.Errorf("order book crossed")
+	}
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
 
-	if err := ws.Subscribe(state.security.Symbol, dydx.WSTradesV3); err != nil {
+	if err := ws.SubscribeTrades(state.security.Symbol); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
@@ -289,7 +292,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			return state.subscribeInstrument(context)
 		}
 		state.lastMessageID = res.MessageID
-
 		var bids, asks []gorderbook.OrderBookLevel
 
 		for _, l := range res.Contents.Bids {
@@ -363,7 +365,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		var aggTrade *models.AggregatedTrade
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		for _, trade := range res.Contents.Trades {
-			fmt.Println(trade)
 			aggID := (uint64(trade.CreatedAt.UnixNano()) / 1000) * 10
 			// Add one to aggregatedID if it's a sell so that
 			// buy and sell happening at the same time won't have the same ID
