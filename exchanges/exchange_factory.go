@@ -157,7 +157,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.CRYPTOFACILITIES.ID:
 		return func() actor.Actor { return cryptofacilities.NewExecutor() }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewExecutor() }
+		return func() actor.Actor { return fbinance.NewExecutor(dialerPool) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewExecutor() }
 	case constants.GEMINI.ID:
