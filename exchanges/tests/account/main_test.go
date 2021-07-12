@@ -7,6 +7,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
+	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"os"
@@ -17,7 +18,7 @@ var executor *actor.PID
 
 var accounts = []*models.Account{
 	BitmexAccount,
-	FBinanceAccount,
+	FBinanceTestnetAccount,
 }
 
 var As *actor.ActorSystem
@@ -63,12 +64,12 @@ func TestMain(m *testing.M) {
 
 	executor, _ = As.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, accnts, false, xchangerUtils.DefaultDialerPool)), "executor")
 	bitmex.EnableTestNet()
-	//fbinance.EnableTestNet()
+	fbinance.EnableTestNet()
 
 	code := m.Run()
 
 	bitmex.DisableTestNet()
-	//fbinance.DisableTestNet()
+	fbinance.DisableTestNet()
 
 	As.Root.PoisonFuture(executor)
 	os.Exit(code)

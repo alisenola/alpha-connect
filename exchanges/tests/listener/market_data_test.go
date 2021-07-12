@@ -2058,7 +2058,7 @@ func TestDydx(t *testing.T) {
 		}
 	}()
 	securityID := []uint64{
-		5390294902314234278,
+		13112609607273681222,
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
@@ -2075,6 +2075,7 @@ func TestDydx(t *testing.T) {
 	}
 	for _, s := range securityList.Securities {
 		tested := false
+		fmt.Println(s)
 		for _, secID := range securityID {
 			if secID == s.SecurityID {
 				tested = true
@@ -2087,11 +2088,11 @@ func TestDydx(t *testing.T) {
 	}
 
 	// Test
-	sec, ok := testedSecurities[5390294902314234278]
+	sec, ok := testedSecurities[13112609607273681222]
 	if !ok {
 		t.Fatalf("security not found")
 	}
-	if sec.Symbol != "BTC-USD" {
+	if sec.Symbol != "ETH-USD" {
 		t.Fatalf("was expecting symbol BTCUSD, got %s", sec.Symbol)
 	}
 	if sec.SecurityType != enum.SecurityType_CRYPTO_PERP {
@@ -2100,7 +2101,7 @@ func TestDydx(t *testing.T) {
 	if sec.Exchange.Name != constants.DYDX.Name {
 		t.Fatalf("was expecting BITHUMBG exchange, got %s", sec.Exchange.Name)
 	}
-	if sec.Underlying.ID != constants.BITCOIN.ID {
+	if sec.Underlying.ID != constants.ETHEREUM.ID {
 		t.Fatalf("was expecting BTC underlying, got %d", sec.Underlying.ID)
 	}
 	if sec.QuoteCurrency.ID != constants.USDC.ID {
@@ -2112,11 +2113,11 @@ func TestDydx(t *testing.T) {
 	if sec.Status != models.Trading {
 		t.Fatal("was expecting enabled security")
 	}
-	if sec.MinPriceIncrement == nil || sec.MinPriceIncrement.Value != 1 {
-		t.Fatalf("was expecting min price increment of 0.01")
+	if sec.MinPriceIncrement == nil || sec.MinPriceIncrement.Value != 0.1 {
+		t.Fatalf("was expecting min price increment of 1, got %f", sec.MinPriceIncrement.Value)
 	}
-	if sec.RoundLot == nil || sec.RoundLot.Value != 0.0001 {
-		t.Fatalf("was expecting round lot of 0.0001")
+	if sec.RoundLot == nil || sec.RoundLot.Value != 0.001 {
+		t.Fatalf("was expecting round lot of 0.0001, got %f", sec.RoundLot.Value)
 	}
 	if sec.MaturityDate != nil {
 		t.Fatalf("was not expecting maturity date")

@@ -30,6 +30,7 @@ var FBinanceTestnetAccount = &models.Account{
 	},
 }
 
+/*
 var FBinanceAccount = &models.Account{
 	AccountID: "299211",
 	Exchange:  &constants.FBINANCE,
@@ -38,6 +39,7 @@ var FBinanceAccount = &models.Account{
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
 	},
 }
+*/
 
 func TestFBinanceAccountListener_OnOrderCancelRequest(t *testing.T) {
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -240,7 +242,7 @@ func TestFBinanceAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FBinanceAccount,
+		Account:   FBinanceTestnetAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -328,7 +330,7 @@ func TestFBinanceAccountListener_OnOrderStatusRequest(t *testing.T) {
 	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FBinanceAccount,
+		Account:   FBinanceTestnetAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:    &types.StringValue{Value: order.OrderID},
 			Instrument: instrument,
@@ -386,7 +388,7 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test no order
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FBinanceAccount,
+		Account:   FBinanceTestnetAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -407,7 +409,7 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Test with one order
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FBinanceAccount,
+		Account:   FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
@@ -433,7 +435,7 @@ func TestFBinanceAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	// Delete orders
 	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   FBinanceAccount,
+		Account:   FBinanceTestnetAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument,
 		},
@@ -520,6 +522,7 @@ func checkFBinanceBalances(t *testing.T, account *models.Account) {
 	}
 	bal2 := balanceResponse.Balances[0]
 
+	fmt.Println(bal1.Quantity, bal2.Quantity)
 	if math.Abs(bal1.Quantity-bal2.Quantity) > 0.00001 {
 		t.Fatalf("different balance %f:%f", bal1.Quantity, bal2.Quantity)
 	}
@@ -550,7 +553,7 @@ func checkFBinancePositions(t *testing.T, account *models.Account, instrument *m
 
 	res, err = As.Root.RequestFuture(executor, &messages.PositionsRequest{
 		RequestID:  0,
-		Account:    FBinanceAccount,
+		Account:    FBinanceTestnetAccount,
 		Instrument: instrument,
 	}, 10*time.Second).Result()
 
@@ -594,7 +597,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			Instrument:    instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
-			Price:         &types.DoubleValue{Value: 45000},
+			Price:         &types.DoubleValue{Value: 39000},
 			Quantity:      0.002,
 		},
 	}, 10*time.Second).Result()
@@ -621,7 +624,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			OrderType:     models.Limit,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
-			Price:         &types.DoubleValue{Value: 35000},
+			Price:         &types.DoubleValue{Value: 30000},
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -644,7 +647,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			OrderType:     models.Limit,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
-			Price:         &types.DoubleValue{Value: 35000},
+			Price:         &types.DoubleValue{Value: 30000},
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -747,7 +750,7 @@ func TestFBinanceAccountListener_OnGetPositionsMarket(t *testing.T) {
 	// Market buy 1 contract
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FBinanceAccount,
+		Account: FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    instrument,
@@ -773,7 +776,7 @@ func TestFBinanceAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	// Market sell 1 contract
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FBinanceAccount,
+		Account: FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,
@@ -795,7 +798,7 @@ func TestFBinanceAccountListener_OnGetPositionsMarket(t *testing.T) {
 	fmt.Println("CLOSING")
 	// Close position
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FBinanceAccount,
+		Account: FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument,

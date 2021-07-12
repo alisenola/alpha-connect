@@ -1,0 +1,941 @@
+{
+  "0": {
+    "symbol": "USD",
+    "name": "dollar"
+  },
+  "1": {
+    "symbol": "EUR",
+    "name": "euro",
+    "ID": 1
+  },
+  "2": {
+    "symbol": "GBP",
+    "name": "pound",
+    "ID": 2
+  },
+  "3": {
+    "symbol": "CAD",
+    "name": "canadian-dollar",
+    "ID": 3
+  },
+  "4": {
+    "symbol": "JPY",
+    "name": "japenese-yen",
+    "ID": 4
+  },
+  "5": {
+    "symbol": "BTC",
+    "name": "bitcoin",
+    "ID": 5
+  },
+  "6": {
+    "symbol": "LTC",
+    "name": "litecoin",
+    "ID": 6
+  },
+  "7": {
+    "symbol": "ETH",
+    "name": "ethereum",
+    "ID": 7
+  },
+  "8": {
+    "symbol": "XRP",
+    "name": "ripple",
+    "ID": 8
+  },
+  "9": {
+    "symbol": "SKY",
+    "name": "skycoin",
+    "ID": 9
+  },
+  "10": {
+    "symbol": "EOS",
+    "name": "eos",
+    "ID": 10
+  },
+  "11": {
+    "symbol": "BCH",
+    "name": "bitcoin-cash",
+    "ID": 11
+  },
+  "12": {
+    "symbol": "USDT",
+    "name": "tether",
+    "ID": 12
+  },
+  "13": {
+    "symbol": "XLM",
+    "name": "stellar",
+    "ID": 13
+  },
+  "14": {
+    "symbol": "ADA",
+    "name": "cardano",
+    "ID": 14
+  },
+  "15": {
+    "symbol": "TRX",
+    "name": "tron",
+    "ID": 15
+  },
+  "16": {
+    "symbol": "BSV",
+    "name": "bitcoin-sv",
+    "ID": 16
+  },
+  "17": {
+    "symbol": "XMR",
+    "name": "monero",
+    "ID": 17
+  },
+  "18": {
+    "symbol": "DASH",
+    "name": "dash",
+    "ID": 18
+  },
+  "19": {
+    "symbol": "IOTA",
+    "name": "iota",
+    "ID": 19
+  },
+  "20": {
+    "symbol": "NEO",
+    "name": "neo",
+    "ID": 20
+  },
+  "21": {
+    "symbol": "ETC",
+    "name": "ethereum-classic",
+    "ID": 21
+  },
+  "22": {
+    "symbol": "MKR",
+    "name": "maker",
+    "ID": 22
+  },
+  "23": {
+    "symbol": "ONT",
+    "name": "ontology",
+    "ID": 23
+  },
+  "24": {
+    "symbol": "XTZ",
+    "name": "tezos",
+    "ID": 24
+  },
+  "25": {
+    "symbol": "XEM",
+    "name": "nem",
+    "ID": 25
+  },
+  "26": {
+    "symbol": "ZEC",
+    "name": "zcash",
+    "ID": 26
+  },
+  "27": {
+    "symbol": "VET",
+    "name": "vechain",
+    "ID": 27
+  },
+  "28": {
+    "symbol": "CRO",
+    "name": "crypto-com-chain",
+    "ID": 28
+  },
+  "29": {
+    "symbol": "BAT",
+    "name": "basic-attention-token",
+    "ID": 29
+  },
+  "30": {
+    "symbol": "DOGE",
+    "name": "dogecoin",
+    "ID": 30
+  },
+  "31": {
+    "symbol": "BTG",
+    "name": "bitcoin-gold",
+    "ID": 31
+  },
+  "32": {
+    "symbol": "OMG",
+    "name": "omisego",
+    "ID": 32
+  },
+  "33": {
+    "symbol": "WAVES",
+    "name": "waves",
+    "ID": 33
+  },
+  "34": {
+    "symbol": "QTUM",
+    "name": "qtum",
+    "ID": 34
+  },
+  "35": {
+    "symbol": "USDC",
+    "name": "usd-coin",
+    "ID": 35
+  },
+  "36": {
+    "symbol": "DCR",
+    "name": "decred",
+    "ID": 36
+  },
+  "37": {
+    "symbol": "LSK",
+    "name": "lisk",
+    "ID": 37
+  },
+  "38": {
+    "symbol": "TUSD",
+    "name": "trueusd",
+    "ID": 38
+  },
+  "39": {
+    "symbol": "RVN",
+    "name": "ravencoin",
+    "ID": 39
+  },
+  "40": {
+    "symbol": "NANO",
+    "name": "nano",
+    "ID": 40
+  },
+  "41": {
+    "symbol": "REP",
+    "name": "augur",
+    "ID": 41
+  },
+  "42": {
+    "symbol": "ZRX",
+    "name": "0x",
+    "ID": 42
+  },
+  "43": {
+    "symbol": "ZIL",
+    "name": "zilliqa",
+    "ID": 43
+  },
+  "44": {
+    "symbol": "ICX",
+    "name": "icon",
+    "ID": 44
+  },
+  "45": {
+    "symbol": "BTS",
+    "name": "bitshares",
+    "ID": 45
+  },
+  "46": {
+    "symbol": "LINK",
+    "name": "chainlink",
+    "ID": 46
+  },
+  "47": {
+    "symbol": "BCN",
+    "name": "bytecoin",
+    "ID": 47
+  },
+  "48": {
+    "symbol": "BCD",
+    "name": "bitcoin-diamond",
+    "ID": 48
+  },
+  "49": {
+    "symbol": "HOT",
+    "name": "holo",
+    "ID": 49
+  },
+  "50": {
+    "symbol": "IOST",
+    "name": "iostoken",
+    "ID": 50
+  },
+  "51": {
+    "symbol": "DGB",
+    "name": "digibyte",
+    "ID": 51
+  },
+  "52": {
+    "symbol": "AET",
+    "name": "aeternity",
+    "ID": 52
+  },
+  "53": {
+    "symbol": "XVG",
+    "name": "verge",
+    "ID": 53
+  },
+  "54": {
+    "symbol": "STEEM",
+    "name": "steem",
+    "ID": 54
+  },
+  "55": {
+    "symbol": "SC",
+    "name": "siacoin",
+    "ID": 55
+  },
+  "56": {
+    "symbol": "PAX",
+    "name": "paxos-standard-token",
+    "ID": 56
+  },
+  "57": {
+    "symbol": "DAI",
+    "name": "dai",
+    "ID": 57
+  },
+  "58": {
+    "symbol": "LRC",
+    "name": "loopring",
+    "ID": 58
+  },
+  "59": {
+    "symbol": "NULS",
+    "name": "nuls",
+    "ID": 59
+  },
+  "60": {
+    "symbol": "ETP",
+    "name": "metaverse",
+    "ID": 60
+  },
+  "61": {
+    "symbol": "GNO",
+    "name": "gnosis",
+    "ID": 61
+  },
+  "62": {
+    "symbol": "MLN",
+    "name": "melon",
+    "ID": 62
+  },
+  "63": {
+    "symbol": "ATOM",
+    "name": "cosmos",
+    "ID": 63
+  },
+  "64": {
+    "symbol": "EDO",
+    "name": "eidoo",
+    "ID": 64
+  },
+  "65": {
+    "symbol": "LEO",
+    "name": "unus-sed-leo",
+    "ID": 65
+  },
+  "66": {
+    "symbol": "GRIN",
+    "name": "grin",
+    "ID": 66
+  },
+  "67": {
+    "symbol": "GNT",
+    "name": "golem",
+    "ID": 67
+  },
+  "68": {
+    "symbol": "HBAR",
+    "name": "hbar",
+    "ID": 68
+  },
+  "69": {
+    "symbol": "USDS",
+    "name": "stable-usd",
+    "ID": 69
+  },
+  "70": {
+    "symbol": "ZEN",
+    "name": "horizen",
+    "ID": 70
+  },
+  "71": {
+    "symbol": "KMD",
+    "name": "komodo",
+    "ID": 71
+  },
+  "72": {
+    "symbol": "VTC",
+    "name": "vertcoin",
+    "ID": 72
+  },
+  "73": {
+    "symbol": "SPND",
+    "name": "spendcoin",
+    "ID": 73
+  },
+  "74": {
+    "symbol": "SIB",
+    "name": "sibcoin",
+    "ID": 74
+  },
+  "75": {
+    "symbol": "ARK",
+    "name": "ark",
+    "ID": 75
+  },
+  "76": {
+    "symbol": "PART",
+    "name": "particl",
+    "ID": 76
+  },
+  "77": {
+    "symbol": "SIX",
+    "name": "six-network",
+    "ID": 77
+  },
+  "78": {
+    "symbol": "HEDG",
+    "name": "hedge-trade",
+    "ID": 78
+  },
+  "79": {
+    "symbol": "STRAT",
+    "name": "stratis",
+    "ID": 79
+  },
+  "80": {
+    "symbol": "RDD",
+    "name": "reddcoin",
+    "ID": 80
+  },
+  "81": {
+    "symbol": "DMT",
+    "name": "dmarket",
+    "ID": 81
+  },
+  "82": {
+    "symbol": "RLC",
+    "name": "iexec-rlc",
+    "ID": 82
+  },
+  "83": {
+    "symbol": "PMA",
+    "name": "puma-pay",
+    "ID": 83
+  },
+  "84": {
+    "symbol": "BTT",
+    "name": "bittorrent",
+    "ID": 84
+  },
+  "85": {
+    "symbol": "OCEAN",
+    "name": "ocean-protocol",
+    "ID": 85
+  },
+  "86": {
+    "symbol": "BNB",
+    "name": "binance-coin",
+    "ID": 86
+  },
+  "87": {
+    "symbol": "UNI",
+    "name": "uniswap",
+    "ID": 87
+  },
+  "88": {
+    "symbol": "REN",
+    "name": "ren",
+    "ID": 88
+  },
+  "89": {
+    "symbol": "YFI",
+    "name": "yearn-finance",
+    "ID": 89
+  },
+  "90": {
+    "symbol": "OXT",
+    "name": "orchid",
+    "ID": 90
+  },
+  "91": {
+    "symbol": "ALGO",
+    "name": "algorand",
+    "ID": 91
+  },
+  "92": {
+    "symbol": "KNC",
+    "name": "kyber-network",
+    "ID": 92
+  },
+  "93": {
+    "symbol": "COMP",
+    "name": "compound",
+    "ID": 93
+  },
+  "94": {
+    "symbol": "BAND",
+    "name": "band-protocol",
+    "ID": 94
+  },
+  "95": {
+    "symbol": "NMR",
+    "name": "numeraire",
+    "ID": 95
+  },
+  "96": {
+    "symbol": "UMA",
+    "name": "uma",
+    "ID": 96
+  },
+  "97": {
+    "symbol": "BAL",
+    "name": "balancer",
+    "ID": 97
+  },
+  "98": {
+    "symbol": "FIL",
+    "name": "filecoin",
+    "ID": 98
+  },
+  "99": {
+    "symbol": "EGLD",
+    "name": "elrond",
+    "ID": 99
+  },
+  "100": {
+    "symbol": "AVAX",
+    "name": "avalanche",
+    "ID": 100
+  },
+  "101": {
+    "symbol": "AKRO",
+    "name": "akropolis",
+    "ID": 101
+  },
+  "102": {
+    "symbol": "COTI",
+    "name": "coti",
+    "ID": 102
+  },
+  "103": {
+    "symbol": "CTSI",
+    "name": "cartesi",
+    "ID": 103
+  },
+  "104": {
+    "symbol": "ENJ",
+    "name": "enjin-coin",
+    "ID": 104
+  },
+  "105": {
+    "symbol": "LUNA",
+    "name": "terra",
+    "ID": 105
+  },
+  "106": {
+    "symbol": "DOT",
+    "name": "polkadot",
+    "ID": 106
+  },
+  "107": {
+    "symbol": "WBTC",
+    "name": "wrapped-bitcoin",
+    "ID": 107
+  },
+  "108": {
+    "symbol": "THETA",
+    "name": "theta",
+    "ID": 108
+  },
+  "109": {
+    "symbol": "SNT",
+    "name": "status",
+    "ID": 109
+  },
+  "110": {
+    "symbol": "BNT",
+    "name": "bancor",
+    "ID": 110
+  },
+  "111": {
+    "symbol": "GAS",
+    "name": "neo-gas",
+    "ID": 111
+  },
+  "112": {
+    "symbol": "OAX",
+    "name": "oax",
+    "ID": 112
+  },
+  "113": {
+    "symbol": "DNT",
+    "name": "district0x",
+    "ID": 113
+  },
+  "114": {
+    "symbol": "WTC",
+    "name": "walton-chain",
+    "ID": 114
+  },
+  "115": {
+    "symbol": "YOYO",
+    "name": "yoyow",
+    "ID": 115
+  },
+  "116": {
+    "symbol": "SNGLS",
+    "name": "singulardtv",
+    "ID": 116
+  },
+  "117": {
+    "symbol": "ALICE",
+    "name": "myneighboralice",
+    "ID": 117
+  },
+  "118": {
+    "symbol": "CHZ",
+    "name": "chiliz",
+    "ID": 118
+  },
+  "119": {
+    "symbol": "BIFI",
+    "name": "beefy-finance",
+    "ID": 119
+  },
+  "120": {
+    "symbol": "BUSD",
+    "name": "binance-usd",
+    "ID": 120
+  },
+  "121": {
+    "symbol": "KRW",
+    "name": "south-korean-won",
+    "ID": 121
+  },
+  "122": {
+    "symbol": "1INCH",
+    "name": "1inch",
+    "ID": 122
+  },
+  "123": {
+    "symbol": "NKN",
+    "name": "nkn",
+    "ID": 123
+  },
+  "124": {
+    "symbol": "OGN",
+    "name": "origin-protocol",
+    "ID": 124
+  },
+  "125": {
+    "symbol": "SLP",
+    "name": "small-love-potion",
+    "ID": 125
+  },
+  "126": {
+    "symbol": "SXP",
+    "name": "swipe",
+    "ID": 126
+  },
+  "127": {
+    "symbol": "KAVA",
+    "name": "kava",
+    "ID": 127
+  },
+  "128": {
+    "symbol": "SNX",
+    "name": "synthetix-network-token",
+    "ID": 128
+  },
+  "129": {
+    "symbol": "BINDEFI",
+    "name": "binance-defi-composite-index",
+    "ID": 129
+  },
+  "130": {
+    "symbol": "CRV",
+    "name": "curve-dao-token",
+    "ID": 130
+  },
+  "131": {
+    "symbol": "TRB",
+    "name": "tellor",
+    "ID": 131
+  },
+  "132": {
+    "symbol": "YFII",
+    "name": "yearn-finance-ii",
+    "ID": 132
+  },
+  "133": {
+    "symbol": "RUNE",
+    "name": "thorchain",
+    "ID": 133
+  },
+  "134": {
+    "symbol": "SUSHI",
+    "name": "sushiswap",
+    "ID": 134
+  },
+  "135": {
+    "symbol": "MANA",
+    "name": "decentraland",
+    "ID": 135
+  },
+  "136": {
+    "symbol": "SRM",
+    "name": "serum",
+    "ID": 136
+  },
+  "137": {
+    "symbol": "ONE",
+    "name": "harmony",
+    "ID": 137
+  },
+  "138": {
+    "symbol": "BZRX",
+    "name": "bzx-protocol",
+    "ID": 138
+  },
+  "139": {
+    "symbol": "SOL",
+    "name": "solana",
+    "ID": 139
+  },
+  "140": {
+    "symbol": "STORJ",
+    "name": "storj",
+    "ID": 140
+  },
+  "141": {
+    "symbol": "CHR",
+    "name": "chromia",
+    "ID": 141
+  },
+  "142": {
+    "symbol": "BLZ",
+    "name": "bluzelle",
+    "ID": 142
+  },
+  "144": {
+    "symbol": "HNT",
+    "name": "helium",
+    "ID": 144
+  },
+  "145": {
+    "symbol": "FTM",
+    "name": "fantom",
+    "ID": 145
+  },
+  "146": {
+    "symbol": "FLM",
+    "name": "flamingo",
+    "ID": 146
+  },
+  "147": {
+    "symbol": "TOMO",
+    "name": "tomochain",
+    "ID": 147
+  },
+  "148": {
+    "symbol": "KSM",
+    "name": "kusama",
+    "ID": 148
+  },
+  "149": {
+    "symbol": "NEAR",
+    "name": "near-protocol",
+    "ID": 149
+  },
+  "150": {
+    "symbol": "AAVE",
+    "name": "aave",
+    "ID": 150
+  },
+  "151": {
+    "symbol": "RSR",
+    "name": "reserve-rights",
+    "ID": 151
+  },
+  "152": {
+    "symbol": "MATIC",
+    "name": "polygon",
+    "ID": 152
+  },
+  "153": {
+    "symbol": "CVC",
+    "name": "civic",
+    "ID": 153
+  },
+  "154": {
+    "symbol": "BEL",
+    "name": "bella-protocol",
+    "ID": 154
+  },
+  "155": {
+    "symbol": "CTK",
+    "name": "certik",
+    "ID": 155
+  },
+  "156": {
+    "symbol": "AXS",
+    "name": "axie-infinity",
+    "ID": 156
+  },
+  "157": {
+    "symbol": "ALPHA",
+    "name": "alpha-finance-lab",
+    "ID": 157
+  },
+  "158": {
+    "symbol": "SKL",
+    "name": "skale-network",
+    "ID": 158
+  },
+  "159": {
+    "symbol": "GRT",
+    "name": "the-graph",
+    "ID": 159
+  },
+  "160": {
+    "symbol": "SAND",
+    "name": "the-sandbox",
+    "ID": 160
+  },
+  "161": {
+    "symbol": "ANKR",
+    "name": "ankr",
+    "ID": 161
+  },
+  "162": {
+    "symbol": "LIT",
+    "name": "litentry",
+    "ID": 162
+  },
+  "163": {
+    "symbol": "UNFI",
+    "name": "unifi-protocol-dao",
+    "ID": 163
+  },
+  "164": {
+    "symbol": "DODO",
+    "name": "dodo",
+    "ID": 164
+  },
+  "165": {
+    "symbol": "REEF",
+    "name": "reef",
+    "ID": 165
+  },
+  "166": {
+    "symbol": "SFP",
+    "name": "safepal",
+    "ID": 166
+  },
+  "167": {
+    "symbol": "BTCST",
+    "name": "btc-standard-hashrate-token",
+    "ID": 167
+  },
+  "168": {
+    "symbol": "LINA",
+    "name": "linear",
+    "ID": 168
+  },
+  "169": {
+    "symbol": "STMX",
+    "name": "stormx",
+    "ID": 169
+  },
+  "170": {
+    "symbol": "DENT",
+    "name": "dent",
+    "ID": 170
+  },
+  "171": {
+    "symbol": "CELR",
+    "name": "celer-network",
+    "ID": 171
+  },
+  "172": {
+    "symbol": "MTL",
+    "name": "metal",
+    "ID": 172
+  },
+  "173": {
+    "symbol": "FUN",
+    "name": "funtoken",
+    "ID": 173
+  },
+  "174": {
+    "symbol": "SNM",
+    "name": "sonm",
+    "ID": 174
+  },
+  "175": {
+    "symbol": "ICP",
+    "name": "internet-computer",
+    "ID": 175
+  },
+  "176": {
+    "symbol": "BAKE",
+    "name": "bakery-token",
+    "ID": 176
+  },
+  "177": {
+    "symbol": "MASK",
+    "name": "mask-network",
+    "ID": 177
+  },
+  "178": {
+    "symbol": "MDX",
+    "name": "mdex",
+    "ID": 178
+  },
+  "179": {
+    "symbol": "POLS",
+    "name": "polkastarter",
+    "ID": 179
+  },
+  "180": {
+    "symbol": "AR",
+    "name": "arweave",
+    "ID": 180
+  },
+  "181": {
+    "symbol": "SHIB",
+    "name": "shiba-inu",
+    "ID": 181
+  },
+  "182": {
+    "symbol": "BURGER",
+    "name": "burger-swap",
+    "ID": 182
+  },
+  "183": {
+    "symbol": "WRX",
+    "name": "wazirx",
+    "ID": 183
+  },
+  "184": {
+    "symbol": "CAKE",
+    "name": "pancake-swap",
+    "ID": 184
+  },
+  "185": {
+    "symbol": "AMPL",
+    "name": "ampleforth",
+    "ID": 185
+  },
+  "186": {
+    "symbol": "MIR",
+    "name": "mirror-protocol",
+    "ID": 186
+  },
+  "187": {
+    "symbol": "BAR",
+    "name": "fc-barcelona-fan-token",
+    "ID": 187
+  },
+  "188": {
+    "symbol": "API3",
+    "name": "api3",
+    "ID": 188
+  }
+}

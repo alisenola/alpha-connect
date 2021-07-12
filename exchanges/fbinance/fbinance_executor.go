@@ -16,7 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
-	"io/ioutil"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"net/http"
 	"reflect"
@@ -38,23 +38,27 @@ import (
 // The global rate limit is per IP and the orderRateLimit is per
 // account.
 
-type Executor struct {
-	client               *http.Client
-	securities           map[uint64]*models.Security
-	symbolToSec          map[string]*models.Security
+type QueryRunner struct {
+	pid                  *actor.PID
 	minuteOrderRateLimit *exchanges.RateLimit
 	globalRateLimit      *exchanges.RateLimit
-	queryRunner          *actor.PID
-	logger               *log.Logger
 }
 
-func NewExecutor() actor.Actor {
+type Executor struct {
+	client       *http.Client
+	securities   map[uint64]*models.Security
+	symbolToSec  map[string]*models.Security
+	queryRunners []*QueryRunner
+	dialerPool   *xutils.DialerPool
+	logger       *log.Logger
+}
+
+func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		client:               nil,
-		minuteOrderRateLimit: nil,
-		globalRateLimit:      nil,
-		queryRunner:          nil,
-		logger:               nil,
+		client:       nil,
+		queryRunners: nil,
+		dialerPool:   dialerPool,
+		logger:       nil,
 	}
 }
 
@@ -80,14 +84,29 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
-	})
-	state.queryRunner = context.Spawn(props)
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid:                  context.Spawn(props),
+			minuteOrderRateLimit: nil,
+			globalRateLimit:      nil,
+		})
+	}
 
 	request, weight, err := fbinance.GetExchangeInfo()
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
 		return err
@@ -110,18 +129,23 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
 			if rateLimit.Interval == "MINUTE" {
-				state.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+				for _, qr := range state.queryRunners {
+					qr.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+				}
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
-			state.globalRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+			for _, qr := range state.queryRunners {
+				qr.globalRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+			}
 		}
 	}
-	if state.minuteOrderRateLimit == nil || state.globalRateLimit == nil {
-		return fmt.Errorf("unable to set minute or global rate limit")
+	if state.queryRunners[0].minuteOrderRateLimit == nil || state.queryRunners[0].globalRateLimit == nil {
+		return fmt.Errorf("unable to set second or day rate limit")
 	}
 
 	// Update rate limit with weight from the current exchange info fetch
-	state.globalRateLimit.Request(weight)
+	state.queryRunners[0].globalRateLimit.Request(weight)
+
 	return state.UpdateSecurityList(context)
 }
 
@@ -135,46 +159,49 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
-	state.globalRateLimit.Request(weight)
-	resp, err := state.client.Do(request)
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	res, err := future.Result()
 	if err != nil {
-		return err
+		return fmt.Errorf("http client error: %v", err)
 	}
-	response, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
+	resp := res.(*jobs.PerformQueryResponse)
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			err := fmt.Errorf(
 				"http client error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else if resp.StatusCode >= 500 {
 			err := fmt.Errorf(
 				"http server error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else {
 			err := fmt.Errorf("%d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		}
 	}
 	var exchangeInfo fbinance.ExchangeInfo
-	err = json.Unmarshal(response, &exchangeInfo)
+	err = json.Unmarshal(resp.Response, &exchangeInfo)
 	if err != nil {
 		err = fmt.Errorf(
 			"error unmarshaling response: %v",
@@ -308,14 +335,21 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return err
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -456,14 +490,20 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		}
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -623,14 +663,20 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		return err
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
-		positionList.RejectionReason = messages.RateLimitExceeded
-		context.Respond(positionList)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
-	state.globalRateLimit.Request(weight)
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -725,14 +771,20 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		return err
 	}
 
-	if state.globalRateLimit.IsRateLimited() {
-		balanceList.RejectionReason = messages.RateLimitExceeded
-		context.Respond(balanceList)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -888,14 +940,20 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	fmt.Println(request.URL)
-	if state.globalRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
@@ -1007,14 +1065,20 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	fmt.Println(request.URL)
-	if state.globalRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
@@ -1122,15 +1186,20 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-
-	if state.globalRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
 	}
 
-	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
