@@ -145,7 +145,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewExecutor(dialerPool) }
 	case constants.BITFINEX.ID:
-		return func() actor.Actor { return bitfinex.NewExecutor() }
+		return func() actor.Actor { return bitfinex.NewExecutor(dialerPool) }
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewExecutor() }
 	case constants.BITSTAMP.ID:

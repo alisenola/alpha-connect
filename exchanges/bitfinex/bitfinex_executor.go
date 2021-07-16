@@ -16,7 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
-	"io/ioutil"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"net/http"
 	"reflect"
 	"strings"
@@ -31,23 +31,24 @@ import (
 // 429 rate limit
 // 418 IP ban
 
-// The role of a Binance Executor is to
-// process api request
-type Executor struct {
-	client           *http.Client
-	securities       []*models.Security
+type QueryRunner struct {
+	pid              *actor.PID
 	obRateLimit      *exchanges.RateLimit
 	symbolsRateLimit *exchanges.RateLimit
-	queryRunner      *actor.PID
-	logger           *log.Logger
 }
 
-func NewExecutor() actor.Actor {
+type Executor struct {
+	securities   []*models.Security
+	queryRunners []*QueryRunner
+	dialerPool   *xutils.DialerPool
+	logger       *log.Logger
+}
+
+func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		client:      nil,
-		obRateLimit: nil,
-		queryRunner: nil,
-		logger:      nil,
+		queryRunners: nil,
+		logger:       nil,
+		dialerPool:   dialerPool,
 	}
 }
 
@@ -60,25 +61,31 @@ func (state *Executor) GetLogger() *log.Logger {
 }
 
 func (state *Executor) Initialize(context actor.Context) error {
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
-	}
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.obRateLimit = exchanges.NewRateLimit(30, time.Minute)
-	state.symbolsRateLimit = exchanges.NewRateLimit(10, time.Minute)
 
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
-	})
-	state.queryRunner = context.Spawn(props)
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid:              context.Spawn(props),
+			obRateLimit:      exchanges.NewRateLimit(30, time.Minute),
+			symbolsRateLimit: exchanges.NewRateLimit(10, time.Minute),
+		})
+	}
 
 	if err := state.UpdateSecurityList(context); err != nil {
 		state.logger.Info("error updating security list: %v", log.Error(err))
@@ -91,49 +98,52 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	if state.symbolsRateLimit.IsRateLimited() {
+	request, weight, err := bitfinex.GetSymbolsDetails()
+	if err != nil {
+		return err
+	}
+
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.symbolsRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
-	request, weight, err := bitfinex.GetSymbolsDetails()
-	state.symbolsRateLimit.Request(weight)
-	if err != nil {
-		return err
-	}
-	resp, err := state.client.Do(request)
-	if err != nil {
-		return err
-	}
-	response, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
+
+	qr.symbolsRateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	res, err := future.Result()
+	resp := res.(*jobs.PerformQueryResponse)
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			err := fmt.Errorf(
 				"http client error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else if resp.StatusCode >= 500 {
 			err := fmt.Errorf(
 				"http server error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else {
 			err := fmt.Errorf("%d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		}
 	}
 	var symbolDetails []bitfinex.SymbolDetail
-	err = json.Unmarshal(response, &symbolDetails)
+	err = json.Unmarshal(resp.Response, &symbolDetails)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
 		return err
@@ -254,20 +264,27 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	symbol := msg.Instrument.Symbol.Value
-
-	if state.obRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-	// Get http request and the expected response
 	request, weight, err := bitfinex.GetOrderBook(symbol, 2500, 2500)
 	if err != nil {
 		return err
 	}
-	state.obRateLimit.Request(weight)
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.obRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.obRateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http client error", log.Error(err))
