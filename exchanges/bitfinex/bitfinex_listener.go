@@ -186,14 +186,14 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	fullBookTicker := time.NewTicker(1 * time.Minute)
+	fullBookTicker := time.NewTicker(5 * time.Minute)
 	state.fullBookTicker = fullBookTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
 			case _ = <-fullBookTicker.C:
 				context.Send(pid, &updateBook{})
-			case <-time.After(2 * time.Minute):
+			case <-time.After(6 * time.Minute):
 				// timer stopped, we leave
 				return
 			}
