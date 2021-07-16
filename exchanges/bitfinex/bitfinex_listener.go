@@ -13,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
@@ -23,6 +24,7 @@ import (
 
 type checkSockets struct{}
 type postAggTrade struct{}
+type updateBook struct{}
 
 type OBL2Request struct {
 	requester *actor.PID
@@ -34,6 +36,7 @@ type InstrumentData struct {
 	tickPrecision     uint64
 	lotPrecision      uint64
 	orderBook         *gorderbook.OrderBookL2
+	fullBook          *gorderbook.OrderBookL2
 	seqNum            uint64
 	lastUpdateTime    uint64
 	lastFundingTime   uint64
@@ -55,6 +58,8 @@ type Listener struct {
 	logger         *log.Logger
 	stashedTrades  *list.List
 	socketTicker   *time.Ticker
+	fullBookTicker *time.Ticker
+	executor       *actor.PID
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -113,9 +118,20 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.MarketDataResponse:
+		if err := state.onMarketDataResponse(context); err != nil {
+			state.logger.Error("error processing market data response", log.Error(err))
+		}
+
 	case *checkSockets:
 		if err := state.checkSockets(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+
+	case *updateBook:
+		if err := state.updateFullBook(context); err != nil {
+			state.logger.Error("error updating full book", log.Error(err))
 			panic(err)
 		}
 
@@ -133,6 +149,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITFINEX.Name+"_executor")
 	state.stashedTrades = list.New()
 
 	if state.security.RoundLot == nil {
@@ -163,6 +180,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 			case _ = <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	fullBookTicker := time.NewTicker(1 * time.Minute)
+	state.fullBookTicker = fullBookTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-fullBookTicker.C:
+				context.Send(pid, &updateBook{})
+			case <-time.After(2 * time.Minute):
 				// timer stopped, we leave
 				return
 			}
@@ -274,6 +305,56 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
 
+	// Try to fetch full book
+	fullBook := gorderbook.NewOrderBookL2(
+		tickPrecision,
+		state.instrumentData.lotPrecision,
+		depth,
+	)
+	state.instrumentData.fullBook = fullBook
+
+	res, err := context.RequestFuture(
+		state.executor,
+		&messages.MarketDataRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Subscribe: false,
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Exchange:   state.security.Exchange,
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			Aggregation: models.L2,
+		}, 10*time.Second).Result()
+	if err == nil {
+		msg := res.(*messages.MarketDataResponse)
+		if msg.Success && msg.SnapshotL2 != nil {
+			// What to do ? ...
+			// Remove all worstBid worstAsk
+			bids := state.instrumentData.orderBook.GetBids(-1)
+			worstBid := bids[len(bids)-1].Price
+			asks := state.instrumentData.orderBook.GetAsks(-1)
+			worstAsk := asks[len(asks)-1].Price
+
+			bids = nil
+			asks = nil
+
+			for _, b := range msg.SnapshotL2.Bids {
+				if b.Price < worstBid {
+					// Add to book
+					bids = append(bids, b)
+				}
+			}
+			for _, a := range msg.SnapshotL2.Asks {
+				if a.Price > worstAsk {
+					// Add to book
+					asks = append(asks, a)
+				}
+			}
+
+			fullBook.Sync(bids, asks)
+		}
+	}
+
 	if err := ws.SubscribeTrades(symbol); err != nil {
 		return err
 	}
@@ -301,9 +382,13 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
+	bids := state.instrumentData.fullBook.GetBids(0)
+	asks := state.instrumentData.fullBook.GetAsks(0)
+	bids = append(bids, state.instrumentData.orderBook.GetBids(0)...)
+	asks = append(asks, state.instrumentData.orderBook.GetAsks(0)...)
 	snapshot := &models.OBL2Snapshot{
-		Bids:          state.instrumentData.orderBook.GetBids(0),
-		Asks:          state.instrumentData.orderBook.GetAsks(0),
+		Bids:          bids,
+		Asks:          asks,
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
 		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
 		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
@@ -474,6 +559,65 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) onMarketDataResponse(context actor.Context) error {
+	msg := context.Message().(*messages.MarketDataResponse)
+	if !msg.Success {
+		state.logger.Error("error fetching snapshot", log.String("rejection-reason", msg.RejectionReason.String()))
+		return nil
+	}
+	if msg.SnapshotL2 == nil {
+		state.logger.Error("error fetching snapshot: no OBL2")
+		return nil
+	}
+
+	// What to do ? ...
+	// Remove all worstBid worstAsk
+	bids := state.instrumentData.orderBook.GetBids(-1)
+	worstBid := bids[len(bids)-1].Price
+	asks := state.instrumentData.orderBook.GetAsks(-1)
+	worstAsk := asks[len(asks)-1].Price
+
+	bids = nil
+	asks = nil
+
+	for _, b := range msg.SnapshotL2.Bids {
+		if b.Price < worstBid {
+			// Add to book
+			bids = append(bids, b)
+		}
+	}
+	for _, a := range msg.SnapshotL2.Asks {
+		if a.Price > worstAsk {
+			// Add to book
+			asks = append(asks, a)
+		}
+	}
+
+	fullBook := gorderbook.NewOrderBookL2(
+		state.instrumentData.fullBook.TickPrecision,
+		state.instrumentData.fullBook.LotPrecision,
+		state.instrumentData.fullBook.Depth)
+
+	fullBook.Sync(bids, asks)
+
+	levels := state.instrumentData.fullBook.Diff(fullBook)
+
+	state.instrumentData.fullBook = fullBook
+
+	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+		UpdateL2: &models.OBL2Update{
+			Levels:    levels,
+			Timestamp: msg.SnapshotL2.Timestamp,
+			Trade:     false,
+		},
+		SeqNum: state.instrumentData.seqNum + 1,
+	})
+	state.instrumentData.seqNum += 1
+	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
+
+	return nil
+}
+
 func (state *Listener) checkSockets(context actor.Context) error {
 	// No need to ping HB mechanism already
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -517,4 +661,21 @@ func (state *Listener) postAggTrade(context actor.Context) {
 			break
 		}
 	}
+}
+
+func (state *Listener) updateFullBook(context actor.Context) error {
+	context.Request(
+		state.executor,
+		&messages.MarketDataRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Subscribe: false,
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Exchange:   state.security.Exchange,
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			Aggregation: models.L2,
+		})
+
+	return nil
 }

@@ -261,7 +261,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	// Get http request and the expected response
-	request, weight, err := bitfinex.GetOrderBook(symbol, 100, 100)
+	request, weight, err := bitfinex.GetOrderBook(symbol, 2500, 2500)
 	if err != nil {
 		return err
 	}
