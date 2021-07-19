@@ -349,7 +349,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		var liquidations []*models.Liquidation
 		for _, l := range bres.Result {
 			liquidations = append(liquidations, &models.Liquidation{
-				Bid:       l.Side == "Buy",
+				Bid:       l.Side == "Sell",
 				Timestamp: utils.MilliToTimestamp(l.Time),
 				OrderID:   uint64(l.ID),
 				Price:     l.Price,
