@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
@@ -37,13 +38,10 @@ func TestMain(m *testing.M) {
 		constants.TETHER.ID:           constants.TETHER,
 		constants.SOUTH_KOREAN_WON.ID: constants.SOUTH_KOREAN_WON,
 		constants.USDC.ID:             constants.USDC,
-		40: xchangerModels.Asset{
-			Symbol: "DASH",
-			Name:   "dash",
-			ID:     40,
-		},
+		constants.DASH.ID:             constants.DASH,
 	}
 
+	fmt.Println("LOAD ASSETS")
 	if err := constants.LoadAssets(assets); err != nil {
 		panic(err)
 	}

@@ -217,7 +217,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		lotPrecision,
 		10000)
 
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
+		return fmt.Errorf("error syncing")
+	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = uint64(time.Now().UnixNano() / 1000000)
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
@@ -244,6 +246,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			}
 		}
 	}
+
+	fmt.Println(ob)
 
 	if err := ws.SubscribeTrades(state.security.Symbol); err != nil {
 		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
