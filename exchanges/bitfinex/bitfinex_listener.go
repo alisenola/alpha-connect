@@ -59,6 +59,7 @@ type Listener struct {
 	stashedTrades  *list.List
 	socketTicker   *time.Ticker
 	fullBookTicker *time.Ticker
+	fullBookDelay  time.Duration
 	executor       *actor.PID
 }
 
@@ -186,16 +187,18 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	fullBookTicker := time.NewTicker(5 * time.Minute)
+	state.fullBookDelay = 5 * time.Minute
+	fullBookTicker := time.NewTicker(state.fullBookDelay)
 	state.fullBookTicker = fullBookTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-fullBookTicker.C:
+			case <-fullBookTicker.C:
 				context.Send(pid, &updateBook{})
-			case <-time.After(6 * time.Minute):
-				// timer stopped, we leave
-				return
+			case <-time.After(10 * time.Second):
+				if state.fullBookTicker != fullBookTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
@@ -213,6 +216,11 @@ func (state *Listener) Clean(context actor.Context) error {
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
+	}
+
+	if state.fullBookTicker != nil {
+		state.fullBookTicker.Stop()
+		state.fullBookTicker = nil
 	}
 
 	return nil
@@ -562,6 +570,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataResponse)
 	if !msg.Success {
+		// We want to converge towards the right value,
+		if msg.RejectionReason == messages.RateLimitExceeded {
+			state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 1.1)
+			state.fullBookTicker.Reset(state.fullBookDelay)
+		}
 		state.logger.Error("error fetching snapshot", log.String("rejection-reason", msg.RejectionReason.String()))
 		return nil
 	}
@@ -569,6 +582,10 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 		state.logger.Error("error fetching snapshot: no OBL2")
 		return nil
 	}
+
+	// Reduce delay
+	state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 0.9)
+	state.fullBookTicker.Reset(state.fullBookDelay)
 
 	// What to do ? ...
 	// Remove all worstBid worstAsk
