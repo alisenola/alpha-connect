@@ -573,6 +573,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 		// We want to converge towards the right value,
 		if msg.RejectionReason == messages.RateLimitExceeded {
 			state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 1.1)
+			fmt.Println("INCREASE DELAY", state.fullBookDelay)
 			state.fullBookTicker.Reset(state.fullBookDelay)
 		}
 		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
@@ -585,6 +586,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 
 	// Reduce delay
 	state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 0.9)
+	fmt.Println("DECREASE DELAY", state.fullBookDelay)
 	state.fullBookTicker.Reset(state.fullBookDelay)
 
 	// What to do ? ...
