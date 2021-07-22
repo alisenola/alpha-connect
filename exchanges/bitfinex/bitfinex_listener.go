@@ -19,8 +19,12 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
+
+var fbd = 5 * time.Minute
+var fbdLock = sync.RWMutex{}
 
 type checkSockets struct{}
 type postAggTrade struct{}
@@ -59,7 +63,6 @@ type Listener struct {
 	stashedTrades  *list.List
 	socketTicker   *time.Ticker
 	fullBookTicker *time.Ticker
-	fullBookDelay  time.Duration
 	executor       *actor.PID
 }
 
@@ -187,8 +190,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	state.fullBookDelay = 5 * time.Minute
-	fullBookTicker := time.NewTicker(state.fullBookDelay)
+	fullBookTicker := time.NewTicker(fbd)
 	state.fullBookTicker = fullBookTicker
 	go func(pid *actor.PID) {
 		for {
@@ -572,9 +574,10 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	if !msg.Success {
 		// We want to converge towards the right value,
 		if msg.RejectionReason == messages.RateLimitExceeded {
-			state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 1.1)
-			fmt.Println("INCREASE DELAY", state.fullBookDelay)
-			state.fullBookTicker.Reset(state.fullBookDelay)
+			fbdLock.Lock()
+			fbd = time.Duration(float64(fbd) * 1.01)
+			fbdLock.Unlock()
+			fmt.Println("INCREASE DELAY", fbd)
 		}
 		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
 		return nil
@@ -585,9 +588,11 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	}
 
 	// Reduce delay
-	state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 0.9)
-	fmt.Println("DECREASE DELAY", state.fullBookDelay)
-	state.fullBookTicker.Reset(state.fullBookDelay)
+	fbdLock.Lock()
+	fbd = time.Duration(float64(fbd) * 0.99)
+	state.fullBookTicker.Reset(fbd)
+	fbdLock.Unlock()
+	fmt.Println("DECREASE DELAY", fbd)
 
 	// What to do ? ...
 	// Remove all worstBid worstAsk
