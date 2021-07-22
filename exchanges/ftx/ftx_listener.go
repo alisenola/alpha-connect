@@ -385,6 +385,15 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 func (state *Listener) checkSockets(context actor.Context) error {
 
+	if state.ws.Err != nil || !state.ws.Connected {
+		if state.ws.Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws.Err))
+		}
+		if err := state.subscribeInstrument(context); err != nil {
+			return fmt.Errorf("error subscribing to instrument: %v", err)
+		}
+	}
+
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
 		if err := state.ws.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
@@ -394,15 +403,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 			return fmt.Errorf("error subscribing to trade stream: %v", err)
 		}
 		state.lastPingTime = time.Now()
-	}
-
-	if state.ws.Err != nil || !state.ws.Connected {
-		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
-		}
-		if err := state.subscribeInstrument(context); err != nil {
-			return fmt.Errorf("error subscribing to instrument: %v", err)
-		}
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat

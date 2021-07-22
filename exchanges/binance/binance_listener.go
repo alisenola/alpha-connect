@@ -449,11 +449,6 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 
 func (state *Listener) checkSockets(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
-		_ = state.ws.ListSubscriptions()
-		state.lastPingTime = time.Now()
-	}
-
 	// TODO ping or HB ?
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
@@ -462,6 +457,11 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
+	}
+
+	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+		_ = state.ws.ListSubscriptions()
+		state.lastPingTime = time.Now()
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat
