@@ -80,7 +80,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 	}
 
-	return state.UpdateSecurityList(context)
+	if err := state.UpdateSecurityList(context); err != nil {
+		state.logger.Info("error updating security list: %v", log.Error(err))
+	}
+
+	return nil
 }
 
 func (state *Executor) Clean(context actor.Context) error {
