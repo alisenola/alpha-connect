@@ -575,7 +575,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 			state.fullBookDelay = time.Duration(float64(state.fullBookDelay) * 1.1)
 			state.fullBookTicker.Reset(state.fullBookDelay)
 		}
-		state.logger.Error("error fetching snapshot", log.String("rejection-reason", msg.RejectionReason.String()))
+		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
 		return nil
 	}
 	if msg.SnapshotL2 == nil {
