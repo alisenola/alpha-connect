@@ -12,10 +12,42 @@ import (
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	assets := map[uint32]xchangerModels.Asset{
+		constants.DOLLAR.ID:           constants.DOLLAR,
+		constants.EURO.ID:             constants.EURO,
+		constants.POUND.ID:            constants.POUND,
+		constants.CANADIAN_DOLLAR.ID:  constants.CANADIAN_DOLLAR,
+		constants.JAPENESE_YEN.ID:     constants.JAPENESE_YEN,
+		constants.BITCOIN.ID:          constants.BITCOIN,
+		constants.LITECOIN.ID:         constants.LITECOIN,
+		constants.ETHEREUM.ID:         constants.ETHEREUM,
+		constants.RIPPLE.ID:           constants.RIPPLE,
+		constants.TETHER.ID:           constants.TETHER,
+		constants.SOUTH_KOREAN_WON.ID: constants.SOUTH_KOREAN_WON,
+		constants.USDC.ID:             constants.USDC,
+		constants.DASH.ID:             constants.DASH,
+		50: xchangerModels.Asset{
+			Symbol: "BTT",
+			Name:   "",
+			ID:     50,
+		},
+	}
+
+	fmt.Println("LOAD ASSETS")
+	if err := constants.LoadAssets(assets); err != nil {
+		panic(err)
+	}
+
+	code := m.Run()
+	os.Exit(code)
+}
 
 func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *actor.PID, func()) {
 	exch := []*xchangerModels.Exchange{
@@ -117,7 +149,6 @@ func TestBinance(t *testing.T) {
 func TestBitfinex(t *testing.T) {
 	t.Parallel()
 	as, executor, clean := StartExecutor(&constants.BITFINEX)
-	defer clean()
 	var obChecker *actor.PID
 	defer func() {
 		if obChecker != nil {
@@ -201,6 +232,7 @@ func TestBitfinex(t *testing.T) {
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
 	}
+	clean()
 }
 
 func TestBitmex(t *testing.T) {
@@ -838,6 +870,7 @@ func TestHuobi(t *testing.T) {
 		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
+		fmt.Println(s)
 		tested := false
 		for _, secID := range securityID {
 			if secID == s.SecurityID {

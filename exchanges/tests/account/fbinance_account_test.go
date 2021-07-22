@@ -577,6 +577,7 @@ func checkFBinancePositions(t *testing.T, account *models.Account, instrument *m
 		p1 := pos1[i]
 		p2 := pos2[i]
 		// Compare the two
+		fmt.Println(p1.Cost, p2.Cost)
 		if math.Abs(p1.Cost-p2.Cost) > 0.000001 {
 			t.Fatalf("different cost %f:%f", p1.Cost, p2.Cost)
 		}
@@ -597,7 +598,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			Instrument:    instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
-			Price:         &types.DoubleValue{Value: 39000},
+			Price:         &types.DoubleValue{Value: 33000},
 			Quantity:      0.002,
 		},
 	}, 10*time.Second).Result()
@@ -756,7 +757,7 @@ func TestFBinanceAccountListener_OnGetPositionsMarket(t *testing.T) {
 			Instrument:    instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
-			Quantity:      0.002,
+			Quantity:      0.005,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -796,6 +797,69 @@ func TestFBinanceAccountListener_OnGetPositionsMarket(t *testing.T) {
 	checkFBinanceBalances(t, FBinanceTestnetAccount)
 
 	fmt.Println("CLOSING")
+	// Close position
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: FBinanceTestnetAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      0.001,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	checkFBinancePositions(t, FBinanceTestnetAccount, instrument)
+	checkFBinanceBalances(t, FBinanceTestnetAccount)
+
+	// Close position
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: FBinanceTestnetAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      0.001,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	checkFBinancePositions(t, FBinanceTestnetAccount, instrument)
+	checkFBinanceBalances(t, FBinanceTestnetAccount)
+
+	// Close position
+	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: FBinanceTestnetAccount,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    instrument,
+			OrderType:     models.Market,
+			OrderSide:     models.Sell,
+			TimeInForce:   models.Session,
+			Quantity:      0.001,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	checkFBinancePositions(t, FBinanceTestnetAccount, instrument)
+	checkFBinanceBalances(t, FBinanceTestnetAccount)
+
 	// Close position
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: FBinanceTestnetAccount,
