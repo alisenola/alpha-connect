@@ -15,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
@@ -172,7 +173,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	symbol := strings.ToLower(state.security.Symbol)
 	err := ws.Connect(
 		symbol,
-		[]string{fbinance.WSDepthStreamRealTime, fbinance.WSAggregatedTradeStream},
+		[]string{
+			fbinance.WSDepthStreamRealTime,
+			fbinance.WSAggregatedTradeStream,
+			fbinance.WSForceOrderStream,
+		},
 		state.dialerPool.GetDialer())
 	if err != nil {
 		return err
@@ -338,6 +343,21 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		})
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastAggTradeTs = ts
+
+	case fbinance.WSForceOrderData:
+		orderData := msg.Message.(fbinance.WSForceOrderData)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			Liquidation: &models.Liquidation{
+				Bid:       orderData.Order.Side == fbinance.BUY_SIDE,
+				Timestamp: utils.MilliToTimestamp(ts),
+				OrderID:   rand.Uint64(),
+				Price:     orderData.Order.OrigPrice,
+				Quantity:  orderData.Order.LastFilledQuantity,
+			},
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
 	}
 
 	return nil
