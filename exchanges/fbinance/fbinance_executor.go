@@ -337,61 +337,56 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 
 			qr.globalRateLimit.Request(weight)
 
-			future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second)
-
-			context.AwaitFuture(future, func(res interface{}, err error) {
-				if err != nil {
+			res, err := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second).Result()
+			if err != nil {
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return nil
+			}
+			queryResponse := res.(*jobs.PerformQueryResponse)
+			if queryResponse.StatusCode != 200 {
+				if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
 					state.logger.Info("http client error", log.Error(err))
 					response.RejectionReason = messages.HTTPError
 					context.Respond(response)
-					return
-				}
-				queryResponse := res.(*jobs.PerformQueryResponse)
-				if queryResponse.StatusCode != 200 {
-					if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-						err := fmt.Errorf(
-							"http client error: %d %s",
-							queryResponse.StatusCode,
-							string(queryResponse.Response))
-						state.logger.Info("http client error", log.Error(err))
-						response.RejectionReason = messages.HTTPError
-						context.Respond(response)
-						return
-					} else if queryResponse.StatusCode >= 500 {
-						err := fmt.Errorf(
-							"http server error: %d %s",
-							queryResponse.StatusCode,
-							string(queryResponse.Response))
-						state.logger.Info("http client error", log.Error(err))
-						response.RejectionReason = messages.HTTPError
-						context.Respond(response)
-						return
-					}
-					return
-				}
-
-				var oires fbinance.OpenInterestData
-				err = json.Unmarshal(queryResponse.Response, &res)
-				if err != nil {
-					state.logger.Info("http error", log.Error(err))
-					response.RejectionReason = messages.ExchangeAPIError
+					return nil
+				} else if queryResponse.StatusCode >= 500 {
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
 					context.Respond(response)
-					return
+					return nil
 				}
+				return nil
+			}
 
-				if oires.Code != 0 {
-					state.logger.Info("http error", log.Error(errors.New(oires.Msg)))
-					response.RejectionReason = messages.ExchangeAPIError
-					context.Respond(response)
-					return
-				}
+			var oires fbinance.OpenInterestData
+			err = json.Unmarshal(queryResponse.Response, &oires)
+			if err != nil {
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return nil
+			}
 
-				fmt.Println("update oi", utils.MilliToTimestamp(uint64(oires.Time)))
-				response.Statistics = append(response.Statistics, &models.Stat{
-					Timestamp: utils.MilliToTimestamp(uint64(oires.Time)),
-					StatType:  models.OpenInterest,
-					Value:     oires.OpenInterest,
-				})
+			if oires.Code != 0 {
+				state.logger.Info("http error", log.Error(errors.New(oires.Msg)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return nil
+			}
+			response.Statistics = append(response.Statistics, &models.Stat{
+				Timestamp: utils.MilliToTimestamp(uint64(oires.Time)),
+				StatType:  models.OpenInterest,
+				Value:     oires.OpenInterest,
 			})
 		}
 	}

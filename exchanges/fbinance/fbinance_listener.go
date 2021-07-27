@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-var oid = 5 * time.Minute
+var oid = 1 * time.Minute
 var oidLock = sync.RWMutex{}
 
 type checkSockets struct{}
@@ -461,7 +461,7 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 			oid = time.Duration(float64(oid) * 1.1)
 			oidLock.Unlock()
 		}
-		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
+		state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
 		return nil
 	}
 
