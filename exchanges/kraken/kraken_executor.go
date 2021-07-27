@@ -305,6 +305,16 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsResponse)
+	context.Respond(&messages.MarketStatisticsResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
 func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"reflect"
 	"time"
@@ -56,6 +57,16 @@ func (state *CoinbaseProFixExecutor) OnHistoricalLiquidationsRequest(context act
 }
 
 func (state *CoinbaseProFixExecutor) UpdateSecurityList(context actor.Context) error {
+	return nil
+}
+
+func (state *CoinbaseProFixExecutor) OnMarketStatisticsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsResponse)
+	context.Respond(&messages.MarketStatisticsResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
 	return nil
 }
 

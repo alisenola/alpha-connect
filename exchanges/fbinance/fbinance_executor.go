@@ -369,9 +369,36 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 					}
 					return
 				}
+
+				var oires fbinance.OpenInterestData
+				err = json.Unmarshal(queryResponse.Response, &res)
+				if err != nil {
+					state.logger.Info("http error", log.Error(err))
+					response.RejectionReason = messages.ExchangeAPIError
+					context.Respond(response)
+					return
+				}
+
+				if oires.Code != 0 {
+					state.logger.Info("http error", log.Error(errors.New(oires.Msg)))
+					response.RejectionReason = messages.ExchangeAPIError
+					context.Respond(response)
+					return
+				}
+
+				fmt.Println("update oi", utils.MilliToTimestamp(uint64(oires.Time)))
+				response.Statistics = append(response.Statistics, &models.Stat{
+					Timestamp: utils.MilliToTimestamp(uint64(oires.Time)),
+					StatType:  models.OpenInterest,
+					Value:     oires.OpenInterest,
+				})
 			})
 		}
 	}
+
+	response.Success = true
+	context.Respond(response)
+
 	return nil
 }
 

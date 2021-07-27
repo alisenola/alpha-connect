@@ -13,6 +13,7 @@ type ExchangeExecutor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
 	OnHistoricalLiquidationsRequest(context actor.Context) error
+	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
@@ -68,6 +69,12 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 	case *messages.HistoricalLiquidationsRequest:
 		if err := state.OnHistoricalLiquidationsRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnHistoricalLiquidationRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.MarketStatisticsRequest:
+		if err := state.OnMarketStatisticsRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnMarketStatisticsRequest", log.Error(err))
 			panic(err)
 		}
 

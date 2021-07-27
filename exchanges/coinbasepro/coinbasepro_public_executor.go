@@ -212,6 +212,16 @@ func (state *CoinbaseProPublicExecutor) OnHistoricalLiquidationsRequest(context 
 	return nil
 }
 
+func (state *CoinbaseProPublicExecutor) OnMarketStatisticsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsResponse)
+	context.Respond(&messages.MarketStatisticsResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
 func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 	response := &messages.MarketDataResponse{
