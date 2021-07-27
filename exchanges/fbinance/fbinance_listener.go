@@ -18,10 +18,15 @@ import (
 	"math/rand"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
+var oid = 5 * time.Minute
+var oidLock = sync.RWMutex{}
+
 type checkSockets struct{}
+type updateOpenInterest struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -33,13 +38,14 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws               *fbinance.Websocket
-	security         *models.Security
-	dialerPool       *xchangerUtils.DialerPool
-	instrumentData   *InstrumentData
-	fbinanceExecutor *actor.PID
-	logger           *log.Logger
-	socketTicker     *time.Ticker
+	ws                 *fbinance.Websocket
+	security           *models.Security
+	dialerPool         *xchangerUtils.DialerPool
+	instrumentData     *InstrumentData
+	executor           *actor.PID
+	logger             *log.Logger
+	socketTicker       *time.Ticker
+	openInterestTicker *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -50,13 +56,13 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		ws:               nil,
-		security:         security,
-		dialerPool:       dialerPool,
-		instrumentData:   nil,
-		fbinanceExecutor: nil,
-		logger:           nil,
-		socketTicker:     nil,
+		ws:             nil,
+		security:       security,
+		dialerPool:     dialerPool,
+		instrumentData: nil,
+		executor:       nil,
+		logger:         nil,
+		socketTicker:   nil,
 	}
 }
 
@@ -98,9 +104,20 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.MarketStatisticsResponse:
+		if err := state.onMarketStatisticsResponse(context); err != nil {
+			state.logger.Error("error processing MarketStatisticsResponse", log.Error(err))
+		}
+
 	case *checkSockets:
 		if err := state.checkSockets(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
+		}
+
+	case *updateOpenInterest:
+		if err := state.updateOpenInterest(context); err != nil {
+			state.logger.Error("error updating open interest", log.Error(err))
 			panic(err)
 		}
 	}
@@ -118,7 +135,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.fbinanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FBINANCE.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FBINANCE.Name+"_executor")
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
@@ -141,6 +158,20 @@ func (state *Listener) Initialize(context actor.Context) error {
 			case _ = <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	openInterestTicker := time.NewTicker(10 * time.Second)
+	state.openInterestTicker = openInterestTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-openInterestTicker.C:
+				context.Send(pid, &updateOpenInterest{})
+			case <-time.After(11 * time.Second):
 				// timer stopped, we leave
 				return
 			}
@@ -187,7 +218,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	time.Sleep(5 * time.Second)
 	fut := context.RequestFuture(
-		state.fbinanceExecutor,
+		state.executor,
 		&messages.MarketDataRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
@@ -421,6 +452,36 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	return nil
 }
 
+func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsResponse)
+	if !msg.Success {
+		// We want to converge towards the right value,
+		if msg.RejectionReason == messages.RateLimitExceeded {
+			oidLock.Lock()
+			oid = time.Duration(float64(oid) * 1.1)
+			oidLock.Unlock()
+		}
+		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
+		return nil
+	}
+
+	fmt.Println("GOT STATS", msg.Statistics)
+	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+		Stats:  msg.Statistics,
+		SeqNum: state.instrumentData.seqNum + 1,
+	})
+	state.instrumentData.seqNum += 1
+
+	// Reduce delay
+	oidLock.Lock()
+	oid = time.Duration(float64(oid) * 0.99)
+	state.openInterestTicker.Reset(oid)
+	oidLock.Unlock()
+	fmt.Println("DECREASE DELAY", oid)
+
+	return nil
+}
+
 func (state *Listener) checkSockets(context actor.Context) error {
 	// TODO ping or hb ?
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -441,6 +502,22 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
+
+	return nil
+}
+
+func (state *Listener) updateOpenInterest(context actor.Context) error {
+	context.Request(
+		state.executor,
+		&messages.MarketStatisticsRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Exchange:   state.security.Exchange,
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			Statistics: []models.StatType{models.OpenInterest},
+		})
 
 	return nil
 }

@@ -220,7 +220,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, symbol := range exchangeInfo.Symbols {
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
-			//fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
+			fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
 			continue
 		}
 		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
@@ -300,17 +300,80 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
-/*
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsRequest)
+	response := &messages.MarketStatisticsResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
+	}
+	symbol := msg.Instrument.Symbol.Value
 	for _, stat := range msg.Statistics {
 		switch stat {
 		case models.OpenInterest:
-			fbinance.GetOpenInterest()
+			req, weight, err := fbinance.GetOpenInterest(symbol)
+			if err != nil {
+				return err
+			}
+
+			var qr *QueryRunner
+			for _, q := range state.queryRunners {
+				if !q.globalRateLimit.IsRateLimited() {
+					qr = q
+					break
+				}
+			}
+
+			if qr == nil {
+				response.RejectionReason = messages.RateLimitExceeded
+				context.Respond(response)
+				return nil
+			}
+
+			qr.globalRateLimit.Request(weight)
+
+			future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second)
+
+			context.AwaitFuture(future, func(res interface{}, err error) {
+				if err != nil {
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return
+				}
+				queryResponse := res.(*jobs.PerformQueryResponse)
+				if queryResponse.StatusCode != 200 {
+					if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+						err := fmt.Errorf(
+							"http client error: %d %s",
+							queryResponse.StatusCode,
+							string(queryResponse.Response))
+						state.logger.Info("http client error", log.Error(err))
+						response.RejectionReason = messages.HTTPError
+						context.Respond(response)
+						return
+					} else if queryResponse.StatusCode >= 500 {
+						err := fmt.Errorf(
+							"http server error: %d %s",
+							queryResponse.StatusCode,
+							string(queryResponse.Response))
+						state.logger.Info("http client error", log.Error(err))
+						response.RejectionReason = messages.HTTPError
+						context.Respond(response)
+						return
+					}
+					return
+				}
+			})
 		}
 	}
+	return nil
 }
-*/
 
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
@@ -356,7 +419,9 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -511,7 +576,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -648,7 +715,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.PositionsRequest)
 
-	positionList := &messages.PositionList{
+	response := &messages.PositionList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
@@ -662,8 +729,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		} else if msg.Instrument.SecurityID != nil {
 			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
 			if !ok {
-				positionList.RejectionReason = messages.UnknownSecurityID
-				context.Respond(positionList)
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
 				return nil
 			}
 			symbol = sec.Symbol
@@ -684,7 +751,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -692,8 +761,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			positionList.RejectionReason = messages.Other
-			context.Respond(positionList)
+			response.RejectionReason = messages.Other
+			context.Respond(response)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
@@ -704,8 +773,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				positionList.RejectionReason = messages.ExchangeAPIError
-				context.Respond(positionList)
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
 				err := fmt.Errorf(
@@ -713,9 +782,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				positionList.Success = false
-				positionList.RejectionReason = messages.ExchangeAPIError
-				context.Respond(positionList)
+				response.Success = false
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
 			}
 			return
 		}
@@ -723,8 +792,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		err = json.Unmarshal(queryResponse.Response, &positions)
 		if err != nil {
 			state.logger.Info("unmarshaling error", log.Error(err))
-			positionList.RejectionReason = messages.ExchangeAPIError
-			context.Respond(positionList)
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
 			return
 		}
 		for _, p := range positions {
@@ -738,8 +807,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if !ok {
 				err := fmt.Errorf("unknown symbol %s", p.Symbol)
 				state.logger.Info("unmarshaling error", log.Error(err))
-				positionList.RejectionReason = messages.ExchangeAPIError
-				context.Respond(positionList)
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
 				return
 			}
 			var cost float64
@@ -759,10 +828,10 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				Cost:     cost,
 				Cross:    false,
 			}
-			positionList.Positions = append(positionList.Positions, pos)
+			response.Positions = append(response.Positions, pos)
 		}
-		positionList.Success = true
-		context.Respond(positionList)
+		response.Success = true
+		context.Respond(response)
 	})
 
 	return nil
@@ -771,7 +840,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
 
-	balanceList := &messages.BalanceList{
+	response := &messages.BalanceList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
@@ -792,7 +861,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -800,8 +871,8 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			balanceList.RejectionReason = messages.HTTPError
-			context.Respond(balanceList)
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
@@ -812,24 +883,24 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				balanceList.RejectionReason = messages.HTTPError
-				context.Respond(balanceList)
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
 					"%d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http server error", log.Error(err))
-				balanceList.RejectionReason = messages.HTTPError
-				context.Respond(balanceList)
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
 			}
 			return
 		}
 		var balances []fbinance.AccountBalance
 		err = json.Unmarshal(queryResponse.Response, &balances)
 		if err != nil {
-			balanceList.RejectionReason = messages.HTTPError
-			context.Respond(balanceList)
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
 			return
 		}
 		for _, b := range balances {
@@ -841,16 +912,16 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				state.logger.Error("got balance for unknown asset", log.String("asset", b.Asset))
 				continue
 			}
-			balanceList.Balances = append(balanceList.Balances, &models.Balance{
+			response.Balances = append(response.Balances, &models.Balance{
 				AccountID: msg.Account.AccountID,
 				Asset:     asset,
 				Quantity:  b.Balance,
 			})
-			fmt.Println(balanceList.Balances)
+			fmt.Println(response.Balances)
 		}
 
-		balanceList.Success = true
-		context.Respond(balanceList)
+		response.Success = true
+		context.Respond(response)
 	})
 
 	return nil
@@ -973,7 +1044,9 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -1098,7 +1171,9 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
@@ -1219,7 +1294,9 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)

@@ -289,7 +289,10 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	}
 
 	if qr == nil {
-		return fmt.Errorf("rate limited")
+		response.Success = false
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
 	}
 
 	qr.rateLimit.Request(weight)

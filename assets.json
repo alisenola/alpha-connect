@@ -937,5 +937,20 @@
     "symbol": "API3",
     "name": "api3",
     "ID": 188
+  },
+  "189": {
+    "symbol": "KEEP",
+    "name": "keep-network",
+    "ID": 189
+  },
+  "190": {
+    "symbol": "TLM",
+    "name": "alien-worlds",
+    "ID": 190
+  },
+  "191": {
+    "symbol": "GTC",
+    "name": "gitcoin",
+    "ID": 191
   }
 }
