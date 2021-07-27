@@ -300,6 +300,18 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
+/*
+func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsRequest)
+	for _, stat := range msg.Statistics {
+		switch stat {
+		case models.OpenInterest:
+			fbinance.GetOpenInterest()
+		}
+	}
+}
+*/
+
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
 	context.Respond(&messages.HistoricalLiquidationsResponse{
@@ -844,7 +856,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
-func buildPostOrderRequest(symbol string, order *messages.NewOrder) (fbinance.NewOrderRequest, *messages.RejectionReason) {
+func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (fbinance.NewOrderRequest, *messages.RejectionReason) {
 	var side fbinance.OrderSide
 	var typ fbinance.OrderType
 	if order.OrderSide == models.Buy {
@@ -868,7 +880,8 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder) (fbinance.Ne
 
 	request := fbinance.NewNewOrderRequest(symbol, side, typ)
 
-	request.SetQuantity(order.Quantity)
+	fmt.Println("SET QTY", order.Quantity, lotPrecision, strconv.FormatFloat(order.Quantity, 'f', int(lotPrecision), 64))
+	request.SetQuantity(order.Quantity, lotPrecision)
 	request.SetNewClientOrderID(order.ClientOrderID)
 
 	if order.OrderType != models.Market {
@@ -888,7 +901,7 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder) (fbinance.Ne
 	}
 
 	if order.Price != nil {
-		request.SetPrice(order.Price.Value)
+		request.SetPrice(order.Price.Value, tickPrecision)
 	}
 
 	// TODO handle multiple exec inst
@@ -909,9 +922,18 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		Success:    false,
 	}
 	symbol := ""
+	var tickPrecision, lotPrecision int
 	if req.Order.Instrument != nil {
 		if req.Order.Instrument.Symbol != nil {
 			symbol = req.Order.Instrument.Symbol.Value
+			sec, ok := state.symbolToSec[symbol]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
 		} else if req.Order.Instrument.SecurityID != nil {
 			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
 			if !ok {
@@ -920,6 +942,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 				return nil
 			}
 			symbol = sec.Symbol
+			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
 		}
 	} else {
 		response.RejectionReason = messages.UnknownSecurityID
@@ -927,7 +951,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	params, rej := buildPostOrderRequest(symbol, req.Order)
+	params, rej := buildPostOrderRequest(symbol, req.Order, tickPrecision, lotPrecision)
 	if rej != nil {
 		response.RejectionReason = *rej
 		context.Respond(response)

@@ -27,6 +27,20 @@ message HistoricalLiquidationsResponse {
     RejectionReason rejection_reason = 5;
 }
 
+message MarketStatisticsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    repeated models.StatType statistics = 3;
+}
+
+message MarketStatisticsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Stat statistics = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
 message MarketDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
