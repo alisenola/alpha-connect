@@ -962,5 +962,50 @@
     "symbol": "DATA",
     "name": "streamr",
     "ID": 193
+  },
+  "194": {
+    "symbol": "NEC",
+    "name": "nectar",
+    "ID": 194
+  },
+  "195": {
+    "symbol": "REQ",
+    "name": "request",
+    "ID": 195
+  },
+  "196": {
+    "symbol": "BFT",
+    "name": "bnktothefuture",
+    "ID": 196
+  },
+  "197": {
+    "symbol": "ODE",
+    "name": "odem",
+    "ID": 197
+  },
+  "198": {
+    "symbol": "ANT",
+    "name": "aragon",
+    "ID": 198
+  },
+  "199": {
+    "symbol": "ZCN",
+    "name": "0chain",
+    "ID": 199
+  },
+  "200": {
+    "symbol": "UTK",
+    "name": "utrust",
+    "ID": 200
+  },
+  "201": {
+    "symbol": "VEE",
+    "name": "blockv",
+    "ID": 201
+  },
+  "202": {
+    "symbol": "ORS",
+    "name": "ors-group",
+    "ID": 202
   }
 }
