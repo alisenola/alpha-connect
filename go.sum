@@ -598,6 +598,12 @@ gitlab.com/alphaticks/xchanger v0.0.0-20210727053312-488429b9ac79 h1:4gs4WBC86vn
 gitlab.com/alphaticks/xchanger v0.0.0-20210727053312-488429b9ac79/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/alphaticks/xchanger v0.0.0-20210727134651-077ad86e1e4a h1:I3XOdHM5NsO6RdGThqZOpW+1OaP71U/szzExvdzKi74=
 gitlab.com/alphaticks/xchanger v0.0.0-20210727134651-077ad86e1e4a/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730085736-83d02dbe1725 h1:KE88ddJ/sERoeN9SlJtpExSYXWCPrSiBhOkes9jVPQg=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730085736-83d02dbe1725/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730090022-f8f028faa7ff h1:TmTG9X47N8yLx/OTsLRDO8mVnKQxoy5/sjgjzY3dHXQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730090022-f8f028faa7ff/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730090251-763946685104 h1:+wy0oDfdma7bosqvQqtYrORriy/J+Ji8kbX2fOek6gU=
+gitlab.com/alphaticks/xchanger v0.0.0-20210730090251-763946685104/go.mod h1:RLpNx8+D+9kBobJS6bUgLnA+cHiAPD+0msuAwjWMTlQ=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210129172750-a2cbffb034bb h1:deeMUS4aGO+FLsnTihoFqYoRlYGtdQ2H/cOXxkyUSqM=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210129172750-a2cbffb034bb/go.mod h1:U7B6DYX6KRF/PCRVOOfbahz5FI6StMmscxIexPWVxvY=
 gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210211101031-f6dda80a7112 h1:y6GuegwMntqIdC1zAL6auPA3iKHQh+Ne7xNrNYGA6dY=

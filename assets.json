@@ -952,5 +952,15 @@
     "symbol": "GTC",
     "name": "gitcoin",
     "ID": 191
+  },
+  "192": {
+    "symbol": "SAN",
+    "name": "santiment",
+    "ID": 192
+  },
+  "193": {
+    "symbol": "DATA",
+    "name": "streamr",
+    "ID": 193
   }
 }
