@@ -159,6 +159,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			}
 			baseCurrency, ok := constants.GetAssetBySymbol(symbolStr)
 			if !ok {
+				//fmt.Println("UNKNOWN BASE", symbolStr)
 				continue
 			}
 			symbolStr = strings.ToUpper(symbol.Pair[3:])

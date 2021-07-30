@@ -1007,5 +1007,175 @@
     "symbol": "ORS",
     "name": "ors-group",
     "ID": 202
+  },
+  "203": {
+    "symbol": "LYM",
+    "name": "lympo",
+    "ID": 203
+  },
+  "204": {
+    "symbol": "FET",
+    "name": "fetch",
+    "ID": 204
+  },
+  "205": {
+    "symbol": "FTT",
+    "name": "ftx-token",
+    "ID": 205
+  },
+  "206": {
+    "symbol": "QASH",
+    "name": "qash",
+    "ID": 206
+  },
+  "207": {
+    "symbol": "WAXP",
+    "name": "wax",
+    "ID": 207
+  },
+  "208": {
+    "symbol": "ESS",
+    "name": "essentia",
+    "ID": 208
+  },
+  "209": {
+    "symbol": "IQ",
+    "name": "everipedia",
+    "ID": 209
+  },
+  "210": {
+    "symbol": "XRA",
+    "name": "xriba",
+    "ID": 210
+  },
+  "211": {
+    "symbol": "GOT",
+    "name": "parkingo",
+    "ID": 211
+  },
+  "212": {
+    "symbol": "OMNI",
+    "name": "omni",
+    "ID": 212
+  },
+  "213": {
+    "symbol": "PNK",
+    "name": "kleros",
+    "ID": 213
+  },
+  "214": {
+    "symbol": "RBTC",
+    "name": "rsk-smart-bitcoin",
+    "ID": 214
+  },
+  "215": {
+    "symbol": "EURT",
+    "name": "tether-eurt",
+    "ID": 215
+  },
+  "216": {
+    "symbol": "PASS",
+    "name": "blockpass",
+    "ID": 216
+  },
+  "217": {
+    "symbol": "VSYS",
+    "name": "v-systems",
+    "ID": 217
+  },
+  "218": {
+    "symbol": "CLO",
+    "name": "callisto-network",
+    "ID": 218
+  },
+  "219": {
+    "symbol": "GT",
+    "name": "gatetoken",
+    "ID": 219
+  },
+  "220": {
+    "symbol": "KAN",
+    "name": "bitkan",
+    "ID": 220
+  },
+  "221": {
+    "symbol": "UOS",
+    "name": "ultra",
+    "ID": 221
+  },
+  "222": {
+    "symbol": "RRB",
+    "name": "renrenbit",
+    "ID": 222
+  },
+  "223": {
+    "symbol": "JST",
+    "name": "just",
+    "ID": 223
+  },
+  "224": {
+    "symbol": "HEZ",
+    "name": "hermez-network",
+    "ID": 224
+  },
+  "225": {
+    "symbol": "XDC",
+    "name": "xinfin-network",
+    "ID": 225
+  },
+  "226": {
+    "symbol": "PLU",
+    "name": "pluton",
+    "ID": 226
+  },
+  "227": {
+    "symbol": "UOP",
+    "name": "utopia-genesis-foundation",
+    "ID": 227
+  },
+  "228": {
+    "symbol": "XSN",
+    "name": "stakenet",
+    "ID": 228
+  },
+  "229": {
+    "symbol": "CEL",
+    "name": "celsius",
+    "ID": 229
+  },
+  "230": {
+    "symbol": "BMI",
+    "name": "bridge-mutual",
+    "ID": 230
+  },
+  "231": {
+    "symbol": "MOB",
+    "name": "mobilecoin",
+    "ID": 231
+  },
+  "232": {
+    "symbol": "ICE",
+    "name": "popsicle-finance",
+    "ID": 232
+  },
+  "233": {
+    "symbol": "OXY",
+    "name": "oxygen",
+    "ID": 233
+  },
+  "234": {
+    "symbol": "IDX",
+    "name": "everest",
+    "ID": 234
+  },
+  "235": {
+    "symbol": "QTF",
+    "name": "quantfury-token",
+    "ID": 235
+  },
+  "236": {
+    "symbol": "FCL",
+    "name": "fractal",
+    "ID": 236
   }
 }
