@@ -77,6 +77,8 @@ message Security {
     google.protobuf.DoubleValue multiplier = 15;
     google.protobuf.Timestamp maturity_date = 16;
     google.protobuf.StringValue securitySubType = 17;
+    google.protobuf.DoubleValue max_limit_quantity = 18;
+    google.protobuf.DoubleValue max_market_quantity = 19;
 }
 
 message Order {

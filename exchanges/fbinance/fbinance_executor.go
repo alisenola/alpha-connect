@@ -264,6 +264,14 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		// Default fee
 		security.MakerFee = &types.DoubleValue{Value: 0.0002}
 		security.TakerFee = &types.DoubleValue{Value: 0.0004}
+		for _, filter := range symbol.Filters {
+			switch filter.FilterType {
+			case fbinance.LOT_SIZE_FILTER:
+				security.MaxLimitQuantity = &types.DoubleValue{Value: filter.MaxQty}
+			case fbinance.MARKET_LOT_SIZE_FILTER:
+				security.MaxMarketQuantity = &types.DoubleValue{Value: filter.MaxQty}
+			}
+		}
 		securities = append(securities, &security)
 	}
 
