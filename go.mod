@@ -19,7 +19,7 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	gitlab.com/alphaticks/gorderbook v0.0.0-20210616120115-89b18aade871
-	gitlab.com/alphaticks/xchanger v0.0.0-20210804140503-b64cf1124bb3
+	gitlab.com/alphaticks/xchanger v0.0.0-20210805135319-ea69a9e423d0
 	gitlab.com/tachikoma.ai/tickobjects v0.0.0-20210528122836-d02ce1923e51
 	gitlab.com/tachikoma.ai/tickstore v0.0.0-20210508085558-6ed77eee2a06
 	gitlab.com/tachikoma.ai/tickstore-go-client v0.0.0-20210215133608-4091e4618451
