@@ -465,7 +465,6 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 		return nil
 	}
 
-	fmt.Println("GOT STATS", msg.Statistics)
 	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 		Stats:  msg.Statistics,
 		SeqNum: state.instrumentData.seqNum + 1,
@@ -477,7 +476,6 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 	oid = time.Duration(float64(oid) * 0.99)
 	state.openInterestTicker.Reset(oid)
 	oidLock.Unlock()
-	fmt.Println("DECREASE DELAY", oid)
 
 	return nil
 }
