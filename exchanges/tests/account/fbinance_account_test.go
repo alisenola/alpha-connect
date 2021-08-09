@@ -118,7 +118,7 @@ func TestFBinanceAccountListener_OnOrderCancelRequest(t *testing.T) {
 		RequestID:  0,
 		Account:    FBinanceTestnetAccount,
 		Instrument: instrument,
-		OrderID:    &types.StringValue{Value: response.OrderID},
+		OrderID:    &types.StringValue{Value: orderID},
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -131,8 +131,8 @@ func TestFBinanceAccountListener_OnOrderCancelRequest(t *testing.T) {
 	if mcResponse.Success {
 		t.Fatalf("was expecting unsuccessful request")
 	}
-	if mcResponse.RejectionReason != messages.UnknownOrder {
-		t.Fatalf("was expecting unknown order")
+	if mcResponse.RejectionReason != messages.NonCancelableOrder {
+		t.Fatalf("was expecting NonCancelableOrder")
 	}
 }
 

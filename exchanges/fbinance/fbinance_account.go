@@ -81,6 +81,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
+	case *messages.AccountDataRequest:
+		if err := state.OnAccountDataRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountDataRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.PositionsRequest:
 		if err := state.OnPositionsRequest(context); err != nil {
 			state.logger.Error("error processing OnPositionListRequest", log.Error(err))
@@ -339,6 +345,23 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		state.refreshKeyTicker = nil
 	}
 
+	return nil
+}
+
+func (state *AccountListener) OnAccountDataRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountDataRequest)
+	positions := state.account.GetPositions()
+	orders := state.account.GetOrders(nil)
+	balances := state.account.GetBalances()
+	context.Respond(&messages.AccountDataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Orders:     orders,
+		Positions:  positions,
+		Balances:   balances,
+		SeqNum:     state.seqNum,
+	})
 	return nil
 }
 
@@ -617,6 +640,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingCancel {
+				fmt.Println("SENDING TO EXECUTOR")
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
 					if err != nil {

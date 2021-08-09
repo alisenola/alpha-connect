@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -19,7 +18,6 @@ import (
 // He is the main part of the whole software..
 type Executor struct {
 	exchanges         []*xchangerModels.Exchange
-	accounts          []*account.Account
 	accountPortfolios map[string]*actor.PID
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
@@ -178,6 +176,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.instruments = make(map[uint64]*actor.PID)
 	state.slSubscribers = make(map[uint64]*actor.PID)
+	state.accountManagers = make(map[string]*actor.PID)
 
 	if state.dialerPool == nil {
 		state.dialerPool = xchangerUtils.DefaultDialerPool
@@ -259,7 +258,9 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		}
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[request.Account.AccountID] = context.Spawn(props)
+		pid := context.Spawn(props)
+		state.accountManagers[request.Account.AccountID] = pid
+		context.Forward(pid)
 	}
 
 	return nil

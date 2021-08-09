@@ -84,9 +84,9 @@ message AccountDataRequest {
 message AccountDataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    OrderList orders = 3;
-    PositionList positions = 4;
-    BalanceList balances = 5;
+    repeated models.Order orders = 3;
+    repeated models.Position positions = 4;
+    repeated models.Balance balances = 5;
     bool success = 6;
     RejectionReason rejection_reason = 7;
     uint64 seq_num = 8;
