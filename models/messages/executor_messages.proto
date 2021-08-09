@@ -87,7 +87,9 @@ message AccountDataResponse {
     OrderList orders = 3;
     PositionList positions = 4;
     BalanceList balances = 5;
-    uint64 seq_num = 6;
+    bool success = 6;
+    RejectionReason rejection_reason = 7;
+    uint64 seq_num = 8;
 }
 
 message AccountDataIncrementalRefresh {
@@ -167,6 +169,7 @@ enum RejectionReason {
     UnsupportedOrderType = 22;
     UnsupportedOrderTimeInForce = 23;
     UnsupportedRequest = 24;
+    UnknownAccount = 25;
 }
 
 enum FeeType {

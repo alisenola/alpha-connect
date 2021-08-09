@@ -328,8 +328,20 @@ func (m *ConstantTradeModel) UpdateTrade(_ uint64, _ uint64, _ float64, _ float6
 
 }
 
-func (m *ConstantTradeModel) Progress(_ uint64) {
+func (m *ConstantTradeModel) Forward(selector int, tick uint64, objectID uint64, object tickobjects.TickObject) {
 
+}
+
+func (m *ConstantTradeModel) Backward() {
+
+}
+
+func (m *ConstantTradeModel) Frequency() uint64 {
+	return 0
+}
+
+func (m *ConstantTradeModel) GetSelectors() []string {
+	return nil
 }
 
 func (m *ConstantTradeModel) Ready() bool {

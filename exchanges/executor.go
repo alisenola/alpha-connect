@@ -28,23 +28,20 @@ type Executor struct {
 	slSubscribers     map[uint64]*actor.PID       // A map from request ID to security list subscribers
 	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
 	logger            *log.Logger
-	paperTrading      bool
 	dialerPool        *xchangerUtils.DialerPool
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges, accounts, paperTrading, dialerPool)
+		return NewExecutor(exchanges, dialerPool)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, accounts []*account.Account, paperTrading bool, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Executor{
-		exchanges:    exchanges,
-		accounts:     accounts,
-		logger:       nil,
-		paperTrading: paperTrading,
-		dialerPool:   dialerPool,
+		exchanges:  exchanges,
+		logger:     nil,
+		dialerPool: dialerPool,
 	}
 }
 
@@ -73,6 +70,12 @@ func (state *Executor) Receive(context actor.Context) {
 			// Attention, no panic in restarting or infinite loop
 		}
 		state.logger.Info("actor restarting")
+
+	case *messages.AccountDataRequest:
+		if err := state.OnAccountDataRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountDataRequest", log.Error(err))
+			panic(err)
+		}
 
 	case *messages.MarketDataRequest:
 		if err := state.OnMarketDataRequest(context); err != nil {
@@ -225,22 +228,40 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 	}
 
-	// Spawn all account listeners
-	state.accountManagers = make(map[string]*actor.PID)
-	for _, accnt := range state.accounts {
-		producer := NewAccountManagerProducer(accnt, state.paperTrading)
+	return nil
+}
+
+func (state *Executor) Clean(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnAccountDataRequest(context actor.Context) error {
+	request := context.Message().(*messages.AccountDataRequest)
+	if request.Account == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownAccount,
+		})
+		return nil
+	}
+
+	if pid, ok := state.accountManagers[request.Account.AccountID]; ok {
+		context.Forward(pid)
+	} else {
+		accnt, err := NewAccount(request.Account)
+		if err != nil {
+			return fmt.Errorf("error creating account: %v", err)
+		}
+		producer := NewAccountManagerProducer(accnt, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[accnt.AccountID] = context.Spawn(props)
+		state.accountManagers[request.Account.AccountID] = context.Spawn(props)
 	}
 
-	return nil
-}
-
-func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 

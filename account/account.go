@@ -66,20 +66,26 @@ type Account struct {
 	quoteCurrency   *xchangerModels.Asset
 }
 
-func NewAccount(account *models.Account, marginCurrency *xchangerModels.Asset, marginPrecision float64) (*Account, error) {
+func NewAccount(account *models.Account) (*Account, error) {
 	quoteCurrency := &constants.DOLLAR
 	accnt := &Account{
-		Account:         account,
-		ordersID:        make(map[string]*Order),
-		ordersClID:      make(map[string]*Order),
-		securities:      make(map[uint64]Security),
-		positions:       make(map[uint64]*Position),
-		balances:        make(map[uint32]float64),
-		assets:          make(map[uint32]*xchangerModels.Asset),
-		margin:          0,
-		MarginCurrency:  marginCurrency,
-		MarginPrecision: marginPrecision,
-		quoteCurrency:   quoteCurrency,
+		Account:       account,
+		ordersID:      make(map[string]*Order),
+		ordersClID:    make(map[string]*Order),
+		securities:    make(map[uint64]Security),
+		positions:     make(map[uint64]*Position),
+		balances:      make(map[uint32]float64),
+		assets:        make(map[uint32]*xchangerModels.Asset),
+		margin:        0,
+		quoteCurrency: quoteCurrency,
+	}
+	switch account.Exchange.ID {
+	case constants.FBINANCE.ID:
+		accnt.MarginCurrency = &constants.TETHER
+		accnt.MarginPrecision = 100000000
+	case constants.BITMEX.ID:
+		accnt.MarginCurrency = &constants.BITCOIN
+		accnt.MarginPrecision = 1. / 0.00000001
 	}
 
 	return accnt, nil

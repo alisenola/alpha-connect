@@ -15,26 +15,27 @@ func (accnt *Account) Value(model modeling.Market) float64 {
 		value += v * model.GetPairPrice(k, accnt.quoteCurrency.ID)
 	}
 
-	marginPrice := model.GetPairPrice(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID)
+	if accnt.MarginCurrency != nil {
+		marginPrice := model.GetPairPrice(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID)
+		for k, p := range accnt.positions {
+			if p.rawSize == 0 {
+				continue
+			}
+			cost := float64(p.cost) / p.marginPrecision
+			size := float64(p.rawSize) / p.lotPrecision
+			factor := size * p.multiplier
+			var exp float64
+			if p.inverse {
+				exp = -1
+			} else {
+				exp = 1
+			}
+			value -= (cost - math.Pow(model.GetPrice(k), exp)*factor) * marginPrice
+		}
 
-	for k, p := range accnt.positions {
-		if p.rawSize == 0 {
-			continue
-		}
-		cost := float64(p.cost) / p.marginPrecision
-		size := float64(p.rawSize) / p.lotPrecision
-		factor := size * p.multiplier
-		var exp float64
-		if p.inverse {
-			exp = -1
-		} else {
-			exp = 1
-		}
-		value -= (cost - math.Pow(model.GetPrice(k), exp)*factor) * marginPrice
+		margin := float64(accnt.margin) / accnt.MarginPrecision
+		value += margin * marginPrice
 	}
-
-	margin := float64(accnt.margin) / accnt.MarginPrecision
-	value += margin * marginPrice
 
 	return math.Max(value, 0.)
 }
@@ -49,30 +50,32 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 			values[i] += v * samplePrices[i]
 		}
 	}
-	marginPrices := model.GetSamplePairPrices(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID, time, N)
-	for k, p := range accnt.positions {
-		if p.rawSize == 0 {
-			continue
+	if accnt.MarginCurrency != nil {
+		marginPrices := model.GetSamplePairPrices(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID, time, N)
+		for k, p := range accnt.positions {
+			if p.rawSize == 0 {
+				continue
+			}
+			cost := float64(p.cost) / p.marginPrecision
+			size := float64(p.rawSize) / p.lotPrecision
+			factor := size * p.multiplier
+			var exp float64
+			if p.inverse {
+				exp = -1
+			} else {
+				exp = 1
+			}
+			samplePrices := model.GetSamplePrices(k, time, N)
+			for i := 0; i < N; i++ {
+				values[i] -= (cost - math.Pow(samplePrices[i], exp)*factor) * marginPrices[i]
+			}
 		}
-		cost := float64(p.cost) / p.marginPrecision
-		size := float64(p.rawSize) / p.lotPrecision
-		factor := size * p.multiplier
-		var exp float64
-		if p.inverse {
-			exp = -1
-		} else {
-			exp = 1
-		}
-		samplePrices := model.GetSamplePrices(k, time, N)
+		margin := float64(accnt.margin) / accnt.MarginPrecision
 		for i := 0; i < N; i++ {
-			values[i] -= (cost - math.Pow(samplePrices[i], exp)*factor) * marginPrices[i]
+			values[i] += margin * marginPrices[i]
 		}
 	}
 
-	margin := float64(accnt.margin) / accnt.MarginPrecision
-	for i := 0; i < N; i++ {
-		values[i] += margin * marginPrices[i]
-	}
 	for _, s := range accnt.securities {
 		s.AddSampleValueChange(model, time, values)
 	}

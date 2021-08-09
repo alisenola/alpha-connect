@@ -75,7 +75,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, xchangerUtils.DefaultDialerPool)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(

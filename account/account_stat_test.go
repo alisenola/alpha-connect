@@ -14,7 +14,7 @@ var bitmex = constants.BITMEX
 var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
-	mdl := modeling.NewMapModel()
+	mdl := modeling.NewMapMarketModel()
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.TETHER.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.ETHEREUM.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(10.))
@@ -43,8 +43,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestAccount_GetAvailableMargin(t *testing.T) {
-	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
+	account, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -72,7 +75,7 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +90,10 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 }
 
 func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
-	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	account, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +122,7 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +136,10 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 }
 
 func TestAccount_PnL_Inverse(t *testing.T) {
-	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	account, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +168,7 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +214,10 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 }
 
 func TestPortfolio_Spot_ELR(t *testing.T) {
-	account := NewAccount(account, &constants.DOLLAR, 1./0.00000001)
+	account, err := NewAccount(bitstampAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	dollarBalance := &models.Balance{
 		AccountID: "1",
 		Asset:     &constants.DOLLAR,
@@ -233,7 +245,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
-	o.Quantity = math.Round(o.Quantity/BTCUSD_SPOT_SEC.RoundLot) * BTCUSD_SPOT_SEC.RoundLot
+	o.Quantity = math.Round(o.Quantity/BTCUSD_SPOT_SEC.RoundLot.Value) * BTCUSD_SPOT_SEC.RoundLot.Value
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
 	_, rej := account.NewOrder(&models.Order{
 		OrderID:       "buy1",
@@ -254,7 +266,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +300,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
-	o.Quantity = math.Round(o.Quantity/ETHUSD_SPOT_SEC.RoundLot) * ETHUSD_SPOT_SEC.RoundLot
+	o.Quantity = math.Round(o.Quantity/ETHUSD_SPOT_SEC.RoundLot.Value) * ETHUSD_SPOT_SEC.RoundLot.Value
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
 	_, rej = account.NewOrder(&models.Order{
 		OrderID:       "buy2",
@@ -337,7 +349,10 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 
 func TestPortfolio_Margin_ELR(t *testing.T) {
 
-	account := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	account, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +394,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,7 +676,10 @@ func TestBitmexPortfolio_Parallel(t *testing.T) {
 
 func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 
-	account := NewAccount(account, &constants.TETHER, 1./0.00000001)
+	account, err := NewAccount(fbinanceAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := account.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, 1000, nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -705,7 +723,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err := account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}

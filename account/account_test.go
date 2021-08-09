@@ -9,8 +9,19 @@ import (
 	"testing"
 )
 
-var account = &models.Account{
+var bitstampAccount = &models.Account{
 	AccountID: "1",
+	Exchange:  &constants.BITSTAMP,
+}
+
+var bitmexAccount = &models.Account{
+	AccountID: "1",
+	Exchange:  &constants.BITMEX,
+}
+
+var fbinanceAccount = &models.Account{
+	AccountID: "1",
+	Exchange:  &constants.FBINANCE,
 }
 
 var BTCUSD_PERP_SEC = &models.Security{
@@ -18,11 +29,10 @@ var BTCUSD_PERP_SEC = &models.Security{
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.BITMEX,
 	Symbol:            "XBTUSD",
-	MinPriceIncrement: 0.05,
-	RoundLot:          1,
+	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
+	RoundLot:          &types.DoubleValue{Value: 1},
 	Underlying:        &constants.BITCOIN,
 	QuoteCurrency:     &constants.DOLLAR,
-	Enabled:           true,
 	IsInverse:         true,
 	MakerFee:          &types.DoubleValue{Value: -0.00025},
 	TakerFee:          &types.DoubleValue{Value: 0.00075},
@@ -35,11 +45,10 @@ var BTCUSDT_PERP_SEC = &models.Security{
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.FBINANCE,
 	Symbol:            "BTCUSDT",
-	MinPriceIncrement: 0.05,
-	RoundLot:          1,
+	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
+	RoundLot:          &types.DoubleValue{Value: 1},
 	Underlying:        &constants.BITCOIN,
 	QuoteCurrency:     &constants.TETHER,
-	Enabled:           true,
 	IsInverse:         false,
 	MakerFee:          &types.DoubleValue{Value: 0.0002},
 	TakerFee:          &types.DoubleValue{Value: 0.0004},
@@ -52,11 +61,10 @@ var ETHUSD_PERP_SEC = &models.Security{
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
 	Exchange:          &constants.BITMEX,
 	Symbol:            "ETHUSD",
-	MinPriceIncrement: 0.05,
-	RoundLot:          1,
+	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
+	RoundLot:          &types.DoubleValue{Value: 1},
 	Underlying:        &constants.ETHEREUM,
 	QuoteCurrency:     &constants.DOLLAR,
-	Enabled:           true,
 	IsInverse:         false,
 	MakerFee:          &types.DoubleValue{Value: -0.00025},
 	TakerFee:          &types.DoubleValue{Value: 0.00075},
@@ -69,11 +77,10 @@ var BTCUSD_SPOT_SEC = &models.Security{
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 	Exchange:          &constants.BITSTAMP,
 	Symbol:            "BTCUSD",
-	MinPriceIncrement: 0.05,
-	RoundLot:          0.0001,
+	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
+	RoundLot:          &types.DoubleValue{Value: 0.0001},
 	Underlying:        &constants.BITCOIN,
 	QuoteCurrency:     &constants.DOLLAR,
-	Enabled:           true,
 	IsInverse:         false,
 	MakerFee:          &types.DoubleValue{Value: 0.0025},
 	TakerFee:          &types.DoubleValue{Value: 0.0025},
@@ -85,11 +92,10 @@ var ETHUSD_SPOT_SEC = &models.Security{
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 	Exchange:          &constants.BITSTAMP,
 	Symbol:            "ETHUSD",
-	MinPriceIncrement: 0.05,
-	RoundLot:          0.0001,
+	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
+	RoundLot:          &types.DoubleValue{Value: 0.0001},
 	Underlying:        &constants.ETHEREUM,
 	QuoteCurrency:     &constants.DOLLAR,
-	Enabled:           true,
 	IsInverse:         false,
 	MakerFee:          &types.DoubleValue{Value: 0.0025},
 	TakerFee:          &types.DoubleValue{Value: 0.0025},
@@ -97,8 +103,11 @@ var ETHUSD_SPOT_SEC = &models.Security{
 }
 
 func TestAccount_ConfirmFill(t *testing.T) {
-	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	accnt, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,8 +207,11 @@ func TestAccount_ConfirmFill(t *testing.T) {
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
-	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	accnt, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,8 +314,11 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	// Post a matching limit order and post a replace right after
 
-	accnt := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	accnt, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +336,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		OrderType:      models.Limit,
 		Side:           models.Buy,
 		TimeInForce:    models.Session,
-		LeavesQuantity: 1.,
+		LeavesQuantity: 2.,
 		CumQuantity:    0,
 		Price:          &types.DoubleValue{Value: 20000.},
 	})
@@ -404,12 +419,18 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 }
 
 func TestAccount_Compare(t *testing.T) {
-	accnt1 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
-	err := accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	accnt1, err := NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	accnt2 := NewAccount(account, &constants.BITCOIN, 1./0.00000001)
+	err = accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accnt2, err := NewAccount(bitmexAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
 	if err != nil {
 		t.Fatal(err)
