@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -296,7 +297,7 @@ func (state *AccountListener) Sync(context actor.Context) error {
 	}
 
 	// Sync account
-	if err := state.account.Sync(state.securities, orderList.Orders, positionList.Positions, balanceList.Balances, 0, nil, nil); err != nil {
+	if err := state.account.Sync(state.securities, orderList.Orders, positionList.Positions, balanceList.Balances, nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -326,18 +327,26 @@ func (state *AccountListener) Clean(context actor.Context) error {
 
 func (state *AccountListener) OnAccountDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.AccountDataRequest)
-	positions := state.account.GetPositions()
-	orders := state.account.GetOrders(nil)
-	balances := state.account.GetBalances()
-	context.Respond(&messages.AccountDataResponse{
+	res := &messages.AccountDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Orders:     orders,
-		Positions:  positions,
-		Balances:   balances,
+		Securities: state.account.GetSecurities(),
+		Orders:     state.account.GetOrders(nil),
+		Positions:  state.account.GetPositions(),
+		Balances:   state.account.GetBalances(),
 		SeqNum:     state.seqNum,
-	})
+	}
+
+	makerFee := state.account.GetMakerFee()
+	takerFee := state.account.GetTakerFee()
+	if makerFee != nil {
+		res.MakerFee = &types.DoubleValue{Value: *makerFee}
+	}
+	if takerFee != nil {
+		res.TakerFee = &types.DoubleValue{Value: *takerFee}
+	}
+
 	return nil
 }
 
@@ -357,7 +366,6 @@ func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
 func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
 	// TODO FILTER
-	state.account.Settle()
 	balances := state.account.GetBalances()
 	context.Respond(&messages.BalanceList{
 		RequestID:  msg.RequestID,
