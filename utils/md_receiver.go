@@ -11,13 +11,14 @@ import (
 // Wrap actor and sends messages to a channel
 
 type MDReceiver struct {
-	ch  chan interface{}
-	as  *actor.ActorSystem
-	pid *actor.PID
-	seq uint64
+	ch       chan interface{}
+	as       *actor.ActorSystem
+	executor *actor.PID
+	pid      *actor.PID
+	seq      uint64
 }
 
-func NewMDReceiver(as *actor.ActorSystem, instrument *models.Instrument, aggregation models.OrderBookAggregation, requestID uint64, ch chan interface{}) *MDReceiver {
+func NewMDReceiver(as *actor.ActorSystem, executor *actor.PID, instrument *models.Instrument, aggregation models.OrderBookAggregation, requestID uint64, ch chan interface{}) *MDReceiver {
 	r := &MDReceiver{
 		ch: ch,
 		as: as,
@@ -33,7 +34,7 @@ func NewMDReceiver(as *actor.ActorSystem, instrument *models.Instrument, aggrega
 				Instrument:  instrument,
 				Aggregation: aggregation,
 			}
-			res, err := c.RequestFuture(as.NewLocalPID("executor"), req, time.Minute).Result()
+			res, err := c.RequestFuture(executor, req, time.Minute).Result()
 			if err != nil {
 				panic(fmt.Errorf("error getting market data"))
 			}

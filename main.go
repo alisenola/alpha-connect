@@ -68,6 +68,10 @@ func main() {
 		&constants.BYBITI,
 		&constants.BYBITL,
 		&constants.UPBIT,
+		&constants.BITHUMB,
+		&constants.BITHUMBG,
+		&constants.DYDX,
+		&constants.OKEXP,
 	}
 	// EXECUTOR //
 	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assets.json")))

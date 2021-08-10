@@ -30,15 +30,14 @@ type Feed struct {
 }
 
 type LiveStore struct {
-	executor   *actor.PID
 	as         *actor.ActorSystem
+	executor   *actor.PID
 	index      *utils.TagIndex
 	securities map[uint64]*models.Security
 	queries    []*LiveQuery
 }
 
-func NewLiveStore(as *actor.ActorSystem) (*LiveStore, error) {
-	executor := as.NewLocalPID("executor")
+func NewLiveStore(as *actor.ActorSystem, executor *actor.PID) (*LiveStore, error) {
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 20*time.Second).Result()
 	if err != nil {
 		return nil, fmt.Errorf("error fetching securities: %v", err)
@@ -52,8 +51,8 @@ func NewLiveStore(as *actor.ActorSystem) (*LiveStore, error) {
 	}
 
 	return &LiveStore{
-		executor:   executor,
 		as:         as,
+		executor:   executor,
 		index:      index,
 		securities: securities,
 	}, nil
@@ -141,7 +140,7 @@ func (lt *LiveStore) NewQuery(qs *query.Settings) (tickstore_go_client.Tickstore
 		feeds[sec.SecurityID] = feed
 	}
 
-	q, err := NewLiveQuery(lt.as, sel, feeds)
+	q, err := NewLiveQuery(lt.as, lt.executor, sel, feeds)
 	lt.queries = append(lt.queries, q)
 	return q, nil
 }

@@ -62,7 +62,7 @@ type LiveQuery struct {
 	err           error
 }
 
-func NewLiveQuery(as *actor.ActorSystem, sel parsing.Selector, feeds map[uint64]*Feed) (*LiveQuery, error) {
+func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Selector, feeds map[uint64]*Feed) (*LiveQuery, error) {
 	// ConstructFunctor
 	// Spawn listener
 	// Let them push events in the chan
@@ -89,7 +89,7 @@ func NewLiveQuery(as *actor.ActorSystem, sel parsing.Selector, feeds map[uint64]
 		} else {
 			aggregation = models.L2
 		}
-		receiver := utils.NewMDReceiver(as, &models.Instrument{
+		receiver := utils.NewMDReceiver(as, executor, &models.Instrument{
 			SecurityID: &types.UInt64Value{Value: f.security.securityID},
 		}, aggregation, f.requestID, lq.ch)
 		f.receiver = receiver
