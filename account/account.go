@@ -26,6 +26,7 @@ type Order struct {
 var ErrNotPendingReplace = errors.New("not pending replace")
 
 type Security interface {
+	GetSecurity() *models.Security
 	AddBidOrder(ID string, price, quantity, queue float64)
 	AddAskOrder(ID string, price, quantity, queue float64)
 	RemoveBidOrder(ID string)
@@ -64,6 +65,8 @@ type Account struct {
 	MarginCurrency  *xchangerModels.Asset
 	MarginPrecision float64
 	quoteCurrency   *xchangerModels.Asset
+	takerFee        *float64
+	makerFee        *float64
 }
 
 func NewAccount(account *models.Account) (*Account, error) {
@@ -91,7 +94,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 	return accnt, nil
 }
 
-func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, margin float64, makerFee, takerFee *float64) error {
+func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order, positions []*models.Position, balances []*models.Balance, makerFee, takerFee *float64) error {
 	accnt.Lock()
 	defer accnt.Unlock()
 	accnt.ordersID = make(map[string]*Order)
@@ -100,6 +103,8 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.positions = make(map[uint64]*Position)
 	accnt.balances = make(map[uint32]float64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
+	accnt.takerFee = takerFee
+	accnt.makerFee = makerFee
 
 	var err error
 	for _, s := range securities {
@@ -139,7 +144,6 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		}
 	}
 
-	accnt.margin = int64(math.Round(margin * accnt.MarginPrecision))
 	for _, s := range accnt.securities {
 		s.Clear()
 	}
@@ -186,6 +190,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		//sec.Position.Cross = p.Cross
 	}
 
+	accnt.margin = 0
 	for _, b := range balances {
 		accnt.assets[b.Asset.ID] = b.Asset
 		accnt.balances[b.Asset.ID] = b.Quantity
@@ -661,7 +666,7 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 	}, nil
 }
 
-func (accnt *Account) Settle() {
+func (accnt *Account) settle() {
 	accnt.balances[accnt.MarginCurrency.ID] += float64(accnt.margin) / accnt.MarginPrecision
 	// TODO check less than zero
 	accnt.margin = 0
@@ -691,6 +696,22 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 	}
 
 	return orders
+}
+
+func (accnt *Account) GetMakerFee() *float64 {
+	return accnt.makerFee
+}
+
+func (accnt *Account) GetTakerFee() *float64 {
+	return accnt.takerFee
+}
+
+func (accnt *Account) GetSecurities() []*models.Security {
+	var secs []*models.Security
+	for _, sec := range accnt.securities {
+		secs = append(secs, sec.GetSecurity())
+	}
+	return secs
 }
 
 func (accnt *Account) GetPositions() []*models.Position {
@@ -728,6 +749,7 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 func (accnt *Account) GetBalances() []*models.Balance {
 	accnt.RLock()
 	defer accnt.RUnlock()
+	accnt.settle()
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
 		balances = append(balances, &models.Balance{

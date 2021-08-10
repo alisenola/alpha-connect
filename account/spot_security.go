@@ -86,6 +86,10 @@ func (sec *SpotSecurity) AddBidOrder(ID string, price, quantity, queue float64) 
 	sec.Unlock()
 }
 
+func (sec *SpotSecurity) GetSecurity() *models.Security {
+	return sec.Security
+}
+
 func (sec *SpotSecurity) AddAskOrder(ID string, price, quantity, queue float64) {
 	sec.Lock()
 	sec.openAskOrders[ID] = &COrder{

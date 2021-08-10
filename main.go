@@ -18,6 +18,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -44,6 +46,23 @@ func main() {
 
 	as := actor.NewActorSystem()
 	ctx := actor.NewRootContext(as, nil)
+
+	actorAddress := os.Getenv("ACTOR_ADDRESS")
+	actorAdvertisedAddress := os.Getenv("ACTOR_ADVERTISED_ADDRESS")
+	if actorAddress != "" {
+		address := strings.Split(actorAddress, ":")[0]
+		port, err := strconv.ParseInt(strings.Split(actorAddress, ":")[1], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		conf := remote.Configure(address, int(port))
+		if actorAdvertisedAddress != "" {
+			conf.AdvertisedHost = actorAdvertisedAddress
+		}
+		conf = conf.WithServerOptions(grpc.MaxRecvMsgSize(math.MaxInt64))
+		rem := remote.NewRemote(as, conf)
+		rem.Start()
+	}
 
 	// Start actors
 	exch := []*models.Exchange{
@@ -88,12 +107,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Start remote actor system
-	conf := remote.Configure("localhost", 7960)
-	conf = conf.WithServerOptions(grpc.MaxRecvMsgSize(math.MaxInt32))
-	rem := remote.NewRemote(as, conf)
-	rem.Start()
 
 	var dataServer *grpc.Server
 	// Start live store gRPC server

@@ -84,12 +84,15 @@ message AccountDataRequest {
 message AccountDataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    repeated models.Order orders = 3;
-    repeated models.Position positions = 4;
-    repeated models.Balance balances = 5;
-    bool success = 6;
-    RejectionReason rejection_reason = 7;
-    uint64 seq_num = 8;
+    repeated models.Security securities = 3;
+    repeated models.Order orders = 4;
+    repeated models.Position positions = 5;
+    repeated models.Balance balances = 6;
+    google.protobuf.DoubleValue maker_fee = 7;
+    google.protobuf.DoubleValue taker_fee = 8;
+    bool success = 9;
+    RejectionReason rejection_reason = 10;
+    uint64 seq_num = 11;
 }
 
 message AccountDataIncrementalRefresh {

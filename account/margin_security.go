@@ -71,6 +71,10 @@ func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asse
 	return m, nil
 }
 
+func (sec *MarginSecurity) GetSecurity() *models.Security {
+	return sec.Security
+}
+
 func (sec *MarginSecurity) AddBidOrder(ID string, price, quantity, queue float64) {
 	sec.Lock()
 	sec.openBidOrders[ID] = &COrder{
