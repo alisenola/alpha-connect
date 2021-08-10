@@ -31,6 +31,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
+	_interface.ExchangeExecutorBase
 	securities   map[uint64]*models.Security
 	queryRunners []*QueryRunner
 	dialerPool   *xutils.DialerPool

@@ -8,7 +8,7 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 
 import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
-import "gitlab.com/alphaticks/alpha-connect/models/account.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
@@ -96,6 +96,29 @@ message AccountDataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
     ExecutionReport report = 3;
+}
+
+message TradeCaptureReportRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    TradeCaptureReportFilter filter = 3;
+}
+
+message TradeCaptureReportFilter {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    models.Instrument instrument = 3;
+    SideValue side = 4;
+    google.protobuf.Timestamp from = 5;
+    google.protobuf.Timestamp to = 6;
+}
+
+message TradeCaptureReport {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.TradeCapture trades = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message SecurityDefinitionRequest {
@@ -218,7 +241,7 @@ message AccountUpdate {
 
 enum UpdateReason {
     FundingFee = 0;
-    Transfer = 1;
+    BalanceTransfer = 1;
     Deposit = 2;
     Withdraw = 3;
     Order = 4;

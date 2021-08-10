@@ -15,6 +15,7 @@ type ExchangeExecutor interface {
 	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
+	OnTradeCaptureReportRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
 	OnBalancesRequest(context actor.Context) error
@@ -28,6 +29,81 @@ type ExchangeExecutor interface {
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
+}
+
+type ExchangeExecutorBase struct {
+}
+
+func (e *ExchangeExecutorBase) OnSecurityListRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnHistoricalLiquidationsRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnMarketStatisticsRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnMarketDataRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnTradeCaptureReportRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnOrderStatusRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnPositionsRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnBalancesRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnNewOrderSingleRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnNewOrderBulkRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnOrderReplaceRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnOrderBulkReplaceRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnOrderCancelRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) OnOrderMassCancelRequest(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) UpdateSecurityList(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) GetLogger() *log.Logger {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) Initialize(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (e *ExchangeExecutorBase) Clean(context actor.Context) error {
+	panic("not implemented")
 }
 
 func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
@@ -93,6 +169,12 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 	case *messages.BalancesRequest:
 		if err := state.OnBalancesRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.TradeCaptureReportRequest:
+		if err := state.OnTradeCaptureReportRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnTradeCaptureReportRequest", log.Error(err))
 			panic(err)
 		}
 

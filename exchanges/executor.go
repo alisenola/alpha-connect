@@ -105,6 +105,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.TradeCaptureReportRequest:
+		if err := state.OnTradeCaptureReportRequest(context); err != nil {
+			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.PositionsRequest:
 		if err := state.OnPositionsRequest(context); err != nil {
 			state.logger.Error("error processing OnPositionRequest", log.Error(err))
@@ -417,6 +423,33 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 		context.Send(v, securityList)
 	}
 
+	return nil
+}
+
+func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
+	msg := context.Message().(*messages.TradeCaptureReportRequest)
+	if msg.Account == nil {
+		fmt.Println("NIL")
+		context.Respond(&messages.TradeCaptureReport{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		fmt.Println("NOT FOUND", state.accountManagers)
+		context.Respond(&messages.TradeCaptureReport{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
 	return nil
 }
 

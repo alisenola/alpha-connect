@@ -43,6 +43,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
+	_interface.ExchangeExecutorBase
 	client       *http.Client
 	securities   []*models.Security
 	queryRunners []*QueryRunner

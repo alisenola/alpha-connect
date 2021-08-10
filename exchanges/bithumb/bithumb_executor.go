@@ -25,6 +25,7 @@ import (
 var pairs = []string{"BTC_KRW"}
 
 type Executor struct {
+	_interface.ExchangeExecutorBase
 	client      *http.Client
 	securities  map[uint64]*models.Security
 	rateLimit   *exchanges.RateLimit

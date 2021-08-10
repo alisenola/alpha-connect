@@ -33,6 +33,7 @@ import (
 // The role of a Binance Executor is to
 // process api request
 type Executor struct {
+	_interface.ExchangeExecutorBase
 	client      *http.Client
 	securities  map[uint64]*models.Security
 	symbolToSec map[string]*models.Security

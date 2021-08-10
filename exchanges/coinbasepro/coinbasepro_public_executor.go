@@ -32,6 +32,7 @@ import (
 // The role of a CoinbasePro Executor is to
 // process api request
 type CoinbaseProPublicExecutor struct {
+	_interface.ExchangeExecutorBase
 	client       *http.Client
 	securities   map[uint64]*models.Security
 	rateLimit    *exchanges.RateLimit

@@ -105,6 +105,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.TradeCaptureReportRequest:
+		if err := state.OnTradeCaptureReportRequest(context); err != nil {
+			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.NewOrderSingleRequest:
 		if err := state.OnNewOrderSingle(context); err != nil {
 			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
@@ -401,6 +407,12 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 		Success:   true,
 		Orders:    orders,
 	})
+	return nil
+}
+
+func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
+	fmt.Println("FORWARDING TRADE CAPTURE REPORT REQUEST")
+	context.Forward(state.fbinanceExecutor)
 	return nil
 }
 

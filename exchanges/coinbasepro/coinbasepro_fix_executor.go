@@ -19,6 +19,7 @@ import (
 // 418 IP ban
 
 type CoinbaseProFixExecutor struct {
+	_interface.ExchangeExecutorBase
 	//fixClient 		*http.Client
 	fixRateLimit *exchanges.RateLimit
 	logger       *log.Logger

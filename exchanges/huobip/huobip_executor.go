@@ -23,6 +23,7 @@ import (
 )
 
 type Executor struct {
+	_interface.ExchangeExecutorBase
 	client      *http.Client
 	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit

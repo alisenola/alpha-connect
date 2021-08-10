@@ -16,6 +16,80 @@ enum InstrumentStatus {
     Disabled = 7;
 }
 
+message Instrument {
+    google.protobuf.UInt64Value securityID = 1;
+    models.Exchange exchange = 2;
+    google.protobuf.StringValue symbol = 3;
+}
+
+message Security {
+    uint64 securityID = 1;
+    string securityType = 2;
+    models.Exchange exchange = 3;
+    string symbol = 4;
+    models.Asset underlying = 7;
+    models.Asset quote_currency = 8;
+    InstrumentStatus status = 9;
+    bool is_inverse = 10;
+    google.protobuf.DoubleValue min_price_increment = 11;
+    google.protobuf.DoubleValue round_lot = 12;
+    google.protobuf.DoubleValue maker_fee = 13;
+    google.protobuf.DoubleValue taker_fee = 14;
+    google.protobuf.DoubleValue multiplier = 15;
+    google.protobuf.Timestamp maturity_date = 16;
+    google.protobuf.StringValue securitySubType = 17;
+    google.protobuf.DoubleValue max_limit_quantity = 18;
+    google.protobuf.DoubleValue max_market_quantity = 19;
+}
+
+
+message Order {
+    string orderID = 1;
+    string client_orderID = 2;
+    Instrument instrument = 3;
+    OrderStatus order_status = 4;
+    OrderType order_type = 5;
+    Side side = 6;
+    TimeInForce time_in_force = 7;
+    double leaves_quantity = 8;
+    double cum_quantity = 9;
+    google.protobuf.DoubleValue price = 10;
+}
+
+message Position {
+    string accountID = 1;
+    Instrument instrument = 2;
+    double quantity = 3;
+    bool cross = 4;
+    double cost = 5;
+}
+
+message Balance {
+    string accountID = 1;
+    models.Asset asset = 2;
+    double quantity = 3;
+}
+
+message TradeCapture {
+    Side side = 1;
+    TradeType type = 2;
+    double price = 3;
+    double quantity = 4;
+    string tradeID = 5;
+    models.Instrument instrument = 6;
+    google.protobuf.StringValue trade_LinkID = 7;
+    google.protobuf.StringValue orderID = 8;
+    google.protobuf.StringValue client_orderID = 9;
+    google.protobuf.Timestamp transaction_time = 10;
+}
+
+enum TradeType {
+    Regular = 0;
+    Block = 1;
+    ExchangeForPhysical = 2;
+    Transfer = 3;
+}
+
 enum Side {
     Buy = 0;
     Sell = 1;
@@ -53,57 +127,4 @@ enum TimeInForce {
     AtTheOpening = 2;
     ImmediateOrCancel = 3;
     FillOrKill = 4;
-}
-
-message Instrument {
-    google.protobuf.UInt64Value securityID = 1;
-    models.Exchange exchange = 2;
-    google.protobuf.StringValue symbol = 3;
-}
-
-message Security {
-    uint64 securityID = 1;
-    string securityType = 2;
-    models.Exchange exchange = 3;
-    string symbol = 4;
-    models.Asset underlying = 7;
-    models.Asset quote_currency = 8;
-    InstrumentStatus status = 9;
-    bool is_inverse = 10;
-    google.protobuf.DoubleValue min_price_increment = 11;
-    google.protobuf.DoubleValue round_lot = 12;
-    google.protobuf.DoubleValue maker_fee = 13;
-    google.protobuf.DoubleValue taker_fee = 14;
-    google.protobuf.DoubleValue multiplier = 15;
-    google.protobuf.Timestamp maturity_date = 16;
-    google.protobuf.StringValue securitySubType = 17;
-    google.protobuf.DoubleValue max_limit_quantity = 18;
-    google.protobuf.DoubleValue max_market_quantity = 19;
-}
-
-message Order {
-    string orderID = 1;
-    string client_orderID = 2;
-    Instrument instrument = 3;
-    OrderStatus order_status = 4;
-    OrderType order_type = 5;
-    Side side = 6;
-    TimeInForce time_in_force = 7;
-    double leaves_quantity = 8;
-    double cum_quantity = 9;
-    google.protobuf.DoubleValue price = 10;
-}
-
-message Position {
-    string accountID = 1;
-    Instrument instrument = 2;
-    double quantity = 3;
-    bool cross = 4;
-    double cost = 5;
-}
-
-message Balance {
-    string accountID = 1;
-    models.Asset asset = 2;
-    double quantity = 3;
 }
