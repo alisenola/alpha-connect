@@ -149,7 +149,7 @@ func (state *PaperAccountListener) Initialize(context actor.Context) error {
 		}
 	}
 
-	if err := state.account.Sync(filteredSecurities, nil, nil, nil, 1., nil, nil); err != nil {
+	if err := state.account.Sync(filteredSecurities, nil, nil, nil, nil, nil); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -179,7 +179,6 @@ func (state *PaperAccountListener) OnPositionsRequest(context actor.Context) err
 func (state *PaperAccountListener) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
 	// TODO FILTER
-	state.account.Settle()
 	balances := state.account.GetBalances()
 	context.Respond(&messages.BalanceList{
 		RequestID:  msg.RequestID,
