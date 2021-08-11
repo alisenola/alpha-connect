@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -18,6 +19,7 @@ import (
 // He is the main part of the whole software..
 type Executor struct {
 	exchanges         []*xchangerModels.Exchange
+	accounts          []*account.Account
 	accountPortfolios map[string]*actor.PID
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
@@ -29,17 +31,18 @@ type Executor struct {
 	dialerPool        *xchangerUtils.DialerPool
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges, dialerPool)
+		return NewExecutor(exchanges, accnts, dialerPool)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewExecutor(exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Executor{
 		exchanges:  exchanges,
 		logger:     nil,
 		dialerPool: dialerPool,
+		accounts:   accnts,
 	}
 }
 
@@ -231,6 +234,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 			}
 			state.securities[s.SecurityID] = s
 		}
+	}
+
+	// Spawn all account listeners
+	state.accountManagers = make(map[string]*actor.PID)
+	for _, accnt := range state.accounts {
+		producer := NewAccountManagerProducer(accnt, false)
+		if producer == nil {
+			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
+		}
+		props := actor.PropsFromProducer(producer).WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		state.accountManagers[accnt.AccountID] = context.Spawn(props)
 	}
 
 	return nil

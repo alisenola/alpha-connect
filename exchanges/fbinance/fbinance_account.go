@@ -377,6 +377,8 @@ func (state *AccountListener) OnAccountDataRequest(context actor.Context) error 
 		res.TakerFee = &types.DoubleValue{Value: *takerFee}
 	}
 
+	context.Respond(res)
+
 	return nil
 }
 
