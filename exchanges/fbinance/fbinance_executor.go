@@ -104,7 +104,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	dialers := state.dialerPool.GetDialers()
-	fmt.Println(len(dialers), "DIALERSSSS !!!!")
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{
