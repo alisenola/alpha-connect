@@ -18,8 +18,10 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"math/rand"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -63,6 +65,22 @@ func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	}
 }
 
+func (state *Executor) getQueryRunner() *QueryRunner {
+	sort.Slice(state.queryRunners, func(i, j int) bool {
+		return rand.Uint64()%2 == 0
+	})
+
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.globalRateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	return qr
+}
+
 func (state *Executor) Receive(context actor.Context) {
 	_interface.ExchangeExecutorReceive(state, context)
 }
@@ -86,6 +104,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	dialers := state.dialerPool.GetDialers()
+	fmt.Println(len(dialers), "DIALERSSSS !!!!")
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{
@@ -160,14 +179,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
@@ -330,13 +342,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				return err
 			}
 
-			var qr *QueryRunner
-			for _, q := range state.queryRunners {
-				if !q.globalRateLimit.IsRateLimited() {
-					qr = q
-					break
-				}
-			}
+			qr := state.getQueryRunner()
 
 			if qr == nil {
 				response.RejectionReason = messages.RateLimitExceeded
@@ -441,13 +447,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
+	qr := state.getQueryRunner()
 
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
@@ -592,14 +592,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -757,14 +750,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		}
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -932,14 +918,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -1042,14 +1021,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -1225,14 +1197,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	fmt.Println(request.URL)
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
 
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -1352,14 +1318,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	fmt.Println(request.URL)
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -1475,14 +1434,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.globalRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
