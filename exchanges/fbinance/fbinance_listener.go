@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-var oid = 1 * time.Minute
+var oid = 2 * time.Minute
 var oidLock = sync.RWMutex{}
 
 type checkSockets struct{}
@@ -261,7 +261,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
+		return fmt.Errorf("error syncing orderbook")
+	}
 	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
 
@@ -456,7 +458,7 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsResponse)
 	if !msg.Success {
 		// We want to converge towards the right value,
-		if msg.RejectionReason == messages.RateLimitExceeded {
+		if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
 			oidLock.Lock()
 			oid = time.Duration(float64(oid) * 1.1)
 			oidLock.Unlock()
