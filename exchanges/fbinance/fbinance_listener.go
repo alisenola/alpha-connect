@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -202,13 +203,17 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	ws := fbinance.NewWebsocket()
 	symbol := strings.ToLower(state.security.Symbol)
+	streams := []string{
+		fbinance.WSDepthStreamRealTime,
+		fbinance.WSAggregatedTradeStream,
+		fbinance.WSForceOrderStream,
+	}
+	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+		streams = append(streams, fbinance.WSMarkPriceStream1000ms)
+	}
 	err := ws.Connect(
 		symbol,
-		[]string{
-			fbinance.WSDepthStreamRealTime,
-			fbinance.WSAggregatedTradeStream,
-			fbinance.WSForceOrderStream,
-		},
+		streams,
 		state.dialerPool.GetDialer())
 	if err != nil {
 		return err
@@ -390,6 +395,18 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			},
 			SeqNum: state.instrumentData.seqNum + 1,
 		})
+		state.instrumentData.seqNum += 1
+
+	case fbinance.WSMarkPriceData:
+		mpData := msg.Message.(fbinance.WSMarkPriceData)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			Funding: &models.Funding{
+				Timestamp: utils.MilliToTimestamp(mpData.NextFundingTime),
+				Rate:      mpData.FundingRate,
+			},
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		context.Send(context.Parent(), refresh)
 		state.instrumentData.seqNum += 1
 	}
 
