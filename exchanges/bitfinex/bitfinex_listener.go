@@ -575,7 +575,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 		// We want to converge towards the right value,
 		if msg.RejectionReason == messages.RateLimitExceeded {
 			fbdLock.Lock()
-			fbd = time.Duration(float64(fbd) * 1.1)
+			fbd = time.Duration(float64(fbd) * 1.01)
 			fbdLock.Unlock()
 			fmt.Println("INCREASE DELAY", fbd)
 		}
@@ -589,7 +589,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 
 	// Reduce delay
 	fbdLock.Lock()
-	fbd = time.Duration(float64(fbd) * 0.99)
+	fbd = time.Duration(float64(fbd) * 0.999)
 	state.fullBookTicker.Reset(fbd)
 	fbdLock.Unlock()
 	fmt.Println("DECREASE DELAY", fbd)

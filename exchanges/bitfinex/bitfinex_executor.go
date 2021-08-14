@@ -17,8 +17,10 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"math/rand"
 	"net/http"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 )
@@ -59,6 +61,31 @@ func (state *Executor) Receive(context actor.Context) {
 
 func (state *Executor) GetLogger() *log.Logger {
 	return state.logger
+}
+
+func (state *Executor) getQueryRunner(method string) *QueryRunner {
+	sort.Slice(state.queryRunners, func(i, j int) bool {
+		return rand.Uint64()%2 == 0
+	})
+
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		switch method {
+		case "OB":
+			if !q.obRateLimit.IsRateLimited() {
+				qr = q
+				break
+			}
+		case "SYMBOL":
+			if !q.symbolsRateLimit.IsRateLimited() {
+				qr = q
+				break
+			}
+		}
+
+	}
+
+	return qr
 }
 
 func (state *Executor) Initialize(context actor.Context) error {
@@ -104,13 +131,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.symbolsRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
+	qr := state.getQueryRunner("SYMBOL")
 
 	if qr == nil {
 		return fmt.Errorf("rate limited")
@@ -281,13 +302,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.obRateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
+	qr := state.getQueryRunner("OB")
 
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
