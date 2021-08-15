@@ -1136,10 +1136,14 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 		request.SetPrice(order.Price.Value, tickPrecision)
 	}
 
-	// TODO handle multiple exec inst
-	if len(order.ExecutionInstructions) > 0 {
-		rej := messages.UnsupportedOrderCharacteristic
-		return nil, &rej
+	for _, exec := range order.ExecutionInstructions {
+		switch exec {
+		case messages.ReduceOnly:
+			rej := messages.UnsupportedOrderCharacteristic
+			if err := request.SetReduceOnly(true); err != nil {
+				return nil, &rej
+			}
+		}
 	}
 	request.SetNewOrderResponseType(fbinance.ACK_RESPONSE_TYPE)
 

@@ -213,6 +213,7 @@ enum FeeBasis {
 
 enum ExecutionInstruction {
     ParticipateDoNotInitiate = 0;
+    ReduceOnly = 1;
 }
 
 message ExecutionReport {
