@@ -41,19 +41,20 @@ import (
 // account.
 
 type QueryRunner struct {
-	pid                  *actor.PID
-	minuteOrderRateLimit *exchanges.RateLimit
-	globalRateLimit      *exchanges.RateLimit
+	pid             *actor.PID
+	globalRateLimit *exchanges.RateLimit
 }
 
 type Executor struct {
 	_interface.ExchangeExecutorBase
-	client       *http.Client
-	securities   map[uint64]*models.Security
-	symbolToSec  map[string]*models.Security
-	queryRunners []*QueryRunner
-	dialerPool   *xutils.DialerPool
-	logger       *log.Logger
+	client               *http.Client
+	securities           map[uint64]*models.Security
+	symbolToSec          map[string]*models.Security
+	queryRunners         []*QueryRunner
+	secondOrderRateLimit *exchanges.RateLimit
+	minuteOrderRateLimit *exchanges.RateLimit
+	dialerPool           *xutils.DialerPool
+	logger               *log.Logger
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
@@ -117,9 +118,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return jobs.NewAPIQuery(client)
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
-			pid:                  context.Spawn(props),
-			minuteOrderRateLimit: nil,
-			globalRateLimit:      nil,
+			pid:             context.Spawn(props),
+			globalRateLimit: nil,
 		})
 	}
 
@@ -148,9 +148,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
 			if rateLimit.Interval == "MINUTE" {
-				for _, qr := range state.queryRunners {
-					qr.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
-				}
+				state.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+			} else if rateLimit.Interval == "SECOND" {
+				state.secondOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Duration(rateLimit.IntervalNum)*time.Second)
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 			for _, qr := range state.queryRunners {
@@ -158,7 +158,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			}
 		}
 	}
-	if state.queryRunners[0].minuteOrderRateLimit == nil || state.queryRunners[0].globalRateLimit == nil {
+	if state.queryRunners[0].globalRateLimit == nil || state.minuteOrderRateLimit == nil || state.secondOrderRateLimit == nil {
 		return fmt.Errorf("unable to set second or day rate limit")
 	}
 
@@ -1199,6 +1199,18 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner()
 	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	if state.secondOrderRateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	if state.minuteOrderRateLimit.IsRateLimited() {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
 		return nil
