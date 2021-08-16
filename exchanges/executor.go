@@ -364,6 +364,7 @@ func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error 
 			RejectionReason: messages.UnknownSecurityID,
 			Success:         false,
 		})
+		return nil
 	}
 	if sec, ok := state.securities[request.Instrument.SecurityID.Value]; ok {
 		context.Respond(&messages.SecurityDefinitionResponse{
@@ -655,19 +656,20 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	msg := context.Message().(*messages.OrderCancelRequest)
-	if msg.Account == nil || msg.Instrument == nil || msg.Instrument.Symbol == nil || (msg.ClientOrderID == nil && msg.OrderID == nil) {
+	if msg.Account == nil {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownOrder,
+			RejectionReason: messages.InvalidAccount,
 		})
+		return nil
 	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownOrder,
+			RejectionReason: messages.InvalidAccount,
 		})
 		return nil
 	}
@@ -683,6 +685,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			Success:         false,
 			RejectionReason: messages.InvalidAccount,
 		})
+		return nil
 	}
 	accountManager, ok := state.accountManagers[msg.Account.AccountID]
 	if !ok {
