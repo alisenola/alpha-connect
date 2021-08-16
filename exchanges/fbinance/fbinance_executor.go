@@ -106,6 +106,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	dialers := state.dialerPool.GetDialers()
 	for _, dialer := range dialers {
+		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: 1024,
