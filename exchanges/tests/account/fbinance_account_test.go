@@ -2,7 +2,6 @@ package account
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -70,48 +69,49 @@ func TestFBinanceAccountListener_OnOrderCancelRequest(t *testing.T) {
 	}
 
 	time.Sleep(2 * time.Second)
-	// cancel directly from the executor
-	fbinanceExecutor := actor.NewPID(As.Address(), "executor/"+constants.FBINANCE.Name+"_executor")
+	/*
+		// cancel directly from the executor
+		fbinanceExecutor := actor.NewPID(As.Address(), "executor/"+constants.FBINANCE.Name+"_executor")
 
-	res, err = As.Root.RequestFuture(fbinanceExecutor, &messages.OrderCancelRequest{
-		RequestID:     0,
-		Account:       FBinanceTestnetAccount,
-		Instrument:    instrument,
-		ClientOrderID: &types.StringValue{Value: orderID},
-	}, 10*time.Second).Result()
+		res, err = As.Root.RequestFuture(fbinanceExecutor, &messages.OrderCancelRequest{
+			RequestID:     0,
+			Account:       FBinanceTestnetAccount,
+			Instrument:    instrument,
+			ClientOrderID: &types.StringValue{Value: orderID},
+		}, 10*time.Second).Result()
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	mcResponse, ok := res.(*messages.OrderCancelResponse)
-	if !ok {
-		t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if !mcResponse.Success {
-		t.Fatalf("was expecting successful request: %s", mcResponse.RejectionReason.String())
-	}
+		if err != nil {
+			t.Fatal(err)
+		}
+		mcResponse, ok := res.(*messages.OrderCancelResponse)
+		if !ok {
+			t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
+		}
+		if !mcResponse.Success {
+			t.Fatalf("was expecting successful request: %s", mcResponse.RejectionReason.String())
+		}
 
-	res, err = As.Root.RequestFuture(fbinanceExecutor, &messages.OrderCancelRequest{
-		RequestID:     0,
-		Account:       FBinanceTestnetAccount,
-		Instrument:    instrument,
-		ClientOrderID: &types.StringValue{Value: orderID},
-	}, 10*time.Second).Result()
+		res, err = As.Root.RequestFuture(fbinanceExecutor, &messages.OrderCancelRequest{
+			RequestID:     0,
+			Account:       FBinanceTestnetAccount,
+			Instrument:    instrument,
+			ClientOrderID: &types.StringValue{Value: orderID},
+		}, 10*time.Second).Result()
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	mcResponse, ok = res.(*messages.OrderCancelResponse)
-	if !ok {
-		t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if mcResponse.Success {
-		t.Fatalf("was expecting unsuccessful request")
-	}
-	if mcResponse.RejectionReason != messages.UnknownOrder {
-		t.Fatalf("was expecting unknown order")
-	}
-
+		if err != nil {
+			t.Fatal(err)
+		}
+		mcResponse, ok = res.(*messages.OrderCancelResponse)
+		if !ok {
+			t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
+		}
+		if mcResponse.Success {
+			t.Fatalf("was expecting unsuccessful request")
+		}
+		if mcResponse.RejectionReason != messages.UnknownOrder {
+			t.Fatalf("was expecting unknown order")
+		}
+	*/
 	// Now cancel from the account
 
 	res, err = As.Root.RequestFuture(executor, &messages.OrderCancelRequest{
@@ -124,15 +124,12 @@ func TestFBinanceAccountListener_OnOrderCancelRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mcResponse, ok = res.(*messages.OrderCancelResponse)
+	mcResponse, ok := res.(*messages.OrderCancelResponse)
 	if !ok {
 		t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
 	}
-	if mcResponse.Success {
-		t.Fatalf("was expecting unsuccessful request")
-	}
-	if mcResponse.RejectionReason != messages.NonCancelableOrder {
-		t.Fatalf("was expecting NonCancelableOrder")
+	if !mcResponse.Success {
+		t.Fatalf("was expecting sucessful request")
 	}
 }
 
@@ -598,7 +595,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			Instrument:    instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
-			Price:         &types.DoubleValue{Value: 33000},
+			Price:         &types.DoubleValue{Value: 50000},
 			Quantity:      0.002,
 		},
 	}, 10*time.Second).Result()
@@ -620,13 +617,14 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
-			Price:         &types.DoubleValue{Value: 30000},
-			Quantity:      0.001,
+			ClientOrderID:         uuid.NewV1().String(),
+			Instrument:            instrument,
+			OrderType:             models.Limit,
+			OrderSide:             models.Sell,
+			TimeInForce:           models.Session,
+			Price:                 &types.DoubleValue{Value: 42000},
+			Quantity:              0.001,
+			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -643,13 +641,14 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		Account: FBinanceTestnetAccount,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
-			Price:         &types.DoubleValue{Value: 30000},
-			Quantity:      0.001,
+			ClientOrderID:         uuid.NewV1().String(),
+			Instrument:            instrument,
+			OrderType:             models.Limit,
+			OrderSide:             models.Sell,
+			TimeInForce:           models.Session,
+			Price:                 &types.DoubleValue{Value: 42000},
+			Quantity:              0.001,
+			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {

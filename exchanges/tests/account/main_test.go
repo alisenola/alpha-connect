@@ -6,7 +6,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
-	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
@@ -14,7 +13,6 @@ import (
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"os"
 	"testing"
-	"time"
 )
 
 var executor *actor.PID
@@ -62,31 +60,9 @@ func TestMain(m *testing.M) {
 
 	As = actor.NewActorSystem()
 
-	executor, _ = As.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, xchangerUtils.DefaultDialerPool)), "executor")
+	executor, _ = As.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, accnts, xchangerUtils.DefaultDialerPool)), "executor")
 	bitmex.EnableTestNet()
 	fbinance.EnableTestNet()
-
-	res, err := As.Root.RequestFuture(executor, &messages.AccountDataRequest{
-		RequestID:  0,
-		Subscribe:  true,
-		Subscriber: As.Root.Self(),
-		Account:    BitmexAccount,
-	}, 10*time.Second).Result()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(res)
-
-	res, err = As.Root.RequestFuture(executor, &messages.AccountDataRequest{
-		RequestID:  0,
-		Subscribe:  true,
-		Subscriber: As.Root.Self(),
-		Account:    FBinanceTestnetAccount,
-	}, 10*time.Second).Result()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(res)
 
 	code := m.Run()
 
