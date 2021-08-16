@@ -525,7 +525,7 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	if order.OrderStatus == models.PendingCancel {
 		if reason == messages.UnknownOrder {
 			order.unknownOrderErrorCount += 1
-			if order.unknownOrderErrorCount > 1 {
+			if order.unknownOrderErrorCount > 3 {
 				return nil, fmt.Errorf("unknown order %s, missed a fill", ID)
 			}
 		} else {
