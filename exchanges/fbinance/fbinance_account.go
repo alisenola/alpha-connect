@@ -645,14 +645,12 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	}
 	report, res := state.account.CancelOrder(ID)
 	if res != nil {
-		fmt.Println("RES NOT NIL", res.String())
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
 			RejectionReason: *res,
 			Success:         false,
 		})
 	} else {
-		fmt.Println("CANCEL SUCCESSFUL PENDING SENDING RES")
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID: req.RequestID,
 			Success:   true,
@@ -662,7 +660,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingCancel {
-				fmt.Println("SENDING TO EXECUTOR")
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
 					if err != nil {
@@ -748,7 +745,6 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		state.seqNum += 1
 		context.Send(context.Parent(), report)
 	}
-	fmt.Println("REQUESTING AMSS CANCEL FUTURE")
 	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
@@ -878,6 +874,8 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 
 	case fbinance.MARGIN_CALL:
 		// TODO
+	case fbinance.ACCOUNT_CONFIG_UPDATE:
+		// skip
 	case "":
 		// skip
 	default:
