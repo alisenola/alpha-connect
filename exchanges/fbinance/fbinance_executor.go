@@ -1257,8 +1257,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
-		b, _ := json.Marshal(order)
-		fmt.Println("ORDER DATA", string(b))
 		response.Success = true
 		response.OrderID = fmt.Sprintf("%d", order.OrderID)
 		context.Respond(response)
