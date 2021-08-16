@@ -677,9 +677,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 					response := res.(*messages.OrderCancelResponse)
 
 					if !response.Success {
-						if response.RejectionReason == messages.UnknownOrder {
-							panic(fmt.Errorf("unknown order rejection"))
-						}
 						report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
 						if err != nil {
 							panic(err)

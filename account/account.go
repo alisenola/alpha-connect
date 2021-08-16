@@ -524,6 +524,10 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 		order.lastEventTime = time.Now()
 	}
 
+	if reason == messages.UnknownOrder {
+		fmt.Println("UNKNOWN ORDER", *order)
+	}
+
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
 		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
