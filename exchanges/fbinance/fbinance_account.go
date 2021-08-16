@@ -409,7 +409,6 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 }
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
-	fmt.Println("GOT ORDERE STATUS REQUEST")
 	req := context.Message().(*messages.OrderStatusRequest)
 	orders := state.account.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{
@@ -421,7 +420,6 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	fmt.Println("FORWARDING TRADE CAPTURE REPORT REQUEST")
 	context.Forward(state.fbinanceExecutor)
 	return nil
 }
@@ -459,11 +457,9 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingNew {
-				fmt.Println("PENDING NEW SENDING")
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
 					if err != nil {
-						fmt.Println("REJECTING")
 						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
 						if err != nil {
 							panic(err)
@@ -491,7 +487,6 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 							context.Send(context.Parent(), nReport)
 						}
 					} else {
-						fmt.Println("REJECTING", response.RejectionReason.String())
 						nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
@@ -797,8 +792,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	udata := msg.Message.(*fbinance.UserDataUpdate)
 	switch udata.Event {
 	case fbinance.ORDER_TRADE_UPDATE:
-		b, _ := json.Marshal(udata.Execution)
-		fmt.Println("EXECUTION", string(b))
 		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
@@ -807,7 +800,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		case fbinance.ET_NEW:
 			// New order
 			orderID := fmt.Sprintf("%d", exec.OrderID)
-			fmt.Println("CONFIRM NEW", exec.ClientOrderID, orderID)
 			report, err := state.account.ConfirmNewOrder(exec.ClientOrderID, orderID)
 			if err != nil {
 				return fmt.Errorf("error confirming new order: %v", err)
@@ -821,12 +813,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		case fbinance.ET_TRADE:
 			orderID := fmt.Sprintf("%d", exec.OrderID)
 			tradeID := fmt.Sprintf("%d", exec.TradeID)
-			fmt.Println("FILLED", exec.LastFilledPrice, exec.LastFilledQuantity)
 			report, err := state.account.ConfirmFill(orderID, tradeID, exec.LastFilledPrice, exec.LastFilledQuantity, !exec.Maker)
 			if err != nil {
 				return fmt.Errorf("error confirming filled order: %v", err)
 			}
-			fmt.Println("FEE", report.FeeAmount)
 			if report != nil {
 				report.SeqNum = state.seqNum + 1
 				state.seqNum += 1
