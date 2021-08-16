@@ -17,10 +17,11 @@ import (
 
 type Order struct {
 	*models.Order
-	lastEventTime     time.Time
-	previousStatus    models.OrderStatus
-	pendingAmendPrice *types.DoubleValue
-	pendingAmendQty   *types.DoubleValue
+	lastEventTime          time.Time
+	previousStatus         models.OrderStatus
+	pendingAmendPrice      *types.DoubleValue
+	pendingAmendQty        *types.DoubleValue
+	unknownOrderErrorCount int
 }
 
 var ErrNotPendingReplace = errors.New("not pending replace")
@@ -150,8 +151,9 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 
 	for _, o := range orders {
 		ord := &Order{
-			Order:          o,
-			previousStatus: o.OrderStatus,
+			Order:                  o,
+			previousStatus:         o.OrderStatus,
+			unknownOrderErrorCount: 0,
 		}
 		accnt.ordersID[o.OrderID] = ord
 		accnt.ordersClID[o.ClientOrderID] = ord
@@ -235,9 +237,10 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		return nil, &res
 	}
 	accnt.ordersClID[order.ClientOrderID] = &Order{
-		Order:          order,
-		lastEventTime:  time.Now(),
-		previousStatus: order.OrderStatus,
+		Order:                  order,
+		lastEventTime:          time.Now(),
+		previousStatus:         order.OrderStatus,
+		unknownOrderErrorCount: 0,
 	}
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -520,12 +523,15 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
 	if order.OrderStatus == models.PendingCancel {
-		order.OrderStatus = order.previousStatus
-		order.lastEventTime = time.Now()
-	}
-
-	if reason == messages.UnknownOrder {
-		fmt.Println("UNKNOWN ORDER", *order)
+		if reason == messages.UnknownOrder {
+			order.unknownOrderErrorCount += 1
+			if order.unknownOrderErrorCount > 1 {
+				return nil, fmt.Errorf("unknown order %s, missed a fill", ID)
+			}
+		} else {
+			order.OrderStatus = order.previousStatus
+			order.lastEventTime = time.Now()
+		}
 	}
 
 	return &messages.ExecutionReport{
