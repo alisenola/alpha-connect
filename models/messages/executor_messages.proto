@@ -12,6 +12,81 @@ import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
+
+enum ExecutionType {
+    New = 0;
+    Done = 1;
+    Canceled = 2;
+    Replaced = 3;
+    PendingCancel = 4;
+    Stopped = 5;
+    Rejected = 6;
+    Suspended = 7;
+    PendingNew = 8;
+    Calculated = 9;
+    Expired = 10;
+    PendingReplace = 11;
+    Trade = 12;
+    OrderStatus = 13;
+    Settlement = 14;
+}
+
+enum RejectionReason {
+    Other = 0;
+    UnknownSymbol = 1;
+    UnknownSecurityID = 2;
+    UnsupportedOrderCharacteristic = 3;
+    IncorrectQuantity = 4;
+    ExchangeClosed = 5;
+    DuplicateOrder = 6;
+    InvalidAccount = 7;
+    TooLateToCancel = 8;
+    UnknownOrder = 9;
+    CancelAlreadyPending = 10;
+    DifferentSymbols = 11;
+    InvalidRequest = 12;
+    ExchangeAPIError = 13;
+    InvalidOrder = 14;
+    RateLimitExceeded = 15;
+    UnsupportedSubscription = 16;
+    MissingInstrument = 17;
+    HTTPError = 18;
+    NonReplaceableOrder = 19;
+    NonCancelableOrder = 20;
+    UnsupportedFilter = 21;
+    UnsupportedOrderType = 22;
+    UnsupportedOrderTimeInForce = 23;
+    UnsupportedRequest = 24;
+    UnknownAccount = 25;
+}
+
+enum FeeType {
+    Regulatory = 0;
+    Tax = 1;
+    LocalCommission = 2;
+    ExchangeFees = 3;
+}
+
+enum FeeBasis {
+    Absolute = 0;
+    PerUnit = 1;
+    Percentage = 2;
+}
+
+enum ExecutionInstruction {
+    ParticipateDoNotInitiate = 0;
+    ReduceOnly = 1;
+}
+
+enum UpdateReason {
+    FundingFee = 0;
+    BalanceTransfer = 1;
+    Deposit = 2;
+    Withdraw = 3;
+    Order = 4;
+    Unknown = 5;
+}
+
 message HistoricalLiquidationsRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
@@ -151,71 +226,6 @@ message SecurityList {
     RejectionReason rejection_reason = 5;
 }
 
-enum ExecutionType {
-    New = 0;
-    Done = 1;
-    Canceled = 2;
-    Replaced = 3;
-    PendingCancel = 4;
-    Stopped = 5;
-    Rejected = 6;
-    Suspended = 7;
-    PendingNew = 8;
-    Calculated = 9;
-    Expired = 10;
-    PendingReplace = 11;
-    Trade = 12;
-    OrderStatus = 13;
-    Settlement = 14;
-}
-
-enum RejectionReason {
-    Other = 0;
-    UnknownSymbol = 1;
-    UnknownSecurityID = 2;
-    UnsupportedOrderCharacteristic = 3;
-    IncorrectQuantity = 4;
-    ExchangeClosed = 5;
-    DuplicateOrder = 6;
-    InvalidAccount = 7;
-    TooLateToCancel = 8;
-    UnknownOrder = 9;
-    CancelAlreadyPending = 10;
-    DifferentSymbols = 11;
-    InvalidRequest = 12;
-    ExchangeAPIError = 13;
-    InvalidOrder = 14;
-    RateLimitExceeded = 15;
-    UnsupportedSubscription = 16;
-    MissingInstrument = 17;
-    HTTPError = 18;
-    NonReplaceableOrder = 19;
-    NonCancelableOrder = 20;
-    UnsupportedFilter = 21;
-    UnsupportedOrderType = 22;
-    UnsupportedOrderTimeInForce = 23;
-    UnsupportedRequest = 24;
-    UnknownAccount = 25;
-}
-
-enum FeeType {
-    Regulatory = 0;
-    Tax = 1;
-    LocalCommission = 2;
-    ExchangeFees = 3;
-}
-
-enum FeeBasis {
-    Absolute = 0;
-    PerUnit = 1;
-    Percentage = 2;
-}
-
-enum ExecutionInstruction {
-    ParticipateDoNotInitiate = 0;
-    ReduceOnly = 1;
-}
-
 message ExecutionReport {
     uint64 seq_num = 1;
     string orderID = 2;
@@ -241,15 +251,6 @@ message AccountUpdate {
     UpdateReason update_reason = 1;
     models.Asset asset = 2;
     double balance = 3;
-}
-
-enum UpdateReason {
-    FundingFee = 0;
-    BalanceTransfer = 1;
-    Deposit = 2;
-    Withdraw = 3;
-    Order = 4;
-    Unknown = 5;
 }
 
 message SideValue {
