@@ -387,7 +387,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			Liquidation: &models.Liquidation{
-				Bid:       orderData.Order.Side == fbinance.BUY_SIDE,
+				Bid:       orderData.Order.Side == fbinance.BUY_ORDER,
 				Timestamp: utils.MilliToTimestamp(ts),
 				OrderID:   rand.Uint64(),
 				Price:     orderData.Order.OrigPrice,

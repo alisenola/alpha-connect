@@ -279,9 +279,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.TakerFee = &types.DoubleValue{Value: 0.0004}
 		for _, filter := range symbol.Filters {
 			switch filter.FilterType {
-			case fbinance.LOT_SIZE_FILTER:
+			case fbinance.LOT_SIZE:
 				security.MaxLimitQuantity = &types.DoubleValue{Value: filter.MaxQty}
-			case fbinance.MARKET_LOT_SIZE_FILTER:
+			case fbinance.MARKET_LOT_SIZE:
 				security.MaxMarketQuantity = &types.DoubleValue{Value: filter.MaxQty}
 			}
 		}
@@ -665,7 +665,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				TransactionTime: utils.MilliToTimestamp(t.Timestamp),
 			}
 
-			if t.Side == fbinance.BUY_SIDE {
+			if t.Side == fbinance.BUY_ORDER {
 				trd.Side = models.Buy
 			} else {
 				trd.Side = models.Sell
@@ -821,9 +821,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			}
 
 			switch o.Status {
-			case fbinance.OS_NEW:
+			case fbinance.NEW_ORDER:
 				ord.OrderStatus = models.New
-			case fbinance.OS_CANCELED:
+			case fbinance.CANCELED_ORDER:
 				ord.OrderStatus = models.Canceled
 			default:
 				fmt.Println("UNKNWOEN ORDER STATUS", o.Status)
@@ -844,22 +844,22 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			*/
 
 			switch o.Type {
-			case fbinance.LIMIT:
+			case fbinance.LIMIT_ORDER:
 				ord.OrderType = models.Limit
-			case fbinance.MARKET:
+			case fbinance.MARKET_ORDER:
 				ord.OrderType = models.Market
-			case fbinance.STOP_LOSS:
+			case fbinance.STOP_LOSS_ORDER:
 				ord.OrderType = models.Stop
-			case fbinance.STOP_LOSS_LIMIT:
+			case fbinance.STOP_LOSS_LIMIT_ORDER:
 				ord.OrderType = models.StopLimit
 			default:
 				fmt.Println("UNKNOWN ORDER TYPE", o.Type)
 			}
 
 			switch o.Side {
-			case fbinance.BUY_SIDE:
+			case fbinance.BUY_ORDER:
 				ord.Side = models.Buy
-			case fbinance.SELL_SIDE:
+			case fbinance.SELL_ODER:
 				ord.Side = models.Sell
 			default:
 				fmt.Println("UNKNOWN ORDER SIDE", o.Side)
@@ -1093,19 +1093,19 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	var side fbinance.OrderSide
 	var typ fbinance.OrderType
 	if order.OrderSide == models.Buy {
-		side = fbinance.BUY_SIDE
+		side = fbinance.BUY_ORDER
 	} else {
-		side = fbinance.SELL_SIDE
+		side = fbinance.SELL_ODER
 	}
 	switch order.OrderType {
 	case models.Limit:
-		typ = fbinance.LIMIT
+		typ = fbinance.LIMIT_ORDER
 	case models.Market:
-		typ = fbinance.MARKET
+		typ = fbinance.MARKET_ORDER
 	case models.Stop:
-		typ = fbinance.STOP_LOSS
+		typ = fbinance.STOP_LOSS_ORDER
 	case models.StopLimit:
-		typ = fbinance.STOP_LOSS_LIMIT
+		typ = fbinance.STOP_LOSS_LIMIT_ORDER
 	default:
 		rej := messages.UnsupportedOrderType
 		return nil, &rej
@@ -1221,6 +1221,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
+	state.secondOrderRateLimit.Request(1)
+	state.minuteOrderRateLimit.Request(1)
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
