@@ -115,13 +115,21 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 			if err != nil {
 				return err
 			}
-			posMakerFee := s.MakerFee.Value
+			var posMakerFee float64
 			if makerFee != nil {
 				posMakerFee = *makerFee
+			} else if s.MakerFee != nil {
+				posMakerFee = s.MakerFee.Value
+			} else {
+				return fmt.Errorf("unknown maker fee")
 			}
-			posTakerFee := s.TakerFee.Value
+			var posTakerFee float64
 			if takerFee != nil {
 				posTakerFee = *takerFee
+			} else if s.TakerFee != nil {
+				posTakerFee = s.TakerFee.Value
+			} else {
+				return fmt.Errorf("unknown taker fee")
 			}
 			if s.MinPriceIncrement == nil || s.RoundLot == nil {
 				return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")

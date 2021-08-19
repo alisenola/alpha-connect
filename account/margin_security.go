@@ -59,13 +59,17 @@ func NewMarginSecurity(sec *models.Security, marginCurrency *xchangerModels.Asse
 
 	if makerFee != nil {
 		m.makerFee = *makerFee
-	} else {
+	} else if sec.MakerFee != nil {
 		m.makerFee = sec.MakerFee.Value
+	} else {
+		return nil, fmt.Errorf("maker fee unknown")
 	}
 	if takerFee != nil {
 		m.takerFee = *takerFee
-	} else {
+	} else if sec.TakerFee != nil {
 		m.takerFee = sec.TakerFee.Value
+	} else {
+		return nil, fmt.Errorf("taker fee unknown")
 	}
 
 	return m, nil
