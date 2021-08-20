@@ -380,7 +380,7 @@ func (state *PaperAccountListener) OnOrderReplaceRequest(context actor.Context) 
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingReplace {
-				report, err := state.account.ConfirmReplaceOrder(ID)
+				report, err := state.account.ConfirmReplaceOrder(ID, "")
 				if err != nil {
 					return fmt.Errorf("error confirming cancel: %v", err)
 				}
@@ -438,7 +438,7 @@ func (state *PaperAccountListener) OnOrderBulkReplaceRequest(context actor.Conte
 	}
 
 	for _, r := range reports {
-		report, err := state.account.ConfirmReplaceOrder(r.ClientOrderID.Value)
+		report, err := state.account.ConfirmReplaceOrder(r.ClientOrderID.Value, "")
 		if err != nil {
 			panic(err)
 		}

@@ -403,7 +403,7 @@ func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity
 	}, nil
 }
 
-func (accnt *Account) ConfirmReplaceOrder(ID string) (*messages.ExecutionReport, error) {
+func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.ExecutionReport, error) {
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
@@ -430,6 +430,9 @@ func (accnt *Account) ConfirmReplaceOrder(ID string) (*messages.ExecutionReport,
 		}
 		order.Price.Value = order.pendingAmendPrice.Value
 		order.pendingAmendPrice = nil
+	}
+	if newID != "" {
+		order.OrderID = newID
 	}
 
 	if order.OrderType == models.Limit {

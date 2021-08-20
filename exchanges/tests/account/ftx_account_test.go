@@ -567,7 +567,6 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	// Market sell 1 contract
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
@@ -577,9 +576,9 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 			Instrument:            FTXInstrument,
 			OrderType:             models.Limit,
 			OrderSide:             models.Sell,
-			TimeInForce:           models.Session,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
+			TimeInForce:           models.GoodTillCancel,
 			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
@@ -590,7 +589,6 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	fmt.Println("CLOSING")
 	// Close position
@@ -601,9 +599,9 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 			Instrument:            FTXInstrument,
 			OrderType:             models.Limit,
 			OrderSide:             models.Sell,
-			TimeInForce:           models.Session,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
+			TimeInForce:           models.GoodTillCancel,
 			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
@@ -613,6 +611,8 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
+	// Only check balances at the end, due to how FTX realize the PnL every
+	// second
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
 	checkFTXBalances(t, FTXAccount)
 }
@@ -628,9 +628,9 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 			Instrument:    FTXInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
-			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 35000.},
+			TimeInForce:   models.GoodTillCancel,
+			Quantity:      0.001,
+			Price:         &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
 
@@ -655,7 +655,7 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
 			OrigClientOrderID: &types.StringValue{Value: orderID},
-			Quantity:          &types.DoubleValue{Value: 2},
+			Quantity:          &types.DoubleValue{Value: 0.002},
 			Price:             nil,
 		},
 	}, 10*time.Second).Result()
@@ -696,8 +696,28 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	if len(orderList.Orders) != 1 {
 		t.Fatalf("was expecting one order, got %d", len(orderList.Orders))
 	}
-	if orderList.Orders[0].LeavesQuantity != 2 {
-		t.Fatalf("was expecting quantity of 2")
+	if orderList.Orders[0].LeavesQuantity != 0.002 {
+		t.Fatalf("was expecting quantity of 0.002")
+	}
+
+	// Delete orders
+	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+		RequestID: 0,
+		Account:   FTXAccount,
+		Filter: &messages.OrderFilter{
+			Instrument: FTXInstrument,
+		},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	mcResponse, ok := res.(*messages.OrderMassCancelResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !mcResponse.Success {
+		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
 }
 
@@ -727,7 +747,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 	fmt.Println("CHECK 1 GOOD")
 
 	// Market sell 1 contract
@@ -749,7 +768,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	fmt.Println("CLOSING")
 	// Close position
@@ -771,7 +789,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	// Close position
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
@@ -792,7 +809,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	// Close position
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
@@ -813,7 +829,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
 
 	// Close position
 	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{

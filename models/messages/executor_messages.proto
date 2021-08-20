@@ -372,8 +372,9 @@ message OrderReplaceRequest {
 message OrderReplaceResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    bool success = 3;
-    RejectionReason rejection_reason = 4;
+    string orderID = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message OrderBulkReplaceRequest {

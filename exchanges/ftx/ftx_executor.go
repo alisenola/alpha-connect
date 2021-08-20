@@ -898,6 +898,85 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	fmt.Println("ORDER REPLACE REQUEST")
+	req := context.Message().(*messages.OrderReplaceRequest)
+	response := &messages.OrderReplaceResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	params := ftx.ModifyOrderRequest{}
+	if req.Update.OrderID == nil {
+		response.RejectionReason = messages.UnknownOrder
+		context.Respond(response)
+		return nil
+	}
+
+	if req.Update.Price != nil {
+		params.Price = &req.Update.Price.Value
+	}
+	if req.Update.Quantity != nil {
+		params.Size = &req.Update.Quantity.Value
+	}
+
+	request, weight, err := ftx.ModifyOrder(req.Update.OrderID.Value, params, req.Account.Credentials)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(request.URL)
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	if state.orderRateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	state.orderRateLimit.Request(1)
+	qr.rateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode >= 500 {
+			err := fmt.Errorf(
+				"%d %s",
+				queryResponse.StatusCode,
+				string(queryResponse.Response))
+			state.logger.Info("http server error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		var order ftx.ModifyOrderResponse
+		err = json.Unmarshal(queryResponse.Response, &order)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if !order.Success {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.Success = true
+		response.OrderID = fmt.Sprintf("%d", order.Result.ID)
+		context.Respond(response)
+	})
 	return nil
 }
 

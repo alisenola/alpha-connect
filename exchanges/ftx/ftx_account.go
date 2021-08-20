@@ -602,7 +602,84 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 }
 
 func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
-	// TODO
+	fmt.Println("ORDER REPLACE REQUEST ACCOUNT")
+	req := context.Message().(*messages.OrderReplaceRequest)
+	var ID string
+	if req.Update.OrigClientOrderID != nil {
+		ID = req.Update.OrigClientOrderID.Value
+	} else if req.Update.OrderID != nil {
+		ID = req.Update.OrderID.Value
+	}
+	report, res := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
+	if res != nil {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *res,
+		})
+	} else {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
+			if report.ExecutionType == messages.PendingReplace {
+				if req.Update.OrderID == nil {
+					o, err := state.account.GetOrder(ID)
+					if err != nil {
+						return fmt.Errorf("error getting existing order: %v", err)
+					}
+					req.Update.OrderID = &types.StringValue{Value: o.OrderID}
+				}
+				fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
+				context.AwaitFuture(fut, func(res interface{}, err error) {
+					if err != nil {
+						report, err := state.account.RejectReplaceOrder(ID, messages.Other)
+						if err != nil {
+							panic(err)
+						}
+						context.Respond(&messages.OrderReplaceResponse{
+							RequestID:       req.RequestID,
+							Success:         false,
+							RejectionReason: messages.Other,
+						})
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+						return
+					}
+					response := res.(*messages.OrderReplaceResponse)
+					context.Respond(response)
+
+					if response.Success {
+						report, err := state.account.ConfirmReplaceOrder(ID, response.OrderID)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					} else {
+						report, err := state.account.RejectReplaceOrder(ID, response.RejectionReason)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					}
+				})
+			}
+		}
+	}
 	return nil
 }
 
@@ -802,6 +879,8 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	}
 	switch res := msg.Message.(type) {
 	case ftx.WSOrdersUpdate:
+		// Problem here, I will get the closed order notification before the fill
+		// therefore I will close the order
 		fmt.Println("WSORDER UPDATE", res)
 
 	case ftx.WSFillsUpdate:

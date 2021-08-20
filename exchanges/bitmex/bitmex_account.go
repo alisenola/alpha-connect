@@ -994,7 +994,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			}
 
 		case "Replaced":
-			report, err := state.account.ConfirmReplaceOrder(*data.ClOrdID)
+			report, err := state.account.ConfirmReplaceOrder(*data.ClOrdID, "")
 			if err != nil {
 				if err == account.ErrNotPendingReplace {
 
