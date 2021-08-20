@@ -627,6 +627,10 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				return
 			}
 			cost := *p.RecentAverageOpenPrice * sec.Multiplier.Value * p.Size
+			size := p.Size
+			if p.Side == "sell" {
+				size *= -1
+			}
 			pos := &models.Position{
 				AccountID: msg.Account.AccountID,
 				Instrument: &models.Instrument{
@@ -634,7 +638,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					Symbol:     &types.StringValue{Value: p.Future},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
-				Quantity: p.Size,
+				Quantity: size,
 				Cost:     cost,
 				Cross:    false,
 			}

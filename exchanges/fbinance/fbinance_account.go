@@ -987,10 +987,10 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 
-	rawMargin1 := int(math.Round(state.account.GetMargin() * state.account.MarginPrecision))
+	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
 	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
 	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(), balanceList.Balances[0].Quantity)
+		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
 	}
 
 	pos1 := state.account.GetPositions()

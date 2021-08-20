@@ -136,7 +136,15 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
+	availableMargin := 0.
+	for k, b := range accnt.balances {
+		if k == accnt.MarginCurrency.ID {
+			availableMargin += b
+		} else {
+			availableMargin += b * model.GetPairPrice(k, accnt.MarginCurrency.ID)
+		}
+	}
+	availableMargin += float64(accnt.margin) / accnt.MarginPrecision
 	availableMargin *= leverage
 	//fmt.Println("AV MARGIN", availableMargin)
 	for k, p := range accnt.positions {

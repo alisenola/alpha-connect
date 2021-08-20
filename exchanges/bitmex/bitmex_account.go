@@ -1207,10 +1207,10 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return nil
 	}
 
-	rawMargin1 := int(math.Round(state.account.GetMargin() * state.account.MarginPrecision))
+	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
 	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
 	if rawMargin1 != rawMargin2 {
-		err := fmt.Errorf("got different margin: %f %f", state.account.GetMargin(), balanceList.Balances[0].Quantity)
+		err := fmt.Errorf("got different margin: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
 		state.logger.Info("re-syncing", log.Error(err))
 		return state.Sync(context)
 	}
