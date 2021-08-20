@@ -18,8 +18,9 @@ import (
 var executor *actor.PID
 
 var accounts = []*models.Account{
-	BitmexAccount,
-	FBinanceTestnetAccount,
+	//BitmexAccount,
+	//FBinanceTestnetAccount,
+	FTXAccount,
 }
 
 var As *actor.ActorSystem
@@ -46,8 +47,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	exch := []*xchangerModels.Exchange{
-		&constants.FBINANCE,
-		&constants.BITMEX,
+		//&constants.FBINANCE,
+		//&constants.BITMEX,
+		&constants.FTX,
 	}
 	accnts := []*account.Account{}
 	for _, a := range accounts {

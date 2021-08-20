@@ -55,6 +55,8 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewAccountListener(account) }
+	case constants.FTX.ID:
+		return func() actor.Actor { return ftx.NewAccountListener(account) }
 	default:
 		return nil
 	}
@@ -149,7 +151,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewExecutor(dialerPool) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewExecutor() }
+		return func() actor.Actor { return ftx.NewExecutor(dialerPool) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewExecutor() }
 	case constants.HITBTC.ID:

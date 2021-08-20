@@ -1355,7 +1355,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
 				response.RejectionReason = messages.HTTPError
 
-				var res fbinance.Response
+				var res fbinance.BaseResponse
 				if err := json.Unmarshal(queryResponse.Response, &res); err != nil {
 					err := fmt.Errorf(
 						"%d %s",
@@ -1487,7 +1487,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			}
 			return
 		}
-		var fres fbinance.Response
+		var fres fbinance.BaseResponse
 		err = json.Unmarshal(queryResponse.Response, &fres)
 		if err != nil {
 			state.logger.Info("error unmarshalling", log.Error(err))

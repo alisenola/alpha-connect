@@ -59,6 +59,7 @@ type Account struct {
 	ordersID        map[string]*Order
 	ordersClID      map[string]*Order
 	securities      map[uint64]Security
+	symbolToSec     map[string]Security
 	positions       map[uint64]*Position
 	balances        map[uint32]float64
 	assets          map[uint32]*xchangerModels.Asset
@@ -90,6 +91,9 @@ func NewAccount(account *models.Account) (*Account, error) {
 	case constants.BITMEX.ID:
 		accnt.MarginCurrency = &constants.BITCOIN
 		accnt.MarginPrecision = 1. / 0.00000001
+	case constants.FTX.ID:
+		accnt.MarginCurrency = &constants.DOLLAR
+		accnt.MarginPrecision = 100000000
 	}
 
 	return accnt, nil
@@ -101,6 +105,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.ordersID = make(map[string]*Order)
 	accnt.ordersClID = make(map[string]*Order)
 	accnt.securities = make(map[uint64]Security)
+	accnt.symbolToSec = make(map[string]Security)
 	accnt.positions = make(map[uint64]*Position)
 	accnt.balances = make(map[uint32]float64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
@@ -155,6 +160,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 
 	for _, s := range accnt.securities {
 		s.Clear()
+		accnt.symbolToSec[s.GetSecurity().Symbol] = s
 	}
 
 	for _, o := range orders {
@@ -209,6 +215,30 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	return nil
 }
 
+func (accnt *Account) getSec(instrument *models.Instrument) (Security, *messages.RejectionReason) {
+	var sec Security
+	if instrument.SecurityID != nil {
+		var ok bool
+		sec, ok = accnt.securities[instrument.SecurityID.Value]
+		if !ok {
+			res := messages.UnknownSecurityID
+			return nil, &res
+		}
+	} else if instrument.Symbol != nil {
+		var ok bool
+		sec, ok = accnt.symbolToSec[instrument.Symbol.Value]
+		if !ok {
+			res := messages.UnknownSymbol
+			return nil, &res
+		}
+	} else {
+		res := messages.InvalidRequest
+		return nil, &res
+	}
+
+	return sec, nil
+}
+
 func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, *messages.RejectionReason) {
 	accnt.Lock()
 	defer accnt.Unlock()
@@ -220,15 +250,22 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		res := messages.Other
 		return nil, &res
 	}
-	if order.Instrument == nil || order.Instrument.SecurityID == nil {
+	if order.Instrument == nil {
 		res := messages.UnknownSymbol
 		return nil, &res
 	}
-	sec, ok := accnt.securities[order.Instrument.SecurityID.Value]
-	if !ok {
-		res := messages.UnknownSymbol
-		return nil, &res
+
+	sec, rej := accnt.getSec(order.Instrument)
+	if rej != nil {
+		return nil, rej
 	}
+	if order.Instrument.SecurityID == nil {
+		order.Instrument.SecurityID = &types.UInt64Value{Value: sec.GetSecurity().SecurityID}
+	}
+	if order.Instrument.Symbol == nil {
+		order.Instrument.Symbol = &types.StringValue{Value: sec.GetSecurity().Symbol}
+	}
+
 	lotPrecision := sec.GetLotPrecision()
 	rawLeavesQuantity := lotPrecision * order.LeavesQuantity
 	if math.Abs(rawLeavesQuantity-math.Round(rawLeavesQuantity)) > 0.00001 {
@@ -277,13 +314,19 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.OrderID = ID
 	order.OrderStatus = models.New
 	order.lastEventTime = time.Now()
+	fmt.Println("ORDER CONFIRM", order.LeavesQuantity)
 	accnt.ordersID[ID] = order
+
+	sec, rej := accnt.getSec(order.Instrument)
+	if rej != nil {
+		return nil, fmt.Errorf("unknown instrument: %s", rej.String())
+	}
 
 	if order.OrderType == models.Limit {
 		if order.Side == models.Buy {
-			accnt.securities[order.Instrument.SecurityID.Value].AddBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
+			accnt.securities[sec.GetSecurity().SecurityID].AddBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		} else {
-			accnt.securities[order.Instrument.SecurityID.Value].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
+			accnt.securities[sec.GetSecurity().SecurityID].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		}
 	}
 
@@ -570,7 +613,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
-	//fmt.Println("FILL", price, quantity, lotPrecision)
+	fmt.Println("FILL", price, quantity, order.LeavesQuantity, lotPrecision)
 	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
 	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {
@@ -685,9 +728,26 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 }
 
 func (accnt *Account) settle() {
-	accnt.balances[accnt.MarginCurrency.ID] += float64(accnt.margin) / accnt.MarginPrecision
-	// TODO check less than zero
-	accnt.margin = 0
+	// Only for margin accounts
+	if accnt.MarginCurrency != nil {
+		accnt.balances[accnt.MarginCurrency.ID] += float64(accnt.margin) / accnt.MarginPrecision
+		// TODO check less than zero
+		accnt.margin = 0
+	}
+}
+
+func (accnt *Account) GetOrder(ID string) (*models.Order, error) {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	return order.Order, nil
 }
 
 func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
@@ -695,21 +755,29 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 	defer accnt.RUnlock()
 	var orders []*models.Order
 	for _, o := range accnt.ordersClID {
-		if filter != nil && filter.Instrument != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
-			continue
+		if filter != nil {
+			if filter.Instrument != nil {
+				if filter.Instrument.SecurityID != nil && o.Instrument.SecurityID.Value != filter.Instrument.SecurityID.Value {
+					continue
+				}
+				if filter.Instrument.Symbol != nil && o.Instrument.Symbol.Value != filter.Instrument.Symbol.Value {
+					continue
+				}
+			}
+			if filter.Side != nil && o.Side != filter.Side.Value {
+				continue
+			}
+			if filter.OrderID != nil && o.OrderID != filter.OrderID.Value {
+				continue
+			}
+			if filter.ClientOrderID != nil && o.ClientOrderID != filter.ClientOrderID.Value {
+				continue
+			}
+			if filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
+				continue
+			}
 		}
-		if filter != nil && filter.Side != nil && o.Side != filter.Side.Value {
-			continue
-		}
-		if filter != nil && filter.OrderID != nil && o.OrderID != filter.OrderID.Value {
-			continue
-		}
-		if filter != nil && filter.ClientOrderID != nil && o.ClientOrderID != filter.ClientOrderID.Value {
-			continue
-		}
-		if filter != nil && filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
-			continue
-		}
+
 		orders = append(orders, o.Order)
 	}
 
