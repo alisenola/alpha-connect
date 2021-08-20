@@ -218,7 +218,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		10000)
 
 	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
-		return fmt.Errorf("error syncing")
+		return fmt.Errorf("error syncing: %v", err)
+	}
+	if ob.Crossed() {
+		return fmt.Errorf("crossed order book")
 	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = uint64(time.Now().UnixNano() / 1000000)
