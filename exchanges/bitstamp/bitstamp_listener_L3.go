@@ -255,7 +255,13 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 		state.instrumentData.lotPrecision,
 		10000)
 
-	ob.Sync(msg.SnapshotL3.Bids, msg.SnapshotL3.Asks)
+	if err := ob.Sync(msg.SnapshotL3.Bids, msg.SnapshotL3.Asks); err != nil {
+		return fmt.Errorf("error syncing ob: %v", err)
+	}
+	if ob.Crossed() {
+		return fmt.Errorf("crossed order book")
+	}
+
 	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
