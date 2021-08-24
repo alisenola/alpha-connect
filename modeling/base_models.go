@@ -4,6 +4,7 @@ import (
 	"gitlab.com/tachikoma.ai/tickobjects"
 	"math"
 	"math/rand"
+	"sync"
 )
 
 type Market interface {
@@ -95,6 +96,7 @@ func (m *MapMarketModel) GetSelectors() []string {
 }
 
 type MapLongShortModel struct {
+	sync.RWMutex
 	longModels  map[uint64]LongModel
 	shortModels map[uint64]ShortModel
 	selectors   []string
@@ -118,19 +120,27 @@ func (m *MapLongShortModel) SetShortModel(ID uint64, sm ShortModel) {
 }
 
 func (m *MapLongShortModel) SetPrice(ID uint64, p float64) {
+	m.Lock()
+	defer m.Unlock()
 	m.prices[ID] = p
 }
 
 func (m *MapLongShortModel) SetPairPrice(base, quote uint32, p float64) {
+	m.Lock()
+	defer m.Unlock()
 	ID := uint64(base)<<32 | uint64(quote)
 	m.prices[ID] = p
 }
 
 func (m *MapLongShortModel) GetPrice(ID uint64) float64 {
+	m.RLock()
+	defer m.RUnlock()
 	return m.prices[ID]
 }
 
 func (m *MapLongShortModel) GetPairPrice(base, quote uint32) float64 {
+	m.RLock()
+	defer m.RUnlock()
 	ID := uint64(base)<<32 | uint64(quote)
 	return m.prices[ID]
 }

@@ -979,10 +979,6 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
-	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
-	}
-
 	// Fetch positions
 	res, err = context.RequestFuture(state.ftxExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -1000,12 +996,6 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	if !positionList.Success {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
-	}
-
-	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
-	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
-	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
 	}
 
 	pos1 := state.account.GetPositions()
