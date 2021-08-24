@@ -164,9 +164,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	tp := math.Ceil(1. / state.security.MinPriceIncrement.Value)
-	fmt.Println("MIN PRICE INCRE", state.security.MinPriceIncrement.Value)
-	fmt.Println("TP", tp)
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 
 	ws := ftx.NewWebsocket()
@@ -200,21 +197,25 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	var bids, asks []gorderbook.OrderBookLevel
-	bids = make([]gorderbook.OrderBookLevel, len(obUpdate.Snapshot.Bids), len(obUpdate.Snapshot.Bids))
-	for i, bid := range obUpdate.Snapshot.Bids {
-		bids[i] = gorderbook.OrderBookLevel{
+	for _, bid := range obUpdate.Snapshot.Bids {
+		if bid.Quantity == 0 {
+			continue
+		}
+		bids = append(bids, gorderbook.OrderBookLevel{
 			Price:    bid.Price,
 			Quantity: bid.Quantity,
 			Bid:      true,
-		}
+		})
 	}
-	asks = make([]gorderbook.OrderBookLevel, len(obUpdate.Snapshot.Asks), len(obUpdate.Snapshot.Asks))
-	for i, ask := range obUpdate.Snapshot.Asks {
-		asks[i] = gorderbook.OrderBookLevel{
+	for _, ask := range obUpdate.Snapshot.Asks {
+		if ask.Quantity == 0 {
+			continue
+		}
+		asks = append(asks, gorderbook.OrderBookLevel{
 			Price:    ask.Price,
 			Quantity: ask.Quantity,
 			Bid:      false,
-		}
+		})
 	}
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	bestAsk := obUpdate.Snapshot.Asks[0].Price
@@ -236,6 +237,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error syncing book: %v", err)
 	}
 	if ob.Crossed() {
+		fmt.Println(ob)
 		return fmt.Errorf("crossed order book")
 	}
 	state.instrumentData.orderBook = ob
@@ -405,7 +407,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
-		fmt.Println("PING")
 		if err := state.ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 			return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 		}
