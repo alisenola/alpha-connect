@@ -164,13 +164,18 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
+	tp := math.Ceil(1. / state.security.MinPriceIncrement.Value)
+	fmt.Println("MIN PRICE INCRE", state.security.MinPriceIncrement.Value)
+	fmt.Println("TP", tp)
+	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+
 	ws := ftx.NewWebsocket()
 	err := ws.Connect(state.dialerPool.GetDialer())
 	if err != nil {
 		return err
 	}
 
-	if err := ws.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
+	if err := ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 		return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 	}
 
@@ -189,9 +194,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
-	obUpdate, ok := ws.Msg.Message.(ftx.WSOrderBookUpdate)
+	obUpdate, ok := ws.Msg.Message.(ftx.WSOrderBookGroupedUpdate)
 	if !ok {
-		return fmt.Errorf("was expecting WSOrderBookUpdate, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		return fmt.Errorf("was expecting WSOrderBookGroupedUpdate, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
 	var bids, asks []gorderbook.OrderBookLevel
@@ -211,7 +216,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			Bid:      false,
 		}
 	}
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	bestAsk := obUpdate.Snapshot.Asks[0].Price
 	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
@@ -228,7 +232,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	ob.Sync(bids, asks)
+	if err := ob.Sync(bids, asks); err != nil {
+		return fmt.Errorf("error syncing book: %v", err)
+	}
+	if ob.Crossed() {
+		return fmt.Errorf("crossed order book")
+	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -280,8 +289,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
-	case ftx.WSOrderBookUpdate:
-		obData := msg.Message.(ftx.WSOrderBookUpdate)
+	case ftx.WSOrderBookGroupedUpdate:
+		obData := msg.Message.(ftx.WSOrderBookGroupedUpdate)
 		instr := state.instrumentData
 		nLevels := len(obData.Snapshot.Bids) + len(obData.Snapshot.Asks)
 
@@ -396,7 +405,8 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
-		if err := state.ws.Subscribe(state.security.Symbol, ftx.WSOrderBookChannel); err != nil {
+		fmt.Println("PING")
+		if err := state.ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 			return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 		}
 		if err := state.ws.Subscribe(state.security.Symbol, ftx.WSTradeChannel); err != nil {

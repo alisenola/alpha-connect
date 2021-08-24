@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestSecurities(t *testing.T) {
+	as := actor.NewActorSystem()
 	exchanges := []*xchangerModels.Exchange{
 		&constants.BITMEX,
 		&constants.BINANCE,
@@ -30,8 +32,14 @@ func TestSecurities(t *testing.T) {
 		&constants.HUOBI,
 		&constants.FTX,
 	}
-	executor, _ := actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
+	_, err := as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	if err != nil {
+		panic(err)
+	}
+
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, xchangerUtils.DefaultDialerPool)), "executor")
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
