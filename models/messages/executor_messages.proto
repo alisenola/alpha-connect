@@ -87,6 +87,21 @@ enum UpdateReason {
     Unknown = 5;
 }
 
+message HistoricalOpenInterestsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
+}
+
+message HistoricalOpenInterestsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Stat interests = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
 message HistoricalLiquidationsRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
@@ -279,9 +294,10 @@ message OrderStatusRequest {
 
 message OrderList {
     uint64 requestID = 1;
-    bool success = 2;
-    repeated models.Order orders = 3;
-    RejectionReason rejection_reason = 4;
+    uint64 responseID = 2;
+    bool success = 3;
+    repeated models.Order orders = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message PositionsRequest {

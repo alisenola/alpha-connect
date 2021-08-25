@@ -4,6 +4,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"math/rand"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type updateSecurityList struct{}
 type ExchangeExecutor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
+	OnHistoricalOpenInterestsRequest(context actor.Context) error
 	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
@@ -35,59 +37,168 @@ type ExchangeExecutorBase struct {
 }
 
 func (e *ExchangeExecutorBase) OnSecurityListRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.SecurityListRequest)
+	context.Respond(&messages.SecurityList{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (e *ExchangeExecutorBase) OnHistoricalOpenInterestsRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalOpenInterestsRequest)
+	context.Respond(&messages.HistoricalOpenInterestsResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.HistoricalLiquidationsRequest)
+	context.Respond(&messages.HistoricalLiquidationsResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnMarketStatisticsRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.MarketStatisticsRequest)
+	context.Respond(&messages.MarketStatisticsResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnMarketDataRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.MarketDataRequest)
+	context.Respond(&messages.MarketDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnTradeCaptureReportRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.TradeCaptureReportRequest)
+	context.Respond(&messages.TradeCaptureReport{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnOrderStatusRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.OrderStatusRequest)
+	context.Respond(&messages.OrderList{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnPositionsRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.PositionsRequest)
+	context.Respond(&messages.PositionList{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnBalancesRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.BalancesRequest)
+	context.Respond(&messages.BalanceList{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnNewOrderSingleRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.NewOrderSingleRequest)
+	context.Respond(&messages.NewOrderSingleResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnNewOrderBulkRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.NewOrderBulkRequest)
+	context.Respond(&messages.NewOrderBulkResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnOrderReplaceRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.OrderReplaceRequest)
+	context.Respond(&messages.OrderReplaceResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnOrderBulkReplaceRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.OrderBulkReplaceRequest)
+	context.Respond(&messages.OrderBulkReplaceResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnOrderCancelRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.OrderCancelRequest)
+	context.Respond(&messages.OrderCancelResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) OnOrderMassCancelRequest(context actor.Context) error {
-	panic("not implemented")
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
 }
 
 func (e *ExchangeExecutorBase) UpdateSecurityList(context actor.Context) error {
