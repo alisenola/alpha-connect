@@ -18,6 +18,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/dydx"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/fbinance"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/ftx"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/ftxus"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gemini"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/hitbtc"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobi"
@@ -57,6 +58,8 @@ func NewAccountListenerProducer(account *account.Account) actor.Producer {
 		return func() actor.Actor { return fbinance.NewAccountListener(account) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewAccountListener(account) }
+	case constants.FTXUS.ID:
+		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	default:
 		return nil
 	}
@@ -91,6 +94,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return fbinance.NewListener(security, dialerPool) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewListener(security, dialerPool) }
+	case constants.FTXUS.ID:
+		return func() actor.Actor { return ftxus.NewListener(security, dialerPool) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewListener(security, dialerPool) }
 	case constants.HITBTC.ID:
@@ -152,6 +157,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 		return func() actor.Actor { return fbinance.NewExecutor(dialerPool) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewExecutor(dialerPool) }
+	case constants.FTXUS.ID:
+		return func() actor.Actor { return ftxus.NewExecutor(dialerPool) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewExecutor() }
 	case constants.HITBTC.ID:

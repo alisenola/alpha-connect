@@ -31,6 +31,7 @@ func TestSecurities(t *testing.T) {
 		&constants.BITZ,
 		&constants.HUOBI,
 		&constants.FTX,
+		&constants.UPBIT,
 	}
 	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
 	_, err := as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
