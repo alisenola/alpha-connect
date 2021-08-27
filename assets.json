@@ -1177,5 +1177,75 @@
     "symbol": "FCL",
     "name": "fractal",
     "ID": 236
+  },
+  "237": {
+    "symbol": "ALCX",
+    "name": "alchemix",
+    "ID": 237
+  },
+  "238": {
+    "symbol": "AUDIO",
+    "name": "audius",
+    "ID": 238
+  },
+  "239": {
+    "symbol": "BADGER",
+    "name": "badger-dao",
+    "ID": 239
+  },
+  "240": {
+    "symbol": "BAO",
+    "name": "bao-finance",
+    "ID": 240
+  },
+  "241": {
+    "symbol": "BRZ",
+    "name": "brazilian-digital-token",
+    "ID": 241
+  },
+  "242": {
+    "symbol": "C98",
+    "name": "coin98",
+    "ID": 242
+  },
+  "243": {
+    "symbol": "CLV",
+    "name": "clover-finance",
+    "ID": 243
+  },
+  "244": {
+    "symbol": "CONV",
+    "name": "convergence",
+    "ID": 244
+  },
+  "245": {
+    "symbol": "COPE",
+    "name": "cope",
+    "ID": 245
+  },
+  "246": {
+    "symbol": "CQT",
+    "name": "covalent",
+    "ID": 246
+  },
+  "247": {
+    "symbol": "CREAM",
+    "name": "cream-finance",
+    "ID": 247
+  },
+  "248": {
+    "symbol": "DAWN",
+    "name": "dawn-protocol",
+    "ID": 248
+  },
+  "249": {
+    "symbol": "DMG",
+    "name": "dmm-governance",
+    "ID": 249
+  },
+  "250": {
+    "symbol": "EMB",
+    "name": "emblem",
+    "ID": 250
   }
 }
