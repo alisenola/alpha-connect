@@ -778,7 +778,7 @@ func buildPlaceOrderRequest(symbol string, order *messages.NewOrder, tickPrecisi
 
 	for _, exec := range order.ExecutionInstructions {
 		switch exec {
-		case messages.ReduceOnly:
+		case models.ReduceOnly:
 			request.ReduceOnly = true
 		default:
 			rej := messages.UnsupportedOrderCharacteristic

@@ -676,7 +676,7 @@ func buildPostOrderRequest(order *messages.NewOrder) (bitmex.PostOrderRequest, *
 	// TODO handle multiple exec inst
 	if len(order.ExecutionInstructions) > 0 {
 		switch order.ExecutionInstructions[0] {
-		case messages.ParticipateDoNotInitiate:
+		case models.ParticipateDoNotInitiate:
 			request.SetExecInst(bitmex.EI_PARTICIPATE_DO_NOT_INITIATE)
 		}
 	}

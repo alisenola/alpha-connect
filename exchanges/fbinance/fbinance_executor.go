@@ -1139,7 +1139,7 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 
 	for _, exec := range order.ExecutionInstructions {
 		switch exec {
-		case messages.ReduceOnly:
+		case models.ReduceOnly:
 			rej := messages.UnsupportedOrderCharacteristic
 			if err := request.SetReduceOnly(true); err != nil {
 				return nil, &rej
