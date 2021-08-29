@@ -16,6 +16,11 @@ enum InstrumentStatus {
     Disabled = 7;
 }
 
+enum ExecutionInstruction {
+    ParticipateDoNotInitiate = 0;
+    ReduceOnly = 1;
+}
+
 message Instrument {
     google.protobuf.UInt64Value securityID = 1;
     models.Exchange exchange = 2;
@@ -54,6 +59,7 @@ message Order {
     double leaves_quantity = 8;
     double cum_quantity = 9;
     google.protobuf.DoubleValue price = 10;
+    repeated ExecutionInstruction execution_instructions = 11;
 }
 
 message Position {
