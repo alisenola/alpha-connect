@@ -200,7 +200,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		case "spot":
 			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)
 			if !ok {
-				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
+				//				fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
 				continue
 			}
 			quoteCurrency, ok := constants.GetAssetBySymbol(market.QuoteCurrency)
@@ -217,7 +217,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if len(splits) == 2 {
 				underlying, ok := constants.GetAssetBySymbol(market.Underlying)
 				if !ok {
-					//fmt.Printf("unknown currency symbol %s \n", market.Underlying)
+					//				fmt.Printf("unknown currency symbol %s \n", market.Underlying)
 					continue
 				}
 				security.Underlying = underlying
@@ -1049,10 +1049,16 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 		if !order.Success {
-			state.logger.Info("error unmarshalling", log.String("error", order.Error))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return
+			if order.Error == "Order already queued for cancellation" {
+				response.RejectionReason = messages.UnknownOrder
+				context.Respond(response)
+				return
+			} else {
+				state.logger.Info("error unmarshalling", log.String("error", order.Error))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
 		}
 		response.Success = true
 		context.Respond(response)
