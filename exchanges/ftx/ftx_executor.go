@@ -1049,7 +1049,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 		if !order.Success {
-			if order.Error == "Order already queued for cancellation" {
+			if order.Error == "Order already queued for cancellation" || order.Error == "Order already closed" {
 				response.RejectionReason = messages.UnknownOrder
 				context.Respond(response)
 				return
