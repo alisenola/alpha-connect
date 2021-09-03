@@ -18,7 +18,7 @@ type TradeReceiver struct {
 	from uint64
 }
 
-func NewTradeReceiver(as *actor.ActorSystem, account *models.Account, instrument *models.Instrument, from uint64, requestID uint64, ch chan *models.TradeCapture) *TradeReceiver {
+func NewTradeReceiver(as *actor.ActorSystem, account *models.Account, instrument *models.Instrument, from uint64, live bool, requestID uint64, ch chan *models.TradeCapture) *TradeReceiver {
 	r := &TradeReceiver{
 		ch:   ch,
 		as:   as,
@@ -32,7 +32,7 @@ func NewTradeReceiver(as *actor.ActorSystem, account *models.Account, instrument
 		case *actor.Started:
 			req := &messages.AccountDataRequest{
 				RequestID:  requestID,
-				Subscribe:  true,
+				Subscribe:  live,
 				Subscriber: c.Self(),
 				Account:    account,
 			}
@@ -64,6 +64,9 @@ func NewTradeReceiver(as *actor.ActorSystem, account *models.Account, instrument
 				}
 				if len(trades.Trades) == 0 {
 					fmt.Println("FINISH", r.from)
+					if !live {
+						c.Stop(c.Self())
+					}
 					done = true
 				}
 			}

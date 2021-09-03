@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -28,13 +29,17 @@ func TestTradeReceiver(t *testing.T) {
 	exchgs := []*xchangerModels.Exchange{
 		&constants.FBINANCE,
 	}
+	accnt, err := account.NewAccount(FBinanceAccount)
+	if err != nil {
+		t.Fatal(err)
+	}
 	as := actor.NewActorSystem()
 	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("../assets.json")))
-	_, err := as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exchgs, xchangerUtils.DefaultDialerPool)), "executor")
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exchgs, []*account.Account{accnt}, xchangerUtils.DefaultDialerPool)), "executor")
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +53,7 @@ func TestTradeReceiver(t *testing.T) {
 				SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				Exchange:   sec.Exchange,
 				Symbol:     &types.StringValue{Value: sec.Symbol},
-			}, 0, uint64(time.Now().UnixNano()), ch)
+			}, 0, false, uint64(time.Now().UnixNano()), ch)
 			receivers = append(receivers, receiver)
 		}
 	}
