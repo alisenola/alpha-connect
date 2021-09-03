@@ -585,7 +585,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		}
 	}
 
-	fmt.Println(from, to)
+	fmt.Println(*from, symbol)
 
 	request, weight, err := fbinance.GetUserTrades(msg.Account.Credentials, params)
 	if err != nil {
@@ -651,10 +651,11 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				return
 			}
 			trd := models.TradeCapture{
-				Type:     models.Regular,
-				Price:    t.Price,
-				Quantity: t.Quantity,
-				TradeID:  fmt.Sprintf("%d", t.TradeID),
+				Type:       models.Regular,
+				Price:      t.Price,
+				Quantity:   t.Quantity,
+				Commission: t.Commission,
+				TradeID:    fmt.Sprintf("%d", t.TradeID),
 				Instrument: &models.Instrument{
 					Exchange:   &constants.FBINANCE,
 					Symbol:     &types.StringValue{Value: t.Symbol},
