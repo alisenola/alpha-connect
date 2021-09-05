@@ -68,12 +68,6 @@ func (state *AccountManager) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.TradeCaptureReportRequest:
-		if err := state.OnTradeCaptureReportRequest(context); err != nil {
-			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
-			panic(err)
-		}
-
 	case *messages.OrderStatusRequest:
 		if err := state.OnOrderStatusRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderStatusRequest", log.Error(err))
@@ -97,7 +91,9 @@ func (state *AccountManager) Receive(context actor.Context) {
 		*messages.OrderCancelRequest,
 		*messages.OrderMassCancelRequest,
 		*messages.OrderReplaceRequest,
-		*messages.OrderBulkReplaceRequest:
+		*messages.OrderBulkReplaceRequest,
+		*messages.TradeCaptureReportRequest,
+		*messages.AccountMovementRequest:
 
 		context.Forward(state.listener)
 
@@ -157,13 +153,6 @@ func (state *AccountManager) OnAccountDataRequest(context actor.Context) error {
 	}
 
 	fmt.Println("FORWARDING ACCOUNT DATA REQUEST")
-	context.Forward(state.listener)
-
-	return nil
-}
-
-func (state *AccountManager) OnTradeCaptureReportRequest(context actor.Context) error {
-	fmt.Println("FORWARDING TRADE CAPTURE REPORT REQUEST")
 	context.Forward(state.listener)
 
 	return nil

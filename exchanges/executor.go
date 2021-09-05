@@ -108,6 +108,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.AccountMovementRequest:
+		if err := state.OnAccountMovementRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.TradeCaptureReportRequest:
 		if err := state.OnTradeCaptureReportRequest(context); err != nil {
 			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
@@ -458,6 +464,33 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if !ok {
 		fmt.Println("NOT FOUND", state.accountManagers)
 		context.Respond(&messages.TradeCaptureReport{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountMovementRequest)
+	if msg.Account == nil {
+		fmt.Println("NIL")
+		context.Respond(&messages.AccountMovementResponse{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	if !ok {
+		fmt.Println("NOT FOUND", state.accountManagers)
+		context.Respond(&messages.AccountMovementResponse{
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,

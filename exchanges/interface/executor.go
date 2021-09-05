@@ -17,6 +17,7 @@ type ExchangeExecutor interface {
 	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
+	OnAccountMovementRequest(context actor.Context) error
 	OnTradeCaptureReportRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
 	OnPositionsRequest(context actor.Context) error
@@ -83,6 +84,17 @@ func (e *ExchangeExecutorBase) OnMarketStatisticsRequest(context actor.Context) 
 func (e *ExchangeExecutorBase) OnMarketDataRequest(context actor.Context) error {
 	req := context.Message().(*messages.MarketDataRequest)
 	context.Respond(&messages.MarketDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (e *ExchangeExecutorBase) OnAccountMovementRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountMovementRequest)
+	context.Respond(&messages.AccountMovementResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
@@ -280,6 +292,12 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 	case *messages.BalancesRequest:
 		if err := state.OnBalancesRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.AccountMovementRequest:
+		if err := state.OnAccountMovementRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnAccountMovementRequest", log.Error(err))
 			panic(err)
 		}
 

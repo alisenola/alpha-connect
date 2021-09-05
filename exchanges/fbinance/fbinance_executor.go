@@ -528,6 +528,157 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
+	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
+	msg := context.Message().(*messages.AccountMovementRequest)
+	response := &messages.AccountMovementResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	params := fbinance.NewIncomeHistoryRequest()
+	if msg.Filter != nil {
+		if msg.Filter.Instrument != nil {
+			if msg.Filter.Instrument.Symbol != nil {
+				params.SetSymbol(msg.Filter.Instrument.Symbol.Value)
+			} else if msg.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					response.RejectionReason = messages.UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				params.SetSymbol(sec.Symbol)
+			}
+		}
+
+		if msg.Filter.From != nil {
+			ms := uint64(msg.Filter.From.Seconds*1000) + uint64(msg.Filter.From.Nanos/1000000)
+			params.SetFrom(ms)
+			fmt.Println("SET FROM", ms)
+		}
+		if msg.Filter.To != nil {
+			ms := uint64(msg.Filter.To.Seconds*1000) + uint64(msg.Filter.To.Nanos/1000000)
+			params.SetTo(ms)
+		}
+	}
+
+	params.SetLimit(1000)
+
+	switch msg.Type {
+	case messages.AccountCommission:
+		params.SetIncomeType(fbinance.COMMISSION)
+	case messages.AccountTransfer:
+		params.SetIncomeType(fbinance.TRANSFER)
+	case messages.AccountDeposit:
+		params.SetIncomeType(fbinance.TRANSFER)
+	case messages.AccountWithdrawal:
+		params.SetIncomeType(fbinance.TRANSFER)
+	case messages.AccountFundingFee:
+		params.SetIncomeType(fbinance.FUNDING_FEE)
+	case messages.AccountRealizedPnl:
+		params.SetIncomeType(fbinance.REALIZED_PNL)
+	case messages.AccountWelcomeBonus:
+		params.SetIncomeType(fbinance.WELCOME_BONUS)
+	}
+
+	request, weight, err := fbinance.GetIncomeHistory(msg.Account.Credentials, params)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("request error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			}
+			return
+		}
+		var incomes []fbinance.Income
+		err = json.Unmarshal(queryResponse.Response, &incomes)
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		var movements []*messages.AccountMovement
+		for _, t := range incomes {
+			asset, ok := constants.GetAssetBySymbol(t.Asset)
+			if !ok {
+				state.logger.Warn("unknown asset " + t.Asset)
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			mvt := messages.AccountMovement{
+				Asset:      asset,
+				Change:     t.Income,
+				MovementID: fmt.Sprintf("%s%s", string(t.IncomeType), t.TransferID),
+				Time:       utils.MilliToTimestamp(t.Time),
+			}
+			switch t.IncomeType {
+			case fbinance.FUNDING_FEE:
+				mvt.Type = messages.AccountFundingFee
+			case fbinance.WELCOME_BONUS:
+				mvt.Type = messages.AccountWelcomeBonus
+			case fbinance.COMMISSION:
+				mvt.Type = messages.AccountCommission
+			case fbinance.TRANSFER:
+				mvt.Type = messages.AccountTransfer
+			case fbinance.REALIZED_PNL:
+				mvt.Type = messages.AccountRealizedPnl
+			default:
+				state.logger.Warn("unknown income type " + string(t.IncomeType))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			movements = append(movements, &mvt)
+		}
+		response.Success = true
+		response.Movements = movements
+		context.Respond(response)
+	})
+
+	return nil
+}
+
 func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
 	fmt.Println("ON TRADE CAPTURE REPORT REQUEST !!!!")
 	msg := context.Message().(*messages.TradeCaptureReportRequest)
@@ -538,6 +689,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 
 	symbol := ""
 	var from, to *uint64
+	var fromID string
 	if msg.Filter != nil {
 		if msg.Filter.Side != nil || msg.Filter.OrderID != nil || msg.Filter.ClientOrderID != nil {
 			response.RejectionReason = messages.UnsupportedFilter
@@ -567,25 +719,31 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			ms := uint64(msg.Filter.To.Seconds*1000) + uint64(msg.Filter.To.Nanos/1000000)
 			to = &ms
 		}
+		if msg.Filter.FromID != nil {
+			fromID = msg.Filter.FromID.Value
+		}
 	}
 	params := fbinance.NewUserTradesRequest(symbol)
 
 	// If from is not set, but to is set,
 	// If from is set, but to is not set, ok
 
-	if from == nil || *from == 0 {
-		params.SetFromID(0)
+	if fromID != "" {
+		fromIDInt, _ := strconv.ParseInt(fromID, 10, 64)
+		params.SetFromID(int(fromIDInt))
 	} else {
-		params.SetFrom(*from)
-		if to != nil {
-			if *to-*from > (7 * 24 * 60 * 60 * 1000) {
-				*to = *from + (7 * 24 * 60 * 60 * 1000)
+		if from == nil || *from == 0 {
+			params.SetFromID(0)
+		} else {
+			params.SetFrom(*from)
+			if to != nil {
+				if *to-*from > (7 * 24 * 60 * 60 * 1000) {
+					*to = *from + (7 * 24 * 60 * 60 * 1000)
+				}
+				params.SetTo(*to)
 			}
-			params.SetTo(*to)
 		}
 	}
-
-	fmt.Println(*from, symbol)
 
 	request, weight, err := fbinance.GetUserTrades(msg.Account.Credentials, params)
 	if err != nil {
@@ -650,12 +808,16 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				context.Respond(response)
 				return
 			}
+			quantity := t.Quantity
+			if t.Side == fbinance.SELL_ODER {
+				quantity *= -1
+			}
 			trd := models.TradeCapture{
 				Type:       models.Regular,
 				Price:      t.Price,
-				Quantity:   t.Quantity,
+				Quantity:   quantity,
 				Commission: t.Commission,
-				TradeID:    fmt.Sprintf("%d", t.TradeID),
+				TradeID:    fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
 				Instrument: &models.Instrument{
 					Exchange:   &constants.FBINANCE,
 					Symbol:     &types.StringValue{Value: t.Symbol},

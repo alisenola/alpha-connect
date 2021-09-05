@@ -12,6 +12,15 @@ import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
+enum AccountMovementType {
+    AccountTransfer = 0;
+    AccountDeposit = 1;
+    AccountWithdrawal = 2;
+    AccountFundingFee = 3;
+    AccountWelcomeBonus = 4;
+    AccountRealizedPnl = 5;
+    AccountCommission = 6;
+}
 
 enum ExecutionType {
     New = 0;
@@ -186,6 +195,35 @@ message AccountDataIncrementalRefresh {
     ExecutionReport report = 3;
 }
 
+message AccountMovement {
+    models.Asset asset = 1;
+    double change = 2;
+    AccountMovementType type = 3;
+    string movementID = 4;
+    google.protobuf.Timestamp time = 5;
+}
+
+message AccountMovementRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    AccountMovementType type = 3;
+    AccountMovementFilter filter = 4;
+}
+
+message AccountMovementFilter {
+    models.Instrument instrument = 1;
+    google.protobuf.Timestamp from = 2;
+    google.protobuf.Timestamp to = 3;
+}
+
+message AccountMovementResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated AccountMovement movements = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
 message TradeCaptureReportRequest {
     uint64 requestID = 1;
     models.Account account = 2;
@@ -199,6 +237,7 @@ message TradeCaptureReportFilter {
     SideValue side = 4;
     google.protobuf.Timestamp from = 5;
     google.protobuf.Timestamp to = 6;
+    google.protobuf.StringValue fromID = 7;
 }
 
 message TradeCaptureReport {
