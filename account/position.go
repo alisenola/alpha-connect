@@ -19,6 +19,21 @@ type Position struct {
 	cross           bool
 }
 
+func NewPosition(inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
+	return &Position{
+		inverse:         inverse,
+		tickPrecision:   tp,
+		lotPrecision:    lp,
+		marginPrecision: mp,
+		multiplier:      mul,
+		makerFee:        maker,
+		takerFee:        taker,
+		cost:            0,
+		rawSize:         0,
+		cross:           false,
+	}
+}
+
 func (pos *Position) UpdateFees(makerFee, takerFee float64) {
 	pos.makerFee = makerFee
 	pos.takerFee = takerFee
@@ -28,7 +43,7 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 	if pos.inverse {
 		price = 1. / price
 	}
-	rawFillQuantity := int64(quantity * pos.lotPrecision)
+	rawFillQuantity := int64(math.Round(quantity * pos.lotPrecision))
 	rawPrice := int64(math.Round(price * pos.multiplier * pos.marginPrecision))
 	var fee int64
 	if taker {
@@ -70,7 +85,6 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 		// math.Floor doesn't work: -21522.73 -> -21523 but should have been -21522
 		// Raw opened margin value
 		openedMarginValue := int64(math.Round(float64(rawFillQuantity*rawPrice) / pos.lotPrecision))
-		fmt.Println("OPENED MARGIN VALUE", openedMarginValue)
 		pos.cost += openedMarginValue
 		pos.rawSize += rawFillQuantity
 	}
@@ -83,7 +97,7 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 		price = 1. / price
 	}
 
-	rawFillQuantity := int64(quantity * pos.lotPrecision)
+	rawFillQuantity := int64(math.Round(quantity * pos.lotPrecision))
 	rawPrice := int64(math.Round(price * pos.multiplier * pos.marginPrecision))
 	var fee, realizedCost int64
 	if taker {
