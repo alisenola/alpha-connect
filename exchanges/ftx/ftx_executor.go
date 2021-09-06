@@ -2,6 +2,7 @@ package ftx
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -306,6 +307,216 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
+	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
+	msg := context.Message().(*messages.AccountMovementRequest)
+	response := &messages.AccountMovementResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	var from, to *uint64
+	var symbol string
+	if msg.Filter != nil {
+		if msg.Filter.Instrument != nil {
+			if msg.Filter.Instrument.Symbol != nil {
+				symbol = msg.Filter.Instrument.Symbol.Value
+			} else if msg.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					response.RejectionReason = messages.UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				symbol = sec.Symbol
+			}
+		}
+
+		if msg.Filter.From != nil {
+			ms := uint64(msg.Filter.From.Seconds*1000) + uint64(msg.Filter.From.Nanos/1000000)
+			from = &ms
+			fmt.Println("SET FROM", ms)
+		}
+		if msg.Filter.To != nil {
+			ms := uint64(msg.Filter.To.Seconds*1000) + uint64(msg.Filter.To.Nanos/1000000)
+			to = &ms
+		}
+	}
+
+	var request *http.Request
+	var weight int
+	var err error
+
+	switch msg.Type {
+	case messages.AccountDeposit:
+		request, weight, err = ftx.GetDepositHistory(from, to, msg.Account.Credentials)
+	case messages.AccountWithdrawal:
+		request, weight, err = ftx.GetWithdrawalHistory(from, to, msg.Account.Credentials)
+	case messages.AccountFundingFee:
+		request, weight, err = ftx.GetFundingPayments(symbol, from, to, msg.Account.Credentials)
+	case messages.AccountRealizedPnl,
+		messages.AccountWelcomeBonus,
+		messages.AccountCommission:
+		response.RejectionReason = messages.UnsupportedRequest
+		context.Respond(response)
+		return nil
+	}
+	if err != nil {
+		response.RejectionReason = messages.InvalidRequest
+		context.Respond(response)
+		return nil
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.rateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("request error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+			}
+			return
+		}
+		var deposits []ftx.Deposit
+		var withdrawals []ftx.Withdrawal
+		var fundings []ftx.FundingPayment
+		switch msg.Type {
+		case messages.AccountDeposit:
+			res := ftx.DepositsResponse{}
+			err = json.Unmarshal(queryResponse.Response, &res)
+			if err != nil {
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			if !res.Success {
+				state.logger.Info("api error", log.Error(errors.New(res.Error)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			deposits = res.Result
+		case messages.AccountWithdrawal:
+			res := ftx.WithdrawalResponse{}
+			err = json.Unmarshal(queryResponse.Response, &res)
+			if err != nil {
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			if !res.Success {
+				state.logger.Info("api error", log.Error(errors.New(res.Error)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			withdrawals = res.Result
+		case messages.AccountFundingFee:
+			res := ftx.FundingPaymentsResponse{}
+			err = json.Unmarshal(queryResponse.Response, &res)
+			if err != nil {
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			if !res.Success {
+				state.logger.Info("api error", log.Error(errors.New(res.Error)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			fundings = res.Result
+		}
+
+		var movements []*messages.AccountMovement
+		for _, t := range deposits {
+			asset, ok := constants.GetAssetBySymbol(t.Coin)
+			if !ok {
+				state.logger.Warn("unknown asset " + t.Coin)
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			ts, _ := types.TimestampProto(t.Time)
+			mvt := messages.AccountMovement{
+				Asset:      asset,
+				Change:     t.Size,
+				MovementID: fmt.Sprintf("%d", t.ID),
+				Time:       ts,
+				Type:       messages.AccountDeposit,
+			}
+			movements = append(movements, &mvt)
+		}
+		for _, t := range withdrawals {
+			asset, ok := constants.GetAssetBySymbol(t.Coin)
+			if !ok {
+				state.logger.Warn("unknown asset " + t.Coin)
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			ts, _ := types.TimestampProto(t.Time)
+			mvt := messages.AccountMovement{
+				Asset:      asset,
+				Change:     t.Size,
+				MovementID: fmt.Sprintf("%d", t.ID),
+				Time:       ts,
+				Type:       messages.AccountWithdrawal,
+			}
+			movements = append(movements, &mvt)
+		}
+		for _, t := range fundings {
+			ts, _ := types.TimestampProto(t.Time)
+			mvt := messages.AccountMovement{
+				Asset:      &constants.DOLLAR,
+				Change:     t.Payment,
+				MovementID: fmt.Sprintf("%d", t.ID),
+				Time:       ts,
+				Type:       messages.AccountWithdrawal,
+			}
+			movements = append(movements, &mvt)
+		}
+		response.Success = true
+		response.Movements = movements
+		context.Respond(response)
+	})
+
 	return nil
 }
 

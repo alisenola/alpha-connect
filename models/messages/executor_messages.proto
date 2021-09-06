@@ -13,13 +13,12 @@ import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
 enum AccountMovementType {
-    AccountTransfer = 0;
-    AccountDeposit = 1;
-    AccountWithdrawal = 2;
-    AccountFundingFee = 3;
-    AccountWelcomeBonus = 4;
-    AccountRealizedPnl = 5;
-    AccountCommission = 6;
+    AccountDeposit = 0;
+    AccountWithdrawal = 1;
+    AccountFundingFee = 2;
+    AccountWelcomeBonus = 3;
+    AccountRealizedPnl = 4;
+    AccountCommission = 5;
 }
 
 enum ExecutionType {

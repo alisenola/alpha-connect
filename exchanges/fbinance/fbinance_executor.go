@@ -569,8 +569,6 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	switch msg.Type {
 	case messages.AccountCommission:
 		params.SetIncomeType(fbinance.COMMISSION)
-	case messages.AccountTransfer:
-		params.SetIncomeType(fbinance.TRANSFER)
 	case messages.AccountDeposit:
 		params.SetIncomeType(fbinance.TRANSFER)
 	case messages.AccountWithdrawal:
@@ -660,7 +658,11 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			case fbinance.COMMISSION:
 				mvt.Type = messages.AccountCommission
 			case fbinance.TRANSFER:
-				mvt.Type = messages.AccountTransfer
+				if mvt.Change > 0 {
+					mvt.Type = messages.AccountDeposit
+				} else {
+					mvt.Type = messages.AccountWithdrawal
+				}
 			case fbinance.REALIZED_PNL:
 				mvt.Type = messages.AccountRealizedPnl
 			default:
