@@ -13,7 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	//fix50nso "github.com/quickfixgo/quickfix/fix50/newordersingle"
 	fix50slr "github.com/quickfixgo/fix50/securitylistrequest"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	models "gitlab.com/alphaticks/alpha-connect/messages/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/messages/executor"
@@ -149,7 +149,7 @@ func (state *Executor) updateExchangeInfos(context actor.Context) error {
 	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.AwaitFuture(future, func(res types{}, err error) {
 
 		if err != nil {
 			// TODO LOG
@@ -199,7 +199,7 @@ func (state *Executor) GetOrderBookL2Request(context actor.Context) error {
 	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.AwaitFuture(future, func(res types{}, err error) {
 		if err != nil {
 			context.Respond(&executor.GetOrderBookL2Response{
 				RequestID: msg.RequestID,

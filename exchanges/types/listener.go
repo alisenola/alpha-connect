@@ -1,4 +1,4 @@
-package _interface
+package types
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"

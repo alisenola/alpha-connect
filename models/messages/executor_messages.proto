@@ -12,15 +12,6 @@ import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
-enum AccountMovementType {
-    AccountDeposit = 0;
-    AccountWithdrawal = 1;
-    AccountFundingFee = 2;
-    AccountWelcomeBonus = 3;
-    AccountRealizedPnl = 4;
-    AccountCommission = 5;
-}
-
 enum ExecutionType {
     New = 0;
     Done = 1;
@@ -81,13 +72,15 @@ enum FeeBasis {
     Percentage = 2;
 }
 
-enum UpdateReason {
-    FundingFee = 0;
-    BalanceTransfer = 1;
-    Deposit = 2;
-    Withdraw = 3;
-    Order = 4;
-    Unknown = 5;
+enum AccountMovementType {
+    Unknown = 0;
+    FundingFee = 1;
+    Exchange = 2;
+    Deposit = 3;
+    Withdrawal = 4;
+    RealizedPnl = 5;
+    Commission = 6;
+    WelcomeBonus = 7;
 }
 
 message HistoricalOpenInterestsRequest {
@@ -198,8 +191,9 @@ message AccountMovement {
     models.Asset asset = 1;
     double change = 2;
     AccountMovementType type = 3;
-    string movementID = 4;
-    google.protobuf.Timestamp time = 5;
+    string subtype = 4;
+    string movementID = 5;
+    google.protobuf.Timestamp time = 6;
 }
 
 message AccountMovementRequest {
@@ -296,7 +290,7 @@ message ExecutionReport {
 }
 
 message AccountUpdate {
-    UpdateReason update_reason = 1;
+    AccountMovementType type = 1;
     models.Asset asset = 2;
     double balance = 3;
 }

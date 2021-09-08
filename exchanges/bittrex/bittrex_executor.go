@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models/messages/executor"
 	"gitlab.com/alphaticks/xchanger/asset"
@@ -87,7 +87,7 @@ func (state *Executor) GetInstrumentsRequest(context actor.Context) error {
 
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.AwaitFuture(future, func(res types{}, err error) {
 		if err != nil {
 			context.Respond(&executor.GetInstrumentsResponse{
 				RequestID:   msg.RequestID,

@@ -107,7 +107,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	err = accnt.Sync([]*models.Security{ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,8 +181,8 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.000000001 {
-		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-expectedMarginChange) > 0.000000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin(nil))
 	}
 
 	_, err = accnt.ConfirmFill("buy", "k1", 200., 2., false)
@@ -201,8 +201,8 @@ func TestAccount_ConfirmFill(t *testing.T) {
 	}
 
 	expectedMarginChange = expectedMarginChange + expectedMarginChange
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.000000001 {
-		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-expectedMarginChange) > 0.000000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin(nil))
 	}
 }
 
@@ -211,7 +211,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,8 +287,8 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	cost1 := (math.Round(1./200.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	cost2 := (math.Round(1./210.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
-		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin(nil))
 	}
 
 	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
@@ -306,8 +306,8 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if math.Abs(accnt.GetMargin()-2*expectedMarginChange) > 0.00000001 {
-		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-2*expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin(nil))
 	}
 }
 
@@ -318,7 +318,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	err = accnt.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,8 +394,8 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	cost1 := (math.Round(1./200.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	cost2 := (math.Round(1./210.*accnt.MarginPrecision) / accnt.MarginPrecision) * 2.
 	expectedMarginChange := (cost1 - cost2) + fee1 + fee2
-	if math.Abs(accnt.GetMargin()-expectedMarginChange) > 0.00000001 {
-		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", expectedMarginChange, accnt.GetMargin(nil))
 	}
 
 	_, err = accnt.ConfirmFill("buy", "k1", 200., 1., false)
@@ -413,8 +413,8 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if math.Abs(accnt.GetMargin()-2*expectedMarginChange) > 0.00000001 {
-		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin())
+	if math.Abs(accnt.GetMargin(nil)-2*expectedMarginChange) > 0.00000001 {
+		t.Fatalf("was expecting margin of %g, got %g", 2*expectedMarginChange, accnt.GetMargin(nil))
 	}
 }
 
@@ -423,7 +423,7 @@ func TestAccount_Compare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	err = accnt1.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestAccount_Compare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, 0., nil, nil)
+	err = accnt2.Sync([]*models.Security{BTCUSD_PERP_SEC}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

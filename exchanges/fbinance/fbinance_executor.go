@@ -8,7 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -46,7 +46,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	_interface.ExchangeExecutorBase
+	extypes.ExchangeExecutorBase
 	client               *http.Client
 	securities           map[uint64]*models.Security
 	symbolToSec          map[string]*models.Security
@@ -83,7 +83,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -270,7 +270,15 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			continue
 		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(symbol.PricePrecision)}
+		for _, f := range symbol.Filters {
+			if f.FilterType == "PRICE_FILTER" {
+				security.MinPriceIncrement = &types.DoubleValue{Value: symbol.Filters[0].TickSize}
+			}
+		}
+		if security.MinPriceIncrement == nil {
+			fmt.Println("NO MIN PRICE INCREMENT", symbol.Symbol)
+			continue
+		}
 		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(symbol.QuantityPrecision)}
 		security.IsInverse = false
 		security.Multiplier = &types.DoubleValue{Value: 1.}
@@ -567,17 +575,17 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	params.SetLimit(1000)
 
 	switch msg.Type {
-	case messages.AccountCommission:
+	case messages.Commission:
 		params.SetIncomeType(fbinance.COMMISSION)
-	case messages.AccountDeposit:
+	case messages.Deposit:
 		params.SetIncomeType(fbinance.TRANSFER)
-	case messages.AccountWithdrawal:
+	case messages.Withdrawal:
 		params.SetIncomeType(fbinance.TRANSFER)
-	case messages.AccountFundingFee:
+	case messages.FundingFee:
 		params.SetIncomeType(fbinance.FUNDING_FEE)
-	case messages.AccountRealizedPnl:
+	case messages.RealizedPnl:
 		params.SetIncomeType(fbinance.REALIZED_PNL)
-	case messages.AccountWelcomeBonus:
+	case messages.WelcomeBonus:
 		params.SetIncomeType(fbinance.WELCOME_BONUS)
 	}
 
@@ -637,6 +645,12 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 
 		var movements []*messages.AccountMovement
 		for _, t := range incomes {
+			if msg.Type == messages.Deposit && t.Income < 0 {
+				continue
+			}
+			if msg.Type == messages.Withdrawal && t.Income > 0 {
+				continue
+			}
 			asset, ok := constants.GetAssetBySymbol(t.Asset)
 			if !ok {
 				state.logger.Warn("unknown asset " + t.Asset)
@@ -652,19 +666,19 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			}
 			switch t.IncomeType {
 			case fbinance.FUNDING_FEE:
-				mvt.Type = messages.AccountFundingFee
+				mvt.Type = messages.FundingFee
 			case fbinance.WELCOME_BONUS:
-				mvt.Type = messages.AccountWelcomeBonus
+				mvt.Type = messages.WelcomeBonus
 			case fbinance.COMMISSION:
-				mvt.Type = messages.AccountCommission
+				mvt.Type = messages.Commission
 			case fbinance.TRANSFER:
 				if mvt.Change > 0 {
-					mvt.Type = messages.AccountDeposit
+					mvt.Type = messages.Deposit
 				} else {
-					mvt.Type = messages.AccountWithdrawal
+					mvt.Type = messages.Withdrawal
 				}
 			case fbinance.REALIZED_PNL:
-				mvt.Type = messages.AccountRealizedPnl
+				mvt.Type = messages.RealizedPnl
 			default:
 				state.logger.Warn("unknown income type " + string(t.IncomeType))
 				response.RejectionReason = messages.ExchangeAPIError

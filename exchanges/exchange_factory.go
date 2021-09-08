@@ -33,6 +33,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 	"gitlab.com/alphaticks/xchanger/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // TODO sample size config
@@ -50,14 +51,14 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewAccountListener(account) }
+		return func() actor.Actor { return fbinance.NewAccountListener(account, txs, execs) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewAccountListener(account) }
+		return func() actor.Actor { return ftx.NewAccountListener(account, txs, execs) }
 	case constants.FTXUS.ID:
 		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	default:

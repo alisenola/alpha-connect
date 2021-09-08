@@ -13,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"gitlab.com/alphaticks/xchanger/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"math"
 	"net"
 	"net/http"
@@ -38,21 +39,26 @@ type AccountListener struct {
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
 	client             *http.Client
+	txs                *mongo.Collection
+	execs              *mongo.Collection
+	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account)
+		return NewAccountListener(account, txs, execs)
 	}
 }
 
-func NewAccountListener(account *account.Account) actor.Actor {
+func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		seqNum:          0,
 		ws:              nil,
 		executorManager: nil,
 		logger:          nil,
+		txs:             txs,
+		execs:           execs,
 	}
 }
 
@@ -155,10 +161,6 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *xchanger.WebsocketMessage:
-		if err := state.onWebsocketMessage(context); err != nil {
-			state.logger.Error("error processing WebsocketMessage", log.Error(err))
-			panic(err)
-		}
 
 	case *checkSocket:
 		if err := state.checkSocket(context); err != nil {
@@ -287,8 +289,13 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		securityMap[sec.SecurityID] = sec
 	}
 	state.securities = securityMap
-
 	state.seqNum = 0
+
+	if state.txs != nil {
+		// Start reconciliation child
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+		state.reconciler = context.Spawn(props)
+	}
 
 	checkAccountTicker := time.NewTicker(5 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
@@ -426,12 +433,20 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 }
 
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
-	context.Forward(state.fbinanceExecutor)
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.fbinanceExecutor)
+	}
 	return nil
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	context.Forward(state.fbinanceExecutor)
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.fbinanceExecutor)
+	}
 	return nil
 }
 
@@ -848,12 +863,12 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	case fbinance.ACCOUNT_UPDATE:
 		b, _ := json.Marshal(udata.Account)
 		fmt.Println("ACCOUNT UPDATE", string(b))
-		var reason messages.UpdateReason
+		var reason messages.AccountMovementType
 		switch udata.Account.Reason {
 		case "DEPOSIT":
 			reason = messages.Deposit
 		case "WITHDRAW":
-			reason = messages.Withdraw
+			reason = messages.Withdrawal
 		case "FUNDING_FEE":
 			reason = messages.FundingFee
 		default:

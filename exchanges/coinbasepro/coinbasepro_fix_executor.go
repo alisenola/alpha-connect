@@ -3,7 +3,7 @@ package coinbasepro
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"reflect"
@@ -19,7 +19,7 @@ import (
 // 418 IP ban
 
 type CoinbaseProFixExecutor struct {
-	_interface.ExchangeExecutorBase
+	extypes.ExchangeExecutorBase
 	//fixClient 		*http.Client
 	fixRateLimit *exchanges.RateLimit
 	logger       *log.Logger
@@ -32,7 +32,7 @@ func NewCoinbaseProFixExecutor() actor.Actor {
 }
 
 func (state *CoinbaseProFixExecutor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *CoinbaseProFixExecutor) GetLogger() *log.Logger {

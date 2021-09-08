@@ -7,7 +7,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -24,7 +24,7 @@ import (
 )
 
 type Executor struct {
-	_interface.ExchangeExecutorBase
+	extypes.ExchangeExecutorBase
 	client      *http.Client
 	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
@@ -43,7 +43,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {

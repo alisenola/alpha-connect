@@ -47,7 +47,8 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
+	// TODO 0.1 margin
+	if err = account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -94,7 +95,8 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
+	// TODO 0.1 margin
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -140,7 +142,8 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
+	// TODO 0.1 margin
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
@@ -228,7 +231,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		Asset:     &constants.ETHEREUM,
 		Quantity:  10,
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, 0., nil, nil); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -353,7 +356,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, 0.1, nil, nil); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -680,7 +683,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, 1000, nil, nil); err != nil {
+	if err := account.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,7 +1,6 @@
 package account
 
 import (
-	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"math"
 )
@@ -48,7 +47,6 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 	var fee int64
 	if taker {
 		fee = int64(math.Floor(quantity * price * pos.marginPrecision * math.Abs(pos.multiplier) * pos.takerFee))
-		fmt.Println("TAKER FEE", fee)
 	} else {
 		fee = int64(math.Floor(quantity * price * pos.marginPrecision * math.Abs(pos.multiplier) * math.Abs(pos.makerFee)))
 		if pos.makerFee < 0 {
@@ -117,7 +115,6 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 		// math.Floor doesn't work
 		closedMarginValue := int64(math.Round(float64(closedSize*rawPrice) / pos.lotPrecision))    //closedSize * rawPrice
 		contractMarginValue := int64(math.Round(float64(pos.rawSize*rawPrice) / pos.lotPrecision)) //pos.rawSize * rawPrice
-
 		unrealizedCost := pos.cost - contractMarginValue
 		realizedCost = int64(math.Round(float64(closedSize*unrealizedCost) / float64(pos.rawSize)))
 

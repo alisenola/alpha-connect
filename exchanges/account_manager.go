@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"go.mongodb.org/mongo-driver/mongo"
 	"reflect"
 )
 
@@ -18,19 +19,29 @@ type AccountManager struct {
 	blcSubscribers  map[uint64]*actor.PID
 	listener        *actor.PID
 	account         *account.Account
+	txs             *mongo.Collection
+	execs           *mongo.Collection
 	logger          *log.Logger
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(account *account.Account, paperTrading bool) actor.Producer {
-	return func() actor.Actor {
-		return NewAccountManager(account, paperTrading)
+func NewAccountManagerProducer(account *account.Account, db *mongo.Database, paperTrading bool) actor.Producer {
+	if db != nil {
+		return func() actor.Actor {
+			return NewAccountManager(account, db.Collection("transactions"), db.Collection("executions"), paperTrading)
+		}
+	} else {
+		return func() actor.Actor {
+			return NewAccountManager(account, nil, nil, paperTrading)
+		}
 	}
 }
 
-func NewAccountManager(account *account.Account, paperTrading bool) actor.Actor {
+func NewAccountManager(account *account.Account, txs, execs *mongo.Collection, paperTrading bool) actor.Actor {
 	return &AccountManager{
 		account:      account,
+		txs:          txs,
+		execs:        execs,
 		logger:       nil,
 		paperTrading: paperTrading,
 	}
@@ -128,7 +139,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 			return fmt.Errorf("error getting account listener")
 		}
 	} else {
-		producer = NewAccountListenerProducer(state.account)
+		producer = NewAccountListenerProducer(state.account, state.txs, state.execs)
 		if producer == nil {
 			return fmt.Errorf("error getting account listener")
 		}

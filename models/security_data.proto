@@ -82,12 +82,13 @@ message TradeCapture {
     double price = 3;
     double quantity = 4;
     double commission = 5;
-    string tradeID = 6;
-    models.Instrument instrument = 7;
-    google.protobuf.StringValue trade_LinkID = 8;
-    google.protobuf.StringValue orderID = 9;
-    google.protobuf.StringValue client_orderID = 10;
-    google.protobuf.Timestamp transaction_time = 11;
+    Asset commission_asset = 6;
+    string tradeID = 7;
+    models.Instrument instrument = 8;
+    google.protobuf.StringValue trade_LinkID = 9;
+    google.protobuf.StringValue orderID = 10;
+    google.protobuf.StringValue client_orderID = 11;
+    google.protobuf.Timestamp transaction_time = 12;
 }
 
 enum TradeType {

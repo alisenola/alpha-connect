@@ -1,16 +1,21 @@
 package exchanges
 
 import (
+	goContext "context"
 	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"reflect"
 	"time"
 )
@@ -18,6 +23,7 @@ import (
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
 type Executor struct {
+	db                *mongo.Database
 	exchanges         []*xchangerModels.Exchange
 	accounts          []*account.Account
 	accountPortfolios map[string]*actor.PID
@@ -31,14 +37,15 @@ type Executor struct {
 	dialerPool        *xchangerUtils.DialerPool
 }
 
-func NewExecutorProducer(exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewExecutorProducer(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(exchanges, accnts, dialerPool)
+		return NewExecutor(db, exchanges, accnts, dialerPool)
 	}
 }
 
-func NewExecutor(exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewExecutor(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Executor{
+		db:         db,
 		exchanges:  exchanges,
 		logger:     nil,
 		dialerPool: dialerPool,
@@ -174,6 +181,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *commands.GetAccountRequest:
+		if err := state.OnGetAccountRequest(context); err != nil {
+			state.logger.Error("error processing OnListenAccountRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *actor.Terminated:
 		if err := state.OnTerminated(context); err != nil {
 			state.logger.Error("error processing OnTerminated", log.Error(err))
@@ -195,6 +208,23 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	if state.dialerPool == nil {
 		state.dialerPool = xchangerUtils.DefaultDialerPool
+	}
+
+	if state.db != nil {
+		unique := true
+		mod := mongo.IndexModel{
+			Keys: bson.M{
+				"id": 1, // index in ascending order
+			}, Options: &options.IndexOptions{Unique: &unique},
+		}
+		txs := state.db.Collection("transactions")
+		execs := state.db.Collection("executions")
+		if _, err := txs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
+			return fmt.Errorf("error creating index on transactions: %v", err)
+		}
+		if _, err := execs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
+			return fmt.Errorf("error creating index on executions: %v", err)
+		}
 	}
 
 	// Spawn all exchange executors
@@ -245,7 +275,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.accounts {
-		producer := NewAccountManagerProducer(accnt, false)
+		producer := NewAccountManagerProducer(accnt, state.db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -279,7 +309,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, false)
+		producer := NewAccountManagerProducer(accnt, state.db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -730,6 +760,41 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		return nil
 	}
 	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnGetAccountRequest(context actor.Context) error {
+	request := context.Message().(*commands.GetAccountRequest)
+	if request.Account == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownAccount,
+		})
+		return nil
+	}
+
+	if _, ok := state.accountManagers[request.Account.AccountID]; ok {
+		context.Respond(&commands.GetAccountResponse{
+			Account: Portfolio.GetAccount(request.Account.AccountID),
+		})
+	} else {
+		accnt, err := NewAccount(request.Account)
+		if err != nil {
+			return fmt.Errorf("error creating account: %v", err)
+		}
+		producer := NewAccountManagerProducer(accnt, state.db, false)
+		if producer == nil {
+			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
+		}
+		props := actor.PropsFromProducer(producer).WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		pid := context.Spawn(props)
+		state.accountManagers[request.Account.AccountID] = pid
+		context.Respond(&commands.GetAccountResponse{
+			Account: accnt,
+		})
+	}
 	return nil
 }
 

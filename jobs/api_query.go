@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-// An api query actor execute a query and fits the result back into a given interface
+// An api query actor execute a query and fits the result back into a given types
 
 // The query actor panic when the request doesn't succeed (timeout etc..)
 // The query actor doesn't panic when the request was successful but the server

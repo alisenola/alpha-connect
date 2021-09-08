@@ -17,10 +17,10 @@ func FileToMD5(filePath string) ([]byte, error) {
 
 	//Tell the program to call the following function when the current function returns
 
-	//Open a new hash interface to write to
+	//Open a new hash types to write to
 	hash := md5.New()
 
-	//Copy the file in the hash interface and check for any error
+	//Copy the file in the hash types and check for any error
 	if _, err := io.Copy(hash, file); err != nil {
 		return nil, err
 	}

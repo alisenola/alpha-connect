@@ -98,7 +98,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, xchangerUtils.DefaultDialerPool)), "executor")
+	// TODO mongo env
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(nil, exch, nil, xchangerUtils.DefaultDialerPool)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(

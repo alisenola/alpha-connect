@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
+	"go.mongodb.org/mongo-driver/mongo"
 	"math"
 	"net"
 	"net/http"
@@ -34,21 +35,26 @@ type AccountListener struct {
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
 	client             *http.Client
+	txs                *mongo.Collection
+	execs              *mongo.Collection
+	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account)
+		return NewAccountListener(account, txs, execs)
 	}
 }
 
-func NewAccountListener(account *account.Account) actor.Actor {
+func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		seqNum:          0,
 		ws:              nil,
 		executorManager: nil,
 		logger:          nil,
+		txs:             txs,
+		execs:           execs,
 	}
 }
 
@@ -99,6 +105,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *messages.OrderStatusRequest:
 		if err := state.OnOrderStatusRequest(context); err != nil {
 			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.AccountMovementRequest:
+		if err := state.OnAccountMovementRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -274,8 +286,13 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		securityMap[sec.SecurityID] = sec
 	}
 	state.securities = securityMap
-
 	state.seqNum = 0
+
+	if state.txs != nil {
+		// Start reconciliation child
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+		state.reconciler = context.Spawn(props)
+	}
 
 	checkAccountTicker := time.NewTicker(5 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
@@ -391,6 +408,11 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 		Success:   true,
 		Orders:    orders,
 	})
+	return nil
+}
+
+func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
+	context.Forward(state.ftxExecutor)
 	return nil
 }
 

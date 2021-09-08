@@ -8,7 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -47,7 +47,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	_interface.ExchangeExecutorBase
+	extypes.ExchangeExecutorBase
 	client         *http.Client
 	securities     map[uint64]*models.Security
 	symbolToSec    map[string]*models.Security
@@ -84,7 +84,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -109,7 +109,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	dialers := state.dialerPool.GetDialers()
 	for _, dialer := range dialers {
-		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: 1024,
@@ -202,7 +201,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		case "spot":
 			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)
 			if !ok {
-				//				fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
+				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
 				continue
 			}
 			quoteCurrency, ok := constants.GetAssetBySymbol(market.QuoteCurrency)
@@ -311,7 +310,6 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
-	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
 	msg := context.Message().(*messages.AccountMovementRequest)
 	response := &messages.AccountMovementResponse{
 		RequestID:  msg.RequestID,
@@ -337,12 +335,11 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 		}
 
 		if msg.Filter.From != nil {
-			ms := uint64(msg.Filter.From.Seconds*1000) + uint64(msg.Filter.From.Nanos/1000000)
+			ms := uint64(msg.Filter.From.Seconds)
 			from = &ms
-			fmt.Println("SET FROM", ms)
 		}
 		if msg.Filter.To != nil {
-			ms := uint64(msg.Filter.To.Seconds*1000) + uint64(msg.Filter.To.Nanos/1000000)
+			ms := uint64(msg.Filter.To.Seconds)
 			to = &ms
 		}
 	}
@@ -352,15 +349,15 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	var err error
 
 	switch msg.Type {
-	case messages.AccountDeposit:
+	case messages.Deposit:
 		request, weight, err = ftx.GetDepositHistory(from, to, msg.Account.Credentials)
-	case messages.AccountWithdrawal:
+	case messages.Withdrawal:
 		request, weight, err = ftx.GetWithdrawalHistory(from, to, msg.Account.Credentials)
-	case messages.AccountFundingFee:
+	case messages.FundingFee:
 		request, weight, err = ftx.GetFundingPayments(symbol, from, to, msg.Account.Credentials)
-	case messages.AccountRealizedPnl,
-		messages.AccountWelcomeBonus,
-		messages.AccountCommission:
+	case messages.RealizedPnl,
+		messages.WelcomeBonus,
+		messages.Commission:
 		response.RejectionReason = messages.UnsupportedRequest
 		context.Respond(response)
 		return nil
@@ -414,7 +411,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 		var withdrawals []ftx.Withdrawal
 		var fundings []ftx.FundingPayment
 		switch msg.Type {
-		case messages.AccountDeposit:
+		case messages.Deposit:
 			res := ftx.DepositsResponse{}
 			err = json.Unmarshal(queryResponse.Response, &res)
 			if err != nil {
@@ -430,7 +427,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				return
 			}
 			deposits = res.Result
-		case messages.AccountWithdrawal:
+		case messages.Withdrawal:
 			res := ftx.WithdrawalResponse{}
 			err = json.Unmarshal(queryResponse.Response, &res)
 			if err != nil {
@@ -446,7 +443,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				return
 			}
 			withdrawals = res.Result
-		case messages.AccountFundingFee:
+		case messages.FundingFee:
 			res := ftx.FundingPaymentsResponse{}
 			err = json.Unmarshal(queryResponse.Response, &res)
 			if err != nil {
@@ -479,7 +476,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				Change:     t.Size,
 				MovementID: fmt.Sprintf("%d", t.ID),
 				Time:       ts,
-				Type:       messages.AccountDeposit,
+				Type:       messages.Deposit,
 			}
 			movements = append(movements, &mvt)
 		}
@@ -497,7 +494,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				Change:     t.Size,
 				MovementID: fmt.Sprintf("%d", t.ID),
 				Time:       ts,
-				Type:       messages.AccountWithdrawal,
+				Type:       messages.Withdrawal,
 			}
 			movements = append(movements, &mvt)
 		}
@@ -508,7 +505,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				Change:     t.Payment,
 				MovementID: fmt.Sprintf("%d", t.ID),
 				Time:       ts,
-				Type:       messages.AccountWithdrawal,
+				Type:       messages.FundingFee,
 			}
 			movements = append(movements, &mvt)
 		}
@@ -521,7 +518,6 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
-	fmt.Println("ON TRADE CAPTURE REPORT REQUEST !!!!")
 	msg := context.Message().(*messages.TradeCaptureReportRequest)
 	response := &messages.TradeCaptureReport{
 		RequestID: msg.RequestID,
@@ -641,13 +637,21 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			if t.Side == ftx.SELL {
 				quantity *= -1
 			}
+			comAsset, ok := constants.GetAssetBySymbol(t.FeeCurrency)
+			if !ok {
+				state.logger.Info("api error", log.Error(fmt.Errorf("unknown commission asset %s", t.FeeCurrency)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
 			ts, _ := types.TimestampProto(t.Time)
 			trd := models.TradeCapture{
-				Type:       models.Regular,
-				Price:      t.Price,
-				Quantity:   quantity,
-				Commission: t.Fee,
-				TradeID:    fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
+				Type:            models.Regular,
+				Price:           t.Price,
+				Quantity:        quantity,
+				Commission:      t.Fee,
+				CommissionAsset: comAsset,
+				TradeID:         fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
 				Instrument: &models.Instrument{
 					Exchange:   &constants.FTX,
 					Symbol:     &types.StringValue{Value: t.Market},
@@ -885,7 +889,6 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		}
 		response.Success = true
 		response.Orders = morders
-		fmt.Println(morders)
 		context.Respond(response)
 	})
 
@@ -976,7 +979,6 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			return
 		}
 		for _, p := range positions.Result {
-			fmt.Println(p)
 			if p.Size == 0 {
 				continue
 			}
@@ -1078,7 +1080,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			return
 		}
 		for _, b := range balances.Result {
-			fmt.Println(b)
 			if b.Total == 0. {
 				continue
 			}
@@ -1092,7 +1093,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				Asset:     asset,
 				Quantity:  b.Total,
 			})
-			fmt.Println(response.Balances)
 		}
 
 		response.Success = true
@@ -1203,8 +1203,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return err
 	}
 
-	fmt.Println(request.URL)
-
 	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
@@ -1246,12 +1244,10 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 		if !order.Success {
-			fmt.Println(order.Error)
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
 		}
-		fmt.Println("ORDER", order, order.Result.ID)
 		response.Success = true
 		response.OrderID = fmt.Sprintf("%d", order.Result.ID)
 		context.Respond(response)
@@ -1264,7 +1260,6 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
-	fmt.Println("ORDER REPLACE REQUEST")
 	req := context.Message().(*messages.OrderReplaceRequest)
 	response := &messages.OrderReplaceResponse{
 		RequestID:  req.RequestID,
@@ -1290,7 +1285,6 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		return err
 	}
 
-	fmt.Println(request.URL)
 	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
@@ -1351,8 +1345,6 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	fmt.Println("ON ORDER CANCEL REQUEST")
-
 	req := context.Message().(*messages.OrderCancelRequest)
 	response := &messages.OrderCancelResponse{
 		RequestID:  req.RequestID,
@@ -1377,7 +1369,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		return nil
 	}
 
-	fmt.Println(request.URL)
 	qr := state.getQueryRunner()
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded

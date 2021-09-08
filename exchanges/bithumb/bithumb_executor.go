@@ -6,7 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/interface"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -25,7 +25,7 @@ import (
 var pairs = []string{"BTC_KRW"}
 
 type Executor struct {
-	_interface.ExchangeExecutorBase
+	extypes.ExchangeExecutorBase
 	client      *http.Client
 	securities  map[uint64]*models.Security
 	rateLimit   *exchanges.RateLimit
@@ -43,7 +43,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {

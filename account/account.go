@@ -712,7 +712,7 @@ func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee floa
 	}
 }
 
-func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64, reason messages.UpdateReason) (*messages.AccountUpdate, error) {
+func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64, reason messages.AccountMovementType) (*messages.AccountUpdate, error) {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	if _, ok := accnt.assets[asset.ID]; !ok {
@@ -724,9 +724,9 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 	}
 	accnt.balances[asset.ID] = balance
 	return &messages.AccountUpdate{
-		UpdateReason: reason,
-		Asset:        accnt.assets[asset.ID],
-		Balance:      balance,
+		Type:    reason,
+		Asset:   accnt.assets[asset.ID],
+		Balance: balance,
 	}, nil
 }
 
