@@ -998,14 +998,19 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				LeavesQuantity: o.OriginalQuantity - o.ExecutedQuantity, // TODO check
 				CumQuantity:    o.CumQuantity,
 			}
+			if o.ReduceOnly {
+				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+			}
 
 			switch o.Status {
 			case fbinance.NEW_ORDER:
 				ord.OrderStatus = models.New
 			case fbinance.CANCELED_ORDER:
 				ord.OrderStatus = models.Canceled
+			case fbinance.PARTIALLY_FILLED:
+				ord.OrderStatus = models.PartiallyFilled
 			default:
-				fmt.Println("UNKNWOEN ORDER STATUS", o.Status)
+				fmt.Println("UNKNOWN ORDER STATUS", o.Status)
 			}
 
 			/*
@@ -1051,6 +1056,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				ord.TimeInForce = models.FillOrKill
 			case fbinance.IMMEDIATE_OR_CANCEL:
 				ord.TimeInForce = models.ImmediateOrCancel
+			case fbinance.GOOD_TILL_CROSSING:
+				ord.TimeInForce = models.GoodTillCancel
+				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ParticipateDoNotInitiate)
 			default:
 				fmt.Println("UNKNOWN TOF", o.TimeInForce)
 			}
