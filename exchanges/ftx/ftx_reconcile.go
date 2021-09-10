@@ -138,7 +138,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 	// First, calculate current positions from historical
 	cur, err := state.txs.Find(goContext.Background(), bson.D{
-		{"account-id", state.account.AccountID},
+		{"account", state.account.Name},
 	}, options.Find().SetSort(bson.D{{"_id", 1}}))
 	if err != nil {
 		return fmt.Errorf("error reconcile trades: %v", err)
@@ -167,20 +167,23 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		}
 	}
 
-	for k, b := range balances {
-		a, _ := constants.GetAssetByID(k)
-		fmt.Println(a.Symbol, b)
-	}
-
-	for k, pos := range state.positions {
-		if ppos := pos.GetPosition(); ppos != nil {
-			kid, _ := strconv.ParseUint(k, 10, 64)
-			fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
+	/*
+		for k, b := range balances {
+			a, _ := constants.GetAssetByID(k)
+			fmt.Println(a.Symbol, b)
 		}
-	}
+
+		for k, pos := range state.positions {
+			if ppos := pos.GetPosition(); ppos != nil {
+				kid, _ := strconv.ParseUint(k, 10, 64)
+				fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
+			}
+		}
+
+	*/
 
 	sres := state.txs.FindOne(goContext.Background(), bson.D{
-		{"account-id", state.account.AccountID},
+		{"account", state.account.Name},
 		{"type", "FUNDING"},
 	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
 	if sres.Err() != nil {
@@ -196,7 +199,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{"account-id", state.account.AccountID},
+		{"account", state.account.Name},
 		{"type", "DEPOSIT"},
 	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
 	if sres.Err() != nil {
@@ -204,7 +207,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 			return fmt.Errorf("error getting last deposit: %v", err)
 		}
 	} else {
-		fmt.Println("DEPO", sres.Err())
 		var tx extypes.Transaction
 		if err := sres.Decode(&tx); err != nil {
 			return fmt.Errorf("error decoding transaction: %v", err)
@@ -213,7 +215,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{"account-id", state.account.AccountID},
+		{"account", state.account.Name},
 		{"type", "WITHDRAWAL"},
 	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
 	if sres.Err() != nil {
@@ -286,10 +288,10 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			secID := fmt.Sprintf("%d", trd.Instrument.SecurityID.Value)
 			sec := state.securities[trd.Instrument.SecurityID.Value]
 			tx := &extypes.Transaction{
-				Type:      "TRADE",
-				Time:      ts,
-				ID:        trd.TradeID,
-				AccountID: state.account.AccountID,
+				Type:    "TRADE",
+				Time:    ts,
+				ID:      trd.TradeID,
+				Account: state.account.Name,
 				Fill: &extypes.Fill{
 					SecurityID: secID,
 					Price:      trd.Price,
@@ -361,7 +363,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 	// Get last account movement
 	done := false
 	for !done {
-		fmt.Println("LAST FUNDING TS", state.lastFundingTs)
 		res, err := context.RequestFuture(state.ftxExecutor, &messages.AccountMovementRequest{
 			RequestID: 0,
 			Type:      messages.FundingFee,
@@ -386,12 +387,12 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		for _, m := range mvts.Movements {
 			ts, _ := types.TimestampFromProto(m.Time)
 			tx := extypes.Transaction{
-				Type:      "FUNDING",
-				SubType:   m.Subtype,
-				Time:      ts,
-				ID:        m.MovementID,
-				AccountID: state.account.AccountID,
-				Fill:      nil,
+				Type:    "FUNDING",
+				SubType: m.Subtype,
+				Time:    ts,
+				ID:      m.MovementID,
+				Account: state.account.Name,
+				Fill:    nil,
 				Movements: []extypes.Movement{{
 					Reason:   int32(messages.FundingFee),
 					AssetID:  m.Asset.ID,
@@ -417,6 +418,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 
 	done = false
 	for !done {
+		fmt.Println("FETCHING DEPOSIT FTX", state.lastDepositTs)
 		res, err := context.RequestFuture(state.ftxExecutor, &messages.AccountMovementRequest{
 			RequestID: 0,
 			Type:      messages.Deposit,
@@ -438,15 +440,19 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			continue
 		}
 		progress := false
+		state.txs.DeleteMany(goContext.Background(), bson.D{
+			{"account", "Test"},
+		})
 		for _, m := range mvts.Movements {
+			fmt.Println("MOV", state.account.Name, m)
 			ts, _ := types.TimestampFromProto(m.Time)
 			tx := extypes.Transaction{
-				Type:      "DEPOSIT",
-				SubType:   m.Subtype,
-				Time:      ts,
-				ID:        m.MovementID,
-				AccountID: state.account.AccountID,
-				Fill:      nil,
+				Type:    "DEPOSIT",
+				SubType: m.Subtype,
+				Time:    ts,
+				ID:      m.MovementID,
+				Account: state.account.Name,
+				Fill:    nil,
 				Movements: []extypes.Movement{{
 					Reason:   int32(messages.Deposit),
 					AssetID:  m.Asset.ID,
@@ -456,6 +462,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
 				// TODO
 				if wexc, ok := err.(mongo.WriteException); ok && wexc.WriteErrors[0].Code == 11000 {
+					fmt.Println(wexc.Error())
 					continue
 				} else {
 					return fmt.Errorf("error writing transaction: %v", err)
@@ -496,12 +503,12 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		for _, m := range mvts.Movements {
 			ts, _ := types.TimestampFromProto(m.Time)
 			tx := extypes.Transaction{
-				Type:      "WITHDRAWAL",
-				SubType:   m.Subtype,
-				Time:      ts,
-				ID:        m.MovementID,
-				AccountID: state.account.AccountID,
-				Fill:      nil,
+				Type:    "WITHDRAWAL",
+				SubType: m.Subtype,
+				Time:    ts,
+				ID:      m.MovementID,
+				Account: state.account.Name,
+				Fill:    nil,
 				Movements: []extypes.Movement{{
 					Reason:   int32(messages.Withdrawal),
 					AssetID:  m.Asset.ID,

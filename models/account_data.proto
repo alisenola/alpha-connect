@@ -4,7 +4,7 @@ package models;
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 
 message Account {
-    string accountID = 1;
+    string name = 1;
     models.Exchange exchange = 2;
     models.APICredentials credentials = 3;
 }

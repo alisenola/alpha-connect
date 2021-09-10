@@ -9,7 +9,7 @@ type Transaction struct {
 	SubType   string     `bson:"subtype"`
 	Time      time.Time  `bson:"time"`
 	ID        string     `bson:"id"`
-	AccountID string     `bson:"account-id"`
+	Account   string     `bson:"account"`
 	Fill      *Fill      `bson:"fill"`
 	Movements []Movement `bson:"movements"`
 }

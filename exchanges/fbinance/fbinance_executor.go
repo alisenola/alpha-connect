@@ -1166,7 +1166,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				cost = (p.MarkPrice * sec.Multiplier.Value * p.PositionAmount) - p.UnrealizedProfit
 			}
 			pos := &models.Position{
-				AccountID: msg.Account.AccountID,
+				Account: msg.Account.Name,
 				Instrument: &models.Instrument{
 					Exchange:   &constants.BITMEX,
 					Symbol:     &types.StringValue{Value: p.Symbol},
@@ -1254,9 +1254,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				continue
 			}
 			response.Balances = append(response.Balances, &models.Balance{
-				AccountID: msg.Account.AccountID,
-				Asset:     asset,
-				Quantity:  b.Balance,
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: b.Balance,
 			})
 			fmt.Println(response.Balances)
 		}

@@ -420,6 +420,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
+			fmt.Println("GOT DEPOSITS", res)
 			if !res.Success {
 				state.logger.Info("api error", log.Error(errors.New(res.Error)))
 				response.RejectionReason = messages.ExchangeAPIError
@@ -996,7 +997,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			cost := *p.RecentAverageOpenPrice * sec.Multiplier.Value * p.NetSize
 			size := p.NetSize
 			pos := &models.Position{
-				AccountID: msg.Account.AccountID,
+				Account: msg.Account.Name,
 				Instrument: &models.Instrument{
 					Exchange:   &constants.BITMEX,
 					Symbol:     &types.StringValue{Value: p.Future},
@@ -1089,9 +1090,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				continue
 			}
 			response.Balances = append(response.Balances, &models.Balance{
-				AccountID: msg.Account.AccountID,
-				Asset:     asset,
-				Quantity:  b.Total,
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: b.Total,
 			})
 		}
 

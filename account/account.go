@@ -186,7 +186,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		pos.Sync(0, 0)
 	}
 	for _, p := range positions {
-		if p.AccountID != accnt.AccountID {
+		if p.Account != accnt.Name {
 			return fmt.Errorf("got position for wrong account ID")
 		}
 		if p.Instrument == nil {
@@ -811,7 +811,7 @@ func (accnt *Account) GetPositions() []*models.Position {
 		pos := pos.GetPosition()
 		if pos != nil {
 			pos.Instrument = accnt.securities[k].GetInstrument()
-			pos.AccountID = accnt.AccountID
+			pos.Account = accnt.Name
 			positions = append(positions, pos)
 		}
 	}
@@ -827,7 +827,7 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 		pos := pos.GetPosition()
 		if pos != nil {
 			pos.Instrument = accnt.securities[k].GetInstrument()
-			pos.AccountID = accnt.AccountID
+			pos.Account = accnt.Name
 			positions[k] = pos
 		}
 	}
@@ -842,9 +842,9 @@ func (accnt *Account) GetBalances() []*models.Balance {
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
 		balances = append(balances, &models.Balance{
-			AccountID: accnt.AccountID,
-			Asset:     accnt.assets[k],
-			Quantity:  b,
+			Account:  accnt.Name,
+			Asset:    accnt.assets[k],
+			Quantity: b,
 		})
 	}
 

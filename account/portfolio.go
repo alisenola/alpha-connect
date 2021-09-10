@@ -39,7 +39,7 @@ func (p *Portfolio) GetAccount(ID string) *Account {
 }
 
 func (p *Portfolio) AddAccount(account *Account) {
-	p.accountPortfolios[account.AccountID] = account
+	p.accountPortfolios[account.Name] = account
 }
 
 func (p *Portfolio) Value(model modeling.Market) float64 {

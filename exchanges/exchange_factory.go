@@ -40,7 +40,7 @@ import (
 var Portfolio = account.NewPortfolio(300)
 
 func NewAccount(accountInfo *models.Account) (*account.Account, error) {
-	if accnt := Portfolio.GetAccount(accountInfo.AccountID); accnt != nil {
+	if accnt := Portfolio.GetAccount(accountInfo.Name); accnt != nil {
 		return accnt, nil
 	}
 	accnt, err := account.NewAccount(accountInfo)

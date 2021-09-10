@@ -631,7 +631,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				size *= -1
 			}
 			pos := &models.Position{
-				AccountID: msg.Account.AccountID,
+				Account: msg.Account.Name,
 				Instrument: &models.Instrument{
 					Exchange:   &constants.BITMEX,
 					Symbol:     &types.StringValue{Value: p.Future},
@@ -725,9 +725,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				continue
 			}
 			response.Balances = append(response.Balances, &models.Balance{
-				AccountID: msg.Account.AccountID,
-				Asset:     asset,
-				Quantity:  b.Total,
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: b.Total,
 			})
 			fmt.Println(response.Balances)
 		}

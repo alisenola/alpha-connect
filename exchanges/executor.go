@@ -281,7 +281,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
-		state.accountManagers[accnt.AccountID] = context.Spawn(props)
+		state.accountManagers[accnt.Name] = context.Spawn(props)
 	}
 
 	return nil
@@ -302,7 +302,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		return nil
 	}
 
-	if pid, ok := state.accountManagers[request.Account.AccountID]; ok {
+	if pid, ok := state.accountManagers[request.Account.Name]; ok {
 		context.Forward(pid)
 	} else {
 		accnt, err := NewAccount(request.Account)
@@ -316,7 +316,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
 		pid := context.Spawn(props)
-		state.accountManagers[request.Account.AccountID] = pid
+		state.accountManagers[request.Account.Name] = pid
 		context.Forward(pid)
 	}
 
@@ -490,7 +490,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		fmt.Println("NOT FOUND", state.accountManagers)
 		context.Respond(&messages.TradeCaptureReport{
@@ -517,7 +517,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		fmt.Println("NOT FOUND", state.accountManagers)
 		context.Respond(&messages.AccountMovementResponse{
@@ -544,7 +544,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.PositionList{
 			RequestID:       msg.RequestID,
@@ -571,7 +571,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.BalanceList{
 			RequestID:       msg.RequestID,
@@ -596,7 +596,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.OrderList{
 			RequestID:       msg.RequestID,
@@ -627,7 +627,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       msg.RequestID,
@@ -650,7 +650,7 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.NewOrderBulkResponse{
 			RequestID:       msg.RequestID,
@@ -681,7 +681,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.OrderReplaceResponse{
 			RequestID:       msg.RequestID,
@@ -704,7 +704,7 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.OrderBulkReplaceResponse{
 			RequestID:       msg.RequestID,
@@ -727,7 +727,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
@@ -750,7 +750,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	accountManager, ok := state.accountManagers[msg.Account.AccountID]
+	accountManager, ok := state.accountManagers[msg.Account.Name]
 	if !ok {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
@@ -774,9 +774,9 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		return nil
 	}
 
-	if _, ok := state.accountManagers[request.Account.AccountID]; ok {
+	if _, ok := state.accountManagers[request.Account.Name]; ok {
 		context.Respond(&commands.GetAccountResponse{
-			Account: Portfolio.GetAccount(request.Account.AccountID),
+			Account: Portfolio.GetAccount(request.Account.Name),
 		})
 	} else {
 		accnt, err := NewAccount(request.Account)
@@ -790,7 +790,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		props := actor.PropsFromProducer(producer).WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
 		pid := context.Spawn(props)
-		state.accountManagers[request.Account.AccountID] = pid
+		state.accountManagers[request.Account.Name] = pid
 		context.Respond(&commands.GetAccountResponse{
 			Account: accnt,
 		})

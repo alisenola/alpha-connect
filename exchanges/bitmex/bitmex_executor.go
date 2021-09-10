@@ -533,7 +533,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			quantity := float64(p.CurrentQty)
 			cost := float64(p.UnrealisedCost) * 0.00000001
 			pos := &models.Position{
-				AccountID: msg.Account.AccountID,
+				Account: msg.Account.Name,
 				Instrument: &models.Instrument{
 					Exchange:   &constants.BITMEX,
 					Symbol:     &types.StringValue{Value: p.Symbol},
@@ -611,9 +611,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			return
 		}
 		balanceList.Balances = append(balanceList.Balances, &models.Balance{
-			AccountID: msg.Account.AccountID,
-			Asset:     &constants.BITCOIN,
-			Quantity:  float64(margin.WalletBalance) * 0.00000001,
+			Account:  msg.Account.Name,
+			Asset:    &constants.BITCOIN,
+			Quantity: float64(margin.WalletBalance) * 0.00000001,
 		})
 		balanceList.Success = true
 		context.Respond(balanceList)

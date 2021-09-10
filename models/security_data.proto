@@ -63,7 +63,7 @@ message Order {
 }
 
 message Position {
-    string accountID = 1;
+    string account = 1;
     Instrument instrument = 2;
     double quantity = 3;
     bool cross = 4;
@@ -71,7 +71,7 @@ message Position {
 }
 
 message Balance {
-    string accountID = 1;
+    string account = 1;
     models.Asset asset = 2;
     double quantity = 3;
 }
