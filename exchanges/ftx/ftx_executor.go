@@ -841,6 +841,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				CumQuantity:    o.FilledSize,
 			}
 
+			if o.ReduceOnly {
+				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+			}
+			if o.PostOnly {
+				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ParticipateDoNotInitiate)
+			}
+
 			switch o.Status {
 			case ftx.NEW_ORDER:
 				ord.OrderStatus = models.PendingNew
