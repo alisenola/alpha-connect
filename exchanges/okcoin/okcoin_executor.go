@@ -15,25 +15,25 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/okcoin"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
 )
 
+type QueryRunner struct {
+	pid       *actor.PID
+	rateLimit *exchanges.RateLimit
+}
+
 type Executor struct {
 	extypes.ExchangeExecutorBase
-	client      *http.Client
 	securities  []*models.Security
-	rateLimit   *exchanges.RateLimit
-	queryRunner *actor.PID
+	queryRunner *QueryRunner
 	logger      *log.Logger
 }
 
 func NewExecutor() actor.Actor {
 	return &Executor{
-		client:      nil,
-		rateLimit:   nil,
 		queryRunner: nil,
 		logger:      nil,
 	}
@@ -54,19 +54,20 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	state.client = &http.Client{
+	client := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
 			TLSHandshakeTimeout: 10 * time.Second,
 		},
 		Timeout: 10 * time.Second,
 	}
-	state.rateLimit = exchanges.NewRateLimit(6, time.Second)
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
+		return jobs.NewAPIQuery(client)
 	})
-	state.queryRunner = context.Spawn(props)
-
+	state.queryRunner = &QueryRunner{
+		pid:       context.Spawn(props),
+		rateLimit: exchanges.NewRateLimit(6, time.Second),
+	}
 	return state.UpdateSecurityList(context)
 }
 
@@ -75,50 +76,48 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	if state.rateLimit.IsRateLimited() {
+	if state.queryRunner.rateLimit.IsRateLimited() {
 		return fmt.Errorf("rate limited")
 	}
 	request, weight, err := okcoin.GetSpotInstruments()
 	if err != nil {
 		return err
 	}
-	state.rateLimit.Request(weight)
-	resp, err := state.client.Do(request)
+	qr := state.queryRunner
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+
+	res, err := future.Result()
 	if err != nil {
-		return err
+		return fmt.Errorf("http client error: %v", err)
 	}
-	response, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
+	resp := res.(*jobs.PerformQueryResponse)
+
+	qr.rateLimit.Request(weight)
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			err := fmt.Errorf(
 				"http client error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else if resp.StatusCode >= 500 {
 			err := fmt.Errorf(
 				"http server error: %d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		} else {
 			err := fmt.Errorf("%d %s",
 				resp.StatusCode,
-				string(response))
+				string(resp.Response))
 			return err
 		}
 	}
 
 	var kResponse []okcoin.SpotInstrument
-	err = json.Unmarshal(response, &kResponse)
+	err = json.Unmarshal(resp.Response, &kResponse)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
 		return err

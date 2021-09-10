@@ -54,7 +54,7 @@ func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *acto
 		exchange,
 	}
 	as := actor.NewActorSystem()
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, xchangerUtils.DefaultDialerPool)), "executor")
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(nil, exch, nil, xchangerUtils.DefaultDialerPool)), "executor")
 	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
 }
 
