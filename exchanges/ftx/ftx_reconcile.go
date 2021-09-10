@@ -440,9 +440,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			continue
 		}
 		progress := false
-		state.txs.DeleteMany(goContext.Background(), bson.D{
-			{"account", "Test"},
-		})
 		for _, m := range mvts.Movements {
 			fmt.Println("MOV", state.account.Name, m)
 			ts, _ := types.TimestampFromProto(m.Time)

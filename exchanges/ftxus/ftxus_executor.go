@@ -782,6 +782,8 @@ func buildPlaceOrderRequest(symbol string, order *messages.NewOrder, tickPrecisi
 		switch exec {
 		case models.ReduceOnly:
 			request.ReduceOnly = true
+		case models.ParticipateDoNotInitiate:
+			request.PostOnly = true
 		default:
 			rej := messages.UnsupportedOrderCharacteristic
 			return request, &rej

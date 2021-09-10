@@ -1317,12 +1317,16 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	}
 
 	for _, exec := range order.ExecutionInstructions {
+		rej := messages.UnsupportedOrderCharacteristic
 		switch exec {
 		case models.ReduceOnly:
-			rej := messages.UnsupportedOrderCharacteristic
 			if err := request.SetReduceOnly(true); err != nil {
 				return nil, &rej
 			}
+		case models.ParticipateDoNotInitiate:
+			request.SetTimeInForce(fbinance.GOOD_TILL_CROSSING)
+		default:
+			return nil, &rej
 		}
 	}
 	request.SetNewOrderResponseType(fbinance.ACK_RESPONSE_TYPE)
