@@ -420,7 +420,6 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			fmt.Println("GOT DEPOSITS", res)
 			if !res.Success {
 				state.logger.Info("api error", log.Error(errors.New(res.Error)))
 				response.RejectionReason = messages.ExchangeAPIError

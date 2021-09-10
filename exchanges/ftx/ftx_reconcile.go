@@ -441,7 +441,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		}
 		progress := false
 		for _, m := range mvts.Movements {
-			fmt.Println("MOV", state.account.Name, m)
 			ts, _ := types.TimestampFromProto(m.Time)
 			tx := extypes.Transaction{
 				Type:    "DEPOSIT",
@@ -459,7 +458,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
 				// TODO
 				if wexc, ok := err.(mongo.WriteException); ok && wexc.WriteErrors[0].Code == 11000 {
-					fmt.Println(wexc.Error())
 					continue
 				} else {
 					return fmt.Errorf("error writing transaction: %v", err)

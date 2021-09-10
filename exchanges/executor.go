@@ -254,8 +254,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, fut := range futures {
 		res, err := fut.Result()
 		if err != nil {
-			state.logger.Error("error fetching securities for one venue", log.Error(err))
-			continue
+			return fmt.Errorf("error fetching securities for one venue: %v", err)
 		}
 		response, ok := res.(*messages.SecurityList)
 		if !ok {
