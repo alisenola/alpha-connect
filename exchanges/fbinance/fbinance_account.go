@@ -228,6 +228,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}
 
+	fmt.Println("FBINANCE SECURITIES", len(filteredSecurities))
 	// Then fetch balances
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
