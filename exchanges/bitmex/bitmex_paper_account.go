@@ -205,16 +205,17 @@ func (state *PaperAccountListener) OnNewOrderSingle(context actor.Context) error
 	req.Account = state.account.Account
 	// Check order quantity
 	order := &models.Order{
-		OrderID:        "",
-		ClientOrderID:  req.Order.ClientOrderID,
-		Instrument:     req.Order.Instrument,
-		OrderStatus:    models.PendingNew,
-		OrderType:      req.Order.OrderType,
-		Side:           req.Order.OrderSide,
-		TimeInForce:    req.Order.TimeInForce,
-		LeavesQuantity: req.Order.Quantity,
-		Price:          req.Order.Price,
-		CumQuantity:    0,
+		OrderID:               "",
+		ClientOrderID:         req.Order.ClientOrderID,
+		Instrument:            req.Order.Instrument,
+		OrderStatus:           models.PendingNew,
+		OrderType:             req.Order.OrderType,
+		Side:                  req.Order.OrderSide,
+		TimeInForce:           req.Order.TimeInForce,
+		LeavesQuantity:        req.Order.Quantity,
+		Price:                 req.Order.Price,
+		CumQuantity:           0,
+		ExecutionInstructions: req.Order.ExecutionInstructions,
 	}
 	report, res := state.account.NewOrder(order)
 	if res != nil {
@@ -256,16 +257,17 @@ func (state *PaperAccountListener) OnNewOrderBulkRequest(context actor.Context) 
 	reports := make([]*messages.ExecutionReport, 0, len(req.Orders))
 	for _, reqOrder := range req.Orders {
 		order := &models.Order{
-			OrderID:        "",
-			ClientOrderID:  reqOrder.ClientOrderID,
-			Instrument:     reqOrder.Instrument,
-			OrderStatus:    models.PendingNew,
-			OrderType:      reqOrder.OrderType,
-			Side:           reqOrder.OrderSide,
-			TimeInForce:    reqOrder.TimeInForce,
-			LeavesQuantity: reqOrder.Quantity,
-			Price:          reqOrder.Price,
-			CumQuantity:    0,
+			OrderID:               "",
+			ClientOrderID:         reqOrder.ClientOrderID,
+			Instrument:            reqOrder.Instrument,
+			OrderStatus:           models.PendingNew,
+			OrderType:             reqOrder.OrderType,
+			Side:                  reqOrder.OrderSide,
+			TimeInForce:           reqOrder.TimeInForce,
+			LeavesQuantity:        reqOrder.Quantity,
+			Price:                 reqOrder.Price,
+			CumQuantity:           0,
+			ExecutionInstructions: reqOrder.ExecutionInstructions,
 		}
 		report, res := state.account.NewOrder(order)
 		if res != nil {

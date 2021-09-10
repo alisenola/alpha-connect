@@ -247,12 +247,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastWithdrawalTs = uint64(tx.Time.UnixNano() / 1000000)
 	}
 
-	/*
-		if err := state.reconcileTrades(context); err != nil {
-			return fmt.Errorf("error reconcile trade: %v", err)
-		}
-
-	*/
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
 
 	if err := state.reconcileMovements(context); err != nil {
 		return fmt.Errorf("error reconcile movements: %v", err)

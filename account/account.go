@@ -255,6 +255,7 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		return nil, &res
 	}
 
+	fmt.Println("NEW ORDER", len(order.ExecutionInstructions))
 	sec, rej := accnt.getSec(order.Instrument)
 	if rej != nil {
 		return nil, rej

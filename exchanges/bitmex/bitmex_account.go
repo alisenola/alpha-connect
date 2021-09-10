@@ -493,16 +493,17 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 	}
 	for _, reqOrder := range req.Orders {
 		order := &models.Order{
-			OrderID:        "",
-			ClientOrderID:  reqOrder.ClientOrderID,
-			Instrument:     reqOrder.Instrument,
-			OrderStatus:    models.PendingNew,
-			OrderType:      reqOrder.OrderType,
-			Side:           reqOrder.OrderSide,
-			TimeInForce:    reqOrder.TimeInForce,
-			LeavesQuantity: reqOrder.Quantity,
-			Price:          reqOrder.Price,
-			CumQuantity:    0,
+			OrderID:               "",
+			ClientOrderID:         reqOrder.ClientOrderID,
+			Instrument:            reqOrder.Instrument,
+			OrderStatus:           models.PendingNew,
+			OrderType:             reqOrder.OrderType,
+			Side:                  reqOrder.OrderSide,
+			TimeInForce:           reqOrder.TimeInForce,
+			LeavesQuantity:        reqOrder.Quantity,
+			Price:                 reqOrder.Price,
+			CumQuantity:           0,
+			ExecutionInstructions: reqOrder.ExecutionInstructions,
 		}
 		report, res := state.account.NewOrder(order)
 		if res != nil {
