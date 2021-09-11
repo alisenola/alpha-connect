@@ -255,7 +255,6 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		return nil, &res
 	}
 
-	fmt.Println("NEW ORDER", len(order.ExecutionInstructions))
 	sec, rej := accnt.getSec(order.Instrument)
 	if rej != nil {
 		return nil, rej
@@ -315,7 +314,6 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.OrderID = ID
 	order.OrderStatus = models.New
 	order.lastEventTime = time.Now()
-	fmt.Println("ORDER CONFIRM", order.LeavesQuantity)
 	accnt.ordersID[ID] = order
 
 	sec, rej := accnt.getSec(order.Instrument)

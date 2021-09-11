@@ -228,7 +228,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}
 
-	fmt.Println("FBINANCE SECURITIES", len(filteredSecurities))
 	// Then fetch balances
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
@@ -828,6 +827,8 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
+		b, _ := json.Marshal(udata.Execution)
+		fmt.Println("EXECUTION UPDATE", string(b))
 		exec := udata.Execution
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
