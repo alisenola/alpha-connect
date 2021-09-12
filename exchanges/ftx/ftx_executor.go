@@ -474,7 +474,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			mvt := messages.AccountMovement{
 				Asset:      asset,
 				Change:     t.Size,
-				MovementID: fmt.Sprintf("%d", t.ID),
+				MovementID: fmt.Sprintf("%s%d", msg.Account.Credentials.AccountID, t.ID),
 				Time:       ts,
 				Type:       messages.Deposit,
 			}
@@ -492,7 +492,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			mvt := messages.AccountMovement{
 				Asset:      asset,
 				Change:     t.Size,
-				MovementID: fmt.Sprintf("%d", t.ID),
+				MovementID: fmt.Sprintf("%s%d", msg.Account.Credentials.AccountID, t.ID),
 				Time:       ts,
 				Type:       messages.Withdrawal,
 			}
