@@ -1554,6 +1554,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 						string(queryResponse.Response))
 					state.logger.Info("http client error", log.Error(err))
 					context.Respond(response)
+					return
 				}
 				if res.Code == -1020 {
 					response.RejectionReason = messages.UnsupportedRequest
@@ -1569,7 +1570,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 					res.Message)
 				state.logger.Info("http client error", log.Error(err))
 				context.Respond(response)
-
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
 					"%d %s",

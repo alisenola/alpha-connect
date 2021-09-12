@@ -867,6 +867,17 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				state.seqNum += 1
 				context.Send(context.Parent(), report)
 			}
+
+		case fbinance.ET_EXPIRED:
+			report, err := state.account.ConfirmExpiredOrder(exec.ClientOrderID)
+			if err != nil {
+				return fmt.Errorf("error confirming cancel order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
 		}
 	case fbinance.ACCOUNT_UPDATE:
 		b, _ := json.Marshal(udata.Account)

@@ -564,6 +564,45 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	}, nil
 }
 
+func (accnt *Account) ConfirmExpiredOrder(ID string) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	if order.OrderStatus == models.Expired {
+		return nil, nil
+	}
+
+	order.OrderStatus = models.Expired
+	order.lastEventTime = time.Now()
+	order.LeavesQuantity = 0.
+	if order.OrderType == models.Limit {
+		if order.Side == models.Buy {
+			accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
+		} else {
+			accnt.securities[order.Instrument.SecurityID.Value].RemoveAskOrder(order.ClientOrderID)
+		}
+	}
+
+	return &messages.ExecutionReport{
+		OrderID:         order.OrderID,
+		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.Expired,
+		OrderStatus:     models.Expired,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: types.TimestampNow(),
+	}, nil
+}
+
 func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReason) (*messages.ExecutionReport, error) {
 	accnt.Lock()
 	defer accnt.Unlock()
