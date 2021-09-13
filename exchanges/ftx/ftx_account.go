@@ -899,6 +899,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		fmt.Println("WSORDER UPDATE", res)
 		switch res.Order.Status {
 		case ftx.CLOSED_ORDER:
+			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
+				// Order closed because of filled, let the fill update manage it
+				return nil
+			}
 			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
 			if err != nil {
 				return fmt.Errorf("error rejecting new order: %v", err)
