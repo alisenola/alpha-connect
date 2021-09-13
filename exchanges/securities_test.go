@@ -39,7 +39,7 @@ func TestSecurities(t *testing.T) {
 		panic(err)
 	}
 
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(exchanges, nil, xchangerUtils.DefaultDialerPool)), "executor")
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(NewExecutorProducer(nil, exchanges, nil, xchangerUtils.DefaultDialerPool)), "executor")
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

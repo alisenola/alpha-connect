@@ -1415,6 +1415,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		}
 		if !order.Success {
 			if order.Error == "Order already queued for cancellation" || order.Error == "Order already closed" {
+				fmt.Println("order already queued for cancel or already closed", req.OrderID)
 				response.RejectionReason = messages.UnknownOrder
 				context.Respond(response)
 				return
