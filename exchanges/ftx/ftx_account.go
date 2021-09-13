@@ -897,48 +897,16 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		// Problem here, I will get the closed order notification before the fill
 		// therefore I will close the order
 		fmt.Println("WSORDER UPDATE", res)
-		order, err := state.account.GetOrder(fmt.Sprintf("%d", res.Order.ID))
-		if err != nil {
-			return fmt.Errorf("unknown order %d", res.Order.ID)
-		}
-		switch order.OrderStatus {
-		/*
-			case models.PendingNew:
-				switch res.Order.Status {
-				case ftx.NEW_ORDER:
-					report, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
-					if err != nil {
-						return fmt.Errorf("error confirming new order: %v", err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
-				case ftx.CLOSED_ORDER:
-					report, err := state.account.RejectNewOrder(*res.Order.ClientID, messages.Other)
-					if err != nil {
-						return fmt.Errorf("error rejecting new order: %v", err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
-				}
-		*/
-		case models.PendingCancel:
-			switch res.Order.Status {
-			case ftx.CLOSED_ORDER:
-				report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
-				if err != nil {
-					return fmt.Errorf("error rejecting new order: %v", err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
+		switch res.Order.Status {
+		case ftx.CLOSED_ORDER:
+			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
+			if err != nil {
+				return fmt.Errorf("error rejecting new order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
 			}
 		}
 
