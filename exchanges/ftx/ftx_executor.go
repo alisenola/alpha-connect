@@ -491,7 +491,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			ts, _ := types.TimestampProto(t.Time)
 			mvt := messages.AccountMovement{
 				Asset:      asset,
-				Change:     t.Size,
+				Change:     -t.Size,
 				MovementID: fmt.Sprintf("%s%d", msg.Account.Credentials.AccountID, t.ID),
 				Time:       ts,
 				Type:       messages.Withdrawal,
@@ -502,13 +502,15 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			ts, _ := types.TimestampProto(t.Time)
 			mvt := messages.AccountMovement{
 				Asset:      &constants.DOLLAR,
-				Change:     t.Payment,
+				Change:     -t.Payment,
 				MovementID: fmt.Sprintf("%d", t.ID),
 				Time:       ts,
 				Type:       messages.FundingFee,
+				Subtype:    t.Future,
 			}
 			movements = append(movements, &mvt)
 		}
+
 		response.Success = true
 		response.Movements = movements
 		context.Respond(response)
@@ -601,6 +603,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
+				fmt.Println(err)
 				response.RejectionReason = messages.ExchangeAPIError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
@@ -611,6 +614,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
 				response.RejectionReason = messages.ExchangeAPIError
+				fmt.Println(err)
 				context.Respond(response)
 			}
 			return
@@ -625,15 +629,35 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		}
 
 		var mtrades []*models.TradeCapture
+		sort.Slice(trades.Result, func(i, j int) bool {
+			return trades.Result[i].Time.Before(trades.Result[j].Time)
+		})
 		for _, t := range trades.Result {
-			sec, ok := state.symbolToSec[t.Market]
-			if !ok {
-				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
-				context.Respond(response)
-				return
+			quantityMul := 1.
+			var instrument *models.Instrument
+			if t.Market != "" {
+				sec, ok := state.symbolToSec[t.Market]
+				instrument = &models.Instrument{
+					Exchange:   &constants.FTX,
+					Symbol:     &types.StringValue{Value: t.Market},
+					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+				}
+				if !ok {
+					err := fmt.Errorf("unknown symbol %s", t.Market)
+					state.logger.Info("http error", log.Error(err))
+					response.RejectionReason = messages.ExchangeAPIError
+					context.Respond(response)
+					return
+				}
+			} else {
+				instrument = &models.Instrument{
+					Exchange:   &constants.FTX,
+					Symbol:     &types.StringValue{Value: t.BaseCurrency + "-" + t.QuoteCurrency},
+					SecurityID: nil,
+				}
 			}
-			quantity := t.Size
+
+			quantity := t.Size * quantityMul
 			if t.Side == ftx.SELL {
 				quantity *= -1
 			}
@@ -652,11 +676,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				Commission:      t.Fee,
 				CommissionAsset: comAsset,
 				TradeID:         fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
-				Instrument: &models.Instrument{
-					Exchange:   &constants.FTX,
-					Symbol:     &types.StringValue{Value: t.Market},
-					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
-				},
+				Instrument:      instrument,
 				Trade_LinkID:    nil,
 				OrderID:         &types.StringValue{Value: fmt.Sprintf("%d", t.OrderID)},
 				TransactionTime: ts,

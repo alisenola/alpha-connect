@@ -14,7 +14,7 @@ type Market interface {
 
 type LongShortModel interface {
 	Market
-	GetPenalty() float64
+	GetPenalty(fees float64) float64
 	GetLongScore(ID uint64) float64
 	GetShortScore(ID uint64) float64
 	SetLongModel(ID uint64, model LongModel)
@@ -153,12 +153,12 @@ func (m *MapLongShortModel) GetShortScore(ID uint64) float64 {
 	return m.shortModels[ID].GetShortScore(ID)
 }
 
-func (m *MapLongShortModel) GetPenalty() float64 {
+func (m *MapLongShortModel) GetPenalty(fees float64) float64 {
 	for _, m := range m.shortModels {
-		return m.GetPenalty()
+		return m.GetPenalty(fees)
 	}
 	for _, m := range m.longModels {
-		return m.GetPenalty()
+		return m.GetPenalty(fees)
 	}
 	return 0.
 }
@@ -187,13 +187,13 @@ type Model interface {
 
 type LongModel interface {
 	Model
-	GetPenalty() float64
+	GetPenalty(fees float64) float64
 	GetLongScore(feedID uint64) float64
 }
 
 type ShortModel interface {
 	Model
-	GetPenalty() float64
+	GetPenalty(fees float64) float64
 	GetShortScore(feedID uint64) float64
 }
 

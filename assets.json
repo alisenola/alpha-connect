@@ -1247,5 +1247,10 @@
     "symbol": "EMB",
     "name": "emblem",
     "ID": 250
+  },
+  "251": {
+    "symbol": "DYDX",
+    "name": "dydx",
+    "ID": 251
   }
 }

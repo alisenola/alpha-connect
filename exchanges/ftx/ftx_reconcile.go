@@ -18,6 +18,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -91,14 +92,12 @@ func (state *AccountReconcile) Receive(context actor.Context) {
 func (state *AccountReconcile) Initialize(context actor.Context) error {
 	// When initialize is done, the account must be aware of all the settings / assets / portfolio
 	// so as to be able to answer to FIX messages
-
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTX.Name+"_executor")
-
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
 	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
@@ -151,36 +150,35 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		}
 		switch tx.Type {
 		case "TRADE":
-			secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
-			sec := state.securities[secID]
-			if sec.SecurityType == "CRPERP" {
-				if tx.Fill.Quantity < 0 {
-					state.positions[tx.Fill.SecurityID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
-				} else {
-					state.positions[tx.Fill.SecurityID].Buy(tx.Fill.Price, tx.Fill.Quantity, false)
+			if tx.Fill.SecurityID != "" {
+				secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
+				sec := state.securities[secID]
+				if sec.SecurityType == "CRPERP" {
+					if tx.Fill.Quantity < 0 {
+						state.positions[tx.Fill.SecurityID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
+					} else {
+						state.positions[tx.Fill.SecurityID].Buy(tx.Fill.Price, tx.Fill.Quantity, false)
+					}
 				}
+				state.lastTradeTs = uint64(tx.Time.UnixNano() / 1000000)
 			}
-			state.lastTradeTs = uint64(tx.Time.UnixNano() / 1000000)
 		}
 		for _, m := range tx.Movements {
 			balances[m.AssetID] += m.Quantity
 		}
 	}
 
-	/*
-		for k, b := range balances {
-			a, _ := constants.GetAssetByID(k)
-			fmt.Println(a.Symbol, b)
-		}
+	for k, b := range balances {
+		a, _ := constants.GetAssetByID(k)
+		fmt.Println(a.Symbol, b)
+	}
 
-		for k, pos := range state.positions {
-			if ppos := pos.GetPosition(); ppos != nil {
-				kid, _ := strconv.ParseUint(k, 10, 64)
-				fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
-			}
+	for k, pos := range state.positions {
+		if ppos := pos.GetPosition(); ppos != nil {
+			kid, _ := strconv.ParseUint(k, 10, 64)
+			fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
 		}
-
-	*/
+	}
 
 	sres := state.txs.FindOne(goContext.Background(), bson.D{
 		{"account", state.account.Name},
@@ -284,9 +282,16 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		progress := false
 		for _, trd := range trds.Trades {
+			// Check if not already inserted
+			if state.txs.FindOne(goContext.Background(), bson.D{{"id", trd.TradeID}}).Err() != mongo.ErrNoDocuments {
+				fmt.Println("skip trd", trd)
+				continue
+			}
 			ts, _ := types.TimestampFromProto(trd.TransactionTime)
-			secID := fmt.Sprintf("%d", trd.Instrument.SecurityID.Value)
-			sec := state.securities[trd.Instrument.SecurityID.Value]
+			var secID string
+			if trd.Instrument.SecurityID != nil {
+				secID = fmt.Sprintf("%d", trd.Instrument.SecurityID.Value)
+			}
 			tx := &extypes.Transaction{
 				Type:    "TRADE",
 				Time:    ts,
@@ -298,36 +303,59 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					Quantity:   trd.Quantity,
 				},
 			}
-			switch sec.SecurityType {
-			case "CRPERP", "CRFUT":
-				var realized int64
-				if trd.Quantity < 0 {
-					_, realized = state.positions[secID].Sell(trd.Price, -trd.Quantity, false)
-				} else {
-					_, realized = state.positions[secID].Buy(trd.Price, trd.Quantity, false)
-				}
-				// Realized PnL
-				if realized != 0 {
+			if trd.Instrument.SecurityID != nil {
+				sec := state.securities[trd.Instrument.SecurityID.Value]
+				switch sec.SecurityType {
+				case "CRPERP", "CRFUT":
+					var realized int64
+					if trd.Quantity < 0 {
+						_, realized = state.positions[secID].Sell(trd.Price, -trd.Quantity, false)
+					} else {
+						_, realized = state.positions[secID].Buy(trd.Price, trd.Quantity, false)
+					}
+					// Realized PnL
+					if realized != 0 {
+						tx.Movements = append(tx.Movements, extypes.Movement{
+							Reason:   int32(messages.RealizedPnl),
+							AssetID:  constants.DOLLAR.ID,
+							Quantity: -float64(realized) / 1e8,
+						})
+					}
+				case "CRSPOT":
+					// SPOT trade
 					tx.Movements = append(tx.Movements, extypes.Movement{
-						Reason:   int32(messages.RealizedPnl),
-						AssetID:  constants.DOLLAR.ID,
-						Quantity: -float64(realized) / 1e8,
+						Reason:   int32(messages.Exchange),
+						AssetID:  sec.Underlying.ID,
+						Quantity: trd.Quantity,
 					})
+					tx.Movements = append(tx.Movements, extypes.Movement{
+						Reason:   int32(messages.Exchange),
+						AssetID:  sec.QuoteCurrency.ID,
+						Quantity: -trd.Quantity * trd.Price,
+					})
+				default:
+					return fmt.Errorf("unsupported type: %s", sec.SecurityType)
 				}
-			case "CRSPOT":
-				// SPOT trade
+			} else {
+				splits := strings.Split(trd.Instrument.Symbol.Value, "-")
+				base, ok := constants.GetAssetBySymbol(splits[0])
+				if !ok {
+					return fmt.Errorf("unknown symbol: %s", splits[0])
+				}
+				quote, ok := constants.GetAssetBySymbol(splits[1])
+				if !ok {
+					return fmt.Errorf("unknown symbol: %s", splits[1])
+				}
 				tx.Movements = append(tx.Movements, extypes.Movement{
 					Reason:   int32(messages.Exchange),
-					AssetID:  sec.Underlying.ID,
+					AssetID:  base.ID,
 					Quantity: trd.Quantity,
 				})
 				tx.Movements = append(tx.Movements, extypes.Movement{
 					Reason:   int32(messages.Exchange),
-					AssetID:  sec.QuoteCurrency.ID,
+					AssetID:  quote.ID,
 					Quantity: -trd.Quantity * trd.Price,
 				})
-			default:
-				return fmt.Errorf("unsupported type: %s", sec.SecurityType)
 			}
 
 			// Commission
@@ -340,12 +368,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			}
 
 			if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
-				// TODO
-				if wexc, ok := err.(mongo.WriteException); ok && wexc.WriteErrors[0].Code == 11000 {
-					continue
-				} else {
-					return fmt.Errorf("error writing transaction: %v", err)
-				}
+				return fmt.Errorf("error writing transaction: %v", err)
 			} else {
 				state.lastTradeTs = uint64(ts.UnixNano() / 1000000)
 				progress = true

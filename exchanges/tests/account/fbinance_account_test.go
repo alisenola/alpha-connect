@@ -21,8 +21,7 @@ var instrument = &models.Instrument{
 }
 
 var FBinanceTestnetAccount = &models.Account{
-	AccountID: "299211",
-	Exchange:  &constants.FBINANCE,
+	Exchange: &constants.FBINANCE,
 	Credentials: &xchangerModels.APICredentials{
 		APIKey:    "74f122652da74f6e1bcc34b8c23fc91e0239b502e68440632ae9a3cb7cefa18e",
 		APISecret: "c3e0d76ee014b597b93616478dc789e6bb6616ad59ddbe384d2554ace4a60f86",
@@ -624,7 +623,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			TimeInForce:           models.Session,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -648,7 +647,7 @@ func TestFBinanceAccountListener_OnGetPositionsLimit(t *testing.T) {
 			TimeInForce:           models.Session,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
