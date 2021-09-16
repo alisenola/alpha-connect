@@ -275,8 +275,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 
 	// Sync account
-	makerFee := 0.0004
-	takerFee := 0.0007
+	// TODO
+	makerFee := 0.
+	takerFee := 0.00038
 	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
