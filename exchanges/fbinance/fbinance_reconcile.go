@@ -139,12 +139,16 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastTradeID[sec.SecurityID] = 0
 	}
 	// First, calculate current positions from historical
-	cur, err := state.txs.Find(goContext.Background(), bson.D{
-		{"account", state.account.Name},
-	}, options.Find().SetSort(bson.D{
+	opts := options.Find()
+	opts.SetSort(bson.D{
 		{"time", 1},
 		{"_id", 1},
-	}))
+	})
+	tr := true
+	opts.AllowDiskUse = &tr
+	cur, err := state.txs.Find(goContext.Background(), bson.D{
+		{"account", state.account.Name},
+	}, opts)
 	if err != nil {
 		return fmt.Errorf("error reconcile trades: %v", err)
 	}

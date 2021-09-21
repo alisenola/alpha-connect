@@ -667,6 +667,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			switch t.IncomeType {
 			case fbinance.FUNDING_FEE:
 				mvt.Type = messages.FundingFee
+				mvt.Subtype = t.Symbol
 			case fbinance.WELCOME_BONUS:
 				mvt.Type = messages.WelcomeBonus
 			case fbinance.COMMISSION:
