@@ -325,13 +325,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("OB socket error: %v", msg)
 
 	case bybiti.OrderBookDelta:
+		if state.ws == nil || msg.WSID != state.ws.ID {
+			return nil
+		}
+
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		update := msg.Message.(bybiti.OrderBookDelta)
 
 		instr := state.instrumentData
-		if update.Sequence <= instr.lastUpdateID {
-			break
-		}
 
 		obDelta := &models.OBL2Update{
 			Levels:    nil,
