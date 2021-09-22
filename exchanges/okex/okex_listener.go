@@ -320,7 +320,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		instr.lastUpdateTime = uint64(msg.ClientTime.UnixNano() / 1000000)
 
-		fmt.Println(state.instrumentData.orderBook)
 		if state.instrumentData.orderBook.Crossed() {
 			fmt.Println(obData)
 			fmt.Println(state.instrumentData.orderBook)

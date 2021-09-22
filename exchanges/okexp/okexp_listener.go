@@ -295,6 +295,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", msg)
 
 	case okex.WSSwapDepthUpdate:
+		if state.obWs == nil || msg.WSID != state.obWs.ID {
+			return nil
+		}
+
 		obData := msg.Message.(okex.WSSwapDepthUpdate)
 
 		instr := state.instrumentData
