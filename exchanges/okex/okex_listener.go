@@ -295,6 +295,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("socket error: %v", msg)
 
 	case okex.WSSpotDepthUpdate:
+		if state.obWs == nil || msg.WSID != state.obWs.ID {
+			return nil
+		}
+
 		obData := msg.Message.(okex.WSSpotDepthUpdate)
 
 		instr := state.instrumentData
@@ -316,6 +320,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		instr.lastUpdateTime = uint64(msg.ClientTime.UnixNano() / 1000000)
 
+		fmt.Println(state.instrumentData.orderBook)
 		if state.instrumentData.orderBook.Crossed() {
 			fmt.Println(obData)
 			fmt.Println(state.instrumentData.orderBook)
