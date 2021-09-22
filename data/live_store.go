@@ -7,9 +7,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	tickstore_go_client "gitlab.com/tachikoma.ai/tickstore-go-client"
-	"gitlab.com/tachikoma.ai/tickstore-go-client/query"
-	"gitlab.com/tachikoma.ai/tickstore/parsing"
+	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
+	"gitlab.com/alphaticks/tickstore-go-client/query"
+	"gitlab.com/alphaticks/tickstore/parsing"
 	"time"
 )
 

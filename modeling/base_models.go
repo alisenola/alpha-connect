@@ -1,7 +1,7 @@
 package modeling
 
 import (
-	"gitlab.com/tachikoma.ai/tickobjects"
+	"gitlab.com/alphaticks/tickobjects"
 	"math"
 	"math/rand"
 	"sync"

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/tickobjects"
+	"gitlab.com/alphaticks/tickstore-go-client/query"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
-	"gitlab.com/tachikoma.ai/tickobjects"
-	"gitlab.com/tachikoma.ai/tickstore-go-client/query"
 	"testing"
 	"time"
 )
