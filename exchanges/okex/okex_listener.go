@@ -217,6 +217,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	if err := ob.Sync(bids, asks); err != nil {
 		return fmt.Errorf("error syncing order book: %v", err)
 	}
+	if ob.Crossed() {
+		return fmt.Errorf("crossed")
+	}
 
 	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
@@ -314,6 +317,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr.lastUpdateTime = uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		if state.instrumentData.orderBook.Crossed() {
+			fmt.Println(obData)
+			fmt.Println(state.instrumentData.orderBook)
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeOrderBook(context)
 		}
