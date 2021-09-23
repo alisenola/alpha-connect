@@ -129,8 +129,8 @@ func TestBinance(t *testing.T) {
 	if math.Abs(sec.MinPriceIncrement.Value-0.01) > 0.000001 {
 		t.Fatalf("was expecting 0.01 min price increment, got %f", sec.MinPriceIncrement.Value)
 	}
-	if math.Abs(sec.RoundLot.Value-0.000001) > 0.0000000001 {
-		t.Fatalf("was expecting 0.000001 round lot increment, got %f", sec.RoundLot.Value)
+	if math.Abs(sec.RoundLot.Value-0.000010) > 0.0000000001 {
+		t.Fatalf("was expecting 0.000010 round lot increment, got %f", sec.RoundLot.Value)
 	}
 
 	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))

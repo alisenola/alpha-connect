@@ -241,7 +241,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
+		return fmt.Errorf("error syncing ob: %v", err)
+	}
 	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
 
@@ -392,12 +394,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDepthData) error {
 
 	symbol := depthData.Symbol
-
-	// Skip depth that are younger than OB
-	if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
-		return nil
-	}
-
 	// Check depth continuity
 	if state.instrumentData.lastUpdateID+1 != depthData.FirstUpdateID {
 		return fmt.Errorf("got wrong sequence ID for %s: %d, %d",
