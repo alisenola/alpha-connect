@@ -265,7 +265,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		res, err := context.RequestFuture(state.ftxExecutor, &messages.TradeCaptureReportRequest{
 			RequestID: 0,
 			Filter: &messages.TradeCaptureReportFilter{
-				From: utils.MilliToTimestamp(state.lastTradeTs + 1),
+				From: utils.MilliToTimestamp(state.lastTradeTs),
 			},
 			Account: state.account,
 		}, 20*time.Second).Result()
@@ -390,7 +390,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			RequestID: 0,
 			Type:      messages.FundingFee,
 			Filter: &messages.AccountMovementFilter{
-				From: utils.MilliToTimestamp(state.lastFundingTs + 1),
+				From: utils.MilliToTimestamp(state.lastFundingTs),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
 			},
 			Account: state.account,
@@ -446,7 +446,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			RequestID: 0,
 			Type:      messages.Deposit,
 			Filter: &messages.AccountMovementFilter{
-				From: utils.MilliToTimestamp(state.lastDepositTs + 1),
+				From: utils.MilliToTimestamp(state.lastDepositTs),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
 			},
 			Account: state.account,
@@ -501,7 +501,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			RequestID: 0,
 			Type:      messages.Withdrawal,
 			Filter: &messages.AccountMovementFilter{
-				From: utils.MilliToTimestamp(state.lastWithdrawalTs + 1),
+				From: utils.MilliToTimestamp(state.lastWithdrawalTs),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
 			},
 			Account: state.account,

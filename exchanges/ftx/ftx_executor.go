@@ -527,7 +527,8 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	}
 
 	symbol := ""
-	var from, to, orderID *uint64
+	var from, to *float64
+	var orderID *uint64
 	if msg.Filter != nil {
 		if msg.Filter.Side != nil || msg.Filter.OrderID != nil || msg.Filter.ClientOrderID != nil {
 			response.RejectionReason = messages.UnsupportedFilter
@@ -550,11 +551,13 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		}
 
 		if msg.Filter.From != nil {
-			ms := uint64(msg.Filter.From.Seconds)
+			ts := utils.TimestampToMilli(msg.Filter.From)
+			ms := float64(ts) / 1000
 			from = &ms
 		}
 		if msg.Filter.To != nil {
-			ms := uint64(msg.Filter.To.Seconds)
+			ts := utils.TimestampToMilli(msg.Filter.To)
+			ms := float64(ts) / 1000
 			to = &ms
 		}
 		if msg.Filter.OrderID != nil {
