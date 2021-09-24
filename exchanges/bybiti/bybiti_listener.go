@@ -23,7 +23,6 @@ import (
 )
 
 type checkSockets struct{}
-type updateLiquidations struct{}
 
 type InstrumentData struct {
 	orderBook           *gorderbook.OrderBookL2
@@ -36,16 +35,15 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws                *bybiti.Websocket
-	security          *models.Security
-	dialerPool        *xchangerUtils.DialerPool
-	instrumentData    *InstrumentData
-	executor          *actor.PID
-	mediator          *actor.PID
-	logger            *log.Logger
-	lastPingTime      time.Time
-	socketTicker      *time.Ticker
-	liquidationTicker *time.Ticker
+	ws             *bybiti.Websocket
+	security       *models.Security
+	dialerPool     *xchangerUtils.DialerPool
+	instrumentData *InstrumentData
+	executor       *actor.PID
+	mediator       *actor.PID
+	logger         *log.Logger
+	lastPingTime   time.Time
+	socketTicker   *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -116,12 +114,6 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
-
-	case *updateLiquidations:
-		if err := state.updateLiquidations(context); err != nil {
-			state.logger.Error("error updating liquidations", log.Error(err))
-			panic(err)
-		}
 	}
 }
 
@@ -169,20 +161,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	liquidationTicker := time.NewTicker(10 * time.Second)
-	state.liquidationTicker = liquidationTicker
-	go func(pid *actor.PID) {
-		for {
-			select {
-			case _ = <-liquidationTicker.C:
-				context.Send(pid, &updateLiquidations{})
-			case <-time.After(11 * time.Second):
-				// timer stopped, we leave
-				return
-			}
-		}
-	}(context.Self())
-
 	return nil
 }
 
@@ -196,11 +174,6 @@ func (state *Listener) Clean(context actor.Context) error {
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
-	}
-
-	if state.liquidationTicker != nil {
-		state.liquidationTicker.Stop()
-		state.liquidationTicker = nil
 	}
 
 	return nil
@@ -265,6 +238,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	if err := ws.SubscribeInstrumentInfo(state.security.Symbol, "100ms"); err != nil {
 		return fmt.Errorf("error subscribing to instrument info for %s", state.security.Symbol)
+	}
+
+	if err := ws.SubscribeLiquidation(state.security.Symbol); err != nil {
+		return fmt.Errorf("error subscribing to liquidation for %s", state.security.Symbol)
 	}
 
 	state.ws = ws
@@ -448,6 +425,22 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
+	case bybiti.Liquidation:
+		l := msg.Message.(bybiti.WSLiquidation)
+		liq := &models.Liquidation{
+			Bid:       l.Side == "Sell",
+			Timestamp: utils.MilliToTimestamp(l.Time),
+			OrderID:   0,
+			Price:     l.Price,
+			Quantity:  l.Quantity,
+		}
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			Liquidation: liq,
+			SeqNum:      state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastLiquidationTime = utils.TimestampToMilli(liq.Timestamp)
+
 	case bybiti.InstrumentInfoSnapshot:
 		info := msg.Message.(bybiti.InstrumentInfoSnapshot)
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
@@ -522,20 +515,6 @@ func (state *Listener) checkSockets(context actor.Context) error {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
 	}
-
-	return nil
-}
-
-func (state *Listener) updateLiquidations(context actor.Context) error {
-
-	context.Request(state.executor, &messages.HistoricalLiquidationsRequest{
-		RequestID: 0,
-		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
-		},
-		From: utils.MilliToTimestamp(state.instrumentData.lastLiquidationTime + 1),
-		To:   nil,
-	})
 
 	return nil
 }
