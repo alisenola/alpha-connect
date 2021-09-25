@@ -425,7 +425,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
-	case bybitl.Liquidation:
+	case bybitl.WSLiquidation:
 		l := msg.Message.(bybitl.WSLiquidation)
 		liq := &models.Liquidation{
 			Bid:       l.Side == "Sell",
