@@ -254,7 +254,16 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
-
+	if state.instrumentData.orderBook.Crossed() {
+		response := &messages.MarketDataResponse{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			RejectionReason: messages.Other,
+			Success:         false,
+		}
+		context.Respond(response)
+		return nil
+	}
 	snapshot := &models.OBL2Snapshot{
 		Bids:          state.instrumentData.orderBook.GetBids(0),
 		Asks:          state.instrumentData.orderBook.GetAsks(0),
