@@ -21,3 +21,5 @@ require (
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
 )
+
+//replace gitlab.com/alphaticks/xchanger => ../xchanger

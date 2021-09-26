@@ -1,7 +1,6 @@
 package dydx
 
 import (
-	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -27,6 +26,8 @@ type InstrumentData struct {
 	lastHBTime     time.Time
 	levelOffset    map[uint64]uint64
 	lastAggTradeTs uint64
+	levelDeltas    []gorderbook.OrderBookLevel
+	nCrossed       int
 }
 
 // OBType: OBL3
@@ -230,9 +231,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err := ob.Sync(bids, asks); err != nil {
 		return fmt.Errorf("error syncing order book: %v", err)
 	}
-	if ob.Crossed() {
-		return fmt.Errorf("order book crossed")
-	}
+
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
@@ -296,7 +295,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		for _, l := range res.Contents.Bids {
 			k := uint64(math.Round(l.Price * float64(state.instrumentData.orderBook.TickPrecision)))
-			if state.instrumentData.levelOffset[k] <= res.Contents.Offset {
+			if state.instrumentData.levelOffset[k] < res.Contents.Offset {
 				bids = append(bids, gorderbook.OrderBookLevel{
 					Price:    l.Price,
 					Quantity: l.Size,
@@ -307,7 +306,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 		for _, l := range res.Contents.Asks {
 			k := uint64(math.Round(l.Price * float64(state.instrumentData.orderBook.TickPrecision)))
-			if state.instrumentData.levelOffset[k] <= res.Contents.Offset {
+			if state.instrumentData.levelOffset[k] < res.Contents.Offset {
 				asks = append(asks, gorderbook.OrderBookLevel{
 					Price:    l.Price,
 					Quantity: l.Size,
@@ -317,35 +316,27 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 
-		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
-
-		limitDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{},
-			Timestamp: utils.MilliToTimestamp(ts),
-			Trade:     false,
-		}
-
 		for _, bid := range bids {
 			state.instrumentData.orderBook.UpdateOrderBookLevel(bid)
-			limitDelta.Levels = append(limitDelta.Levels, bid)
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, bid)
 		}
 		for _, ask := range asks {
 			state.instrumentData.orderBook.UpdateOrderBookLevel(ask)
-			limitDelta.Levels = append(limitDelta.Levels, ask)
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, ask)
 		}
 
-		if state.instrumentData.orderBook.Crossed() {
-			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		if !state.instrumentData.orderBook.Crossed() {
+			// Send the deltas
+			ts := uint64(msg.ClientTime.UnixNano()) / 1000000
+			state.postDelta(context, ts)
+		} else {
+			state.instrumentData.nCrossed += 1
+		}
+		if state.instrumentData.nCrossed > 20 {
+			fmt.Println("CROSSED")
+			fmt.Println(state.instrumentData.orderBook)
 			return state.subscribeInstrument(context)
 		}
-
-		state.instrumentData.lastUpdateTime = ts
-
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			UpdateL2: limitDelta,
-			SeqNum:   state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
 
 	case dydx.WSTradesSubscribed:
 		// Ignore
@@ -446,4 +437,43 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	return nil
+}
+
+func (state *Listener) postDelta(context actor.Context, ts uint64) {
+	// Send the deltas
+
+	if len(state.instrumentData.levelDeltas) > 1 {
+		// Aggregate
+		bids := make(map[uint64]gorderbook.OrderBookLevel)
+		asks := make(map[uint64]gorderbook.OrderBookLevel)
+		for _, l := range state.instrumentData.levelDeltas {
+			k := uint64(math.Round(l.Price * float64(state.instrumentData.orderBook.TickPrecision)))
+			if l.Bid {
+				bids[k] = l
+			} else {
+				asks[k] = l
+			}
+		}
+		state.instrumentData.levelDeltas = nil
+		for _, l := range bids {
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, l)
+		}
+		for _, l := range asks {
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, l)
+		}
+	}
+
+	obDelta := &models.OBL2Update{
+		Levels:    state.instrumentData.levelDeltas,
+		Timestamp: utils.MilliToTimestamp(ts),
+		Trade:     false,
+	}
+	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+		UpdateL2: obDelta,
+		SeqNum:   state.instrumentData.seqNum + 1,
+	})
+	state.instrumentData.seqNum += 1
+	state.instrumentData.lastUpdateTime = ts
+	state.instrumentData.levelDeltas = nil
+	state.instrumentData.nCrossed = 0
 }
