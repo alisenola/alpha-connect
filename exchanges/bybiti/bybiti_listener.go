@@ -210,7 +210,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 				tickPrecision,
 				lotPrecision,
 				10000)
-			ob.Sync(bids, asks)
+			if err := ob.Sync(bids, asks); err != nil {
+				return fmt.Errorf("error syncing order book: %v", err)
+			}
 			ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 			state.instrumentData.orderBook = ob
 			state.instrumentData.lastUpdateTime = ts
