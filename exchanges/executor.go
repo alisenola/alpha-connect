@@ -35,21 +35,23 @@ type Executor struct {
 	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
 	logger            *log.Logger
 	dialerPool        *xchangerUtils.DialerPool
+	strict            bool
 }
 
-func NewExecutorProducer(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewExecutorProducer(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool, strict bool) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(db, exchanges, accnts, dialerPool)
+		return NewExecutor(db, exchanges, accnts, dialerPool, strict)
 	}
 }
 
-func NewExecutor(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewExecutor(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool, strict bool) actor.Actor {
 	return &Executor{
 		db:         db,
 		exchanges:  exchanges,
 		logger:     nil,
 		dialerPool: dialerPool,
 		accounts:   accnts,
+		strict:     strict,
 	}
 }
 
@@ -254,7 +256,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, fut := range futures {
 		res, err := fut.Result()
 		if err != nil {
-			return fmt.Errorf("error fetching securities for one venue: %v", err)
+			if state.strict {
+				return fmt.Errorf("error fetching securities for one venue: %v", err)
+			} else {
+				state.logger.Error("error fetching securities for one venue", log.Error(err))
+			}
 		}
 		response, ok := res.(*messages.SecurityList)
 		if !ok {

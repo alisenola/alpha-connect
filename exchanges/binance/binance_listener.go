@@ -333,7 +333,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case binance.WSDepthData:
 		depthData := msg.Message.(binance.WSDepthData)
-
 		// change event time
 		depthData.EventTime = uint64(msg.ClientTime.UnixNano()) / 1000000
 		err := state.onDepthData(context, depthData)
