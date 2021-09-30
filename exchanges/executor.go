@@ -260,6 +260,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 				return fmt.Errorf("error fetching securities for one venue: %v", err)
 			} else {
 				state.logger.Error("error fetching securities for one venue", log.Error(err))
+				continue
 			}
 		}
 		response, ok := res.(*messages.SecurityList)
