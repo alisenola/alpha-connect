@@ -60,6 +60,7 @@ message Order {
     double cum_quantity = 9;
     google.protobuf.DoubleValue price = 10;
     repeated ExecutionInstruction execution_instructions = 11;
+    string tag = 12;
 }
 
 message Position {
