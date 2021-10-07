@@ -368,6 +368,7 @@ message NewOrder {
     double quantity = 8;
     google.protobuf.DoubleValue price = 9;
     repeated models.ExecutionInstruction execution_instructions = 10;
+    string tag = 11;
 }
 
 message NewOrderSingleRequest {
