@@ -394,16 +394,18 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 	req.Account = state.account.Account
 	// Check order quantity
 	order := &models.Order{
-		OrderID:        "",
-		ClientOrderID:  req.Order.ClientOrderID,
-		Instrument:     req.Order.Instrument,
-		OrderStatus:    models.PendingNew,
-		OrderType:      req.Order.OrderType,
-		Side:           req.Order.OrderSide,
-		TimeInForce:    req.Order.TimeInForce,
-		LeavesQuantity: req.Order.Quantity,
-		Price:          req.Order.Price,
-		CumQuantity:    0,
+		OrderID:               "",
+		ClientOrderID:         req.Order.ClientOrderID,
+		Instrument:            req.Order.Instrument,
+		OrderStatus:           models.PendingNew,
+		OrderType:             req.Order.OrderType,
+		Side:                  req.Order.OrderSide,
+		TimeInForce:           req.Order.TimeInForce,
+		LeavesQuantity:        req.Order.Quantity,
+		Price:                 req.Order.Price,
+		CumQuantity:           0,
+		ExecutionInstructions: req.Order.ExecutionInstructions,
+		Tag:                   req.Order.Tag,
 	}
 	report, res := state.account.NewOrder(order)
 	if res != nil {
@@ -504,6 +506,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			Price:                 reqOrder.Price,
 			CumQuantity:           0,
 			ExecutionInstructions: reqOrder.ExecutionInstructions,
+			Tag:                   reqOrder.Tag,
 		}
 		report, res := state.account.NewOrder(order)
 		if res != nil {

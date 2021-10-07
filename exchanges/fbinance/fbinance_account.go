@@ -472,6 +472,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 		Price:                 req.Order.Price,
 		CumQuantity:           0,
 		ExecutionInstructions: req.Order.ExecutionInstructions,
+		Tag:                   req.Order.Tag,
 	}
 	report, res := state.account.NewOrder(order)
 	if res != nil {
@@ -572,6 +573,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			Price:                 reqOrder.Price,
 			CumQuantity:           0,
 			ExecutionInstructions: reqOrder.ExecutionInstructions,
+			Tag:                   reqOrder.Tag,
 		}
 		report, res := state.account.NewOrder(order)
 		if res != nil {

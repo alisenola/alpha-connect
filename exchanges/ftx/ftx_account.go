@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger"
@@ -157,10 +158,6 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *xchanger.WebsocketMessage:
-		if err := state.onWebsocketMessage(context); err != nil {
-			state.logger.Error("error processing WebsocketMessage", log.Error(err))
-			panic(err)
-		}
 
 	case *checkSocket:
 		if err := state.checkSocket(context); err != nil {
@@ -282,6 +279,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
+	m := modeling.NewMapMarketModel()
+	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
+	fmt.Println("INIT", state.account.GetMargin(m))
 	securityMap := make(map[uint64]*models.Security)
 	for _, sec := range filteredSecurities {
 		securityMap[sec.SecurityID] = sec
@@ -440,6 +440,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 		Price:                 req.Order.Price,
 		CumQuantity:           0,
 		ExecutionInstructions: req.Order.ExecutionInstructions,
+		Tag:                   req.Order.Tag,
 	}
 	report, res := state.account.NewOrder(order)
 	if res != nil {
@@ -544,6 +545,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			Price:                 reqOrder.Price,
 			CumQuantity:           0,
 			ExecutionInstructions: reqOrder.ExecutionInstructions,
+			Tag:                   reqOrder.Tag,
 		}
 		report, res := state.account.NewOrder(order)
 		if res != nil {
