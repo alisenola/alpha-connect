@@ -14,7 +14,6 @@ type Market interface {
 
 type LongShortModel interface {
 	Market
-	GetPenalty(fees float64) float64
 	GetLongScore(ID uint64, logFee, lambda float64) float64
 	GetShortScore(ID uint64, logFee, lambda float64) float64
 	SetLongModel(ID uint64, model LongModel)
