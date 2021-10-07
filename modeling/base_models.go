@@ -8,15 +8,15 @@ import (
 )
 
 type Market interface {
-	GetPrice(ID uint64) float64
-	GetPairPrice(base, quote uint32) float64
+	GetPrice(ID uint64) (float64, bool)
+	GetPairPrice(base, quote uint32) (float64, bool)
 }
 
 type LongShortModel interface {
 	Market
 	GetPenalty(fees float64) float64
-	GetLongScore(ID uint64) float64
-	GetShortScore(ID uint64) float64
+	GetLongScore(ID uint64, logFee, lambda float64) float64
+	GetShortScore(ID uint64, logFee, lambda float64) float64
 	SetLongModel(ID uint64, model LongModel)
 	SetShortModel(ID uint64, model ShortModel)
 	SetPrice(ID uint64, price float64)
@@ -49,13 +49,21 @@ func NewMapMarketModel() *MapMarketModel {
 	}
 }
 
-func (m *MapMarketModel) GetPrice(ID uint64) float64 {
-	return m.priceModels[ID].GetPrice(ID)
+func (m *MapMarketModel) GetPrice(ID uint64) (float64, bool) {
+	if pm, ok := m.priceModels[ID]; ok {
+		return pm.GetPrice(ID), true
+	} else {
+		return 0., false
+	}
 }
 
-func (m *MapMarketModel) GetPairPrice(base uint32, quote uint32) float64 {
+func (m *MapMarketModel) GetPairPrice(base uint32, quote uint32) (float64, bool) {
 	ID := uint64(base)<<32 | uint64(quote)
-	return m.priceModels[ID].GetPrice(ID)
+	if pm, ok := m.priceModels[ID]; ok {
+		return pm.GetPrice(ID), true
+	} else {
+		return 0., false
+	}
 }
 
 func (m *MapMarketModel) GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64 {
@@ -132,17 +140,19 @@ func (m *MapLongShortModel) SetPairPrice(base, quote uint32, p float64) {
 	m.prices[ID] = p
 }
 
-func (m *MapLongShortModel) GetPrice(ID uint64) float64 {
+func (m *MapLongShortModel) GetPrice(ID uint64) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
-	return m.prices[ID]
+	p, ok := m.prices[ID]
+	return p, ok
 }
 
-func (m *MapLongShortModel) GetPairPrice(base, quote uint32) float64 {
+func (m *MapLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	ID := uint64(base)<<32 | uint64(quote)
-	return m.prices[ID]
+	p, ok := m.prices[ID]
+	return p, ok
 }
 
 func (m *MapLongShortModel) GetLongScore(ID uint64) float64 {

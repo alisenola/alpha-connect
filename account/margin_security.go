@@ -397,7 +397,10 @@ func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, t
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
 	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, sec.modelCurrency.ID, time, N)
 	sampleSecurityPrice := model.GetSamplePrices(sec.SecurityID, time, N)
-	securityPrice := model.GetPrice(sec.SecurityID)
+	securityPrice, ok := model.GetPrice(sec.SecurityID)
+	if !ok {
+		panic("no security price")
+	}
 	mul := sec.Multiplier.Value
 	makerFee := sec.makerFee
 

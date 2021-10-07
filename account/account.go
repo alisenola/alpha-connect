@@ -919,7 +919,10 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 			if k == accnt.MarginCurrency.ID {
 				availableMargin += b
 			} else {
-				availableMargin += b * model.GetPairPrice(k, accnt.MarginCurrency.ID)
+				pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
+				if ok {
+					availableMargin += b * pp
+				}
 			}
 		}
 		availableMargin += float64(accnt.margin) / accnt.MarginPrecision

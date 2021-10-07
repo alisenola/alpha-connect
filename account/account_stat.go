@@ -12,11 +12,17 @@ func (accnt *Account) Value(model modeling.Market) float64 {
 	defer accnt.RUnlock()
 	value := 0.
 	for k, v := range accnt.balances {
-		value += v * model.GetPairPrice(k, accnt.quoteCurrency.ID)
+		pp, ok := model.GetPairPrice(k, accnt.quoteCurrency.ID)
+		if ok {
+			value += v * pp
+		}
 	}
 
 	if accnt.MarginCurrency != nil {
-		marginPrice := model.GetPairPrice(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID)
+		marginPrice, ok := model.GetPairPrice(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID)
+		if !ok {
+			panic("no price for margin currency")
+		}
 		for k, p := range accnt.positions {
 			if p.rawSize == 0 {
 				continue
@@ -30,7 +36,11 @@ func (accnt *Account) Value(model modeling.Market) float64 {
 			} else {
 				exp = 1
 			}
-			value -= (cost - math.Pow(model.GetPrice(k), exp)*factor) * marginPrice
+			pp, ok := model.GetPrice(k)
+			if !ok {
+				panic("no price for position")
+			}
+			value -= (cost - math.Pow(pp, exp)*factor) * marginPrice
 		}
 
 		margin := float64(accnt.margin) / accnt.MarginPrecision
@@ -123,7 +133,10 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 		if p.rawSize == 0 {
 			continue
 		}
-		exitPrice := model.GetPrice(k)
+		exitPrice, ok := model.GetPrice(k)
+		if !ok {
+			panic("no price for position")
+		}
 		if p.inverse {
 			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / exitPrice) * math.Abs(p.multiplier)
 		} else {
@@ -141,7 +154,10 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 		if k == accnt.MarginCurrency.ID {
 			availableMargin += b
 		} else {
-			availableMargin += b * model.GetPairPrice(k, accnt.MarginCurrency.ID)
+			pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
+			if ok {
+				availableMargin += b * pp
+			}
 		}
 	}
 	availableMargin += float64(accnt.margin) / accnt.MarginPrecision
@@ -152,7 +168,10 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 		if p.rawSize == 0 {
 			continue
 		}
-		exitPrice := model.GetPrice(k)
+		exitPrice, ok := model.GetPrice(k)
+		if !ok {
+			panic("no price for position")
+		}
 		cost := float64(p.cost) / accnt.MarginPrecision
 
 		if p.inverse {

@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.12.0
 	github.com/AsynkronIT/protoactor-go v0.0.0-20210901041048-df2fc305778c
 	github.com/alecthomas/participle v0.4.4 // indirect
+	github.com/ethereum/go-ethereum v1.10.8 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/melaurent/gotickfile/v2 v2.0.0-20210406111104-845d7c5ec5dc
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
@@ -16,7 +17,7 @@ require (
 	gitlab.com/alphaticks/tickstore v0.0.0-20210922125948-0d794fe0d1e0
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0
-	gitlab.com/alphaticks/xchanger v0.0.0-20210924141109-dd64bec838a3
+	gitlab.com/alphaticks/xchanger v0.0.0-20210930133147-3a29e65c92a5
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
