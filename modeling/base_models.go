@@ -14,8 +14,10 @@ type Market interface {
 
 type LongShortModel interface {
 	Market
-	GetLongScore(ID uint64, fee, lambda float64) float64
-	GetShortScore(ID uint64, fee, lambda float64) float64
+	GetEnterLongELR(ID uint64, fee, lambda float64) float64
+	GetEnterShortELR(ID uint64, fee, lambda float64) float64
+	GetExitLongELR(ID uint64, fee, lambda float64) float64
+	GetExitShortELR(ID uint64, fee, lambda float64) float64
 	SetLongModel(ID uint64, model LongModel)
 	SetShortModel(ID uint64, model ShortModel)
 	SetPrice(ID uint64, price float64)
