@@ -158,6 +158,10 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *xchanger.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
+			panic(err)
+		}
 
 	case *checkSocket:
 		if err := state.checkSocket(context); err != nil {
