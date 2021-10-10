@@ -283,6 +283,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
+	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	m := modeling.NewMapMarketModel()
 	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
 	fmt.Println("INIT", state.account.GetMargin(m))
@@ -1065,6 +1066,43 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
 		if rawCost1 != rawCost2 {
 			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
+		}
+	}
+
+	// Fetch orders
+	res, err = context.RequestFuture(state.ftxExecutor, &messages.OrderStatusRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	orderList, ok := res.(*messages.OrderList)
+
+	orders1 := make(map[string]*models.Order)
+	orders2 := make(map[string]*models.Order)
+	for _, o := range orderList.Orders {
+		orders1[o.OrderID] = o
+	}
+
+	orders := state.account.GetOrders(&messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.PartiallyFilled},
+	})
+	for _, o := range orders {
+		orders2[o.OrderID] = o
+	}
+	orders = state.account.GetOrders(&messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+	})
+	for _, o := range orders {
+		orders2[o.OrderID] = o
+	}
+
+	for k, o1 := range orders1 {
+		if o2, ok := orders2[k]; ok {
+			fmt.Println(o1, o2)
+		} else {
+			return fmt.Errorf("incosistent order")
 		}
 	}
 	return nil
