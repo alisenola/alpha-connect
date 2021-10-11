@@ -69,20 +69,22 @@ type Account struct {
 	quoteCurrency   *xchangerModels.Asset
 	takerFee        *float64
 	makerFee        *float64
+	expirationLimit time.Duration
 }
 
 func NewAccount(account *models.Account) (*Account, error) {
 	quoteCurrency := &constants.DOLLAR
 	accnt := &Account{
-		Account:       account,
-		ordersID:      make(map[string]*Order),
-		ordersClID:    make(map[string]*Order),
-		securities:    make(map[uint64]Security),
-		positions:     make(map[uint64]*Position),
-		balances:      make(map[uint32]float64),
-		assets:        make(map[uint32]*xchangerModels.Asset),
-		margin:        0,
-		quoteCurrency: quoteCurrency,
+		Account:         account,
+		ordersID:        make(map[string]*Order),
+		ordersClID:      make(map[string]*Order),
+		securities:      make(map[uint64]Security),
+		positions:       make(map[uint64]*Position),
+		balances:        make(map[uint32]float64),
+		assets:          make(map[uint32]*xchangerModels.Asset),
+		margin:          0,
+		quoteCurrency:   quoteCurrency,
+		expirationLimit: 5 * time.Second,
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
@@ -932,15 +934,19 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 	}
 }
 
+func (accnt *Account) CheckExpiration() error {
+	for k, o := range accnt.ordersClID {
+		if (o.OrderStatus == models.PendingNew || o.OrderStatus == models.PendingCancel || o.OrderStatus == models.PendingReplace) && (time.Now().Sub(o.lastEventTime) > accnt.expirationLimit) {
+			return fmt.Errorf("order %s in unknown state", k)
+		}
+	}
+	return nil
+}
+
 func (accnt *Account) CleanOrders() {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
-			delete(accnt.ordersClID, k)
-		}
-	}
-	for k, o := range accnt.ordersID {
 		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
 		}

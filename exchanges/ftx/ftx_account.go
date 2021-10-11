@@ -23,22 +23,24 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
+type checkExpiration struct{}
 
 type AccountListener struct {
-	account            *account.Account
-	seqNum             uint64
-	ftxExecutor        *actor.PID
-	ws                 *ftx.Websocket
-	executorManager    *actor.PID
-	logger             *log.Logger
-	checkAccountTicker *time.Ticker
-	checkSocketTicker  *time.Ticker
-	lastPingTime       time.Time
-	securities         map[uint64]*models.Security
-	client             *http.Client
-	txs                *mongo.Collection
-	execs              *mongo.Collection
-	reconciler         *actor.PID
+	account               *account.Account
+	seqNum                uint64
+	ftxExecutor           *actor.PID
+	ws                    *ftx.Websocket
+	executorManager       *actor.PID
+	logger                *log.Logger
+	checkAccountTicker    *time.Ticker
+	checkSocketTicker     *time.Ticker
+	checkExpirationTicker *time.Ticker
+	lastPingTime          time.Time
+	securities            map[uint64]*models.Security
+	client                *http.Client
+	txs                   *mongo.Collection
+	execs                 *mongo.Collection
+	reconciler            *actor.PID
 }
 
 func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
@@ -172,6 +174,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *checkAccount:
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking account", log.Error(err))
+			panic(err)
+		}
+
+	case *checkExpiration:
+		if err := state.checkExpiration(context); err != nil {
+			state.logger.Error("error checking expired orders", log.Error(err))
 			panic(err)
 		}
 	}
@@ -328,6 +336,20 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	checkExpirationTicker := time.NewTicker(1 * time.Second)
+	state.checkExpirationTicker = checkExpirationTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-checkExpirationTicker.C:
+				context.Send(pid, &checkExpiration{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -347,6 +369,11 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.checkSocketTicker != nil {
 		state.checkSocketTicker.Stop()
 		state.checkSocketTicker = nil
+	}
+
+	if state.checkExpirationTicker != nil {
+		state.checkExpirationTicker.Stop()
+		state.checkExpirationTicker = nil
 	}
 
 	return nil
@@ -913,7 +940,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
 			if err != nil {
-				return fmt.Errorf("error rejecting new order: %v", err)
+				return fmt.Errorf("error confirming cancel order: %v", err)
 			}
 			if report != nil {
 				report.SeqNum = state.seqNum + 1
@@ -1106,4 +1133,8 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		}
 	}
 	return nil
+}
+
+func (state *AccountListener) checkExpiration(context actor.Context) error {
+	return state.account.CheckExpiration()
 }

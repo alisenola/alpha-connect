@@ -1275,6 +1275,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		b, _ := json.Marshal(order)
+		fmt.Println("ORDER RESPONSE", string(b))
 		if !order.Success {
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
