@@ -899,18 +899,6 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 					context.Send(context.Parent(), report)
 				}
 			}
-		} else {
-			for _, r := range reports {
-				report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
-				if err != nil {
-					panic(err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-			}
 		}
 	})
 
