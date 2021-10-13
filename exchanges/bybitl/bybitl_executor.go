@@ -208,7 +208,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceFilter.TickSize}
 		security.RoundLot = &types.DoubleValue{Value: symbol.LotSizeFilter.QuantityStep}
-		security.IsInverse = true
+		security.IsInverse = false
 		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}
 
