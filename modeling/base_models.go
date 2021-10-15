@@ -14,10 +14,8 @@ type Market interface {
 
 type LongShortModel interface {
 	Market
-	GetEnterLongELR(ID uint64, fee, lambda float64) float64
-	GetExitLongELR(ID uint64, fee, lambda float64) float64
-	GetExitShortELR(ID uint64, fee, lambda float64) float64
-	GetEnterShortELR(ID uint64, fee, lambda float64) float64
+	GetLongScore(ID uint64, fee, lambda float64) float64
+	GetShortScore(ID uint64, fee, lambda float64) float64
 	SetLongModel(ID uint64, model LongModel)
 	SetShortModel(ID uint64, model ShortModel)
 	SetPrice(ID uint64, price float64)
@@ -156,14 +154,15 @@ func (m *MapLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	return p, ok
 }
 
-func (m *MapLongShortModel) GetEnterLongELR(ID uint64, fee, lambda float64) float64 {
-	return m.longModels[ID].GetEnterLongELR(ID, fee, lambda)
+func (m *MapLongShortModel) GetLongScore(ID uint64, fee, lambda float64) float64 {
+	return m.longModels[ID].GetLongScore(ID, fee, lambda)
 }
 
-func (m *MapLongShortModel) GetExitLongELR(ID uint64, fee, lambda float64) float64 {
-	return m.longModels[ID].GetExitLongELR(ID, fee, lambda)
+func (m *MapLongShortModel) GetShortScore(ID uint64, fee, lambda float64) float64 {
+	return m.shortModels[ID].GetShortScore(ID, fee, lambda)
 }
 
+/*
 func (m *MapLongShortModel) GetEnterShortELR(ID uint64, fee, lambda float64) float64 {
 	return m.shortModels[ID].GetEnterShortELR(ID, fee, lambda)
 }
@@ -171,6 +170,7 @@ func (m *MapLongShortModel) GetEnterShortELR(ID uint64, fee, lambda float64) flo
 func (m *MapLongShortModel) GetExitShortELR(ID uint64, fee, lambda float64) float64 {
 	return m.shortModels[ID].GetExitShortELR(ID, fee, lambda)
 }
+*/
 
 /*
 func (m *MapModel) Progress(time uint64) {
@@ -196,14 +196,14 @@ type Model interface {
 
 type LongModel interface {
 	Model
-	GetEnterLongELR(ID uint64, fee, lambda float64) float64
-	GetExitLongELR(ID uint64, fee, lambda float64) float64
+	GetLongScore(ID uint64, fee, lambda float64) float64
+	//GetExitLongELR(ID uint64, fee, lambda float64) float64
 }
 
 type ShortModel interface {
 	Model
-	GetEnterShortELR(ID uint64, fee, lambda float64) float64
-	GetExitShortELR(ID uint64, fee, lambda float64) float64
+	GetShortScore(ID uint64, fee, lambda float64) float64
+	//GetExitShortELR(ID uint64, fee, lambda float64) float64
 }
 
 type PriceModel interface {
