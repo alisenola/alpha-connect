@@ -194,6 +194,11 @@ func (state *Listener) Clean(context actor.Context) error {
 		state.socketTicker = nil
 	}
 
+	if state.openInterestTicker != nil {
+		state.openInterestTicker.Stop()
+		state.openInterestTicker = nil
+	}
+
 	return nil
 }
 
@@ -526,7 +531,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 }
 
 func (state *Listener) updateOpenInterest(context actor.Context) error {
-	fmt.Println("UPDATE OI")
+	fmt.Println("UPDATE OI", oid)
 	context.Request(
 		state.executor,
 		&messages.MarketStatisticsRequest{
