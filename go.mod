@@ -24,3 +24,4 @@ require (
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger
+//replace gitlab.com/alphaticks/tickstore => ../tickstore

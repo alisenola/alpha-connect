@@ -173,8 +173,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 			case _ = <-openInterestTicker.C:
 				context.Send(pid, &updateOpenInterest{})
 			case <-time.After(11 * time.Second):
-				// timer stopped, we leave
-				return
+				if state.openInterestTicker != openInterestTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
@@ -484,6 +485,7 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 		return nil
 	}
 
+	fmt.Println(msg.Statistics)
 	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 		Stats:  msg.Statistics,
 		SeqNum: state.instrumentData.seqNum + 1,
@@ -524,6 +526,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 }
 
 func (state *Listener) updateOpenInterest(context actor.Context) error {
+	fmt.Println("UPDATE OI")
 	context.Request(
 		state.executor,
 		&messages.MarketStatisticsRequest{
