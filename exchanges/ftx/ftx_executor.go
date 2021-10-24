@@ -218,7 +218,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if len(splits) == 2 {
 				underlying, ok := constants.GetAssetBySymbol(market.Underlying)
 				if !ok {
-					//				fmt.Printf("unknown currency symbol %s \n", market.Underlying)
+					fmt.Printf("unknown currency symbol %s \n", market.Underlying)
 					continue
 				}
 				security.Underlying = underlying
@@ -296,12 +296,111 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 }
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsResponse)
-	context.Respond(&messages.MarketStatisticsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
+	msg := context.Message().(*messages.MarketStatisticsRequest)
+	response := &messages.MarketStatisticsResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
+	}
+
+	symbol := msg.Instrument.Symbol.Value
+	has := func(stat models.StatType) bool {
+		for _, s := range response.Statistics {
+			if s.StatType == stat {
+				return true
+			}
+		}
+		return false
+	}
+	for _, stat := range msg.Statistics {
+		switch stat {
+		case models.OpenInterest, models.FundingRate:
+			if has(stat) {
+				continue
+			}
+			req, weight, err := ftx.GetFutureStats(symbol)
+			if err != nil {
+				return err
+			}
+
+			qr := state.getQueryRunner()
+
+			if qr == nil {
+				response.RejectionReason = messages.RateLimitExceeded
+				context.Respond(response)
+				return nil
+			}
+
+			qr.rateLimit.Request(weight)
+
+			res, err := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second).Result()
+			if err != nil {
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return nil
+			}
+			queryResponse := res.(*jobs.PerformQueryResponse)
+			if queryResponse.StatusCode != 200 {
+				if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+					err := fmt.Errorf(
+						"http client error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return nil
+				} else if queryResponse.StatusCode >= 500 {
+					err := fmt.Errorf(
+						"http server error: %d %s",
+						queryResponse.StatusCode,
+						string(queryResponse.Response))
+					state.logger.Info("http client error", log.Error(err))
+					response.RejectionReason = messages.HTTPError
+					context.Respond(response)
+					return nil
+				}
+				return nil
+			}
+
+			var fstat ftx.FutureStatsResponse
+			err = json.Unmarshal(queryResponse.Response, &fstat)
+			if err != nil {
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return nil
+			}
+
+			if !fstat.Success {
+				state.logger.Info("http error", log.Error(errors.New(fstat.Error)))
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return nil
+			}
+			ts := time.Now().UnixNano() / 1000000
+			response.Statistics = append(response.Statistics, &models.Stat{
+				Timestamp: utils.MilliToTimestamp(uint64(ts)),
+				StatType:  models.OpenInterest,
+				Value:     fstat.Result.OpenInterest,
+			})
+			response.Statistics = append(response.Statistics, &models.Stat{
+				Timestamp: utils.MilliToTimestamp(uint64(fstat.Result.NextFundingTime.UnixNano() / 1000000)),
+				StatType:  models.FundingRate,
+				Value:     fstat.Result.NextFundingRate,
+			})
+		}
+	}
+
+	response.Success = true
+	context.Respond(response)
+
 	return nil
 }
 

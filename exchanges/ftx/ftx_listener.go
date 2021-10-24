@@ -11,15 +11,21 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 )
 
+var oid = 2 * time.Minute
+var oidLock = sync.RWMutex{}
+
 type checkSockets struct{}
+type updateOpenInterest struct{}
 
 type InstrumentData struct {
 	orderBook      *gorderbook.OrderBookL2
@@ -30,13 +36,15 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws             *ftx.Websocket
-	security       *models.Security
-	dialerPool     *xchangerUtils.DialerPool
-	instrumentData *InstrumentData
-	logger         *log.Logger
-	lastPingTime   time.Time
-	socketTicker   *time.Ticker
+	ws                 *ftx.Websocket
+	security           *models.Security
+	dialerPool         *xchangerUtils.DialerPool
+	instrumentData     *InstrumentData
+	executor           *actor.PID
+	logger             *log.Logger
+	lastPingTime       time.Time
+	socketTicker       *time.Ticker
+	openInterestTicker *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -51,6 +59,7 @@ func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool
 		security:       security,
 		dialerPool:     dialerPool,
 		instrumentData: nil,
+		executor:       nil,
 		logger:         nil,
 		socketTicker:   nil,
 	}
@@ -114,6 +123,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTX.Name+"_executor")
+
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -141,6 +152,22 @@ func (state *Listener) Initialize(context actor.Context) error {
 			}
 		}
 	}(context.Self())
+
+	openInterestTicker := time.NewTicker(10 * time.Second)
+	state.openInterestTicker = openInterestTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-openInterestTicker.C:
+				context.Send(pid, &updateOpenInterest{})
+			case <-time.After(11 * time.Second):
+				if state.openInterestTicker != openInterestTicker {
+					return
+				}
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -154,6 +181,11 @@ func (state *Listener) Clean(context actor.Context) error {
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
+	}
+
+	if state.openInterestTicker != nil {
+		state.openInterestTicker.Stop()
+		state.openInterestTicker = nil
 	}
 
 	return nil
@@ -347,6 +379,19 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		var aggTrade *models.AggregatedTrade
 		for _, trade := range tradeData.Trades {
+			if trade.Liquidation {
+				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+					Liquidation: &models.Liquidation{
+						Bid:       trade.Side == "buy",
+						Timestamp: utils.MilliToTimestamp(ts),
+						OrderID:   trade.ID,
+						Price:     trade.Price,
+						Quantity:  trade.Size,
+					},
+					SeqNum: state.instrumentData.seqNum + 1,
+				})
+				state.instrumentData.seqNum += 1
+			}
 			aggID := uint64(trade.Time.UnixNano())
 			if trade.Side == "buy" {
 				aggID += 1
@@ -394,6 +439,38 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
+	msg := context.Message().(*messages.MarketStatisticsResponse)
+	if !msg.Success {
+		// We want to converge towards the right value,
+		if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
+			oidLock.Lock()
+			oid = time.Duration(float64(oid) * 1.1)
+			oidLock.Unlock()
+		}
+		state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
+		return nil
+	}
+
+	fmt.Println(msg.Statistics)
+	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+		Stats:  msg.Statistics,
+		SeqNum: state.instrumentData.seqNum + 1,
+	})
+	state.instrumentData.seqNum += 1
+
+	// Reduce delay
+	oidLock.Lock()
+	oid = time.Duration(float64(oid) * 0.99)
+	if oid < 2*time.Second {
+		oid = 2 * time.Second
+	}
+	state.openInterestTicker.Reset(oid)
+	oidLock.Unlock()
+
+	return nil
+}
+
 func (state *Listener) checkSockets(context actor.Context) error {
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -425,6 +502,23 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		state.instrumentData.seqNum += 1
 		state.instrumentData.lastHBTime = time.Now()
 	}
+
+	return nil
+}
+
+func (state *Listener) updateOpenInterest(context actor.Context) error {
+	fmt.Println("UPDATE OI", oid)
+	context.Request(
+		state.executor,
+		&messages.MarketStatisticsRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Exchange:   state.security.Exchange,
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			Statistics: []models.StatType{models.OpenInterest, models.FundingRate},
+		})
 
 	return nil
 }

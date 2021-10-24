@@ -17,6 +17,7 @@ enum StatType {
     Imbalance = 7;
     TradeVolume = 8;
     OpenInterest = 9;
+    FundingRate = 10;
 }
 
 enum OrderBookAggregation {
