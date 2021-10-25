@@ -104,11 +104,6 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.MarketStatisticsResponse:
-		if err := state.onMarketStatisticsResponse(context); err != nil {
-			state.logger.Error("error processing MarketStatisticsResponse", log.Error(err))
-		}
-
 	case *checkSockets:
 		if err := state.checkSockets(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
@@ -453,38 +448,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsResponse)
-	if !msg.Success {
-		// We want to converge towards the right value,
-		if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
-			oidLock.Lock()
-			oid = time.Duration(float64(oid) * 1.1)
-			oidLock.Unlock()
-		}
-		state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
-		return nil
-	}
-
-	fmt.Println(msg.Statistics)
-	context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-		Stats:  msg.Statistics,
-		SeqNum: state.instrumentData.seqNum + 1,
-	})
-	state.instrumentData.seqNum += 1
-
-	// Reduce delay
-	oidLock.Lock()
-	oid = time.Duration(float64(oid) * 0.99)
-	if oid < 15*time.Second {
-		oid = 15 * time.Second
-	}
-	state.openInterestTicker.Reset(oid)
-	oidLock.Unlock()
-
-	return nil
-}
-
 func (state *Listener) checkSockets(context actor.Context) error {
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -522,7 +485,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 func (state *Listener) updateOpenInterest(context actor.Context) error {
 	fmt.Println("UPDATE OI", oid)
-	context.Request(
+	fut := context.RequestFuture(
 		state.executor,
 		&messages.MarketStatisticsRequest{
 			RequestID: uint64(time.Now().UnixNano()),
@@ -532,7 +495,45 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 				Symbol:     &types.StringValue{Value: state.security.Symbol},
 			},
 			Statistics: []models.StatType{models.OpenInterest, models.FundingRate},
+		}, 2*time.Second)
+
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			if err == actor.ErrTimeout {
+				oidLock.Lock()
+				oid = time.Duration(float64(oid) * 1.1)
+				oidLock.Unlock()
+			}
+			state.logger.Info("error fetching market statistics", log.Error(err))
+			return
+		}
+		msg := res.(*messages.MarketStatisticsResponse)
+		if !msg.Success {
+			// We want to converge towards the right value,
+			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
+				oidLock.Lock()
+				oid = time.Duration(float64(oid) * 1.1)
+				oidLock.Unlock()
+			}
+			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
+		}
+
+		fmt.Println(msg.Statistics)
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			Stats:  msg.Statistics,
+			SeqNum: state.instrumentData.seqNum + 1,
 		})
+		state.instrumentData.seqNum += 1
+
+		// Reduce delay
+		oidLock.Lock()
+		oid = time.Duration(float64(oid) * 0.99)
+		if oid < 15*time.Second {
+			oid = 15 * time.Second
+		}
+		state.openInterestTicker.Reset(oid)
+		oidLock.Unlock()
+	})
 
 	return nil
 }
