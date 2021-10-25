@@ -500,8 +500,8 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 	// Reduce delay
 	oidLock.Lock()
 	oid = time.Duration(float64(oid) * 0.99)
-	if oid < 3*time.Second {
-		oid = 3 * time.Second
+	if oid < 5*time.Second {
+		oid = 5 * time.Second
 	}
 	state.openInterestTicker.Reset(oid)
 	oidLock.Unlock()
