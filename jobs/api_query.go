@@ -69,8 +69,7 @@ func (q *APIQuery) Clean(context actor.Context) error {
 
 func (q *APIQuery) PerformQueryRequest(context actor.Context) error {
 	msg := context.Message().(*PerformQueryRequest)
-
-	go func() {
+	go func(sender *actor.PID) {
 		queryResponse := PerformQueryResponse{}
 		resp, err := q.client.Do(msg.Request)
 		if err != nil {
@@ -81,8 +80,8 @@ func (q *APIQuery) PerformQueryRequest(context actor.Context) error {
 			queryResponse.StatusCode = int64(resp.StatusCode)
 			queryResponse.Response, _ = ioutil.ReadAll(resp.Body)
 		}
-		context.Respond(&queryResponse)
-	}()
+		context.Send(sender, &queryResponse)
+	}(context.Sender())
 
 	return nil
 }
