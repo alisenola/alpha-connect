@@ -70,24 +70,19 @@ func (q *APIQuery) Clean(context actor.Context) error {
 func (q *APIQuery) PerformQueryRequest(context actor.Context) error {
 	msg := context.Message().(*PerformQueryRequest)
 
-	queryResponse := PerformQueryResponse{}
-	resp, err := q.client.Do(msg.Request)
-	if err != nil {
-		return err
-	}
+	go func() {
+		queryResponse := PerformQueryResponse{}
+		resp, err := q.client.Do(msg.Request)
+		if err != nil {
+			queryResponse.Response = nil
+			queryResponse.StatusCode = 500
+		} else {
+			defer resp.Body.Close()
+			queryResponse.StatusCode = int64(resp.StatusCode)
+			queryResponse.Response, _ = ioutil.ReadAll(resp.Body)
+		}
+		context.Respond(&queryResponse)
+	}()
 
-	queryResponse.StatusCode = int64(resp.StatusCode)
-	queryResponse.Response, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		_ = resp.Body.Close()
-		return err
-	}
-
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-
-	context.Respond(&queryResponse)
 	return nil
 }
