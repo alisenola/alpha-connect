@@ -516,6 +516,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 				oidLock.Unlock()
 			}
 			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
+			return
 		}
 
 		fmt.Println(msg.Statistics)
