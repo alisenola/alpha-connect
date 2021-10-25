@@ -108,6 +108,12 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error checking socket", log.Error(err))
 			panic(err)
 		}
+
+	case *updateOpenInterest:
+		if err := state.updateOpenInterest(context); err != nil {
+			state.logger.Error("error updating open interest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -462,8 +468,8 @@ func (state *Listener) onMarketStatisticsResponse(context actor.Context) error {
 	// Reduce delay
 	oidLock.Lock()
 	oid = time.Duration(float64(oid) * 0.99)
-	if oid < 2*time.Second {
-		oid = 2 * time.Second
+	if oid < 5*time.Second {
+		oid = 5 * time.Second
 	}
 	state.openInterestTicker.Reset(oid)
 	oidLock.Unlock()
