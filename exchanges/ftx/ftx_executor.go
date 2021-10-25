@@ -317,7 +317,6 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		}
 		return false
 	}
-	fmt.Println("STATS", symbol)
 	for _, stat := range msg.Statistics {
 		switch stat {
 		case models.OpenInterest, models.FundingRate:

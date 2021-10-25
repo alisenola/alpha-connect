@@ -6,6 +6,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -159,20 +160,22 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	openInterestTicker := time.NewTicker(10 * time.Second)
-	state.openInterestTicker = openInterestTicker
-	go func(pid *actor.PID) {
-		for {
-			select {
-			case _ = <-openInterestTicker.C:
-				context.Send(pid, &updateOpenInterest{})
-			case <-time.After(11 * time.Second):
-				if state.openInterestTicker != openInterestTicker {
-					return
+	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP || state.security.SecurityType == enum.SecurityType_CRYPTO_FUT {
+		openInterestTicker := time.NewTicker(10 * time.Second)
+		state.openInterestTicker = openInterestTicker
+		go func(pid *actor.PID) {
+			for {
+				select {
+				case _ = <-openInterestTicker.C:
+					context.Send(pid, &updateOpenInterest{})
+				case <-time.After(11 * time.Second):
+					if state.openInterestTicker != openInterestTicker {
+						return
+					}
 				}
 			}
-		}
-	}(context.Self())
+		}(context.Self())
+	}
 
 	return nil
 }
