@@ -104,6 +104,11 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.MarketStatisticsResponse:
+		if err := state.onMarketStatisticsResponse(context); err != nil {
+			state.logger.Error("error processing MarketStatisticsResponse", log.Error(err))
+		}
+
 	case *checkSockets:
 		if err := state.checkSockets(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
