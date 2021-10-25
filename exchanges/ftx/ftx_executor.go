@@ -390,11 +390,13 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				StatType:  models.OpenInterest,
 				Value:     fstat.Result.OpenInterest,
 			})
-			response.Statistics = append(response.Statistics, &models.Stat{
-				Timestamp: utils.MilliToTimestamp(uint64(fstat.Result.NextFundingTime.UnixNano() / 1000000)),
-				StatType:  models.FundingRate,
-				Value:     fstat.Result.NextFundingRate,
-			})
+			if state.symbolToSec[symbol].SecurityType == enum.SecurityType_CRYPTO_PERP {
+				response.Statistics = append(response.Statistics, &models.Stat{
+					Timestamp: utils.MilliToTimestamp(uint64(fstat.Result.NextFundingTime.UnixNano() / 1000000)),
+					StatType:  models.FundingRate,
+					Value:     fstat.Result.NextFundingRate,
+				})
+			}
 		}
 	}
 
