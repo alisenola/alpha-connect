@@ -501,7 +501,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		if err != nil {
 			if err == actor.ErrTimeout {
 				oidLock.Lock()
-				oid = time.Duration(float64(oid) * 1.1)
+				oid = time.Duration(float64(oid) * 1.01)
 				oidLock.Unlock()
 			}
 			state.logger.Info("error fetching market statistics", log.Error(err))
@@ -512,7 +512,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 			// We want to converge towards the right value,
 			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
 				oidLock.Lock()
-				oid = time.Duration(float64(oid) * 1.1)
+				oid = time.Duration(float64(oid) * 1.01)
 				oidLock.Unlock()
 			}
 			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
