@@ -14,7 +14,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e
 	gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f
-	gitlab.com/alphaticks/tickstore v0.0.0-20211013103345-d9f10fdc27cc
+	gitlab.com/alphaticks/tickstore v0.0.0-20211026073327-70c8d9e07de7
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0
 	gitlab.com/alphaticks/xchanger v0.0.0-20211019143513-c1a11408e148

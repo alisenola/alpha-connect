@@ -389,6 +389,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		var aggTrade *models.AggregatedTrade
 		for _, trade := range tradeData.Trades {
 			if trade.Liquidation {
+				fmt.Println("LIQUIDATION", trade)
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					Liquidation: &models.Liquidation{
 						Bid:       trade.Side == "buy",
