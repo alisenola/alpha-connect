@@ -390,9 +390,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		for _, trade := range tradeData.Trades {
 			if trade.Liquidation {
 				fmt.Println("LIQUIDATION", trade)
+				// Liquidation limit order, so was on the bid if order.Side == "sell"
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					Liquidation: &models.Liquidation{
-						Bid:       trade.Side == "buy",
+						Bid:       trade.Side == "sell",
 						Timestamp: utils.MilliToTimestamp(ts),
 						OrderID:   trade.ID,
 						Price:     trade.Price,
