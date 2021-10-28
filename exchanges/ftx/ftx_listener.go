@@ -393,7 +393,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				// Liquidation limit order, so was on the bid if order.Side == "sell"
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					Liquidation: &models.Liquidation{
-						Bid:       trade.Side == "sell",
+						Bid:       trade.Side == "buy",
 						Timestamp: utils.MilliToTimestamp(ts),
 						OrderID:   trade.ID,
 						Price:     trade.Price,
