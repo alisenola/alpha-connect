@@ -59,6 +59,7 @@ type LiveQuery struct {
 	groupID       uint64
 	functor       parsing.Functor
 	deltas        *gotickfile.TickDeltas
+	nextDeadline  *time.Time
 	err           error
 }
 
@@ -100,17 +101,28 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 }
 
 func (lq *LiveQuery) SetNextDeadline(time time.Time) {
-	panic("implement me")
+	lq.nextDeadline = &time
 }
 
 func (lq *LiveQuery) Next() bool {
+	res := lq.next()
+	lq.nextDeadline = nil
+	return res
+}
+
+func (lq *LiveQuery) next() bool {
 	var el interface{}
-	select {
-	case el = <-lq.ch:
-		break
-	default:
-		return false
+	if lq.nextDeadline != nil {
+		select {
+		case el = <-lq.ch:
+			break
+		case <-time.After(lq.nextDeadline.Sub(time.Now())):
+			return false
+		}
+	} else {
+		el = <-lq.ch
 	}
+
 	switch msg := el.(type) {
 	case *messages.MarketDataResponse:
 		feed := lq.subscriptions[msg.RequestID]
@@ -312,7 +324,10 @@ func (lq *LiveQuery) Next() bool {
 }
 
 func (lq *LiveQuery) Progress(end uint64) bool {
-	panic("implement me")
+	for end < lq.tick {
+		lq.next()
+	}
+	return lq.tick >= end
 }
 
 func (lq *LiveQuery) Read() (uint64, tickobjects.TickObject, uint64) {
@@ -320,7 +335,8 @@ func (lq *LiveQuery) Read() (uint64, tickobjects.TickObject, uint64) {
 }
 
 func (lq *LiveQuery) Tags() map[string]string {
-	panic("implement me")
+	// TODO
+	return make(map[string]string)
 }
 
 func (lq *LiveQuery) Close() error {

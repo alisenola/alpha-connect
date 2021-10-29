@@ -13,13 +13,10 @@ type Market interface {
 }
 
 type LongShortModel interface {
-	Market
-	GetLongScore(ID uint64, fee, lambda float64) float64
-	GetShortScore(ID uint64, fee, lambda float64) float64
-	SetLongModel(ID uint64, model LongModel)
-	SetShortModel(ID uint64, model ShortModel)
-	SetPrice(ID uint64, price float64)
-	SetPairPrice(base, quote uint32, price float64)
+	GetPenalty(fee float64) float64
+	GetLongScore(ID uint64) float64
+	GetShortScore(ID uint64) float64
+	GetSelectors() []string
 }
 
 type MarketModel interface {
@@ -102,51 +99,41 @@ func (m *MapMarketModel) GetSelectors() []string {
 	return m.selectors
 }
 
-type MapLongShortModel struct {
+type MarketLongShortModel struct {
 	sync.RWMutex
-	longModels  map[uint64]LongModel
-	shortModels map[uint64]ShortModel
-	selectors   []string
-	prices      map[uint64]float64
+	model     LongShortModel
+	selectors []string
+	prices    map[uint64]float64
 }
 
-func NewMapLongShortModel() *MapLongShortModel {
-	return &MapLongShortModel{
-		longModels:  make(map[uint64]LongModel),
-		shortModels: make(map[uint64]ShortModel),
-		prices:      make(map[uint64]float64),
+func NewMarketLongShortModel(model LongShortModel) *MarketLongShortModel {
+	return &MarketLongShortModel{
+		model:  model,
+		prices: make(map[uint64]float64),
 	}
 }
 
-func (m *MapLongShortModel) SetLongModel(ID uint64, lm LongModel) {
-	m.longModels[ID] = lm
-}
-
-func (m *MapLongShortModel) SetShortModel(ID uint64, sm ShortModel) {
-	m.shortModels[ID] = sm
-}
-
-func (m *MapLongShortModel) SetPrice(ID uint64, p float64) {
+func (m *MarketLongShortModel) SetPrice(ID uint64, p float64) {
 	m.Lock()
 	defer m.Unlock()
 	m.prices[ID] = p
 }
 
-func (m *MapLongShortModel) SetPairPrice(base, quote uint32, p float64) {
+func (m *MarketLongShortModel) SetPairPrice(base, quote uint32, p float64) {
 	m.Lock()
 	defer m.Unlock()
 	ID := uint64(base)<<32 | uint64(quote)
 	m.prices[ID] = p
 }
 
-func (m *MapLongShortModel) GetPrice(ID uint64) (float64, bool) {
+func (m *MarketLongShortModel) GetPrice(ID uint64) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	p, ok := m.prices[ID]
 	return p, ok
 }
 
-func (m *MapLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
+func (m *MarketLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	ID := uint64(base)<<32 | uint64(quote)
@@ -154,12 +141,16 @@ func (m *MapLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	return p, ok
 }
 
-func (m *MapLongShortModel) GetLongScore(ID uint64, fee, lambda float64) float64 {
-	return m.longModels[ID].GetLongScore(ID, fee, lambda)
+func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
+	return m.model.GetPenalty(fee)
 }
 
-func (m *MapLongShortModel) GetShortScore(ID uint64, fee, lambda float64) float64 {
-	return m.shortModels[ID].GetShortScore(ID, fee, lambda)
+func (m *MarketLongShortModel) GetLongScore(ID uint64) float64 {
+	return m.model.GetLongScore(ID)
+}
+
+func (m *MarketLongShortModel) GetShortScore(ID uint64) float64 {
+	return m.model.GetShortScore(ID)
 }
 
 /*
@@ -196,13 +187,13 @@ type Model interface {
 
 type LongModel interface {
 	Model
-	GetLongScore(ID uint64, fee, lambda float64) float64
+	GetLongScore(ID uint64) float64
 	//GetExitLongELR(ID uint64, fee, lambda float64) float64
 }
 
 type ShortModel interface {
 	Model
-	GetShortScore(ID uint64, fee, lambda float64) float64
+	GetShortScore(ID uint64) float64
 	//GetExitShortELR(ID uint64, fee, lambda float64) float64
 }
 
