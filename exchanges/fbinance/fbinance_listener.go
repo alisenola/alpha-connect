@@ -160,21 +160,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	openInterestTicker := time.NewTicker(10 * time.Second)
-	state.openInterestTicker = openInterestTicker
-	go func(pid *actor.PID) {
-		for {
-			select {
-			case _ = <-openInterestTicker.C:
-				context.Send(pid, &updateOpenInterest{})
-			case <-time.After(11 * time.Second):
-				if state.openInterestTicker != openInterestTicker {
-					return
-				}
-			}
-		}
-	}(context.Self())
-
 	return nil
 }
 
@@ -336,6 +321,27 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
+	}
+
+	if msg.Subscribe {
+		for _, stat := range msg.Stats {
+			if stat == models.OpenInterest && state.openInterestTicker != nil {
+				openInterestTicker := time.NewTicker(10 * time.Second)
+				state.openInterestTicker = openInterestTicker
+				go func(pid *actor.PID) {
+					for {
+						select {
+						case _ = <-openInterestTicker.C:
+							context.Send(pid, &updateOpenInterest{})
+						case <-time.After(11 * time.Second):
+							if state.openInterestTicker != openInterestTicker {
+								return
+							}
+						}
+					}
+				}(context.Self())
+			}
+		}
 	}
 
 	context.Respond(response)

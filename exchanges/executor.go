@@ -22,10 +22,16 @@ import (
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
+type ExecutorConfig struct {
+	Db         *mongo.Database
+	Exchanges  []*xchangerModels.Exchange
+	Accounts   []*account.Account
+	DialerPool *xchangerUtils.DialerPool
+	Strict     bool
+}
+
 type Executor struct {
-	db                *mongo.Database
-	exchanges         []*xchangerModels.Exchange
-	accounts          []*account.Account
+	*ExecutorConfig
 	accountPortfolios map[string]*actor.PID
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
@@ -38,20 +44,15 @@ type Executor struct {
 	strict            bool
 }
 
-func NewExecutorProducer(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool, strict bool) actor.Producer {
+func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(db, exchanges, accnts, dialerPool, strict)
+		return NewExecutor(cfg)
 	}
 }
 
-func NewExecutor(db *mongo.Database, exchanges []*xchangerModels.Exchange, accnts []*account.Account, dialerPool *xchangerUtils.DialerPool, strict bool) actor.Actor {
+func NewExecutor(cfg *ExecutorConfig) actor.Actor {
 	return &Executor{
-		db:         db,
-		exchanges:  exchanges,
-		logger:     nil,
-		dialerPool: dialerPool,
-		accounts:   accnts,
-		strict:     strict,
+		ExecutorConfig: cfg,
 	}
 }
 
@@ -212,15 +213,15 @@ func (state *Executor) Initialize(context actor.Context) error {
 		state.dialerPool = xchangerUtils.DefaultDialerPool
 	}
 
-	if state.db != nil {
+	if state.Db != nil {
 		unique := true
 		mod := mongo.IndexModel{
 			Keys: bson.M{
 				"id": 1, // index in ascending order
 			}, Options: &options.IndexOptions{Unique: &unique},
 		}
-		txs := state.db.Collection("transactions")
-		execs := state.db.Collection("executions")
+		txs := state.Db.Collection("transactions")
+		execs := state.Db.Collection("executions")
 		if _, err := txs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
 			return fmt.Errorf("error creating index on transactions: %v", err)
 		}
@@ -231,7 +232,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
-	for _, exch := range state.exchanges {
+	for _, exch := range state.Exchanges {
 		producer := NewExchangeExecutorProducer(exch, state.dialerPool)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
@@ -280,8 +281,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
-	for _, accnt := range state.accounts {
-		producer := NewAccountManagerProducer(accnt, state.db, false)
+	for _, accnt := range state.Accounts {
+		producer := NewAccountManagerProducer(accnt, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -315,7 +316,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.db, false)
+		producer := NewAccountManagerProducer(accnt, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -789,7 +790,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.db, false)
+		producer := NewAccountManagerProducer(accnt, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}

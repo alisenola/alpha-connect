@@ -133,6 +133,7 @@ message MarketDataRequest {
     actor.PID subscriber = 3;
     models.Instrument instrument = 4;
     models.OrderBookAggregation aggregation = 5;
+    repeated models.StatType stats = 6;
 }
 
 message MarketDataResponse {
