@@ -49,6 +49,7 @@ func NewMDReceiver(as *actor.ActorSystem, executor *actor.PID, instrument *model
 				panic(fmt.Errorf("out of order sequence"))
 			}
 			r.seq = msg.SeqNum
+			fmt.Println(len(ch))
 			ch <- msg
 		}
 	}))
