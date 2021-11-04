@@ -60,5 +60,4 @@ func NewMDReceiver(as *actor.ActorSystem, executor *actor.PID, instrument *model
 
 func (r *MDReceiver) Close() {
 	r.as.Root.Stop(r.pid)
-	// TODO chans ?
 }

@@ -346,6 +346,7 @@ func (lq *LiveQuery) Close() error {
 		}
 	}
 	close(lq.ch)
+	lq.err = fmt.Errorf("query closed")
 	return nil
 }
 
