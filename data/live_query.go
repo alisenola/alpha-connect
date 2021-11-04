@@ -256,7 +256,7 @@ func (lq *LiveQuery) next() bool {
 
 				return true
 			}
-		} else if lq.measurement == "trade" {
+		} else if lq.measurement == "trade" && len(msg.Trades) > 0 {
 			var tradeDeltas []market.RawTradeDelta
 			var ts uint64
 			for _, aggTrade := range msg.Trades {
@@ -284,7 +284,6 @@ func (lq *LiveQuery) next() bool {
 			}
 
 			if functor, ok := lq.objects[feed.groupID]; ok {
-				fmt.Println(functor.(market.TradeObject).Price(), feed.security.tickPrecision, feed.security.lotPrecision)
 				resdeltas, err := functor.ApplyDeltas(deltas, feed.security.securityID, ts)
 				if err != nil {
 					lq.err = fmt.Errorf("error applying deltas: %v", err)
