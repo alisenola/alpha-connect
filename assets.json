@@ -1252,5 +1252,25 @@
     "symbol": "DYDX",
     "name": "dydx",
     "ID": 251
+  },
+  "252": {
+    "symbol": "SPELL",
+    "name": "spell-token",
+    "ID": 252
+  },
+  "253": {
+    "symbol": "AURY",
+    "name": "aurory",
+    "ID": 253
+  },
+  "254": {
+    "symbol": "RAY",
+    "name": "raydium",
+    "ID": 254
+  },
+  "255": {
+    "symbol": "ILV",
+    "name": "illuvium",
+    "ID": 255
   }
 }

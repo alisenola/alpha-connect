@@ -10,6 +10,7 @@ import (
 	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
 	"gitlab.com/alphaticks/tickstore-go-client/query"
 	"gitlab.com/alphaticks/tickstore/parsing"
+	"sync"
 	"time"
 )
 
@@ -30,32 +31,44 @@ type Feed struct {
 }
 
 type LiveStore struct {
+	sync.RWMutex
 	as         *actor.ActorSystem
 	executor   *actor.PID
+	sub        *actor.PID
 	index      *utils.TagIndex
 	securities map[uint64]*models.Security
 	queries    []*LiveQuery
 }
 
 func NewLiveStore(as *actor.ActorSystem, executor *actor.PID) (*LiveStore, error) {
-	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 20*time.Second).Result()
-	if err != nil {
-		return nil, fmt.Errorf("error fetching securities: %v", err)
+	lt := &LiveStore{
+		as:       as,
+		executor: executor,
 	}
-	sl := res.(*messages.SecurityList)
-	// Build index
-	index := utils.NewTagIndex(sl.Securities)
-	securities := make(map[uint64]*models.Security)
-	for _, sec := range sl.Securities {
-		securities[sec.SecurityID] = sec
-	}
+	props := actor.PropsFromFunc(func(c actor.Context) {
+		switch res := c.Message().(type) {
+		case *actor.Started:
+			c.Request(executor, &messages.SecurityListRequest{
+				Subscribe:  true,
+				Subscriber: c.Self(),
+			})
+		case *messages.SecurityList:
+			index := utils.NewTagIndex(res.Securities)
+			securities := make(map[uint64]*models.Security)
+			for _, sec := range res.Securities {
+				securities[sec.SecurityID] = sec
+			}
+			lt.Lock()
+			lt.index = index
+			lt.securities = securities
+			lt.Unlock()
+		}
+	})
 
-	return &LiveStore{
-		as:         as,
-		executor:   executor,
-		index:      index,
-		securities: securities,
-	}, nil
+	// Build index
+	lt.sub = as.Root.Spawn(props)
+
+	return lt, nil
 }
 
 func (lt *LiveStore) RegisterMeasurement(measurement string, typeID string) error {
@@ -93,11 +106,16 @@ func (lt *LiveStore) NewQuery(qs *query.Settings) (tickstore_go_client.Tickstore
 	for _, t := range sel.TickSelector.Tags {
 		queryTags[t.Key] = t.Value
 	}
+
+	lt.RLock()
+	defer lt.RUnlock()
+	if lt.index == nil {
+		return NewLiveQuery(lt.as, lt.executor, sel, nil)
+	}
 	inputSecurities, err := lt.index.Query(queryTags)
 	if err != nil {
 		return nil, fmt.Errorf("error querying input securities: %v", err)
 	}
-
 	// Need to subscribe to every securities, clone the functor for each group
 	// for each security, compute which functor it has to go to, based on tags.
 	// Place in map[securityID]Functor, use security ID as object ID
@@ -143,4 +161,11 @@ func (lt *LiveStore) NewQuery(qs *query.Settings) (tickstore_go_client.Tickstore
 	q, err := NewLiveQuery(lt.as, lt.executor, sel, feeds)
 	lt.queries = append(lt.queries, q)
 	return q, nil
+}
+
+func (lt *LiveStore) Close() {
+	if lt.sub != nil {
+		lt.as.Root.Stop(lt.sub)
+		lt.sub = nil
+	}
 }
