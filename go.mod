@@ -7,7 +7,6 @@ require (
 	github.com/AsynkronIT/protoactor-go v0.0.0-20210901041048-df2fc305778c
 	github.com/alecthomas/participle v0.4.4 // indirect
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang/snappy v0.0.3 // indirect
 	github.com/melaurent/gotickfile/v2 v2.0.0-20210406111104-845d7c5ec5dc
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
@@ -17,7 +16,7 @@ require (
 	gitlab.com/alphaticks/tickstore v0.0.0-20211026090124-f0a2d5e7bdb2
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0
-	gitlab.com/alphaticks/xchanger v0.0.0-20211019143513-c1a11408e148
+	gitlab.com/alphaticks/xchanger v0.0.0-20211115105813-60472405f78b
 	go.mongodb.org/mongo-driver v1.7.2
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect
 	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912 // indirect
