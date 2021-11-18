@@ -1,10 +1,19 @@
 package types
 
 import (
+	goContext "context"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger/constants"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"math"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -29,6 +38,15 @@ type ExchangeExecutor interface {
 	OnOrderCancelRequest(context actor.Context) error
 	OnOrderMassCancelRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
+	GetLogger() *log.Logger
+	Initialize(context actor.Context) error
+	Clean(context actor.Context) error
+}
+
+type AccountReconcile interface {
+	actor.Actor
+	OnAccountMovementRequest(context actor.Context) error
+	OnTradeCaptureReportRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
@@ -357,5 +375,134 @@ func ExchangeExecutorReceive(state ExchangeExecutor, context actor.Context) {
 			time.Sleep(time.Minute)
 			context.Send(pid, &updateSecurityList{})
 		}(context.Self())
+	}
+}
+
+type AccountReconcileBase struct {
+}
+
+func (state *AccountReconcileBase) GetLogger() *log.Logger {
+	panic("not implemented")
+}
+
+func (state *AccountReconcileBase) GetTransactions() *mongo.Collection {
+	panic("not implemented")
+}
+
+func (state *AccountReconcileBase) OnTradeCaptureReportRequest(context actor.Context) error {
+	msg := context.Message().(*messages.TradeCaptureReportRequest)
+	res := &messages.TradeCaptureReport{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+	}
+	defer context.Respond(res)
+	filter := bson.D{
+		{"account", msg.Account.Name},
+		{"type", "TRADE"},
+	}
+	if msg.Filter.From != nil {
+		from, err := types.TimestampFromProto(msg.Filter.From)
+		if err != nil {
+			res.Success = false
+			res.RejectionReason = messages.InvalidRequest
+			return nil
+		}
+		filter = append(filter, bson.E{"time", bson.D{{"$gt", from}}})
+	}
+	if msg.Filter.To != nil {
+		to, err := types.TimestampFromProto(msg.Filter.To)
+		if err != nil {
+			res.Success = false
+			res.RejectionReason = messages.InvalidRequest
+			return nil
+		}
+		filter = append(filter, bson.E{"time", bson.D{{"$lt", to}}})
+	}
+	cur, err := state.GetTransactions().Find(goContext.Background(), filter)
+	if err != nil {
+		res.Success = false
+		res.RejectionReason = messages.Other
+		state.GetLogger().Error("error fetching trades", log.Error(err))
+		return nil
+	}
+	defer cur.Close(goContext.Background())
+	for cur.Next(goContext.Background()) {
+		var tx Transaction
+		if err := cur.Decode(tx); err != nil {
+			state.GetLogger().Error("error decoding tx", log.Error(err))
+			res.Success = false
+			res.RejectionReason = messages.Other
+			return nil
+		}
+		side := models.Buy
+		if tx.Fill.Quantity < 0 {
+			side = models.Sell
+		}
+		secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
+		ts, _ := types.TimestampProto(tx.Time)
+		var commission float64
+		var commissionAsset *xchangerModels.Asset
+		for _, m := range tx.Movements {
+			if m.Reason == int32(messages.Commission) {
+				commission = m.Quantity
+				commissionAsset, _ = constants.GetAssetByID(m.AssetID)
+			}
+		}
+		res.Trades = append(res.Trades, &models.TradeCapture{
+			Side:            side,
+			Type:            models.Regular,
+			Price:           tx.Fill.Price,
+			Quantity:        math.Abs(tx.Fill.Quantity),
+			Commission:      commission,
+			CommissionAsset: commissionAsset,
+			TradeID:         tx.ID,
+			Instrument:      &models.Instrument{SecurityID: &types.UInt64Value{Value: secID}},
+			Trade_LinkID:    nil,
+			OrderID:         nil,
+			ClientOrderID:   nil,
+			TransactionTime: ts,
+		})
+	}
+	return nil
+}
+
+func AccountReconcileReceive(state AccountReconcile, context actor.Context) {
+	switch context.Message().(type) {
+	case *actor.Started:
+		if err := state.Initialize(context); err != nil {
+			state.GetLogger().Error("error initializing", log.Error(err))
+			panic(err)
+		}
+		state.GetLogger().Info("actor started")
+
+	case *actor.Stopping:
+		if err := state.Clean(context); err != nil {
+			state.GetLogger().Error("error stopping", log.Error(err))
+			panic(err)
+		}
+		state.GetLogger().Info("actor stopping")
+
+	case *actor.Stopped:
+		state.GetLogger().Info("actor stopped")
+
+	case *actor.Restarting:
+		if err := state.Clean(context); err != nil {
+			state.GetLogger().Error("error restarting", log.Error(err))
+			// Attention, no panic in restarting or infinite loop
+		}
+		state.GetLogger().Info("actor restarting")
+
+	case *messages.AccountMovementRequest:
+		if err := state.OnAccountMovementRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnAccountMovementRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.TradeCaptureReportRequest:
+		if err := state.OnTradeCaptureReportRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnTradeCaptureReportRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }

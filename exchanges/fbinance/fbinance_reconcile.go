@@ -23,6 +23,7 @@ import (
 )
 
 type AccountReconcile struct {
+	extypes.AccountReconcileBase
 	account          *models.Account
 	fbinanceExecutor *actor.PID
 	executorManager  *actor.PID
@@ -49,44 +50,16 @@ func NewAccountReconcile(account *models.Account, txs *mongo.Collection) actor.A
 	}
 }
 
+func (state *AccountReconcile) GetLogger() *log.Logger {
+	return state.logger
+}
+
+func (state *AccountReconcile) GetTransactions() *mongo.Collection {
+	return state.txs
+}
+
 func (state *AccountReconcile) Receive(context actor.Context) {
-	switch context.Message().(type) {
-	case *actor.Started:
-		if err := state.Initialize(context); err != nil {
-			state.logger.Error("error initializing", log.Error(err))
-			panic(err)
-		}
-		state.logger.Info("actor started")
-
-	case *actor.Stopping:
-		if err := state.Clean(context); err != nil {
-			state.logger.Error("error stopping", log.Error(err))
-			panic(err)
-		}
-		state.logger.Info("actor stopping")
-
-	case *actor.Stopped:
-		state.logger.Info("actor stopped")
-
-	case *actor.Restarting:
-		if err := state.Clean(context); err != nil {
-			state.logger.Error("error restarting", log.Error(err))
-			// Attention, no panic in restarting or infinite loop
-		}
-		state.logger.Info("actor restarting")
-
-	case *messages.AccountMovementRequest:
-		if err := state.OnAccountMovementRequest(context); err != nil {
-			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
-			panic(err)
-		}
-
-	case *messages.TradeCaptureReportRequest:
-		if err := state.OnTradeCaptureReportRequest(context); err != nil {
-			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
-			panic(err)
-		}
-	}
+	extypes.AccountReconcileReceive(state, context)
 }
 
 func (state *AccountReconcile) Initialize(context actor.Context) error {
@@ -273,12 +246,6 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 	state.txs.Find(goContext.Background(), bson.D{
 		{"type", msg.Type.String()},
 	})
-	return nil
-}
-
-func (state *AccountReconcile) OnTradeCaptureReportRequest(context actor.Context) error {
-	//msg := context.Message().(*messages.TradeCaptureReportRequest)
-	state.txs.Find(goContext.Background(), bson.D{})
 	return nil
 }
 

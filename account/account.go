@@ -97,6 +97,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		accnt.MarginCurrency = &constants.DOLLAR
 		accnt.MarginPrecision = 100000000
 	}
+	accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
 
 	return accnt, nil
 }
