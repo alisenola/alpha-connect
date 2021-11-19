@@ -921,6 +921,19 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		// therefore I will close the order
 		fmt.Println("WSORDER UPDATE", res)
 		switch res.Order.Status {
+		case ftx.NEW_ORDER:
+			// If we don't have the order, it was created by someone else, add it.
+			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
+				fmt.Println("INSERTING NEW !!!")
+				_, rej := state.account.NewOrder(wsOrderToModel(res.Order))
+				if rej != nil {
+					return fmt.Errorf("error creating new order: %s", rej.String())
+				}
+				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+				if err != nil {
+					return fmt.Errorf("error creating new order: %v", err)
+				}
+			}
 		case ftx.CLOSED_ORDER:
 			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
 				// Order closed because of filled, let the fill update manage it

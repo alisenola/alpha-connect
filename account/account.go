@@ -268,7 +268,9 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	if order.Instrument.Symbol == nil {
 		order.Instrument.Symbol = &types.StringValue{Value: sec.GetSecurity().Symbol}
 	}
-
+	if order.CreationTime == nil {
+		order.CreationTime, _ = types.TimestampProto(time.Now())
+	}
 	lotPrecision := sec.GetLotPrecision()
 	rawLeavesQuantity := lotPrecision * order.LeavesQuantity
 	if math.Abs(rawLeavesQuantity-math.Round(rawLeavesQuantity)) > 0.00001 {
@@ -778,6 +780,17 @@ func (accnt *Account) settle() {
 		// TODO check less than zero
 		accnt.margin = 0
 	}
+}
+
+func (accnt *Account) HasOrder(ID string) bool {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	var order *Order
+	order, _ = accnt.ordersClID[ID]
+	if order == nil {
+		order, _ = accnt.ordersID[ID]
+	}
+	return order != nil
 }
 
 func (accnt *Account) GetOrder(ID string) (*models.Order, error) {

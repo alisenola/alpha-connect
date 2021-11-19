@@ -50,6 +50,10 @@ func NewAccountReconcile(account *models.Account, txs *mongo.Collection) actor.A
 	}
 }
 
+func (state *AccountReconcile) GetLogger() *log.Logger {
+	return state.logger
+}
+
 func (state *AccountReconcile) Receive(context actor.Context) {
 	extypes.AccountReconcileReceive(state, context)
 }

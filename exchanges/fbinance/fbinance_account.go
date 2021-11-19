@@ -837,6 +837,15 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
 			// New order
+			if !state.account.HasOrder(exec.ClientOrderID) {
+				// We don't have the order, was created by another client
+				o := wsOrderToModel(exec)
+				o.OrderStatus = models.PendingNew
+				_, rej := state.account.NewOrder(o)
+				if rej != nil {
+					return fmt.Errorf("error creating new order: %s", rej.String())
+				}
+			}
 			orderID := fmt.Sprintf("%d", exec.OrderID)
 			report, err := state.account.ConfirmNewOrder(exec.ClientOrderID, orderID)
 			if err != nil {
