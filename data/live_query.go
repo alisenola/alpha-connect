@@ -84,12 +84,7 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 	lq.measurement = *tmpFunctor.Measurement
 
 	for _, f := range feeds {
-		var aggregation models.OrderBookAggregation
-		if lq.measurement == "trade" {
-			aggregation = models.L1
-		} else {
-			aggregation = models.L2
-		}
+		aggregation := models.L2
 		receiver := utils.NewMDReceiver(as, executor, &models.Instrument{
 			SecurityID: &types.UInt64Value{Value: f.security.securityID},
 		}, aggregation, f.requestID, lq.ch)

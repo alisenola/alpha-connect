@@ -235,6 +235,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			RequestID: 0,
 			Filter: &messages.TradeCaptureReportFilter{
 				From: utils.MilliToTimestamp(state.lastTradeTs),
+				To:   types.TimestampNow(),
 			},
 			Account: state.account,
 		}, 20*time.Second).Result()

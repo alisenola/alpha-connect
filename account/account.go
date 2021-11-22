@@ -963,6 +963,9 @@ func (accnt *Account) CleanOrders() {
 	for k, o := range accnt.ordersClID {
 		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
+			if _, ok := accnt.ordersID[o.OrderID]; ok {
+				delete(accnt.ordersID, o.OrderID)
+			}
 		}
 	}
 }
