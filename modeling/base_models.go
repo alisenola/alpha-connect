@@ -19,6 +19,44 @@ type LongShortModel interface {
 	GetSelectors() []string
 }
 
+type ConstantLongShortModel struct {
+	penalty     float64
+	longScores  map[uint64]float64
+	shortScores map[uint64]float64
+}
+
+func NewConstantLongShortModel(penalty float64) *ConstantLongShortModel {
+	return &ConstantLongShortModel{
+		penalty:     penalty,
+		longScores:  make(map[uint64]float64),
+		shortScores: make(map[uint64]float64),
+	}
+}
+
+func (m *ConstantLongShortModel) GetPenalty(_ float64) float64 {
+	return m.penalty
+}
+
+func (m *ConstantLongShortModel) SetLongScore(ID uint64, score float64) {
+	m.longScores[ID] = score
+}
+
+func (m *ConstantLongShortModel) GetLongScore(ID uint64) float64 {
+	return m.longScores[ID]
+}
+
+func (m *ConstantLongShortModel) SetShortScore(ID uint64, score float64) {
+	m.shortScores[ID] = score
+}
+
+func (m *ConstantLongShortModel) GetShortScore(ID uint64) float64 {
+	return m.longScores[ID]
+}
+
+func (m *ConstantLongShortModel) GetSelectors() []string {
+	return nil
+}
+
 type MarketModel interface {
 	Market
 	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64

@@ -1272,5 +1272,45 @@
     "symbol": "ILV",
     "name": "illuvium",
     "ID": 255
+  },
+  "256": {
+    "symbol": "MDA",
+    "name": "moeda-loyalty-points",
+    "ID": 256
+  },
+  "257": {
+    "symbol": "MTH",
+    "name": "monetha",
+    "ID": 257
+  },
+  "258": {
+    "symbol": "AST",
+    "name": "airswap",
+    "ID": 258
+  },
+  "259": {
+    "symbol": "EVX",
+    "name": "everex",
+    "ID": 259
+  },
+  "260": {
+    "symbol": "VIB",
+    "name": "viberate",
+    "ID": 260
+  },
+  "261": {
+    "symbol": "POWR",
+    "name": "power-ledger",
+    "ID": 261
+  },
+  "262": {
+    "symbol": "RDN",
+    "name": "raiden-network-token",
+    "ID": 262
+  },
+  "263": {
+    "symbol": "AMB",
+    "name": "amber",
+    "ID": 263
   }
 }
