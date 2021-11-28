@@ -45,6 +45,20 @@ func NewLiveStore(as *actor.ActorSystem, executor *actor.PID) (*LiveStore, error
 		as:       as,
 		executor: executor,
 	}
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		return nil, err
+	}
+	sec := res.(*messages.SecurityList)
+	if !sec.Success {
+		return nil, fmt.Errorf("error fetching securities: %s", sec.RejectionReason.String())
+	}
+	lt.index = utils.NewTagIndex(sec.Securities)
+	lt.securities = make(map[uint64]*models.Security)
+	for _, sec := range sec.Securities {
+		lt.securities[sec.SecurityID] = sec
+	}
+
 	props := actor.PropsFromFunc(func(c actor.Context) {
 		switch res := c.Message().(type) {
 		case *actor.Started:

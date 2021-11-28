@@ -16,13 +16,12 @@ require (
 	gitlab.com/alphaticks/tickstore v0.0.0-20211026090124-f0a2d5e7bdb2
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0
-	gitlab.com/alphaticks/xchanger v0.0.0-20211119092630-d5776c6045a5
+	gitlab.com/alphaticks/xchanger v0.0.0-20211125104838-c20ac7a12853
 	go.mongodb.org/mongo-driver v1.7.2
-	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect
-	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912 // indirect
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger
+
 //replace gitlab.com/alphaticks/tickstore => ../tickstore

@@ -97,7 +97,9 @@ func NewAccount(account *models.Account) (*Account, error) {
 		accnt.MarginCurrency = &constants.DOLLAR
 		accnt.MarginPrecision = 100000000
 	}
-	accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
+	if accnt.MarginCurrency != nil {
+		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
+	}
 
 	return accnt, nil
 }
@@ -762,8 +764,8 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 		accnt.assets[asset.ID] = asset
 	}
 	// Reset margin, as we have a fresh balance for it
-	if asset.ID == accnt.MarginCurrency.ID {
-		accnt.margin = 0
+	if accnt.MarginCurrency != nil && asset.ID == accnt.MarginCurrency.ID {
+		accnt.margin = 0.
 	}
 	accnt.balances[asset.ID] = balance
 	return &messages.AccountUpdate{
@@ -929,6 +931,9 @@ func (accnt *Account) GetPositionSize(securityID uint64) float64 {
 func (accnt *Account) GetMargin(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
+	if accnt.MarginCurrency == nil {
+		return 0.
+	}
 	if model != nil {
 		availableMargin := 0.
 		for k, b := range accnt.balances {

@@ -1312,5 +1312,45 @@
     "symbol": "AMB",
     "name": "amber",
     "ID": 263
+  },
+  "264": {
+    "symbol": "QSP",
+    "name": "quantstamp",
+    "ID": 264
+  },
+  "265": {
+    "symbol": "ADX",
+    "name": "adx-net",
+    "ID": 265
+  },
+  "266": {
+    "symbol": "CND",
+    "name": "cindicator",
+    "ID": 266
+  },
+  "267": {
+    "symbol": "WABI",
+    "name": "wabi",
+    "ID": 267
+  },
+  "268": {
+    "symbol": "GTO",
+    "name": "gifto",
+    "ID": 268
+  },
+  "269": {
+    "symbol": "ELF",
+    "name": "aelf",
+    "ID": 269
+  },
+  "270": {
+    "symbol": "ELF",
+    "name": "aelf",
+    "ID": 270
+  },
+  "271": {
+    "symbol": "AION",
+    "name": "aion",
+    "ID": 271
   }
 }
