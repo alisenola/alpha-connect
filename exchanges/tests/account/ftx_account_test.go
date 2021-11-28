@@ -8,20 +8,19 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	"math"
 	"reflect"
 	"testing"
 	"time"
 )
 
-var FTXInstrument = &models.Instrument{
+var ftxInstrument = &models.Instrument{
 	Exchange: &constants.FTX,
 	Symbol:   &types.StringValue{Value: "BTC-PERP"},
 }
 
-var FTXAccount = &models.Account{
-	AccountID: "299211",
-	Exchange:  &constants.FTX,
+var ftxAccount = &models.Account{
+	Name:     "299211",
+	Exchange: &constants.FTX,
 	Credentials: &xchangerModels.APICredentials{
 		APIKey:    "ej2YRRJMMwQD2qjOaRQnB18K7EWTpy3fRTP1ZZoX",
 		APISecret: "MjJSlt1ix9OLpQLzkaQPlD_-y-N7c_2-6ZQJiwlY",
@@ -39,15 +38,17 @@ var FBinanceAccount = &models.Account{
 }
 */
 
-func TestFTXAccountListener_OnOrderCancelRequest(t *testing.T) {
+func TestftxAccountListener_OnOrderCancelRequest(t *testing.T) {
+	as, executor := start(t, ftxAccount)
+
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -71,10 +72,10 @@ func TestFTXAccountListener_OnOrderCancelRequest(t *testing.T) {
 
 	// Now cancel from the account
 
-	res, err = As.Root.RequestFuture(executor, &messages.OrderCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderCancelRequest{
 		RequestID:     0,
-		Account:       FTXAccount,
-		Instrument:    FTXInstrument,
+		Account:       ftxAccount,
+		Instrument:    ftxInstrument,
 		ClientOrderID: &types.StringValue{Value: orderID},
 	}, 10*time.Second).Result()
 
@@ -92,9 +93,11 @@ func TestFTXAccountListener_OnOrderCancelRequest(t *testing.T) {
 	time.Sleep(2 * time.Second)
 }
 
-func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestftxAccountListener_OnOrderStatusRequest(t *testing.T) {
+	as, executor := start(t, ftxAccount)
+
 	// Test with no account
-	res, err := As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   nil,
@@ -119,10 +122,10 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with account
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 	}, 30*time.Second).Result()
 
 	if err != nil {
@@ -137,15 +140,15 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
 	}
 
-	// Test with FTXInstrument and order status
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	// Test with ftxInstrument and order status
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderStatus:   &messages.OrderStatusValue{Value: models.New},
 		},
 	}, 10*time.Second).Result()
@@ -167,12 +170,12 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -194,15 +197,15 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	// Test with FTXInstrument and order status
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	// Test with ftxInstrument and order status
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderStatus:   &messages.OrderStatusValue{Value: models.New},
 		},
 	}, 10*time.Second).Result()
@@ -241,10 +244,10 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 		t.Fatalf("was expecting buy side order")
 	}
 
-	res, err = As.Root.RequestFuture(executor, &messages.OrderCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderCancelRequest{
 		RequestID:  0,
-		Account:    FTXAccount,
-		Instrument: FTXInstrument,
+		Account:    ftxAccount,
+		Instrument: ftxInstrument,
 		OrderID:    &types.StringValue{Value: order.OrderID},
 	}, 10*time.Second).Result()
 
@@ -260,11 +263,11 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 	/*
 		// Now delete
-		res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+		res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 			RequestID: 0,
-			Account:   FTXAccount,
+			Account:   ftxAccount,
 			Filter: &messages.OrderFilter{
-				Instrument: FTXInstrument,
+				Instrument: ftxInstrument,
 			},
 		}, 10*time.Second).Result()
 
@@ -283,13 +286,13 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Query order and check if got canceled
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:    &types.StringValue{Value: order.OrderID},
-			Instrument: FTXInstrument,
+			Instrument: ftxInstrument,
 		},
 	}, 10*time.Second).Result()
 
@@ -319,9 +322,11 @@ func TestFTXAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestFTXAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestftxAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+	as, executor := start(t, ftxAccount)
+
 	// Test Invalid account
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   nil,
 		Order:     nil,
@@ -342,9 +347,9 @@ func TestFTXAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test no order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -363,12 +368,12 @@ func TestFTXAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test with one order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -389,11 +394,11 @@ func TestFTXAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
-			Instrument: FTXInstrument,
+			Instrument: ftxInstrument,
 		},
 	}, 10*time.Second).Result()
 
@@ -409,10 +414,12 @@ func TestFTXAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestFTXAccountListener_OnBalancesRequest(t *testing.T) {
-	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
+func TestftxAccountListener_OnBalancesRequest(t *testing.T) {
+	as, executor := start(t, ftxAccount)
+
+	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -431,123 +438,16 @@ func TestFTXAccountListener_OnBalancesRequest(t *testing.T) {
 	fmt.Println(balanceResponse.Balances)
 }
 
-func checkFTXBalances(t *testing.T, account *models.Account) {
-	// Now check balance
-	ftxExecutor := As.NewLocalPID("executor/ftx_executor")
-	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
-		RequestID: 0,
-		Account:   account,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	balanceResponse, ok := res.(*messages.BalanceList)
-	if !ok {
-		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
-	}
-	if !balanceResponse.Success {
-		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
-	}
-	if len(balanceResponse.Balances) != 2 {
-		t.Fatalf("was expecting two balances, got %d", len(balanceResponse.Balances))
-	}
-	bal1 := balanceResponse.Balances[0]
-
-	res, err = As.Root.RequestFuture(ftxExecutor, &messages.BalancesRequest{
-		RequestID: 0,
-		Account:   account,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	balanceResponse, ok = res.(*messages.BalanceList)
-	if !ok {
-		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
-	}
-	if !balanceResponse.Success {
-		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
-	}
-	if len(balanceResponse.Balances) != 2 {
-		t.Fatalf("was expecting two balance, got %d", len(balanceResponse.Balances))
-	}
-	bal2 := balanceResponse.Balances[0]
-
-	fmt.Println(bal1.Quantity, bal2.Quantity)
-	if math.Abs(bal1.Quantity-bal2.Quantity) > 0.00001 {
-		t.Fatalf("different balance %f:%f", bal1.Quantity, bal2.Quantity)
-	}
-}
-
-func checkFTXPositions(t *testing.T, account *models.Account, FTXInstrument *models.Instrument) {
-	// Request the same from fbinance directly
-	ftxExecutor := As.NewLocalPID("executor/ftx_executor")
-
-	res, err := As.Root.RequestFuture(ftxExecutor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    account,
-		Instrument: FTXInstrument,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, ok := res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.PositionList, got %s", reflect.TypeOf(res).String())
-	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-
-	pos1 := response.Positions
-
-	res, err = As.Root.RequestFuture(executor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    FTXAccount,
-		Instrument: FTXInstrument,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, ok = res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-	pos2 := response.Positions
-
-	if len(pos1) != len(pos2) {
-		t.Fatalf("got different number of positions: %d %d", len(pos1), len(pos2))
-	}
-
-	for i := range pos1 {
-		p1 := pos1[i]
-		p2 := pos2[i]
-		// Compare the two
-		fmt.Println(p1.Cost, p2.Cost)
-		if math.Abs(p1.Cost-p2.Cost) > 0.000001 {
-			t.Fatalf("different cost %f:%f", p1.Cost, p2.Cost)
-		}
-		if math.Abs(p1.Quantity-p2.Quantity) > 0.00001 {
-			t.Fatalf("different quantity %f:%f", p1.Quantity, p2.Quantity)
-		}
-	}
-}
-
-func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
+func TestftxAccountListener_OnGetPositionsLimit(t *testing.T) {
+	as, executor := start(t, ftxAccount)
 
 	// Market buy 2 contract
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			Price:         &types.DoubleValue{Value: 50000},
@@ -566,20 +466,20 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	// Market sell 1 contract
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID:         uuid.NewV1().String(),
-			Instrument:            FTXInstrument,
+			Instrument:            ftxInstrument,
 			OrderType:             models.Limit,
 			OrderSide:             models.Sell,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
 			TimeInForce:           models.GoodTillCancel,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -588,21 +488,21 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	fmt.Println("CLOSING")
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID:         uuid.NewV1().String(),
-			Instrument:            FTXInstrument,
+			Instrument:            ftxInstrument,
 			OrderType:             models.Limit,
 			OrderSide:             models.Sell,
 			Price:                 &types.DoubleValue{Value: 42000},
 			Quantity:              0.001,
 			TimeInForce:           models.GoodTillCancel,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -613,19 +513,21 @@ func TestFTXAccountListener_OnGetPositionsLimit(t *testing.T) {
 
 	// Only check balances at the end, due to how FTX realize the PnL every
 	// second
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
+	checkBalances(t, as, executor, ftxAccount)
 }
 
-func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
+func TestftxAccountListener_OnOrderReplaceRequest(t *testing.T) {
+	as, executor := start(t, ftxAccount)
+
 	orderID := uuid.NewV1().String()
 	// Post one order
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -648,10 +550,10 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
-	res, err = As.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
-		Account:    FTXAccount,
-		Instrument: FTXInstrument,
+		Account:    ftxAccount,
+		Instrument: ftxInstrument,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
 			OrigClientOrderID: &types.StringValue{Value: orderID},
@@ -673,10 +575,10 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 	// Fetch orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: orderID},
 		},
@@ -701,11 +603,11 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   FTXAccount,
+		Account:   ftxAccount,
 		Filter: &messages.OrderFilter{
-			Instrument: FTXInstrument,
+			Instrument: ftxInstrument,
 		},
 	}, 10*time.Second).Result()
 
@@ -721,15 +623,16 @@ func TestFTXAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
+func TestftxAccountListener_OnGetPositionsMarket(t *testing.T) {
+	as, executor := start(t, ftxAccount)
 
 	// Market buy 1 contract
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
 			Quantity:      0.005,
@@ -746,15 +649,15 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 	fmt.Println("CHECK 1 GOOD")
 
 	// Market sell 1 contract
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
@@ -767,15 +670,15 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	fmt.Println("CLOSING")
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
@@ -788,14 +691,14 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
@@ -808,14 +711,14 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
@@ -828,14 +731,14 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
 
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: FTXAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: ftxAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    FTXInstrument,
+			Instrument:    ftxInstrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.Session,
@@ -848,6 +751,6 @@ func TestFTXAccountListener_OnGetPositionsMarket(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	checkFTXPositions(t, FTXAccount, FTXInstrument)
-	checkFTXBalances(t, FTXAccount)
+	checkPositions(t, as, executor, ftxAccount, ftxInstrument)
+	checkBalances(t, as, executor, ftxAccount)
 }

@@ -7,7 +7,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -24,18 +23,20 @@ var instrument2 = &models.Instrument{
 	Symbol:     &types.StringValue{Value: "ETHUSD"},
 }
 
-var BitmexAccount = &models.Account{
-	AccountID: "299210",
-	Exchange:  &constants.BITMEX,
+var bitmexAccount = &models.Account{
+	Name:     "299210",
+	Exchange: &constants.BITMEX,
 	Credentials: &xchangerModels.APICredentials{
 		APIKey:    "k5k6Mmaq3xe88Ph3fgIk9Vrt",
 		APISecret: "0laIjZaKOMkJPtKy2ldJ18m4Dxjp66Vdim0k1-q4TXASZFZo",
 	},
 }
 
-func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestbitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
 	// Test with no account
-	res, err := As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   nil,
@@ -60,10 +61,10 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with account
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -79,10 +80,10 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with instrument and order status
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -107,14 +108,14 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Test with one order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID:         uuid.NewV1().String(),
 			Instrument:            instrument1,
 			OrderType:             models.Limit,
-			ExecutionInstructions: []messages.ExecutionInstruction{messages.ParticipateDoNotInitiate},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ParticipateDoNotInitiate},
 			OrderSide:             models.Buy,
 			TimeInForce:           models.Session,
 			Quantity:              10.,
@@ -136,10 +137,10 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Test with instrument and order status
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:       nil,
 			ClientOrderID: nil,
@@ -183,9 +184,9 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 
 	// Now delete
-	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -205,10 +206,10 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order and check if got canceled
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			OrderID:    &types.StringValue{Value: order.OrderID},
 			Instrument: instrument1,
@@ -241,9 +242,11 @@ func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestbitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
 	// Test Invalid account
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   nil,
 		Order:     nil,
@@ -264,9 +267,9 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test no order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Order:     nil,
 	}, 10*time.Second).Result()
 
@@ -285,9 +288,9 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Test with one order
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -311,9 +314,9 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -331,9 +334,11 @@ func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
+func TestbitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
 	// Test Invalid account
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
 		Account:   nil,
 		Orders:    nil,
@@ -354,9 +359,9 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Test no orders
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Orders:    nil,
 	}, 10*time.Second).Result()
 
@@ -372,9 +377,9 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Test with two orders diff symbols
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -411,9 +416,9 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	order1ClID := uuid.NewV1().String()
 	order2ClID := uuid.NewV1().String()
 	// Test with two orders same symbol diff price
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -446,10 +451,10 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 			Instrument:    instrument1,
@@ -491,10 +496,10 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Query order
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order2ClID},
 			Instrument:    instrument1,
@@ -536,9 +541,9 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 
 	// Delete orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderMassCancelRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			Instrument: instrument1,
 		},
@@ -556,12 +561,14 @@ func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 }
 
-func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
+func TestbitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
 	orderID := uuid.NewV1().String()
 	// Post one order
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    instrument1,
@@ -587,9 +594,9 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
-	res, err = As.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
-		Account:    BitmexAccount,
+		Account:    bitmexAccount,
 		Instrument: instrument1,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
@@ -612,10 +619,10 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 	// Fetch orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: orderID},
 		},
@@ -640,12 +647,14 @@ func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
+func TestbitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
 	order1ClID := uuid.NewV1().String()
 	order2ClID := uuid.NewV1().String()
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -678,9 +687,9 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
-	res, err = As.Root.RequestFuture(executor, &messages.OrderBulkReplaceRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderBulkReplaceRequest{
 		RequestID:  0,
-		Account:    BitmexAccount,
+		Account:    bitmexAccount,
 		Instrument: instrument1,
 		Updates: []*messages.OrderUpdate{
 			{
@@ -711,10 +720,10 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Fetch orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 		},
@@ -739,10 +748,10 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	}
 
 	// Fetch orders
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order2ClID},
 		},
@@ -767,10 +776,12 @@ func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
-	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
+func TestbitmexAccountListener_OnBalancesRequest(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
+
+	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -788,118 +799,11 @@ func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
 	}
 }
 
-func checkBitmexBalances(t *testing.T) {
-	// Now check balance
-	bitmexExecutor := As.NewLocalPID("executor/bitmex_executor")
-
-	res, err := As.Root.RequestFuture(executor, &messages.BalancesRequest{
-		RequestID: 0,
-		Account:   BitmexAccount,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	balanceResponse, ok := res.(*messages.BalanceList)
-	if !ok {
-		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
-	}
-	if !balanceResponse.Success {
-		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
-	}
-	if len(balanceResponse.Balances) != 1 {
-		t.Fatalf("was expecting one balance, got %d", len(balanceResponse.Balances))
-	}
-	bal1 := balanceResponse.Balances[0]
-
-	res, err = As.Root.RequestFuture(bitmexExecutor, &messages.BalancesRequest{
-		RequestID: 0,
-		Account:   BitmexAccount,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	balanceResponse, ok = res.(*messages.BalanceList)
-	if !ok {
-		t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
-	}
-	if !balanceResponse.Success {
-		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
-	}
-	if len(balanceResponse.Balances) != 1 {
-		t.Fatalf("was expecting one balance, got %d", len(balanceResponse.Balances))
-	}
-	bal2 := balanceResponse.Balances[0]
-
-	if math.Abs(bal1.Quantity-bal2.Quantity) > 0.00001 {
-		t.Fatalf("different balance %f:%f", bal1.Quantity, bal2.Quantity)
-	}
-}
-
-func checkBitmexPositions(t *testing.T, instrument *models.Instrument) {
-	// Request the same from bitmex directly
-	bitmexExecutor := As.NewLocalPID("executor/bitmex_executor")
-
-	res, err := As.Root.RequestFuture(bitmexExecutor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    BitmexAccount,
-		Instrument: instrument,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, ok := res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.PositionList, got %s", reflect.TypeOf(res).String())
-	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-
-	pos1 := response.Positions
-
-	res, err = As.Root.RequestFuture(executor, &messages.PositionsRequest{
-		RequestID:  0,
-		Account:    BitmexAccount,
-		Instrument: instrument,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, ok = res.(*messages.PositionList)
-	if !ok {
-		t.Fatalf("was expecting *messages.NewOrderBulkResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
-	}
-	pos2 := response.Positions
-
-	if len(pos1) != len(pos2) {
-		t.Fatalf("got different number of positions: %d %d", len(pos1), len(pos2))
-	}
-
-	for i := range pos1 {
-		p1 := pos1[i]
-		p2 := pos2[i]
-		// Compare the two
-		if math.Abs(p1.Cost-p2.Cost) > 0.000001 {
-			t.Fatalf("different cost %f:%f", p1.Cost, p2.Cost)
-		}
-		if math.Abs(p1.Quantity-p2.Quantity) > 0.00001 {
-			t.Fatalf("different quantity %f:%f", p1.Quantity, p2.Quantity)
-		}
-	}
-}
-
-func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
-
+func TestbitmexAccountListener_OnGetPositions(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
 	// Market buy 1 contract
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -920,12 +824,12 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkBitmexPositions(t, instrument2)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument2)
+	checkBalances(t, as, executor, bitmexAccount)
 
 	// Market sell 1 contract
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -941,12 +845,12 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkBitmexPositions(t, instrument2)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument2)
+	checkBalances(t, as, executor, bitmexAccount)
 
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument2,
@@ -962,15 +866,16 @@ func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkBitmexPositions(t, instrument2)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument2)
+	checkBalances(t, as, executor, bitmexAccount)
 }
 
-func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
+func TestbitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
 
 	// Market buy 2 contracts
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -991,12 +896,12 @@ func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkBitmexPositions(t, instrument1)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument1)
+	checkBalances(t, as, executor, bitmexAccount)
 
 	// Market sell 1 contract
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -1012,12 +917,12 @@ func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	checkBitmexPositions(t, instrument1)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument1)
+	checkBalances(t, as, executor, bitmexAccount)
 
 	// Close position
-	res, err = As.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
-		Account: BitmexAccount,
+	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
+		Account: bitmexAccount,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    instrument1,
@@ -1035,17 +940,18 @@ func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 
 	// Request the same from bitmex directly
 
-	checkBitmexPositions(t, instrument1)
-	checkBitmexBalances(t)
+	checkPositions(t, as, executor, bitmexAccount, instrument1)
+	checkBalances(t, as, executor, bitmexAccount)
 }
 
-func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
+func TestbitmexAccountListener_ConfirmFillReplace(t *testing.T) {
+	as, executor := start(t, bitmexAccount)
 
 	order1ClID := uuid.NewV1().String()
 	// Test with two orders same symbol diff price
-	res, err := As.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
+	res, err := as.Root.RequestFuture(executor, &messages.NewOrderBulkRequest{
 		RequestID: 0,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    instrument1,
@@ -1071,9 +977,9 @@ func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Send a replace right after
-	res, err = As.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderReplaceRequest{
 		RequestID:  0,
-		Account:    BitmexAccount,
+		Account:    bitmexAccount,
 		Instrument: instrument1,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
@@ -1097,10 +1003,10 @@ func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Query order
-	res, err = As.Root.RequestFuture(executor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
-		Account:   BitmexAccount,
+		Account:   bitmexAccount,
 		Filter: &messages.OrderFilter{
 			ClientOrderID: &types.StringValue{Value: order1ClID},
 			Instrument:    instrument1,

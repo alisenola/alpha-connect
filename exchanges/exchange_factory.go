@@ -55,6 +55,8 @@ func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Coll
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
+	case constants.BINANCE.ID:
+		return func() actor.Actor { return binance.NewAccountListener(account, txs, execs) }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewAccountListener(account, txs, execs) }
 	case constants.FTX.ID:

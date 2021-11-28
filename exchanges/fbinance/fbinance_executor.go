@@ -1201,72 +1201,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
-func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (fbinance.NewOrderRequest, *messages.RejectionReason) {
-	var side fbinance.OrderSide
-	var typ fbinance.OrderType
-	if order.OrderSide == models.Buy {
-		side = fbinance.BUY_ORDER
-	} else {
-		side = fbinance.SELL_ODER
-	}
-	switch order.OrderType {
-	case models.Limit:
-		typ = fbinance.LIMIT_ORDER
-	case models.Market:
-		typ = fbinance.MARKET_ORDER
-	case models.Stop:
-		typ = fbinance.STOP_LOSS_ORDER
-	case models.StopLimit:
-		typ = fbinance.STOP_LOSS_LIMIT_ORDER
-	default:
-		rej := messages.UnsupportedOrderType
-		return nil, &rej
-	}
-
-	request := fbinance.NewNewOrderRequest(symbol, side, typ)
-
-	fmt.Println("SET QTY", order.Quantity, lotPrecision, strconv.FormatFloat(order.Quantity, 'f', int(lotPrecision), 64))
-	request.SetQuantity(order.Quantity, lotPrecision)
-	request.SetNewClientOrderID(order.ClientOrderID)
-
-	if order.OrderType != models.Market {
-		switch order.TimeInForce {
-		case models.Session:
-			request.SetTimeInForce(fbinance.GOOD_TILL_CANCEL)
-		case models.GoodTillCancel:
-			request.SetTimeInForce(fbinance.GOOD_TILL_CANCEL)
-		case models.ImmediateOrCancel:
-			request.SetTimeInForce(fbinance.IMMEDIATE_OR_CANCEL)
-		case models.FillOrKill:
-			request.SetTimeInForce(fbinance.FILL_OR_KILL)
-		default:
-			rej := messages.UnsupportedOrderTimeInForce
-			return nil, &rej
-		}
-	}
-
-	if order.Price != nil {
-		request.SetPrice(order.Price.Value, tickPrecision)
-	}
-
-	for _, exec := range order.ExecutionInstructions {
-		rej := messages.UnsupportedOrderCharacteristic
-		switch exec {
-		case models.ReduceOnly:
-			if err := request.SetReduceOnly(true); err != nil {
-				return nil, &rej
-			}
-		case models.ParticipateDoNotInitiate:
-			request.SetTimeInForce(fbinance.GOOD_TILL_CROSSING)
-		default:
-			return nil, &rej
-		}
-	}
-	request.SetNewOrderResponseType(fbinance.ACK_RESPONSE_TYPE)
-
-	return request, nil
-}
-
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	response := &messages.NewOrderSingleResponse{
@@ -1274,6 +1208,25 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	if state.secondOrderRateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	if state.minuteOrderRateLimit.IsRateLimited() {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
 	symbol := ""
 	var tickPrecision, lotPrecision int
 	if req.Order.Instrument != nil {
@@ -1314,27 +1267,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	request, weight, err := fbinance.NewOrder(req.Account.Credentials, params)
 	if err != nil {
 		return err
-	}
-
-	fmt.Println(request.URL)
-
-	qr := state.getQueryRunner()
-	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-
-	if state.secondOrderRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-
-	if state.minuteOrderRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
 	}
 
 	state.secondOrderRateLimit.Request(1)
