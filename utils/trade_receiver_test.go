@@ -1,4 +1,4 @@
-package tests
+package utils_test
 
 import (
 	"fmt"
@@ -17,8 +17,8 @@ import (
 )
 
 var FBinanceAccount = &models.Account{
-	AccountID: "299211",
-	Exchange:  &constants.FBINANCE,
+	Name:     "299211",
+	Exchange: &constants.FBINANCE,
 	Credentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
@@ -37,9 +37,16 @@ func TestTradeReceiver(t *testing.T) {
 	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("../assets.json")))
 	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exchgs, []*account.Account{accnt}, xchangerUtils.DefaultDialerPool)), "executor")
+	cfg := &exchanges.ExecutorConfig{
+		Db:         nil,
+		Exchanges:  exchgs,
+		Accounts:   []*account.Account{accnt},
+		DialerPool: xchangerUtils.DefaultDialerPool,
+		Strict:     false,
+	}
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(cfg)), "executor")
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

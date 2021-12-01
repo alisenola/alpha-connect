@@ -230,9 +230,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
-			if symbol.Status == "TRADING" {
-				fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
-			}
+			/*
+				if symbol.Status == "TRADING" {
+					fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
+				}
+			*/
 			continue
 		}
 		quote := symbol.QuoteAsset
