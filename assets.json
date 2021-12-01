@@ -1344,13 +1344,8 @@
     "ID": 269
   },
   "270": {
-    "symbol": "ELF",
-    "name": "aelf",
-    "ID": 270
-  },
-  "271": {
     "symbol": "AION",
     "name": "aion",
-    "ID": 271
+    "ID": 270
   }
 }
