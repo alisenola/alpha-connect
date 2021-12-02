@@ -376,7 +376,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 }
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsResponse)
+	msg := context.Message().(*messages.MarketStatisticsRequest)
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,

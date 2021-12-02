@@ -36,9 +36,10 @@ type Executor struct {
 	accountManagers   map[string]*actor.PID
 	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
 	securities        map[uint64]*models.Security // A map from security ID to security
-	instruments       map[uint64]*actor.PID       // A map from security ID to market manager
-	slSubscribers     map[uint64]*actor.PID       // A map from request ID to security list subscribers
-	execSubscribers   map[uint64]*actor.PID       // A map from request ID to execution report subscribers
+	symbToSecs        map[uint32]map[string]*models.Security
+	instruments       map[uint64]*actor.PID // A map from security ID to market manager
+	slSubscribers     map[uint64]*actor.PID // A map from request ID to security list subscribers
+	execSubscribers   map[uint64]*actor.PID // A map from request ID to execution report subscribers
 	logger            *log.Logger
 	dialerPool        *xchangerUtils.DialerPool
 	strict            bool
@@ -91,6 +92,12 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.MarketDataRequest:
 		if err := state.OnMarketDataRequest(context); err != nil {
 			state.logger.Error("error processing OnMarketDataRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.MarketStatisticsRequest:
+		if err := state.OnMarketStatisticsRequest(context); err != nil {
+			state.logger.Error("error processing OnMarketStatisticsRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -254,6 +261,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 
 	state.securities = make(map[uint64]*models.Security)
+	state.symbToSecs = make(map[uint32]map[string]*models.Security)
 	for _, fut := range futures {
 		res, err := fut.Result()
 		if err != nil {
@@ -271,12 +279,17 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if !response.Success {
 			return errors.New(response.RejectionReason.String())
 		}
+		symbToSec := make(map[string]*models.Security)
+		var exchID uint32
 		for _, s := range response.Securities {
 			if sec2, ok := state.securities[s.SecurityID]; ok {
 				return fmt.Errorf("got two securities with the same ID: %s %s", sec2.Symbol, s.Symbol)
 			}
 			state.securities[s.SecurityID] = s
+			symbToSec[s.Symbol] = s
+			exchID = s.Exchange.ID
 		}
+		state.symbToSecs[exchID] = symbToSec
 	}
 
 	// Spawn all account listeners
@@ -330,65 +343,106 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) getSecurity(instr *models.Instrument) (*models.Security, *messages.RejectionReason) {
+	if instr == nil {
+		rej := messages.MissingInstrument
+		return nil, &rej
+	}
+	if instr.SecurityID != nil {
+		if sec, ok := state.securities[instr.SecurityID.Value]; ok {
+			return sec, nil
+		} else {
+			rej := messages.UnknownSecurityID
+			return nil, &rej
+		}
+	} else if instr.Symbol != nil {
+		if instr.Exchange == nil {
+			rej := messages.UnknownExchange
+			return nil, &rej
+		}
+		symbolsToSecs, ok := state.symbToSecs[instr.Exchange.ID]
+		if !ok {
+			rej := messages.UnknownExchange
+			return nil, &rej
+		}
+		sec, ok := symbolsToSecs[instr.Symbol.Value]
+		if !ok {
+			rej := messages.UnknownSymbol
+			return nil, &rej
+		}
+		return sec, nil
+	} else {
+		rej := messages.MissingInstrument
+		return nil, &rej
+	}
+}
+
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
-	if request.Instrument == nil || request.Instrument.SecurityID == nil {
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
 		context.Respond(&messages.MarketDataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownSecurityID,
+			RejectionReason: *rej,
 		})
 		return nil
 	}
-	securityID := request.Instrument.SecurityID.Value
-	security, ok := state.securities[securityID]
-	if !ok {
-		context.Respond(&messages.MarketDataResponse{
-			RequestID:       request.RequestID,
-			Success:         false,
-			RejectionReason: messages.UnknownSecurityID,
-		})
-		return nil
-	}
-	if pid, ok := state.instruments[securityID]; ok {
+	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewMarketDataManagerProducer(security, state.dialerPool)).WithSupervisor(
+		props := actor.PropsFromProducer(NewMarketDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
-		state.instruments[securityID] = pid
+		state.instruments[sec.SecurityID] = pid
 		context.Forward(pid)
 	}
 
 	return nil
 }
 
+func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
+	request := context.Message().(*messages.MarketStatisticsRequest)
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.MarketStatisticsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	exchange, ok := state.executors[sec.Exchange.ID]
+	if !ok {
+		context.Respond(&messages.MarketStatisticsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownExchange,
+		})
+		return nil
+	}
+	context.Forward(exchange)
+
+	return nil
+}
+
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	request := context.Message().(*messages.HistoricalLiquidationsRequest)
-	if request.Instrument == nil || request.Instrument.SecurityID == nil {
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
 		context.Respond(&messages.HistoricalLiquidationsResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownSecurityID,
+			RejectionReason: *rej,
 		})
 		return nil
 	}
-	securityID := request.Instrument.SecurityID.Value
-	security, ok := state.securities[securityID]
+	exchange, ok := state.executors[sec.Exchange.ID]
 	if !ok {
 		context.Respond(&messages.HistoricalLiquidationsResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownSecurityID,
-		})
-		return nil
-	}
-	exchange, ok := state.executors[security.Exchange.ID]
-	if !ok {
-		context.Respond(&messages.HistoricalLiquidationsResponse{
-			RequestID:       request.RequestID,
-			Success:         false,
-			RejectionReason: messages.UnknownSecurityID,
+			RejectionReason: messages.UnknownExchange,
 		})
 		return nil
 	}
@@ -399,32 +453,23 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error {
 	request := context.Message().(*messages.SecurityDefinitionRequest)
-	if request.Instrument == nil || request.Instrument.SecurityID == nil {
-		context.Respond(&messages.SecurityDefinitionResponse{
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.MarketDataResponse{
 			RequestID:       request.RequestID,
-			ResponseID:      uint64(time.Now().UnixNano()),
-			Security:        nil,
-			RejectionReason: messages.UnknownSecurityID,
 			Success:         false,
+			RejectionReason: *rej,
 		})
 		return nil
 	}
-	if sec, ok := state.securities[request.Instrument.SecurityID.Value]; ok {
-		context.Respond(&messages.SecurityDefinitionResponse{
-			RequestID:  request.RequestID,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Security:   sec,
-			Success:    true,
-		})
-	} else {
-		context.Respond(&messages.SecurityDefinitionResponse{
-			RequestID:       request.RequestID,
-			ResponseID:      uint64(time.Now().UnixNano()),
-			Security:        nil,
-			RejectionReason: messages.UnknownSecurityID,
-			Success:         false,
-		})
-	}
+
+	context.Respond(&messages.SecurityDefinitionResponse{
+		RequestID:  request.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Security:   sec,
+		Success:    true,
+	})
+
 	return nil
 }
 
