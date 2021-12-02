@@ -289,32 +289,21 @@ var MDTests = []MDTest{
 		isInverse:         true,
 		status:            models.Trading,
 	},
-	{
-		securityID:        2402007053666382556,
-		symbol:            "BTC210625",
-		securityType:      enum.SecurityType_CRYPTO_FUT,
-		exchange:          constants.HUOBIF,
-		baseCurrency:      constants.BITCOIN,
-		quoteCurrency:     constants.DOLLAR,
-		minPriceIncrement: 0.01,
-		roundLot:          1.,
-		hasMaturityDate:   true,
-		isInverse:         false,
-		status:            models.Trading,
-	},
-	{
-		securityID:        2402007053666382556,
-		symbol:            "BTC210625",
-		securityType:      enum.SecurityType_CRYPTO_FUT,
-		exchange:          constants.HUOBIP,
-		baseCurrency:      constants.BITCOIN,
-		quoteCurrency:     constants.DOLLAR,
-		minPriceIncrement: 0.01,
-		roundLot:          1.,
-		hasMaturityDate:   true,
-		isInverse:         false,
-		status:            models.Trading,
-	},
+	/*
+		{
+			securityID:        2402007053666382556,
+			symbol:            "BTC210625",
+			securityType:      enum.SecurityType_CRYPTO_FUT,
+			exchange:          constants.HUOBIF,
+			baseCurrency:      constants.BITCOIN,
+			quoteCurrency:     constants.DOLLAR,
+			minPriceIncrement: 0.01,
+			roundLot:          1.,
+			hasMaturityDate:   true,
+			isInverse:         false,
+			status:            models.Trading,
+		},
+	*/
 	{
 		securityID:        7374647908427501521,
 		symbol:            "BTCUSD",
@@ -355,14 +344,14 @@ var MDTests = []MDTest{
 		status:            models.Trading,
 	},
 	{
-		securityID:        5390294902314234278,
-		symbol:            "BTC-USD",
+		securityID:        8219034216918946889,
+		symbol:            "BTC-USDT",
 		securityType:      enum.SecurityType_CRYPTO_SPOT,
 		exchange:          constants.BITHUMBG,
 		baseCurrency:      constants.BITCOIN,
-		quoteCurrency:     constants.DOLLAR,
-		minPriceIncrement: 0.,
-		roundLot:          0.,
+		quoteCurrency:     constants.TETHER,
+		minPriceIncrement: 0.01,
+		roundLot:          1e-06,
 		hasMaturityDate:   false,
 		isInverse:         false,
 		status:            models.Trading,
@@ -395,7 +384,6 @@ func TestAll(t *testing.T) {
 
 func MarketData(t *testing.T, test MDTest) {
 	//t.Parallel()
-	fmt.Println("MARKET DATA", test)
 	as, executor, clean := StartExecutor(&test.exchange)
 	defer clean()
 	var obChecker *actor.PID
