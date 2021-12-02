@@ -1,11 +1,9 @@
-package listener
+package tests
 
 import (
-	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -289,21 +287,20 @@ var MDTests = []MDTest{
 		isInverse:         true,
 		status:            models.Trading,
 	},
-	/*
-		{
-			securityID:        2402007053666382556,
-			symbol:            "BTC210625",
-			securityType:      enum.SecurityType_CRYPTO_FUT,
-			exchange:          constants.HUOBIF,
-			baseCurrency:      constants.BITCOIN,
-			quoteCurrency:     constants.DOLLAR,
-			minPriceIncrement: 0.01,
-			roundLot:          1.,
-			hasMaturityDate:   true,
-			isInverse:         false,
-			status:            models.Trading,
-		},
-	*/
+
+	{
+		securityID:        2402007053666382556,
+		symbol:            "BTC210625",
+		securityType:      enum.SecurityType_CRYPTO_FUT,
+		exchange:          constants.HUOBIF,
+		baseCurrency:      constants.BITCOIN,
+		quoteCurrency:     constants.DOLLAR,
+		minPriceIncrement: 0.01,
+		roundLot:          1.,
+		hasMaturityDate:   true,
+		isInverse:         false,
+		status:            models.Trading,
+	},
 	{
 		securityID:        7374647908427501521,
 		symbol:            "BTCUSD",
@@ -369,6 +366,19 @@ var MDTests = []MDTest{
 		isInverse:         false,
 		status:            models.Trading,
 	},
+	{
+		securityID:        11630614572540763252,
+		symbol:            "BTC-USD",
+		securityType:      enum.SecurityType_CRYPTO_SPOT,
+		exchange:          constants.COINBASEPRO,
+		baseCurrency:      constants.BITCOIN,
+		quoteCurrency:     constants.DOLLAR,
+		minPriceIncrement: 0.01,
+		roundLot:          1e-08,
+		hasMaturityDate:   false,
+		isInverse:         false,
+		status:            models.Trading,
+	},
 }
 
 func TestAll(t *testing.T) {
@@ -409,7 +419,6 @@ func MarketData(t *testing.T, test MDTest) {
 		t.Fatal(securityList.RejectionReason.String())
 	}
 	for _, s := range securityList.Securities {
-		fmt.Println(s)
 		tested := false
 		for _, secID := range securityID {
 			if secID == s.SecurityID {
@@ -458,13 +467,13 @@ func MarketData(t *testing.T, test MDTest) {
 		t.Fatalf("was expecting different maturity date")
 	}
 
-	obChecker = as.Root.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+	obChecker = as.Root.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec)))
 	time.Sleep(20 * time.Second)
-	res, err = as.Root.RequestFuture(obChecker, &tests.GetStat{}, 10*time.Second).Result()
+	res, err = as.Root.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	stats := res.(*tests.GetStat)
+	stats := res.(*GetStat)
 	t.Logf("Trades: %d | OBUpdates: %d", stats.Trades, stats.OBUpdates)
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
