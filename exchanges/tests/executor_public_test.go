@@ -10,11 +10,6 @@ import (
 	"time"
 )
 
-type ReqRes struct {
-	request  interface{}
-	response interface{}
-}
-
 type ExPubTest struct {
 	instrument                    *models.Instrument
 	securityListRequest           bool
