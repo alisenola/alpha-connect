@@ -57,6 +57,7 @@ enum RejectionReason {
     UnsupportedOrderTimeInForce = 23;
     UnsupportedRequest = 24;
     UnknownAccount = 25;
+    UnknownExchange = 26;
 }
 
 enum FeeType {
