@@ -2,6 +2,7 @@ package tests
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -21,7 +22,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *actor.PID, func()) {
+func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
 	assets := map[uint32]xchangerModels.Asset{
 		constants.DOLLAR.ID:           constants.DOLLAR,
 		constants.EURO.ID:             constants.EURO,
@@ -48,9 +49,19 @@ func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *acto
 		exchange,
 	}
 	as := actor.NewActorSystem()
+	var accnts []*account.Account
+	if acc != nil {
+		accnt, err := exchanges.NewAccount(acc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		accnts = append(accnts, accnt)
+	}
+
 	cfg := &exchanges.ExecutorConfig{
 		Exchanges: exch,
 		Strict:    true,
+		Accounts:  accnts,
 	}
 	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(cfg)), "executor")
 	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
@@ -394,7 +405,7 @@ func TestAll(t *testing.T) {
 
 func MarketData(t *testing.T, test MDTest) {
 	//t.Parallel()
-	as, executor, clean := StartExecutor(&test.exchange)
+	as, executor, clean := StartExecutor(t, &test.exchange, nil)
 	defer clean()
 	var obChecker *actor.PID
 	defer func() {

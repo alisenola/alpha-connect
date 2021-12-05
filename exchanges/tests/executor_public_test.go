@@ -254,7 +254,7 @@ func TestAllExPub(t *testing.T) {
 }
 
 func ExPub(t *testing.T, tc ExPubTest) {
-	as, executor, cleaner := StartExecutor(tc.instrument.Exchange)
+	as, executor, cleaner := StartExecutor(t, tc.instrument.Exchange, nil)
 	defer cleaner()
 
 	if tc.securityListRequest {
