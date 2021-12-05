@@ -14,8 +14,8 @@ type Market interface {
 
 type LongShortModel interface {
 	GetPenalty(fee float64) float64
-	GetLongScore(ID uint64) float64
-	GetShortScore(ID uint64) float64
+	GetLongScore(ID uint64) (float64, bool)
+	GetShortScore(ID uint64) (float64, bool)
 	GetSelectors() []string
 }
 
@@ -183,11 +183,11 @@ func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
 	return m.model.GetPenalty(fee)
 }
 
-func (m *MarketLongShortModel) GetLongScore(ID uint64) float64 {
+func (m *MarketLongShortModel) GetLongScore(ID uint64) (float64, bool) {
 	return m.model.GetLongScore(ID)
 }
 
-func (m *MarketLongShortModel) GetShortScore(ID uint64) float64 {
+func (m *MarketLongShortModel) GetShortScore(ID uint64) (float64, bool) {
 	return m.model.GetShortScore(ID)
 }
 
