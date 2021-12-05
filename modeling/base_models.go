@@ -41,16 +41,18 @@ func (m *ConstantLongShortModel) SetLongScore(ID uint64, score float64) {
 	m.longScores[ID] = score
 }
 
-func (m *ConstantLongShortModel) GetLongScore(ID uint64) float64 {
-	return m.longScores[ID]
+func (m *ConstantLongShortModel) GetLongScore(ID uint64) (float64, bool) {
+	s, ok := m.longScores[ID]
+	return s, ok
 }
 
 func (m *ConstantLongShortModel) SetShortScore(ID uint64, score float64) {
 	m.shortScores[ID] = score
 }
 
-func (m *ConstantLongShortModel) GetShortScore(ID uint64) float64 {
-	return m.longScores[ID]
+func (m *ConstantLongShortModel) GetShortScore(ID uint64) (float64, bool) {
+	s, ok := m.longScores[ID]
+	return s, ok
 }
 
 func (m *ConstantLongShortModel) GetSelectors() []string {
