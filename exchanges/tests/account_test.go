@@ -6,6 +6,8 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"testing"
@@ -23,8 +25,8 @@ var spotTests = []AccntTest{
 			Name:     "binance",
 			Exchange: &constants.BINANCE,
 			Credentials: &xchangerModels.APICredentials{
-				APIKey:    "XgHlK1xiQcq5IBP6KsmD7ewZONJHjhlq9JqopTuoB7lanSw3TYdLAcFn5fudyevO",
-				APISecret: "GAiZ4UOztJzoB3Qonv4nE2X8KgEyl0jxSBtLBkpwgXeZYtSqGogwlh89YerLSqlu",
+				APIKey:    "DNySYXVSG7xrM7S8dGSTvLRmRGJIzoU80Uj78IpFOYxiI9veS54VCu8bxQNLloz2",
+				APISecret: "OrIJH6qYynrVFgEi62cknUpf02MoA82l45ySfP3ZTKRPainFJzG377BoJJmTuwXv",
 			},
 		},
 		instrument: &models.Instrument{
@@ -37,6 +39,8 @@ var spotTests = []AccntTest{
 var derivTests = []AccntTest{}
 
 func TestAllAccount(t *testing.T) {
+	binance.EnableTestNet()
+	fbinance.EnableTestNet()
 	t.Parallel()
 	for _, tc := range spotTests {
 		tc := tc
