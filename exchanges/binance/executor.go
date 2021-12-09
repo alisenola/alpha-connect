@@ -493,14 +493,14 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			params.SetOrigClientOrderID(clOrderID)
 		}
 		var err error
-		request, weight, err = binance.QueryOrder(params, msg.Account.Credentials)
+		request, weight, err = binance.QueryOrder(params, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
 	} else {
 		multi = true
 		var err error
-		request, weight, err = binance.GetOpenOrders(symbol, msg.Account.Credentials)
+		request, weight, err = binance.GetOpenOrders(symbol, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
@@ -617,7 +617,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Balances:   nil,
 	}
 
-	request, weight, err := binance.GetAccountInformation(msg.Account.Credentials)
+	request, weight, err := binance.GetAccountInformation(msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -756,7 +756,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := binance.NewOrder(params, req.Account.Credentials)
+	request, weight, err := binance.NewOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -857,7 +857,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := binance.CancelOrder(symbol, orderID, req.Account.Credentials)
+	request, weight, err := binance.CancelOrder(symbol, orderID, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}

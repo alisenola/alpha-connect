@@ -589,7 +589,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 		params.SetIncomeType(fbinance.WELCOME_BONUS)
 	}
 
-	request, weight, err := fbinance.GetIncomeHistory(params, msg.Account.Credentials)
+	request, weight, err := fbinance.GetIncomeHistory(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -762,7 +762,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		}
 	}
 
-	request, weight, err := fbinance.GetUserTrades(params, msg.Account.Credentials)
+	request, weight, err := fbinance.GetUserTrades(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -918,13 +918,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			params.SetOrigClientOrderID(clOrderID)
 		}
 		var err error
-		request, weight, err = fbinance.QueryOrder(params, msg.Account.Credentials)
+		request, weight, err = fbinance.QueryOrder(params, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
 	} else {
 		var err error
-		request, weight, err = fbinance.QueryOpenOrders(symbol, msg.Account.Credentials)
+		request, weight, err = fbinance.QueryOpenOrders(symbol, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
@@ -1025,7 +1025,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		}
 	}
 
-	request, weight, err := fbinance.GetPositionRisk(msg.Account.Credentials)
+	request, weight, err := fbinance.GetPositionRisk(msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1128,7 +1128,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Balances:   nil,
 	}
 
-	request, weight, err := fbinance.GetBalance(msg.Account.Credentials)
+	request, weight, err := fbinance.GetBalance(msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1264,7 +1264,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := fbinance.NewOrder(params, req.Account.Credentials)
+	request, weight, err := fbinance.NewOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1376,7 +1376,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := fbinance.CancelOrder(params, req.Account.Credentials)
+	request, weight, err := fbinance.CancelOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1494,7 +1494,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := fbinance.CancelAllOrders(symbol, req.Account.Credentials)
+	request, weight, err := fbinance.CancelAllOrders(symbol, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}

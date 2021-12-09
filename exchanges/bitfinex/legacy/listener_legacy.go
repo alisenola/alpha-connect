@@ -1,4 +1,4 @@
-package bitfinex
+package legacy
 
 /*
 type readSocket struct{}

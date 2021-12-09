@@ -355,13 +355,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		multi = false
 		if orderID != "" {
 			var err error
-			request, weight, err = ftxus.GetOrderStatus(orderID, msg.Account.Credentials)
+			request, weight, err = ftxus.GetOrderStatus(orderID, msg.Account.ApiCredentials)
 			if err != nil {
 				return err
 			}
 		} else {
 			var err error
-			request, weight, err = ftxus.GetOrderStatusByClientID(orderID, msg.Account.Credentials)
+			request, weight, err = ftxus.GetOrderStatusByClientID(orderID, msg.Account.ApiCredentials)
 			if err != nil {
 				return err
 			}
@@ -369,7 +369,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	} else {
 		multi = true
 		var err error
-		request, weight, err = ftxus.GetOpenOrders(symbol, msg.Account.Credentials)
+		request, weight, err = ftxus.GetOpenOrders(symbol, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
@@ -551,7 +551,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		}
 	}
 
-	request, weight, err := ftxus.GetPositions(true, msg.Account.Credentials)
+	request, weight, err := ftxus.GetPositions(true, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -660,7 +660,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Balances:   nil,
 	}
 
-	request, weight, err := ftxus.GetBalances(msg.Account.Credentials)
+	request, weight, err := ftxus.GetBalances(msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -837,7 +837,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := ftxus.PlaceOrder(params, req.Account.Credentials)
+	request, weight, err := ftxus.PlaceOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -924,7 +924,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		params.Size = &req.Update.Quantity.Value
 	}
 
-	request, weight, err := ftxus.ModifyOrder(req.Update.OrderID.Value, params, req.Account.Credentials)
+	request, weight, err := ftxus.ModifyOrder(req.Update.OrderID.Value, params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1002,7 +1002,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	var weight int
 	if req.OrderID != nil {
 		var err error
-		request, weight, err = ftxus.CancelOrder(req.OrderID.Value, req.Account.Credentials)
+		request, weight, err = ftxus.CancelOrder(req.OrderID.Value, req.Account.ApiCredentials)
 		if err != nil {
 			response.RejectionReason = messages.InvalidRequest
 			context.Respond(response)

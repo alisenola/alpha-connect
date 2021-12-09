@@ -129,6 +129,7 @@ enum OrderType {
     StopLimit = 3;
     LimitIfTouched = 4;
     MarketIfTouched = 5;
+    TrailingStopLimit = 6;
 }
 
 enum TimeInForce {

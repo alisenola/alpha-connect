@@ -1,17 +1,18 @@
-package ftx
+package binance
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/account"
-	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
+	"gitlab.com/alphaticks/xchanger/exchanges/binance"
+	"gitlab.com/alphaticks/xchanger/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 	"math"
 	"net"
@@ -23,24 +24,25 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
-type checkExpiration struct{}
+type refreshKey struct{}
 
 type AccountListener struct {
-	account               *account.Account
-	seqNum                uint64
-	ftxExecutor           *actor.PID
-	ws                    *ftx.Websocket
-	executorManager       *actor.PID
-	logger                *log.Logger
-	checkAccountTicker    *time.Ticker
-	checkSocketTicker     *time.Ticker
-	checkExpirationTicker *time.Ticker
-	lastPingTime          time.Time
-	securities            map[uint64]*models.Security
-	client                *http.Client
-	txs                   *mongo.Collection
-	execs                 *mongo.Collection
-	reconciler            *actor.PID
+	account            *account.Account
+	seqNum             uint64
+	binanceExecutor    *actor.PID
+	listenKey          string
+	ws                 *binance.AuthWebsocket
+	executorManager    *actor.PID
+	logger             *log.Logger
+	checkAccountTicker *time.Ticker
+	checkSocketTicker  *time.Ticker
+	refreshKeyTicker   *time.Ticker
+	lastPingTime       time.Time
+	securities         map[uint64]*models.Security
+	client             *http.Client
+	txs                *mongo.Collection
+	execs              *mongo.Collection
+	reconciler         *actor.PID
 }
 
 func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
@@ -124,8 +126,9 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *messages.NewOrderSingleRequest:
+		fmt.Println("HRELLO")
 		if err := state.OnNewOrderSingleRequest(context); err != nil {
-			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+			state.logger.Error("error processing OnNewOrderSingleRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -177,9 +180,9 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *checkExpiration:
-		if err := state.checkExpiration(context); err != nil {
-			state.logger.Error("error checking expired orders", log.Error(err))
+	case *refreshKey:
+		if err := state.refreshKey(context); err != nil {
+			state.logger.Error("error refreshing key", log.Error(err))
 			panic(err)
 		}
 	}
@@ -194,8 +197,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	fmt.Println("STARTING")
-	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTX.Name+"_executor")
+	state.binanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BINANCE.Name+"_executor")
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
@@ -204,9 +206,11 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
+	fmt.Println("SUBSCRIBE ACCOUNT")
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to account: %v", err)
 	}
+	fmt.Println("REQ SECURITIES")
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
 	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
@@ -229,7 +233,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 
 	// Then fetch balances
-	res, err = context.RequestFuture(state.ftxExecutor, &messages.BalancesRequest{
+	res, err = context.RequestFuture(state.binanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -246,27 +250,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
-	// Then fetch positions
-	res, err = context.RequestFuture(state.ftxExecutor, &messages.PositionsRequest{
-		Instrument: nil,
-		Account:    state.account.Account,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		return fmt.Errorf("error getting positions from executor: %v", err)
-	}
-
-	positionList, ok := res.(*messages.PositionList)
-	if !ok {
-		return fmt.Errorf("was expecting PositionList, got %s", reflect.TypeOf(res).String())
-	}
-
-	if !positionList.Success {
-		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
-	}
-
 	// Then fetch orders
-	res, err = context.RequestFuture(state.ftxExecutor, &messages.OrderStatusRequest{
+	res, err = context.RequestFuture(state.binanceExecutor, &messages.OrderStatusRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -284,17 +269,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 
 	// Sync account
-	// TODO
-	makerFee := 0.
-	takerFee := 0.00038
-	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, &makerFee, &takerFee); err != nil {
+	makerFee := 0.0002
+	takerFee := 0.0004
+	if err := state.account.Sync(filteredSecurities, orderList.Orders, nil, balanceList.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
-	fmt.Println("MARGIN", state.account.GetMargin(nil))
-	m := modeling.NewMapMarketModel()
-	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
-	fmt.Println("INIT", state.account.GetMargin(m))
 	securityMap := make(map[uint64]*models.Security)
 	for _, sec := range filteredSecurities {
 		securityMap[sec.SecurityID] = sec
@@ -302,11 +282,13 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.securities = securityMap
 	state.seqNum = 0
 
-	if state.txs != nil {
-		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
-		state.reconciler = context.Spawn(props)
-	}
+	/*
+		if state.txs != nil {
+			// Start reconciliation child
+			props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+			state.reconciler = context.Spawn(props)
+		}
+	*/
 
 	checkAccountTicker := time.NewTicker(5 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
@@ -336,14 +318,14 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	checkExpirationTicker := time.NewTicker(1 * time.Second)
-	state.checkExpirationTicker = checkExpirationTicker
+	refreshKeyTicker := time.NewTicker(30 * time.Minute)
+	state.refreshKeyTicker = refreshKeyTicker
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkExpirationTicker.C:
-				context.Send(pid, &checkExpiration{})
-			case <-time.After(10 * time.Second):
+			case _ = <-refreshKeyTicker.C:
+				context.Send(pid, &refreshKey{})
+			case <-time.After(31 * time.Minute):
 				// timer stopped, we leave
 				return
 			}
@@ -371,9 +353,9 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		state.checkSocketTicker = nil
 	}
 
-	if state.checkExpirationTicker != nil {
-		state.checkExpirationTicker.Stop()
-		state.checkExpirationTicker = nil
+	if state.refreshKeyTicker != nil {
+		state.refreshKeyTicker.Stop()
+		state.refreshKeyTicker = nil
 	}
 
 	return nil
@@ -433,7 +415,6 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 }
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
-	fmt.Println("GOT ORDERE STATUS REQUEST")
 	req := context.Message().(*messages.OrderStatusRequest)
 	orders := state.account.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{
@@ -445,20 +426,27 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 }
 
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
-	context.Forward(state.ftxExecutor)
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.binanceExecutor)
+	}
 	return nil
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	fmt.Println("FORWARDING TRADE CAPTURE REPORT REQUEST")
-	context.Forward(state.ftxExecutor)
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.binanceExecutor)
+	}
 	return nil
 }
 
 func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) error {
+	fmt.Println("ACCOUNT NEW SINGLE")
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	req.Account = state.account.Account
-	fmt.Println("GOT NEW ORDER", req.Order.Instrument)
 	// Check order quantity
 	order := &models.Order{
 		OrderID:               "",
@@ -491,11 +479,9 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingNew {
-				fmt.Println("PENDING NEW SENDING")
-				fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
+				fut := context.RequestFuture(state.binanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
 					if err != nil {
-						fmt.Println("REJECTING")
 						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
 						if err != nil {
 							panic(err)
@@ -516,7 +502,6 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 					context.Respond(response)
 
 					if response.Success {
-						fmt.Println("CONFIRM", order.ClientOrderID, response.OrderID)
 						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
@@ -524,7 +509,6 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 							context.Send(context.Parent(), nReport)
 						}
 					} else {
-						fmt.Println("REJECTING", response.RejectionReason.String())
 						nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
@@ -605,7 +589,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		state.seqNum += 1
 		context.Send(context.Parent(), report)
 	}
-	fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
+	fut := context.RequestFuture(state.binanceExecutor, req, 10*time.Second)
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
@@ -661,84 +645,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 }
 
 func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
-	fmt.Println("ORDER REPLACE REQUEST ACCOUNT")
-	req := context.Message().(*messages.OrderReplaceRequest)
-	var ID string
-	if req.Update.OrigClientOrderID != nil {
-		ID = req.Update.OrigClientOrderID.Value
-	} else if req.Update.OrderID != nil {
-		ID = req.Update.OrderID.Value
-	}
-	report, res := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
-	if res != nil {
-		context.Respond(&messages.OrderReplaceResponse{
-			RequestID:       req.RequestID,
-			RejectionReason: *res,
-		})
-	} else {
-		context.Respond(&messages.OrderReplaceResponse{
-			RequestID: req.RequestID,
-			Success:   true,
-		})
-		if report != nil {
-			report.SeqNum = state.seqNum + 1
-			state.seqNum += 1
-			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingReplace {
-				if req.Update.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
-					}
-					req.Update.OrderID = &types.StringValue{Value: o.OrderID}
-				}
-				fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
-					if err != nil {
-						report, err := state.account.RejectReplaceOrder(ID, messages.Other)
-						if err != nil {
-							panic(err)
-						}
-						context.Respond(&messages.OrderReplaceResponse{
-							RequestID:       req.RequestID,
-							Success:         false,
-							RejectionReason: messages.Other,
-						})
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-						return
-					}
-					response := res.(*messages.OrderReplaceResponse)
-					context.Respond(response)
-
-					if response.Success {
-						report, err := state.account.ConfirmReplaceOrder(ID, response.OrderID)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-					} else {
-						report, err := state.account.RejectReplaceOrder(ID, response.RejectionReason)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-					}
-				})
-			}
-		}
-	}
+	// TODO
 	return nil
 }
 
@@ -755,7 +662,18 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	} else if req.OrderID != nil {
 		ID = req.OrderID.Value
 	}
-	report, res := state.account.CancelOrder(ID)
+	if !state.account.HasOrder(ID) {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: messages.UnknownOrder,
+			Success:         false,
+		})
+		return nil
+	}
+	order, _ := state.account.GetOrder(ID)
+	report, res := state.account.CancelOrder(order.OrderID)
+	req.ClientOrderID = nil
+	req.OrderID = &types.StringValue{Value: order.OrderID}
 	if res != nil {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
@@ -772,16 +690,8 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.PendingCancel {
-				if req.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
-					}
-					req.OrderID = &types.StringValue{Value: o.OrderID}
-				}
-				fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
+				fut := context.RequestFuture(state.binanceExecutor, req, 10*time.Second)
 				context.AwaitFuture(fut, func(res interface{}, err error) {
-					fmt.Println("GOT RESPONSE FROM EXECUTOR")
 					if err != nil {
 						report, err := state.account.RejectCancelOrder(ID, messages.Other)
 						if err != nil {
@@ -807,7 +717,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 							context.Send(context.Parent(), report)
 						}
 					}
-					// Don't confirm cancel order, happens often to get delayed fills
 				})
 			}
 		}
@@ -863,7 +772,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		state.seqNum += 1
 		context.Send(context.Parent(), report)
 	}
-	fut := context.RequestFuture(state.ftxExecutor, req, 10*time.Second)
+	fut := context.RequestFuture(state.binanceExecutor, req, 10*time.Second)
 	context.AwaitFuture(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
@@ -915,31 +824,70 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	if msg.Message == nil {
 		return fmt.Errorf("received nil message")
 	}
+	fmt.Println(reflect.TypeOf(msg.Message).String())
 	switch res := msg.Message.(type) {
-	case ftx.WSOrdersUpdate:
-		// Problem here, I will get the closed order notification before the fill
-		// therefore I will close the order
-		fmt.Println("WSORDER UPDATE", res)
-		switch res.Order.Status {
-		case ftx.NEW_ORDER:
-			// If we don't have the order, it was created by someone else, add it.
-			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
-				fmt.Println("INSERTING NEW !!!")
-				_, rej := state.account.NewOrder(wsOrderToModel(res.Order))
-				if rej != nil {
-					return fmt.Errorf("error creating new order: %s", rej.String())
-				}
-				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
-				if err != nil {
-					return fmt.Errorf("error creating new order: %v", err)
-				}
+	case *binance.WSAccountUpdate:
+		b, _ := json.Marshal(res)
+		fmt.Println("ACCOUNT UPDATE", string(b))
+		for _, b := range res.Balances {
+			asset, ok := constants.GetAssetBySymbol(b.Asset)
+			if !ok {
+				state.logger.Error(fmt.Sprintf("got update for unknown asset %s", b.Asset))
+				continue
 			}
-		case ftx.CLOSED_ORDER:
-			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
-				// Order closed because of filled, let the fill update manage it
-				return nil
+			if _, err := state.account.UpdateBalance(asset, b.Free+b.Locked, messages.Unknown); err != nil {
+				return fmt.Errorf("error updating account balance: %v", err)
 			}
-			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
+		}
+	case *binance.WSBalanceUpdate:
+		b, _ := json.Marshal(res)
+		fmt.Println("BALANCE UPDATE", string(b))
+		break
+	case *binance.WSExecutionReport:
+		b, _ := json.Marshal(res)
+		fmt.Println("EXECUTION UPDATE", string(b))
+		switch res.ExecutionType {
+		case binance.ET_NEW:
+			// New order
+			/*
+				if !state.account.HasOrder(exec.ClientOrderID) {
+					// We don't have the order, was created by another client
+					//o := wsOrderToModel(exec)
+					//o.OrderStatus = models.PendingNew
+					_, rej := state.account.NewOrder(o)
+					if rej != nil {
+						return fmt.Errorf("error creating new order: %s", rej.String())
+					}
+				}
+
+			*/
+			orderID := fmt.Sprintf("%d", res.OrderID)
+			report, err := state.account.ConfirmNewOrder(res.ClientOrderID, orderID)
+			if err != nil {
+				return fmt.Errorf("error confirming new order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
+		case binance.ET_TRADE:
+			orderID := fmt.Sprintf("%d", res.OrderID)
+			tradeID := fmt.Sprintf("%d", res.TradeID)
+			report, err := state.account.ConfirmFill(orderID, tradeID, res.LastFilledPrice, res.LastFilledQuantity, !res.Maker)
+			if err != nil {
+				return fmt.Errorf("error confirming filled order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+
+		case binance.ET_CANCELED:
+			fmt.Println("CANCELED ???")
+			report, err := state.account.ConfirmCancelOrder(res.OrigClientOrderID)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
 			}
@@ -948,31 +896,19 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				state.seqNum += 1
 				context.Send(context.Parent(), report)
 			}
+
+		case binance.ET_EXPIRED:
+			report, err := state.account.ConfirmExpiredOrder(res.OrigClientOrderID)
+			if err != nil {
+				return fmt.Errorf("error confirming expired order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
 		}
-
-	case ftx.WSFillsUpdate:
-		orderID := fmt.Sprintf("%d", res.Fill.OrderID)
-		tradeID := fmt.Sprintf("%d", res.Fill.TradeID)
-		report, err := state.account.ConfirmFill(orderID, tradeID, res.Fill.Price, res.Fill.Size, res.Fill.Liquidity == "taker")
-		if err != nil {
-			return fmt.Errorf("error confirming fill: %v", err)
-		}
-		if report != nil {
-			report.SeqNum = state.seqNum + 1
-			state.seqNum += 1
-			context.Send(context.Parent(), report)
-		}
-
-	case ftx.WSSubscribeResponse:
-		// pass
-
-	case ftx.WSPong:
-		// pass
-
-	default:
-		return fmt.Errorf("received unknown event type: %s", reflect.TypeOf(msg.Message))
 	}
-
 	return nil
 }
 
@@ -981,23 +917,35 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := ftx.NewWebsocket()
+	req, _, err := binance.GetListenKey(state.account.ApiCredentials)
+	if err != nil {
+		return fmt.Errorf("error getting listen key request: %v", err)
+	}
+
+	listenKey := binance.ListenKeyResponse{}
+	if err := utils.PerformRequest(state.client, req, &listenKey); err != nil {
+		return fmt.Errorf("error getting listen key: %v", err)
+	}
+	if listenKey.Code != 0 {
+		return fmt.Errorf(listenKey.Message)
+	}
+	state.listenKey = listenKey.ListenKey
+
+	req, _, err = binance.RefreshListenKey(state.listenKey, state.account.ApiCredentials)
+	if err != nil {
+		return fmt.Errorf("error getting refresh listen key request: %v", err)
+	}
+	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+		return fmt.Errorf("error refreshing listen key: %v", err)
+	}
+
+	ws := binance.NewAuthWebsocket(listenKey.ListenKey)
 	// TODO Dialer
 	if err := ws.Connect(&net.Dialer{}); err != nil {
-		return fmt.Errorf("error connecting to ftx websocket: %v", err)
-	}
-	if err := ws.Login(state.account.Credentials); err != nil {
-		return fmt.Errorf("error login in to ftx websocket: %v", err)
+		return fmt.Errorf("error connecting to binance websocket: %v", err)
 	}
 
-	if err := ws.Subscribe("", ftx.WSOrdersChannel); err != nil {
-		return fmt.Errorf("error subscribing to WSOrdersChannel: %v", err)
-	}
-	if err := ws.Subscribe("", ftx.WSFillsChannel); err != nil {
-		return fmt.Errorf("error subscribing to WSFillsChannel: %v", err)
-	}
-
-	go func(ws *ftx.Websocket, pid *actor.PID) {
+	go func(ws *binance.AuthWebsocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -1026,10 +974,21 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 	return nil
 }
 
+func (state *AccountListener) refreshKey(context actor.Context) error {
+	req, _, err := binance.RefreshListenKey(state.listenKey, state.account.ApiCredentials)
+	if err != nil {
+		return fmt.Errorf("error getting refresh listen key request: %v", err)
+	}
+	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+		return fmt.Errorf("error refreshing listen key: %v", err)
+	}
+	return nil
+}
+
 func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT !")
 	// Fetch balances
-	res, err := context.RequestFuture(state.ftxExecutor, &messages.BalancesRequest{
+	res, err := context.RequestFuture(state.binanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -1046,8 +1005,12 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
+	if len(balanceList.Balances) != 1 {
+		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+	}
+
 	// Fetch positions
-	res, err = context.RequestFuture(state.ftxExecutor, &messages.PositionsRequest{
+	res, err = context.RequestFuture(state.binanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
 		Account:    state.account.Account,
 	}, 10*time.Second).Result()
@@ -1063,6 +1026,12 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	if !positionList.Success {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
+	}
+
+	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
+	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
+	if rawMargin1 != rawMargin2 {
+		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
 	}
 
 	pos1 := state.account.GetPositions()
@@ -1096,46 +1065,5 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
 		}
 	}
-
-	// Fetch orders
-	res, err = context.RequestFuture(state.ftxExecutor, &messages.OrderStatusRequest{
-		Account: state.account.Account,
-	}, 10*time.Second).Result()
-	if err != nil {
-		return fmt.Errorf("error getting positions from executor: %v", err)
-	}
-
-	orderList, ok := res.(*messages.OrderList)
-
-	orders1 := make(map[string]*models.Order)
-	orders2 := make(map[string]*models.Order)
-	for _, o := range orderList.Orders {
-		orders1[o.OrderID] = o
-	}
-
-	orders := state.account.GetOrders(&messages.OrderFilter{
-		OrderStatus: &messages.OrderStatusValue{Value: models.PartiallyFilled},
-	})
-	for _, o := range orders {
-		orders2[o.OrderID] = o
-	}
-	orders = state.account.GetOrders(&messages.OrderFilter{
-		OrderStatus: &messages.OrderStatusValue{Value: models.New},
-	})
-	for _, o := range orders {
-		orders2[o.OrderID] = o
-	}
-
-	for k, o1 := range orders1 {
-		if o2, ok := orders2[k]; ok {
-			fmt.Println(o1, o2)
-		} else {
-			return fmt.Errorf("incosistent order")
-		}
-	}
 	return nil
-}
-
-func (state *AccountListener) checkExpiration(context actor.Context) error {
-	return state.account.CheckExpiration()
 }

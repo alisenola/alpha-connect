@@ -662,6 +662,7 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e h1:NsAmBTB7b
 gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e/go.mod h1:Q7czYSyXyw4eo76eHe+BlHzC4stXLlZ5Ap6mkGy79uE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211006094310-d032e1628700 h1:T91N0bT2LoHX+9Wqwm2Y3LXKQgm6H7NFMs4u9yU2uFE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211006094310-d032e1628700/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
+gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f h1:gvGF7HWQcu0Yhe4oJkzxhtXEYqDiPDtnzmI8bbaMnBI=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f/go.mod h1:tAB9hrPkrzTt3QmqPlV4gX9SBgUbC5maWkhBQR2iZYQ=
@@ -689,6 +690,12 @@ gitlab.com/alphaticks/xchanger v0.0.0-20211207144837-21dd6bb18bb4 h1:IhBdmQDOM/h
 gitlab.com/alphaticks/xchanger v0.0.0-20211207144837-21dd6bb18bb4/go.mod h1:XqvGc9NG5XmDJc4siC5zyVGmfR6Qzwq0riou6t7sHIU=
 gitlab.com/alphaticks/xchanger v0.0.0-20211207145121-2a1589b9fcdf h1:wVPJYcoVkqzi78pbcTELaljR41iy/C92K+fniYF6hvo=
 gitlab.com/alphaticks/xchanger v0.0.0-20211207145121-2a1589b9fcdf/go.mod h1:XqvGc9NG5XmDJc4siC5zyVGmfR6Qzwq0riou6t7sHIU=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209051909-c777a2ccda44 h1:KzjaxEJNL8mgkH+0qiNL4iQMX5wbLC2YCJLi8tVCC8s=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209051909-c777a2ccda44/go.mod h1:3tdffgUjQFN+XinV9YfAiaD6l0u00k2m3EleAdh9sL8=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209065002-c4707d9384e7 h1:YjjENxXsXzdeZ21OrCjBdq8x7lTJCng34pR0Syiercg=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209065002-c4707d9384e7/go.mod h1:3tdffgUjQFN+XinV9YfAiaD6l0u00k2m3EleAdh9sL8=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209084723-8e12de881b1c h1:4vNu72k7S3cCtpIcQoVxnl5StfGumKv/L8v8ub6jj5I=
+gitlab.com/alphaticks/xchanger v0.0.0-20211209084723-8e12de881b1c/go.mod h1:3tdffgUjQFN+XinV9YfAiaD6l0u00k2m3EleAdh9sL8=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

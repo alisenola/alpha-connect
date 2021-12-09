@@ -299,7 +299,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		params.SetFilters(filters)
 	}
 
-	request, weight, err := bitmex.GetOrder(msg.Account.Credentials, params)
+	request, weight, err := bitmex.GetOrder(msg.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -468,7 +468,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		params.SetFilters(filters)
 	}
 
-	request, weight, err := bitmex.GetPosition(msg.Account.Credentials, params)
+	request, weight, err := bitmex.GetPosition(msg.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -562,7 +562,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Balances:   nil,
 	}
 
-	request, weight, err := bitmex.GetMargin(msg.Account.Credentials, "XBt")
+	request, weight, err := bitmex.GetMargin(msg.Account.ApiCredentials, "XBt")
 	if err != nil {
 		return err
 	}
@@ -704,7 +704,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := bitmex.PostOrder(req.Account.Credentials, params)
+	request, weight, err := bitmex.PostOrder(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -799,7 +799,7 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 		}
 		params = append(params, param)
 	}
-	request, weight, err := bitmex.PostBulkOrder(req.Account.Credentials, params)
+	request, weight, err := bitmex.PostBulkOrder(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -889,7 +889,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		params.SetOrderQty(req.Update.Quantity.Value)
 	}
 
-	request, weight, err := bitmex.AmendOrder(req.Account.Credentials, params)
+	request, weight, err := bitmex.AmendOrder(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -971,7 +971,7 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 		params = append(params, param)
 	}
 
-	request, weight, err := bitmex.AmendBulkOrder(req.Account.Credentials, params)
+	request, weight, err := bitmex.AmendBulkOrder(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -1040,7 +1040,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		params.SetClOrdID(req.ClientOrderID.Value)
 	}
 
-	request, weight, err := bitmex.CancelOrder(req.Account.Credentials, params)
+	request, weight, err := bitmex.CancelOrder(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}
@@ -1129,7 +1129,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		}
 	}
 
-	request, weight, err := bitmex.CancelAllOrders(req.Account.Credentials, params)
+	request, weight, err := bitmex.CancelAllOrders(req.Account.ApiCredentials, params)
 	if err != nil {
 		return err
 	}

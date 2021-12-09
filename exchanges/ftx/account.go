@@ -1,4 +1,4 @@
-package ftxus
+package ftx
 
 import (
 	"fmt"
@@ -6,11 +6,13 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/ftxus"
+	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
+	"go.mongodb.org/mongo-driver/mongo"
 	"math"
 	"net"
 	"net/http"
@@ -21,34 +23,41 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
+type checkExpiration struct{}
 
 type AccountListener struct {
-	account            *account.Account
-	seqNum             uint64
-	ftxExecutor        *actor.PID
-	ws                 *ftxus.Websocket
-	executorManager    *actor.PID
-	logger             *log.Logger
-	checkAccountTicker *time.Ticker
-	checkSocketTicker  *time.Ticker
-	lastPingTime       time.Time
-	securities         map[uint64]*models.Security
-	client             *http.Client
+	account               *account.Account
+	seqNum                uint64
+	ftxExecutor           *actor.PID
+	ws                    *ftx.Websocket
+	executorManager       *actor.PID
+	logger                *log.Logger
+	checkAccountTicker    *time.Ticker
+	checkSocketTicker     *time.Ticker
+	checkExpirationTicker *time.Ticker
+	lastPingTime          time.Time
+	securities            map[uint64]*models.Security
+	client                *http.Client
+	txs                   *mongo.Collection
+	execs                 *mongo.Collection
+	reconciler            *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account)
+		return NewAccountListener(account, txs, execs)
 	}
 }
 
-func NewAccountListener(account *account.Account) actor.Actor {
+func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		seqNum:          0,
 		ws:              nil,
 		executorManager: nil,
 		logger:          nil,
+		txs:             txs,
+		execs:           execs,
 	}
 }
 
@@ -102,6 +111,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.AccountMovementRequest:
+		if err := state.OnAccountMovementRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.TradeCaptureReportRequest:
 		if err := state.OnTradeCaptureReportRequest(context); err != nil {
 			state.logger.Error("error processing OnTradeCaptureReportRequest", log.Error(err))
@@ -146,7 +161,7 @@ func (state *AccountListener) Receive(context actor.Context) {
 
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
-			state.logger.Error("error processing WebsocketMessage", log.Error(err))
+			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
 			panic(err)
 		}
 
@@ -159,6 +174,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *checkAccount:
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking account", log.Error(err))
+			panic(err)
+		}
+
+	case *checkExpiration:
+		if err := state.checkExpiration(context); err != nil {
+			state.logger.Error("error checking expired orders", log.Error(err))
 			panic(err)
 		}
 	}
@@ -174,7 +195,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 	fmt.Println("STARTING")
-	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTXUS.Name+"_executor")
+	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTX.Name+"_executor")
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,
@@ -263,19 +284,29 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 
 	// Sync account
-	makerFee := 0.0004
-	takerFee := 0.0007
+	// TODO
+	makerFee := 0.
+	takerFee := 0.00038
 	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
+	fmt.Println("MARGIN", state.account.GetMargin(nil))
+	m := modeling.NewMapMarketModel()
+	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
+	fmt.Println("INIT", state.account.GetMargin(m))
 	securityMap := make(map[uint64]*models.Security)
 	for _, sec := range filteredSecurities {
 		securityMap[sec.SecurityID] = sec
 	}
 	state.securities = securityMap
-
 	state.seqNum = 0
+
+	if state.txs != nil {
+		// Start reconciliation child
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+		state.reconciler = context.Spawn(props)
+	}
 
 	checkAccountTicker := time.NewTicker(5 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
@@ -305,6 +336,20 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	checkExpirationTicker := time.NewTicker(1 * time.Second)
+	state.checkExpirationTicker = checkExpirationTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-checkExpirationTicker.C:
+				context.Send(pid, &checkExpiration{})
+			case <-time.After(10 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -324,6 +369,11 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.checkSocketTicker != nil {
 		state.checkSocketTicker.Stop()
 		state.checkSocketTicker = nil
+	}
+
+	if state.checkExpirationTicker != nil {
+		state.checkExpirationTicker.Stop()
+		state.checkExpirationTicker = nil
 	}
 
 	return nil
@@ -391,6 +441,11 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 		Success:   true,
 		Orders:    orders,
 	})
+	return nil
+}
+
+func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
+	context.Forward(state.ftxExecutor)
 	return nil
 }
 
@@ -751,17 +806,8 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 							state.seqNum += 1
 							context.Send(context.Parent(), report)
 						}
-					} else {
-						report, err := state.account.ConfirmCancelOrder(ID)
-						if err != nil {
-							panic(fmt.Errorf("error confirming cancel order: %v", err))
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
 					}
+					// Don't confirm cancel order, happens often to get delayed fills
 				})
 			}
 		}
@@ -853,18 +899,6 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 					context.Send(context.Parent(), report)
 				}
 			}
-		} else {
-			for _, r := range reports {
-				report, err := state.account.ConfirmCancelOrder(r.ClientOrderID.Value)
-				if err != nil {
-					panic(err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-			}
 		}
 	})
 
@@ -882,12 +916,41 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		return fmt.Errorf("received nil message")
 	}
 	switch res := msg.Message.(type) {
-	case ftxus.WSOrdersUpdate:
+	case ftx.WSOrdersUpdate:
 		// Problem here, I will get the closed order notification before the fill
 		// therefore I will close the order
 		fmt.Println("WSORDER UPDATE", res)
+		switch res.Order.Status {
+		case ftx.NEW_ORDER:
+			// If we don't have the order, it was created by someone else, add it.
+			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
+				fmt.Println("INSERTING NEW !!!")
+				_, rej := state.account.NewOrder(wsOrderToModel(res.Order))
+				if rej != nil {
+					return fmt.Errorf("error creating new order: %s", rej.String())
+				}
+				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+				if err != nil {
+					return fmt.Errorf("error creating new order: %v", err)
+				}
+			}
+		case ftx.CLOSED_ORDER:
+			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
+				// Order closed because of filled, let the fill update manage it
+				return nil
+			}
+			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
+			if err != nil {
+				return fmt.Errorf("error confirming cancel order: %v", err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+		}
 
-	case ftxus.WSFillsUpdate:
+	case ftx.WSFillsUpdate:
 		orderID := fmt.Sprintf("%d", res.Fill.OrderID)
 		tradeID := fmt.Sprintf("%d", res.Fill.TradeID)
 		report, err := state.account.ConfirmFill(orderID, tradeID, res.Fill.Price, res.Fill.Size, res.Fill.Liquidity == "taker")
@@ -900,10 +963,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			context.Send(context.Parent(), report)
 		}
 
-	case ftxus.WSSubscribeResponse:
+	case ftx.WSSubscribeResponse:
 		// pass
 
-	case ftxus.WSPong:
+	case ftx.WSPong:
 		// pass
 
 	default:
@@ -918,23 +981,23 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := ftxus.NewWebsocket()
+	ws := ftx.NewWebsocket()
 	// TODO Dialer
 	if err := ws.Connect(&net.Dialer{}); err != nil {
 		return fmt.Errorf("error connecting to ftx websocket: %v", err)
 	}
-	if err := ws.Login(state.account.Credentials); err != nil {
+	if err := ws.Login(state.account.ApiCredentials); err != nil {
 		return fmt.Errorf("error login in to ftx websocket: %v", err)
 	}
 
-	if err := ws.Subscribe("", ftxus.WSOrdersChannel); err != nil {
+	if err := ws.Subscribe("", ftx.WSOrdersChannel); err != nil {
 		return fmt.Errorf("error subscribing to WSOrdersChannel: %v", err)
 	}
-	if err := ws.Subscribe("", ftxus.WSFillsChannel); err != nil {
+	if err := ws.Subscribe("", ftx.WSFillsChannel); err != nil {
 		return fmt.Errorf("error subscribing to WSFillsChannel: %v", err)
 	}
 
-	go func(ws *ftxus.Websocket, pid *actor.PID) {
+	go func(ws *ftx.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -1033,5 +1096,46 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
 		}
 	}
+
+	// Fetch orders
+	res, err = context.RequestFuture(state.ftxExecutor, &messages.OrderStatusRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	orderList, ok := res.(*messages.OrderList)
+
+	orders1 := make(map[string]*models.Order)
+	orders2 := make(map[string]*models.Order)
+	for _, o := range orderList.Orders {
+		orders1[o.OrderID] = o
+	}
+
+	orders := state.account.GetOrders(&messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.PartiallyFilled},
+	})
+	for _, o := range orders {
+		orders2[o.OrderID] = o
+	}
+	orders = state.account.GetOrders(&messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+	})
+	for _, o := range orders {
+		orders2[o.OrderID] = o
+	}
+
+	for k, o1 := range orders1 {
+		if o2, ok := orders2[k]; ok {
+			fmt.Println(o1, o2)
+		} else {
+			return fmt.Errorf("incosistent order")
+		}
+	}
 	return nil
+}
+
+func (state *AccountListener) checkExpiration(context actor.Context) error {
+	return state.account.CheckExpiration()
 }

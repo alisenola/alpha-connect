@@ -451,11 +451,11 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 
 	switch msg.Type {
 	case messages.Deposit:
-		request, weight, err = ftx.GetDepositHistory(from, to, msg.Account.Credentials)
+		request, weight, err = ftx.GetDepositHistory(from, to, msg.Account.ApiCredentials)
 	case messages.Withdrawal:
-		request, weight, err = ftx.GetWithdrawalHistory(from, to, msg.Account.Credentials)
+		request, weight, err = ftx.GetWithdrawalHistory(from, to, msg.Account.ApiCredentials)
 	case messages.FundingFee:
-		request, weight, err = ftx.GetFundingPayments(symbol, from, to, msg.Account.Credentials)
+		request, weight, err = ftx.GetFundingPayments(symbol, from, to, msg.Account.ApiCredentials)
 	case messages.RealizedPnl,
 		messages.WelcomeBonus,
 		messages.Commission:
@@ -575,7 +575,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			mvt := messages.AccountMovement{
 				Asset:      asset,
 				Change:     t.Size,
-				MovementID: fmt.Sprintf("%s%d", msg.Account.Credentials.AccountID, t.ID),
+				MovementID: fmt.Sprintf("%s%d", msg.Account.ApiCredentials.AccountID, t.ID),
 				Time:       ts,
 				Type:       messages.Deposit,
 			}
@@ -593,7 +593,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			mvt := messages.AccountMovement{
 				Asset:      asset,
 				Change:     -t.Size,
-				MovementID: fmt.Sprintf("%s%d", msg.Account.Credentials.AccountID, t.ID),
+				MovementID: fmt.Sprintf("%s%d", msg.Account.ApiCredentials.AccountID, t.ID),
 				Time:       ts,
 				Type:       messages.Withdrawal,
 			}
@@ -676,7 +676,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			return nil
 		}
 	}
-	request, weight, err := ftx.GetFills(symbol, from, to, "asc", orderID, msg.Account.Credentials)
+	request, weight, err := ftx.GetFills(symbol, from, to, "asc", orderID, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -849,13 +849,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		multi = false
 		if orderID != "" {
 			var err error
-			request, weight, err = ftx.GetOrderStatus(orderID, msg.Account.Credentials)
+			request, weight, err = ftx.GetOrderStatus(orderID, msg.Account.ApiCredentials)
 			if err != nil {
 				return err
 			}
 		} else {
 			var err error
-			request, weight, err = ftx.GetOrderStatusByClientID(orderID, msg.Account.Credentials)
+			request, weight, err = ftx.GetOrderStatusByClientID(orderID, msg.Account.ApiCredentials)
 			if err != nil {
 				return err
 			}
@@ -863,7 +863,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	} else {
 		multi = true
 		var err error
-		request, weight, err = ftx.GetOpenOrders(symbol, msg.Account.Credentials)
+		request, weight, err = ftx.GetOpenOrders(symbol, msg.Account.ApiCredentials)
 		if err != nil {
 			return err
 		}
@@ -1051,7 +1051,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		}
 	}
 
-	request, weight, err := ftx.GetPositions(true, msg.Account.Credentials)
+	request, weight, err := ftx.GetPositions(true, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1156,7 +1156,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Balances:   nil,
 	}
 
-	request, weight, err := ftx.GetBalances(msg.Account.Credentials)
+	request, weight, err := ftx.GetBalances(msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1331,7 +1331,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := ftx.PlaceOrder(params, req.Account.Credentials)
+	request, weight, err := ftx.PlaceOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1415,7 +1415,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		params.Size = &req.Update.Quantity.Value
 	}
 
-	request, weight, err := ftx.ModifyOrder(req.Update.OrderID.Value, params, req.Account.Credentials)
+	request, weight, err := ftx.ModifyOrder(req.Update.OrderID.Value, params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1490,7 +1490,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	var weight int
 	if req.OrderID != nil {
 		var err error
-		request, weight, err = ftx.CancelOrder(req.OrderID.Value, req.Account.Credentials)
+		request, weight, err = ftx.CancelOrder(req.OrderID.Value, req.Account.ApiCredentials)
 		if err != nil {
 			response.RejectionReason = messages.InvalidRequest
 			context.Respond(response)

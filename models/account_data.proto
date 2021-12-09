@@ -6,5 +6,7 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 message Account {
     string name = 1;
     models.Exchange exchange = 2;
-    models.APICredentials credentials = 3;
+    models.APICredentials api_credentials = 3;
+    models.STARKCredentials stark_credentials = 4;
+    models.ECDSACredentials ecdsa_credentials = 5;
 }
