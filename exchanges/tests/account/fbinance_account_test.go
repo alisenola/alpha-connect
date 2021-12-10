@@ -21,7 +21,7 @@ var instrument = &models.Instrument{
 
 var fbinanceAccount = &models.Account{
 	Exchange: &constants.FBINANCE,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "74f122652da74f6e1bcc34b8c23fc91e0239b502e68440632ae9a3cb7cefa18e",
 		APISecret: "c3e0d76ee014b597b93616478dc789e6bb6616ad59ddbe384d2554ace4a60f86",
 	},
@@ -31,7 +31,7 @@ var fbinanceAccount = &models.Account{
 var FBinanceAccount = &models.Account{
 	AccountID: "299211",
 	Exchange:  &constants.FBINANCE,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
 	},

@@ -21,7 +21,7 @@ var ftxInstrument = &models.Instrument{
 var ftxAccount = &models.Account{
 	Name:     "299211",
 	Exchange: &constants.FTX,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "ej2YRRJMMwQD2qjOaRQnB18K7EWTpy3fRTP1ZZoX",
 		APISecret: "MjJSlt1ix9OLpQLzkaQPlD_-y-N7c_2-6ZQJiwlY",
 	},
@@ -31,7 +31,7 @@ var ftxAccount = &models.Account{
 var FBinanceAccount = &models.Account{
 	AccountID: "299211",
 	Exchange:  &constants.FBINANCE,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
 	},

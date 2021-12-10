@@ -24,7 +24,7 @@ var spotTests = []AccntTest{
 		account: &models.Account{
 			Name:     "binance",
 			Exchange: &constants.BINANCE,
-			Credentials: &xchangerModels.APICredentials{
+			ApiCredentials: &xchangerModels.APICredentials{
 				APIKey:    "DNySYXVSG7xrM7S8dGSTvLRmRGJIzoU80Uj78IpFOYxiI9veS54VCu8bxQNLloz2",
 				APISecret: "OrIJH6qYynrVFgEi62cknUpf02MoA82l45ySfP3ZTKRPainFJzG377BoJJmTuwXv",
 			},

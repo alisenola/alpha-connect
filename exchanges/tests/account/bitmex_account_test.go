@@ -26,7 +26,7 @@ var instrument2 = &models.Instrument{
 var bitmexAccount = &models.Account{
 	Name:     "299210",
 	Exchange: &constants.BITMEX,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "k5k6Mmaq3xe88Ph3fgIk9Vrt",
 		APISecret: "0laIjZaKOMkJPtKy2ldJ18m4Dxjp66Vdim0k1-q4TXASZFZo",
 	},

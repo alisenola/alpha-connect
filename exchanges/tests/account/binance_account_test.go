@@ -20,7 +20,7 @@ var binanceInstrument = &models.Instrument{
 
 var binanceAccount = &models.Account{
 	Exchange: &constants.BINANCE,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "XgHlK1xiQcq5IBP6KsmD7ewZONJHjhlq9JqopTuoB7lanSw3TYdLAcFn5fudyevO",
 		APISecret: "GAiZ4UOztJzoB3Qonv4nE2X8KgEyl0jxSBtLBkpwgXeZYtSqGogwlh89YerLSqlu",
 	},
@@ -30,7 +30,7 @@ var binanceAccount = &models.Account{
 var binanceAccount = &models.Account{
 	AccountID: "299211",
 	Exchange:  &constants.binance,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
 	},
