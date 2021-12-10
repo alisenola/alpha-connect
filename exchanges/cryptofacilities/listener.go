@@ -171,12 +171,12 @@ func (state *Listener) Initialize(context actor.Context) error {
 func (state *Listener) Clean(context actor.Context) error {
 	if state.tradeWs != nil {
 		if err := state.tradeWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+			state.logger.Warn("error disconnecting socket", log.Error(err))
 		}
 	}
 	if state.obWs != nil {
 		if err := state.obWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+			state.logger.Warn("error disconnecting socket", log.Error(err))
 		}
 	}
 	if state.socketTicker != nil {
@@ -362,7 +362,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr.lastUpdateTime = ts
 
 		if state.instrumentData.orderBook.Crossed() {
-			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			state.logger.Warn("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeOrderBook(context)
 		}
 
@@ -428,7 +428,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	*/
 	if state.obWs.Err != nil || !state.obWs.Connected {
 		if state.obWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.obWs.Err))
+			state.logger.Warn("error on socket", log.Error(state.obWs.Err))
 		}
 		if err := state.subscribeOrderBook(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
@@ -437,7 +437,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 
 	if state.tradeWs.Err != nil || !state.tradeWs.Connected {
 		if state.tradeWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.tradeWs.Err))
+			state.logger.Warn("error on socket", log.Error(state.tradeWs.Err))
 		}
 		if err := state.subscribeTrades(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)

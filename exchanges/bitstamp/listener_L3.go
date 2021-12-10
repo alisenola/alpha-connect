@@ -167,7 +167,7 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 func (state *ListenerL3) Clean(context actor.Context) error {
 	if state.ws != nil {
 		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+			state.logger.Warn("error disconnecting socket", log.Error(err))
 		}
 	}
 	if state.socketTicker != nil {
@@ -334,7 +334,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		}
 		// If crossed before applying create, bug
 		if state.instrumentData.orderBook.Crossed() {
-			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+			state.logger.Warn("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeInstrument(context)
 		}
 		if !state.instrumentData.orderBook.HasOrder(o.ID) {
@@ -485,7 +485,7 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
+			state.logger.Warn("error on socket", log.Error(state.ws.Err))
 		}
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)

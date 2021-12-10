@@ -279,17 +279,19 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if !response.Success {
 			return errors.New(response.RejectionReason.String())
 		}
-		symbToSec := make(map[string]*models.Security)
-		var exchID uint32
-		for _, s := range response.Securities {
-			if sec2, ok := state.securities[s.SecurityID]; ok {
-				return fmt.Errorf("got two securities with the same ID: %s %s", sec2.Symbol, s.Symbol)
+		if len(response.Securities) > 0 {
+			symbToSec := make(map[string]*models.Security)
+			var exchID uint32
+			for _, s := range response.Securities {
+				if sec2, ok := state.securities[s.SecurityID]; ok {
+					return fmt.Errorf("got two securities with the same ID: %s %s", sec2.Symbol, s.Symbol)
+				}
+				state.securities[s.SecurityID] = s
+				symbToSec[s.Symbol] = s
+				exchID = s.Exchange.ID
 			}
-			state.securities[s.SecurityID] = s
-			symbToSec[s.Symbol] = s
-			exchID = s.Exchange.ID
+			state.symbToSecs[exchID] = symbToSec
 		}
-		state.symbToSecs[exchID] = symbToSec
 	}
 
 	// Spawn all account listeners
@@ -455,7 +457,7 @@ func (state *Executor) OnSecurityDefinitionRequest(context actor.Context) error 
 	request := context.Message().(*messages.SecurityDefinitionRequest)
 	sec, rej := state.getSecurity(request.Instrument)
 	if rej != nil {
-		context.Respond(&messages.MarketDataResponse{
+		context.Respond(&messages.SecurityDefinitionResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
 			RejectionReason: *rej,

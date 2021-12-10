@@ -273,7 +273,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
-				state.logger.Info("http client error", log.Error(err))
+				state.logger.Warn("http client error", log.Error(err))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return
@@ -285,7 +285,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 						"http client error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					state.logger.Info("http client error", log.Error(err))
+					state.logger.Warn("http client error", log.Error(err))
 					response.RejectionReason = messages.HTTPError
 					context.Respond(response)
 				} else if queryResponse.StatusCode >= 500 {
@@ -293,7 +293,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 						"http server error: %d %s",
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
-					state.logger.Info("http client error", log.Error(err))
+					state.logger.Warn("http client error", log.Error(err))
 					response.RejectionReason = messages.HTTPError
 					context.Respond(response)
 				}
@@ -301,20 +301,20 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			}
 			var bresponse bithumbg.Response
 			if err := json.Unmarshal(queryResponse.Response, &bresponse); err != nil {
-				state.logger.Info("error decoding query response", log.Error(err))
+				state.logger.Warn("error decoding query response", log.Error(err))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return
 			}
 			if bresponse.Code != "0" {
-				state.logger.Info("error getting order book data", log.Error(errors.New(bresponse.Msg)))
+				state.logger.Warn("error getting order book data", log.Error(errors.New(bresponse.Msg)))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return
 			}
 			var obData bithumbg.OrderBook
 			if err := json.Unmarshal(bresponse.Data, &obData); err != nil {
-				state.logger.Info("error decoding query response", log.Error(err))
+				state.logger.Warn("error decoding query response", log.Error(err))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return

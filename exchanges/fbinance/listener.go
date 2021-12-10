@@ -166,7 +166,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 func (state *Listener) Clean(context actor.Context) error {
 	if state.ws != nil {
 		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+			state.logger.Warn("error disconnecting socket", log.Error(err))
 		}
 	}
 	if state.socketTicker != nil {
@@ -464,7 +464,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	}
 
 	if state.instrumentData.orderBook.Crossed() {
-		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		state.logger.Warn("crossed orderbook", log.Error(errors.New("crossed")))
 		return state.subscribeInstrument(context)
 	}
 
@@ -482,7 +482,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	// TODO ping or hb ?
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
+			state.logger.Warn("error on socket", log.Error(state.ws.Err))
 		}
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
@@ -524,7 +524,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 				state.openInterestTicker.Reset(oid)
 				oidLock.Unlock()
 			}
-			state.logger.Info("error fetching market statistics", log.Error(err))
+			state.logger.Warn("error fetching market statistics", log.Error(err))
 			return
 		}
 		msg := res.(*messages.MarketStatisticsResponse)
@@ -536,7 +536,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 				state.openInterestTicker.Reset(oid)
 				oidLock.Unlock()
 			}
-			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
+			state.logger.Warn("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
 			return
 		}
 

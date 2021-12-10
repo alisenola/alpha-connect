@@ -81,7 +81,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 
 	if err := state.UpdateSecurityList(context); err != nil {
-		state.logger.Info("error updating security list: %v", log.Error(err))
+		state.logger.Warn("error updating security list: %v", log.Error(err))
 	}
 
 	return nil
@@ -302,7 +302,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			state.logger.Info("request error", log.Error(err))
+			state.logger.Warn("request error", log.Error(err))
 			response.RejectionReason = messages.HTTPError
 			context.Respond(response)
 			return
@@ -315,7 +315,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 					"%d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				state.logger.Info("http error", log.Error(err))
+				state.logger.Warn("http error", log.Error(err))
 				response.RejectionReason = messages.ExchangeAPIError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
@@ -324,7 +324,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 					"%d %s",
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
-				state.logger.Info("http error", log.Error(err))
+				state.logger.Warn("http error", log.Error(err))
 				response.RejectionReason = messages.ExchangeAPIError
 				context.Respond(response)
 			}
@@ -341,14 +341,14 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		var bres Res
 		err = json.Unmarshal(queryResponse.Response, &bres)
 		if err != nil {
-			state.logger.Info("http error", log.Error(err))
+			state.logger.Warn("http error", log.Error(err))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
 		}
 
 		if bres.ReturnCode != 0 {
-			state.logger.Info("http error", log.Error(errors.New(bres.ReturnMessage)))
+			state.logger.Warn("http error", log.Error(errors.New(bres.ReturnMessage)))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return

@@ -362,7 +362,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 
 			res, err := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second).Result()
 			if err != nil {
-				state.logger.Info("http client error", log.Error(err))
+				state.logger.Warn("http client error", log.Error(err))
 				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 				return nil

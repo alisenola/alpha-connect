@@ -168,7 +168,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 func (state *Listener) Clean(context actor.Context) error {
 	if state.ws != nil {
 		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+			state.logger.Warn("error disconnecting socket", log.Error(err))
 		}
 	}
 	if state.socketTicker != nil {
@@ -337,11 +337,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		depthData.EventTime = uint64(msg.ClientTime.UnixNano()) / 1000000
 		err := state.onDepthData(context, depthData)
 		if err != nil {
-			state.logger.Info("error processing depth data for "+depthData.Symbol,
+			state.logger.Warn("error processing depth data for "+depthData.Symbol,
 				log.Error(err))
 			// Stop the socket, we will restart instrument at the end
 			if err := state.ws.Disconnect(); err != nil {
-				state.logger.Info("error disconnecting from socket", log.Error(err))
+				state.logger.Warn("error disconnecting from socket", log.Error(err))
 			}
 		}
 
@@ -427,7 +427,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData binance.WSDe
 	}
 
 	if state.instrumentData.orderBook.Crossed() {
-		state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
+		state.logger.Warn("crossed orderbook", log.Error(errors.New("crossed")))
 		return state.subscribeInstrument(context)
 	}
 
@@ -447,7 +447,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	// TODO ping or HB ?
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
+			state.logger.Warn("error on socket", log.Error(state.ws.Err))
 		}
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
