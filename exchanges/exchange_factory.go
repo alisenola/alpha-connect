@@ -19,6 +19,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/fbinance"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/ftx"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/ftxus"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/gate"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gemini"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/hitbtc"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobi"
@@ -131,6 +132,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return dydx.NewListener(security, dialerPool) }
 	case constants.OKEXP.ID:
 		return func() actor.Actor { return okexp.NewListener(security, dialerPool) }
+	case constants.GATE.ID:
+		return func() actor.Actor { return gate.NewListener(security, dialerPool) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -194,6 +197,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 		return func() actor.Actor { return dydx.NewExecutor(dialerPool) }
 	case constants.OKEXP.ID:
 		return func() actor.Actor { return okexp.NewExecutor() }
+	case constants.GATE.ID:
+		return func() actor.Actor { return gate.NewExecutor() }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }
