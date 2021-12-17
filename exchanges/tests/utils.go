@@ -2,15 +2,66 @@ package tests
 
 import (
 	"fmt"
+	"math"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
-	"math"
-	"reflect"
-	"time"
+	"gitlab.com/alphaticks/xchanger/constants"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 )
+
+func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
+	assets := map[uint32]xchangerModels.Asset{
+		constants.DOLLAR.ID:           constants.DOLLAR,
+		constants.EURO.ID:             constants.EURO,
+		constants.POUND.ID:            constants.POUND,
+		constants.CANADIAN_DOLLAR.ID:  constants.CANADIAN_DOLLAR,
+		constants.JAPENESE_YEN.ID:     constants.JAPENESE_YEN,
+		constants.BITCOIN.ID:          constants.BITCOIN,
+		constants.LITECOIN.ID:         constants.LITECOIN,
+		constants.ETHEREUM.ID:         constants.ETHEREUM,
+		constants.RIPPLE.ID:           constants.RIPPLE,
+		constants.TETHER.ID:           constants.TETHER,
+		constants.SOUTH_KOREAN_WON.ID: constants.SOUTH_KOREAN_WON,
+		constants.USDC.ID:             constants.USDC,
+		constants.DASH.ID:             constants.DASH,
+		50: xchangerModels.Asset{
+			Symbol: "BTT",
+			Name:   "",
+			ID:     50,
+		},
+	}
+
+	_ = constants.LoadAssets(assets)
+	exch := []*xchangerModels.Exchange{
+		exchange,
+	}
+	as := actor.NewActorSystem()
+	var accnts []*account.Account
+	if acc != nil {
+		accnt, err := exchanges.NewAccount(acc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		accnts = append(accnts, accnt)
+	}
+
+	cfg := &exchanges.ExecutorConfig{
+		Exchanges: exch,
+		Strict:    true,
+		Accounts:  accnts,
+	}
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(cfg)), "executor")
+	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
+}
 
 type GetStat struct {
 	Error     error
@@ -20,6 +71,7 @@ type GetStat struct {
 }
 
 type OBChecker struct {
+	test          MDTest
 	security      *models.Security
 	orderbook     *gorderbook.OrderBookL2
 	tickPrecision uint64
@@ -33,14 +85,15 @@ type OBChecker struct {
 	err           error
 }
 
-func NewOBCheckerProducer(security *models.Security) actor.Producer {
+func NewOBCheckerProducer(security *models.Security, test MDTest) actor.Producer {
 	return func() actor.Actor {
-		return NewOBChecker(security)
+		return NewOBChecker(security, test)
 	}
 }
 
-func NewOBChecker(security *models.Security) actor.Actor {
+func NewOBChecker(security *models.Security, test MDTest) actor.Actor {
 	return &OBChecker{
+		test:        test,
 		security:    security,
 		orderbook:   nil,
 		seqNum:      0,
@@ -91,7 +144,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 			Symbol:     &types.StringValue{Value: state.security.Symbol},
 		},
 		Aggregation: models.L2,
-	}, 20*time.Second).Result()
+	}, 80*time.Second).Result()
 	if err != nil {
 		return err
 	}
@@ -122,23 +175,31 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 	state.lotPrecision = lotPrecision
 
 	for _, b := range response.SnapshotL2.Bids {
-		rawPrice := b.Price * float64(tickPrecision)
-		rawQty := b.Quantity * float64(lotPrecision)
-		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
-			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
+		if !state.test.IgnoreSizeResidue {
+			rawQty := b.Quantity * float64(lotPrecision)
+			if (math.Round(rawQty) - rawQty) > 0.01 {
+				return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
+			}
 		}
-		if (math.Round(rawQty) - rawQty) > 0.01 {
-			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
+		if !state.test.IgnorePriceResidue {
+			rawPrice := b.Price * float64(tickPrecision)
+			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
+				return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
+			}
 		}
 	}
 	for _, a := range response.SnapshotL2.Asks {
-		rawPrice := a.Price * float64(tickPrecision)
-		rawQty := a.Quantity * float64(lotPrecision)
-		if (math.Round(rawPrice) - rawPrice) > 0.00001 {
-			return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
+		if !state.test.IgnoreSizeResidue {
+			rawQty := a.Quantity * float64(lotPrecision)
+			if (math.Round(rawQty) - rawQty) > 0.01 {
+				return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
+			}
 		}
-		if (math.Round(rawQty) - rawQty) > 0.01 {
-			return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
+		if !state.test.IgnorePriceResidue {
+			rawPrice := a.Price * float64(tickPrecision)
+			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
+				return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
+			}
 		}
 	}
 	state.OBUpdates += 1
@@ -166,16 +227,21 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 
 	if refresh.UpdateL2 != nil {
 		for _, l := range refresh.UpdateL2.Levels {
-			rawPrice := l.Price * float64(state.tickPrecision)
-			rawQty := l.Quantity * float64(state.lotPrecision)
-			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
-				return fmt.Errorf("residue in ob price: %f %f", rawPrice, math.Round(rawPrice))
+			if !state.test.IgnoreSizeResidue {
+				rawQty := l.Quantity * float64(state.lotPrecision)
+				if (math.Round(rawQty) - rawQty) > 0.01 {
+					return fmt.Errorf("residue in qty: %f %f", rawQty, math.Round(rawQty))
+				}
 			}
-			if (math.Round(rawQty) - rawQty) > 0.0001 {
-				return fmt.Errorf("residue in ob qty: %f %f", rawQty, math.Round(rawQty))
+			if !state.test.IgnorePriceResidue {
+				rawPrice := l.Price * float64(state.tickPrecision)
+				if (math.Round(rawPrice) - rawPrice) > 0.00001 {
+					return fmt.Errorf("residue in price: %f %f", rawPrice, math.Round(rawPrice))
+				}
 			}
 			state.orderbook.UpdateOrderBookLevel(l)
 		}
+
 		if state.orderbook.Crossed() {
 			fmt.Println("CROSSED")
 			for _, l := range refresh.UpdateL2.Levels {
