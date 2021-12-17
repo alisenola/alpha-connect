@@ -18,28 +18,28 @@ import (
 // 429 rate limit
 // 418 IP ban
 
-type CoinbaseProFixExecutor struct {
-	extypes.ExchangeExecutorBase
+type FixExecutor struct {
+	extypes.BaseExecutor
 	//fixClient 		*http.Client
 	fixRateLimit *exchanges.RateLimit
 	logger       *log.Logger
 }
 
-func NewCoinbaseProFixExecutor() actor.Actor {
-	return &CoinbaseProFixExecutor{
+func NewFixExecutor() actor.Actor {
+	return &FixExecutor{
 		fixRateLimit: nil,
 	}
 }
 
-func (state *CoinbaseProFixExecutor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+func (state *FixExecutor) Receive(context actor.Context) {
+	extypes.ReceiveExecutor(state, context)
 }
 
-func (state *CoinbaseProFixExecutor) GetLogger() *log.Logger {
+func (state *FixExecutor) GetLogger() *log.Logger {
 	return state.logger
 }
 
-func (state *CoinbaseProFixExecutor) Initialize(context actor.Context) error {
+func (state *FixExecutor) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -49,19 +49,19 @@ func (state *CoinbaseProFixExecutor) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) Clean(context actor.Context) error {
+func (state *FixExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+func (state *FixExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) UpdateSecurityList(context actor.Context) error {
+func (state *FixExecutor) UpdateSecurityList(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnMarketStatisticsRequest(context actor.Context) error {
+func (state *FixExecutor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsResponse)
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
@@ -71,46 +71,46 @@ func (state *CoinbaseProFixExecutor) OnMarketStatisticsRequest(context actor.Con
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnMarketDataRequest(context actor.Context) error {
+func (state *FixExecutor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnSecurityListRequest(context actor.Context) error {
+func (state *FixExecutor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnOrderStatusRequest(context actor.Context) error {
+func (state *FixExecutor) OnOrderStatusRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnPositionsRequest(context actor.Context) error {
+func (state *FixExecutor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnBalancesRequest(context actor.Context) error {
+func (state *FixExecutor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnNewOrderSingleRequest(context actor.Context) error {
+func (state *FixExecutor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnNewOrderBulkRequest(context actor.Context) error {
+func (state *FixExecutor) OnNewOrderBulkRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnOrderReplaceRequest(context actor.Context) error {
+func (state *FixExecutor) OnOrderReplaceRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnOrderBulkReplaceRequest(context actor.Context) error {
+func (state *FixExecutor) OnOrderBulkReplaceRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnOrderCancelRequest(context actor.Context) error {
+func (state *FixExecutor) OnOrderCancelRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProFixExecutor) OnOrderMassCancelRequest(context actor.Context) error {
+func (state *FixExecutor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }
