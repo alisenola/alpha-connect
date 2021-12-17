@@ -25,7 +25,7 @@ import (
 var pairs = []string{"BTC_KRW"}
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	client      *http.Client
 	securities  map[uint64]*models.Security
 	rateLimit   *exchanges.RateLimit
@@ -43,7 +43,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -72,10 +72,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunner = context.Spawn(props)
 
 	return state.UpdateSecurityList(context)
-}
-
-func (state *Executor) Clean(context actor.Context) error {
-	return nil
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
@@ -191,66 +187,5 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		Success:    true,
 		Securities: securities})
 
-	return nil
-}
-
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Liquidations:    nil,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsResponse)
-	context.Respond(&messages.MarketStatisticsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnPositionsRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnBalancesRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

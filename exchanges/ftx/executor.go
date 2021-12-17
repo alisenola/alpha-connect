@@ -47,7 +47,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	client         *http.Client
 	securities     map[uint64]*models.Security
 	symbolToSec    map[string]*models.Security
@@ -84,7 +84,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -285,16 +285,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsRequest)
 	response := &messages.MarketStatisticsResponse{
@@ -403,10 +393,6 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	response.Success = true
 	context.Respond(response)
 
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	return nil
 }
 
@@ -1390,10 +1376,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderReplaceRequest)
 	response := &messages.OrderReplaceResponse{
@@ -1475,10 +1457,6 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderCancelRequest)
 	response := &messages.OrderCancelResponse{
@@ -1555,9 +1533,5 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		response.Success = true
 		context.Respond(response)
 	})
-	return nil
-}
-
-func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

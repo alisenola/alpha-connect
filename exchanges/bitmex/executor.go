@@ -33,7 +33,7 @@ import (
 // The role of a Binance Executor is to
 // process api request
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	client      *http.Client
 	securities  map[uint64]*models.Security
 	symbolToSec map[string]*models.Security
@@ -54,7 +54,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -84,10 +84,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunner = context.Spawn(props)
 	state.rateLimit = exchanges.NewRateLimit(60, time.Minute)
 	return state.UpdateSecurityList(context)
-}
-
-func (state *Executor) Clean(context actor.Context) error {
-	return nil
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
@@ -231,36 +227,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		Success:    true,
 		Securities: securities})
 
-	return nil
-}
-
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsRequest)
-	context.Respond(&messages.MarketStatisticsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketDataRequest)
-	context.Respond(&messages.MarketDataResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
 	return nil
 }
 
@@ -620,68 +586,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	})
 
 	return nil
-}
-
-func buildPostOrderRequest(order *messages.NewOrder) (bitmex.PostOrderRequest, *messages.RejectionReason) {
-	request := bitmex.NewPostOrderRequest(order.Instrument.Symbol.Value)
-
-	request.SetOrderQty(order.Quantity)
-	request.SetClOrdID(order.ClientOrderID)
-
-	switch order.OrderSide {
-	case models.Buy:
-		request.SetSide(bitmex.BUY_ORDER_SIDE)
-	case models.Sell:
-		request.SetSide(bitmex.SELL_ORDER_SIDE)
-	default:
-		request.SetSide(bitmex.BUY_ORDER_SIDE)
-	}
-
-	switch order.OrderType {
-	case models.Limit:
-		request.SetOrderType(bitmex.LIMIT)
-	case models.Market:
-		request.SetOrderType(bitmex.MARKET)
-	case models.Stop:
-		request.SetOrderType(bitmex.STOP)
-	case models.StopLimit:
-		request.SetOrderType(bitmex.STOP_LIMIT)
-	case models.LimitIfTouched:
-		request.SetOrderType(bitmex.LIMIT_IF_TOUCHED)
-	case models.MarketIfTouched:
-		request.SetOrderType(bitmex.MARKET_IF_TOUCHED)
-	default:
-		rej := messages.UnsupportedOrderType
-		return nil, &rej
-	}
-
-	switch order.TimeInForce {
-	case models.Session:
-		request.SetTimeInForce(bitmex.TIF_DAY)
-	case models.GoodTillCancel:
-		request.SetTimeInForce(bitmex.GOOD_TILL_CANCEL)
-	case models.ImmediateOrCancel:
-		request.SetTimeInForce(bitmex.IMMEDIATE_OR_CANCEL)
-	case models.FillOrKill:
-		request.SetTimeInForce(bitmex.FILL_OR_KILL)
-	default:
-		rej := messages.UnsupportedOrderTimeInForce
-		return nil, &rej
-	}
-
-	if order.Price != nil {
-		request.SetPrice(order.Price.Value)
-	}
-
-	// TODO handle multiple exec inst
-	if len(order.ExecutionInstructions) > 0 {
-		switch order.ExecutionInstructions[0] {
-		case models.ParticipateDoNotInitiate:
-			request.SetExecInst(bitmex.EI_PARTICIPATE_DO_NOT_INITIATE)
-		}
-	}
-
-	return request, nil
 }
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {

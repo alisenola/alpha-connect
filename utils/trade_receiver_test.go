@@ -19,7 +19,7 @@ import (
 var FBinanceAccount = &models.Account{
 	Name:     "299211",
 	Exchange: &constants.FBINANCE,
-	Credentials: &xchangerModels.APICredentials{
+	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
 	},

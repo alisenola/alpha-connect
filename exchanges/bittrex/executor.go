@@ -36,7 +36,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	_interface.ExchangeExecutorReceive(state, context)
+	_interface.ExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {

@@ -22,7 +22,7 @@ import (
 )
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	client      *http.Client
 	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
@@ -40,7 +40,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {

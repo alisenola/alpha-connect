@@ -24,7 +24,7 @@ import (
 )
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	client      *http.Client
 	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
@@ -43,7 +43,7 @@ func NewExecutor() actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -188,166 +188,5 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		Success:    true,
 		Securities: state.securities})
 
-	return nil
-}
-
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	var snapshot *models.OBL2Snapshot
-	msg := context.Message().(*messages.MarketDataRequest)
-	response := &messages.MarketDataResponse{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    false,
-	}
-	if msg.Subscribe {
-		response.RejectionReason = messages.UnsupportedSubscription
-		context.Respond(response)
-		return nil
-	}
-	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		response.RejectionReason = messages.MissingInstrument
-		context.Respond(response)
-		return nil
-	}
-	// Get http request and the expected response
-	symbol := msg.Instrument.Symbol.Value
-	request, weight, err := kraken.GetOrderBook(symbol)
-	if err != nil {
-		return err
-	}
-
-	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-
-	state.rateLimit.Request(weight)
-
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
-
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
-			context.Respond(response)
-			return
-		}
-		queryResponse := res.(*jobs.PerformQueryResponse)
-
-		if queryResponse.StatusCode != 200 {
-			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				err := fmt.Errorf(
-					"http client error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
-				context.Respond(response)
-				return
-			} else if queryResponse.StatusCode >= 500 {
-				err := fmt.Errorf(
-					"http server error: %d %s",
-					queryResponse.StatusCode,
-					string(queryResponse.Response))
-				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
-				context.Respond(response)
-				return
-			}
-			return
-		}
-
-		var apiResponse struct {
-			Error  []string                      `json:"error"`
-			Result map[string]kraken.OrderBookL2 `json:"result"`
-		}
-		err = json.Unmarshal(queryResponse.Response, &apiResponse)
-		if err != nil {
-			err = fmt.Errorf("error decoding query response: %v", err)
-			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return
-		}
-
-		bids, asks := apiResponse.Result[symbol].ToBidAsk()
-		var maxTs uint64 = 0
-		for _, bid := range apiResponse.Result[symbol].Bids {
-			if bid.Time > maxTs {
-				maxTs = bid.Time
-			}
-		}
-		for _, ask := range apiResponse.Result[symbol].Asks {
-			if ask.Time > maxTs {
-				maxTs = ask.Time
-			}
-		}
-		snapshot = &models.OBL2Snapshot{
-			Bids:      bids,
-			Asks:      asks,
-			Timestamp: utils.MicroToTimestamp(maxTs),
-		}
-		response.Success = true
-		response.SnapshotL2 = snapshot
-		response.SeqNum = maxTs
-		context.Respond(response)
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsResponse)
-	context.Respond(&messages.MarketStatisticsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnPositionsRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnBalancesRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

@@ -17,20 +17,20 @@ import (
 // 429 rate limit
 // 418 IP ban
 
-type CoinbaseProPrivateExecutor struct {
+type PrivateExecutor struct {
 	httpClient    *http.Client
 	httpRateLimit *exchanges.RateLimit
 	logger        *log.Logger
 }
 
-func NewCoinbaseProPrivateExecutor() actor.Actor {
-	return &CoinbaseProPrivateExecutor{
+func NewPrivateExecutor() actor.Actor {
+	return &PrivateExecutor{
 		httpClient:    nil,
 		httpRateLimit: nil,
 	}
 }
 
-func (state *CoinbaseProPrivateExecutor) Receive(context actor.Context) {
+func (state *PrivateExecutor) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -58,11 +58,11 @@ func (state *CoinbaseProPrivateExecutor) Receive(context actor.Context) {
 	}
 }
 
-func (state *CoinbaseProPrivateExecutor) GetLogger() *log.Logger {
+func (state *PrivateExecutor) GetLogger() *log.Logger {
 	return state.logger
 }
 
-func (state *CoinbaseProPrivateExecutor) Initialize(context actor.Context) error {
+func (state *PrivateExecutor) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -74,6 +74,6 @@ func (state *CoinbaseProPrivateExecutor) Initialize(context actor.Context) error
 	return nil
 }
 
-func (state *CoinbaseProPrivateExecutor) Clean(context actor.Context) error {
+func (state *PrivateExecutor) Clean(context actor.Context) error {
 	return nil
 }

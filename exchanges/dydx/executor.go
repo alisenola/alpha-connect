@@ -37,7 +37,7 @@ type AccountRateLimit struct {
 }
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	securities        map[uint64]*models.Security
 	symbolToSec       map[string]*models.Security
 	accountRateLimits map[string]*AccountRateLimit
@@ -54,6 +54,10 @@ func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	}
 }
 
+func (state *Executor) Receive(context actor.Context) {
+	extypes.ReceiveExecutor(state, context)
+}
+
 func (state *Executor) getQueryRunner() *QueryRunner {
 	sort.Slice(state.queryRunners, func(i, j int) bool {
 		return rand.Uint64()%2 == 0
@@ -68,10 +72,6 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 	}
 
 	return qr
-}
-
-func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -234,36 +234,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		Securities: securities,
 	})
 
-	return nil
-}
-
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketStatisticsRequest)
-	context.Respond(&messages.MarketStatisticsResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	msg := context.Message().(*messages.MarketDataRequest)
-	context.Respond(&messages.MarketDataResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
 	return nil
 }
 
@@ -713,25 +683,5 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		response.OrderID = fmt.Sprintf("%d", order.OrderID)
 		context.Respond(response)
 	})
-	return nil
-}
-
-func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

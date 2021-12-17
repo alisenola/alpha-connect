@@ -31,8 +31,8 @@ import (
 
 // The role of a CoinbasePro Executor is to
 // process api request
-type CoinbaseProPublicExecutor struct {
-	extypes.ExchangeExecutorBase
+type PublicExecutor struct {
+	extypes.BaseExecutor
 	client       *http.Client
 	securities   map[uint64]*models.Security
 	rateLimit    *exchanges.RateLimit
@@ -41,8 +41,8 @@ type CoinbaseProPublicExecutor struct {
 	logger       *log.Logger
 }
 
-func NewCoinbaseProPublicExecutor() actor.Actor {
-	return &CoinbaseProPublicExecutor{
+func NewPublicExecutor() actor.Actor {
+	return &PublicExecutor{
 		client:       nil,
 		securities:   nil,
 		rateLimit:    nil,
@@ -51,15 +51,15 @@ func NewCoinbaseProPublicExecutor() actor.Actor {
 	}
 }
 
-func (state *CoinbaseProPublicExecutor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+func (state *PublicExecutor) Receive(context actor.Context) {
+	extypes.ReceiveExecutor(state, context)
 }
 
-func (state *CoinbaseProPublicExecutor) GetLogger() *log.Logger {
+func (state *PublicExecutor) GetLogger() *log.Logger {
 	return state.logger
 }
 
-func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error {
+func (state *PublicExecutor) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -92,11 +92,11 @@ func (state *CoinbaseProPublicExecutor) Initialize(context actor.Context) error 
 	return state.UpdateSecurityList(context)
 }
 
-func (state *CoinbaseProPublicExecutor) Clean(context actor.Context) error {
+func (state *PublicExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context) error {
+func (state *PublicExecutor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := coinbasepro.GetProducts()
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (state *CoinbaseProPublicExecutor) UpdateSecurityList(context actor.Context
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Context) error {
+func (state *PublicExecutor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
 	securities := make([]*models.Security, len(state.securities))
@@ -203,7 +203,7 @@ func (state *CoinbaseProPublicExecutor) OnSecurityListRequest(context actor.Cont
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
+func (state *PublicExecutor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
 	context.Respond(&messages.HistoricalLiquidationsResponse{
 		RequestID:       msg.RequestID,
@@ -213,7 +213,7 @@ func (state *CoinbaseProPublicExecutor) OnHistoricalLiquidationsRequest(context 
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) OnMarketStatisticsRequest(context actor.Context) error {
+func (state *PublicExecutor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsResponse)
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
@@ -223,7 +223,7 @@ func (state *CoinbaseProPublicExecutor) OnMarketStatisticsRequest(context actor.
 	return nil
 }
 
-func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Context) error {
+func (state *PublicExecutor) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
 	response := &messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -392,40 +392,4 @@ func (state *CoinbaseProPublicExecutor) OnMarketDataRequest(context actor.Contex
 
 		return nil
 	}
-}
-
-func (state *CoinbaseProPublicExecutor) OnOrderStatusRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnPositionsRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnBalancesRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnNewOrderSingleRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnOrderReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnOrderCancelRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *CoinbaseProPublicExecutor) OnOrderMassCancelRequest(context actor.Context) error {
-	return nil
 }

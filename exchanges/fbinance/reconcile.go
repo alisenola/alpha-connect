@@ -23,7 +23,7 @@ import (
 )
 
 type AccountReconcile struct {
-	extypes.AccountReconcileBase
+	extypes.BaseReconcile
 	account          *models.Account
 	fbinanceExecutor *actor.PID
 	executorManager  *actor.PID
@@ -56,10 +56,6 @@ func (state *AccountReconcile) GetLogger() *log.Logger {
 
 func (state *AccountReconcile) GetTransactions() *mongo.Collection {
 	return state.txs
-}
-
-func (state *AccountReconcile) Receive(context actor.Context) {
-	extypes.AccountReconcileReceive(state, context)
 }
 
 func (state *AccountReconcile) Initialize(context actor.Context) error {

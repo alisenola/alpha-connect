@@ -32,7 +32,7 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	extypes.ExchangeExecutorBase
+	extypes.BaseExecutor
 	securities   map[uint64]*models.Security
 	queryRunners []*QueryRunner
 	dialerPool   *xutils.DialerPool
@@ -48,7 +48,7 @@ func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extypes.ExchangeExecutorReceive(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -382,45 +382,5 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		Success:         false,
 		RejectionReason: messages.UnsupportedRequest,
 	})
-	return nil
-}
-
-func (state *Executor) OnMarketDataRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnPositionsRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnBalancesRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	return nil
 }

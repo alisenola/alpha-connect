@@ -4,9 +4,10 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"math/rand"
 )
 
-type ExchangeListener interface {
+type Listener interface {
 	actor.Actor
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -14,7 +15,32 @@ type ExchangeListener interface {
 	OnMarketDataRequest(context actor.Context) error
 }
 
-func ExchangeListenerReceive(state ExchangeListener, context actor.Context) {
+type BaseListener struct{}
+
+func (state *BaseListener) GetLogger() *log.Logger {
+	panic("not implemented")
+}
+
+func (state *BaseListener) Initialize(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (state *BaseListener) Clean(context actor.Context) error {
+	panic("not implemented")
+}
+
+func (state *BaseListener) OnMarketDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.MarketDataRequest)
+	context.Respond(&messages.MarketDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseListener) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
