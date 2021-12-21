@@ -152,8 +152,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	var markets dydx.Markets
-	err = json.Unmarshal(resp.Response, &res)
+	var markets dydx.MarketsResponse
+	err = json.Unmarshal(resp.Response, &markets)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
 		return err
