@@ -34,15 +34,15 @@ func (state *BaseReconcile) GetLogger() *log.Logger {
 }
 
 func (state *BaseReconcile) Initialize(context actor.Context) error {
-	panic("not implemented")
+	return nil
 }
 
 func (state *BaseReconcile) Clean(context actor.Context) error {
-	panic("not implemented")
+	return nil
 }
 
 func (state *BaseReconcile) GetTransactions() *mongo.Collection {
-	panic("not implemented")
+	return nil
 }
 
 func (state *BaseReconcile) OnAccountMovementRequest(context actor.Context) error {
@@ -134,7 +134,7 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 	return nil
 }
 
-func (state *BaseReconcile) Receive(context actor.Context) {
+func ReconcileReceive(state Reconcile, context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {

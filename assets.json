@@ -1347,5 +1347,15 @@
     "symbol": "AION",
     "name": "aion",
     "ID": 270
+  },
+  "271": {
+    "symbol": "SLRS",
+    "name": "solrise-finance",
+    "ID": 271
+  },
+  "272": {
+    "symbol": "GHST",
+    "name": "aavegotchi",
+    "ID": 272
   }
 }

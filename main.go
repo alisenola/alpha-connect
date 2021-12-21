@@ -76,7 +76,6 @@ func main() {
 		&constants.OKCOIN,
 		&constants.FBINANCE,
 		&constants.HITBTC,
-		&constants.BITZ,
 		&constants.HUOBI,
 		&constants.FTX,
 		&constants.BITMEX,

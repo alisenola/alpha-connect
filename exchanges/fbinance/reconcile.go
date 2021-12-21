@@ -58,6 +58,10 @@ func (state *AccountReconcile) GetTransactions() *mongo.Collection {
 	return state.txs
 }
 
+func (state *AccountReconcile) Receive(context actor.Context) {
+	extypes.ReconcileReceive(state, context)
+}
+
 func (state *AccountReconcile) Initialize(context actor.Context) error {
 	// When initialize is done, the account must be aware of all the settings / assets / portfolio
 	// so as to be able to answer to FIX messages
@@ -133,7 +137,11 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		case "TRADE":
 			secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
 			sec := state.securities[secID]
-			if sec.SecurityType == "CRPERP" {
+			if sec == nil {
+				state.positions[fmt.Sprintf("%d", secID)] = account.NewPosition(
+					false, 1, 1, 1e8, 1, 0, 0)
+			}
+			if sec == nil || sec.SecurityType == "CRPERP" {
 				if tx.Fill.Quantity < 0 {
 					_, realized := state.positions[tx.Fill.SecurityID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
 					realized1 -= float64(realized) / 1e8
@@ -159,12 +167,14 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		fmt.Println(a.Symbol, b)
 	}
 
-	for k, pos := range state.positions {
-		if ppos := pos.GetPosition(); ppos != nil {
-			kid, _ := strconv.ParseUint(k, 10, 64)
-			fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
+	/*
+		for k, pos := range state.positions {
+			if ppos := pos.GetPosition(); ppos != nil {
+				//kid, _ := strconv.ParseUint(k, 10, 64)
+				//fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
+			}
 		}
-	}
+	*/
 
 	sres := state.txs.FindOne(goContext.Background(), bson.D{
 		{"account", state.account.Name},

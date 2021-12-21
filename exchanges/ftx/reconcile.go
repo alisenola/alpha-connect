@@ -54,6 +54,10 @@ func (state *AccountReconcile) GetLogger() *log.Logger {
 	return state.logger
 }
 
+func (state *AccountReconcile) Receive(context actor.Context) {
+	extypes.ReconcileReceive(state, context)
+}
+
 func (state *AccountReconcile) Initialize(context actor.Context) error {
 	// When initialize is done, the account must be aware of all the settings / assets / portfolio
 	// so as to be able to answer to FIX messages
