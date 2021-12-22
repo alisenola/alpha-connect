@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -324,14 +325,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		obDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{},
+			Levels:    []gmodels.OrderBookLevel{},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
 
 		lvlIdx := 0
 		for _, bid := range obData.Bids {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Amount,
 				Bid:      true,
@@ -342,7 +343,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		for _, ask := range obData.Asks {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Amount,
 				Bid:      false,

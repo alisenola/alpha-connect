@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/deribit"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -197,18 +198,18 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error casting message to OrderBookUpdate")
 	}
 
-	var bids, asks []gorderbook.OrderBookLevel
-	bids = make([]gorderbook.OrderBookLevel, len(update.Bids), len(update.Bids))
+	var bids, asks []gmodels.OrderBookLevel
+	bids = make([]gmodels.OrderBookLevel, len(update.Bids), len(update.Bids))
 	for i, bid := range update.Bids {
-		bids[i] = gorderbook.OrderBookLevel{
+		bids[i] = gmodels.OrderBookLevel{
 			Price:    bid.Price,
 			Quantity: bid.Quantity,
 			Bid:      true,
 		}
 	}
-	asks = make([]gorderbook.OrderBookLevel, len(update.Asks), len(update.Asks))
+	asks = make([]gmodels.OrderBookLevel, len(update.Asks), len(update.Asks))
 	for i, ask := range update.Asks {
-		asks[i] = gorderbook.OrderBookLevel{
+		asks[i] = gmodels.OrderBookLevel{
 			Price:    ask.Price,
 			Quantity: ask.Quantity,
 			Bid:      false,
@@ -308,14 +309,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
-			Levels:    make([]gorderbook.OrderBookLevel, nLevels, nLevels),
+			Levels:    make([]gmodels.OrderBookLevel, nLevels, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
 
 		lvlIdx := 0
 		for _, bid := range obData.Bids {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Quantity,
 				Bid:      true,
@@ -325,7 +326,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			instr.orderBook.UpdateOrderBookLevel(level)
 		}
 		for _, ask := range obData.Asks {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Quantity,
 				Bid:      false,

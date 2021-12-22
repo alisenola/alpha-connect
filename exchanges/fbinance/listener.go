@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
@@ -442,7 +443,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	}
 
 	obDelta := &models.OBL2Update{
-		Levels:    []gorderbook.OrderBookLevel{},
+		Levels:    []gmodels.OrderBookLevel{},
 		Timestamp: utils.MilliToTimestamp(depthData.EventTime),
 		Trade:     false,
 	}

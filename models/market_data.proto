@@ -4,7 +4,7 @@ package models;
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "gitlab.com/alphaticks/gorderbook/protos.proto";
+import "gitlab.com/alphaticks/gorderbook/gorderbook.models/protos.proto";
 
 enum StatType {
     IndexValue = 0;
@@ -39,30 +39,42 @@ message OBL1Snapshot {
 }
 
 message OBL2Update {
-    repeated gorderbook.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 2;
     bool trade = 4;
 }
 
 message OBL2Snapshot {
-    repeated gorderbook.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
     google.protobuf.UInt64Value tick_precision = 5;
     google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Update {
-    repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order asks = 3 [(gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 4;
     google.protobuf.UInt64Value tick_precision = 5;
     google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Snapshot {
-    repeated gorderbook.Order bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.Order asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order bids = 2 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order asks = 3 [(gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 4;
+}
+
+message UPV3Snapshot {
+    repeated gorderbook.models.UPV3Tick ticks = 1;
+    repeated gorderbook.models.UPV3Position positions = 2;
+}
+
+message UPV3Update {
+    gorderbook.models.UPV3Mint mint = 1;
+    gorderbook.models.UPV3Burn burn = 2;
+    gorderbook.models.UPV3Swap swap = 3;
     google.protobuf.Timestamp timestamp = 4;
 }
 

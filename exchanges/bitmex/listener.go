@@ -13,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -207,17 +208,17 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 	}
 
-	var bids, asks []gorderbook.OrderBookLevel
+	var bids, asks []gmodels.OrderBookLevel
 
 	for _, data := range obData.Data {
 		if data.Side == "Buy" {
-			bids = append(bids, gorderbook.OrderBookLevel{
+			bids = append(bids, gmodels.OrderBookLevel{
 				Price:    state.instrumentData.levelIDToPrice[data.ID],
 				Quantity: float64(data.Size),
 				Bid:      true,
 			})
 		} else {
-			asks = append(asks, gorderbook.OrderBookLevel{
+			asks = append(asks, gmodels.OrderBookLevel{
 				Price:    state.instrumentData.levelIDToPrice[data.ID],
 				Quantity: float64(data.Size),
 				Bid:      false,
@@ -306,17 +307,17 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 
-		var bids, asks []gorderbook.OrderBookLevel
+		var bids, asks []gmodels.OrderBookLevel
 
 		for _, data := range obData.Data {
 			if data.Side == "Buy" {
-				bids = append(bids, gorderbook.OrderBookLevel{
+				bids = append(bids, gmodels.OrderBookLevel{
 					Price:    state.instrumentData.levelIDToPrice[data.ID],
 					Quantity: float64(data.Size),
 					Bid:      true,
 				})
 			} else {
-				asks = append(asks, gorderbook.OrderBookLevel{
+				asks = append(asks, gmodels.OrderBookLevel{
 					Price:    state.instrumentData.levelIDToPrice[data.ID],
 					Quantity: float64(data.Size),
 					Bid:      false,
@@ -326,7 +327,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 
 		limitDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{},
+			Levels:    []gmodels.OrderBookLevel{},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}

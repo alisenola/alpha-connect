@@ -95,6 +95,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.UnipoolV3DataRequest:
+		if err := state.OnUnipoolV3DataRequest(context); err != nil {
+			state.logger.Error("error processing OnUnipoolV3DataRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.MarketStatisticsRequest:
 		if err := state.OnMarketStatisticsRequest(context); err != nil {
 			state.logger.Error("error processing OnMarketStatisticsRequest", log.Error(err))
@@ -393,7 +399,31 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewMarketDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
+		pid := context.Spawn(props)
+		state.instruments[sec.SecurityID] = pid
+		context.Forward(pid)
+	}
+
+	return nil
+}
+
+func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
+	request := context.Message().(*messages.UnipoolV3DataRequest)
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.UnipoolV3DataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	if pid, ok := state.instruments[sec.SecurityID]; ok {
+		context.Forward(pid)
+	} else {
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid

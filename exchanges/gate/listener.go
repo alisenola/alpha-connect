@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"math"
 	"reflect"
 	"time"
@@ -421,7 +422,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		bids, asks := res.ToBidAsk()
 
 		obDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{},
+			Levels:    []gmodels.OrderBookLevel{},
 			Timestamp: utils.MilliToTimestamp(res.Time),
 			Trade:     false,
 		}

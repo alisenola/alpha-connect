@@ -162,6 +162,29 @@ message MarketDataIncrementalRefresh {
     repeated models.Stat stats = 10;
 }
 
+message UnipoolV3DataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
+}
+
+message UnipoolV3DataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.UPV3Snapshot snapshot = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message UnipoolV3DataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.UPV3Update update = 4;
+}
+
 message AccountDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;

@@ -269,7 +269,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				Trade:     false,
 			}
 			for _, bid := range exchangeState.Buys {
-				level := gorderbook.OrderBookLevel{
+				level := gmodels.OrderBookLevel{
 					Price:    bid.Rate,
 					Quantity: bid.Quantity,
 					Bid:      true,
@@ -278,7 +278,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 				obDelta.Levels = append(obDelta.Levels, level)
 			}
 			for _, ask := range exchangeState.Sells {
-				level := gorderbook.OrderBookLevel{
+				level := gmodels.OrderBookLevel{
 					Price:    ask.Rate,
 					Quantity: ask.Quantity,
 					Bid:      false,
