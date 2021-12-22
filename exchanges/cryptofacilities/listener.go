@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -216,18 +217,18 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			continue
 		}
 
-		var bids, asks []gorderbook.OrderBookLevel
-		bids = make([]gorderbook.OrderBookLevel, len(obData.Bids), len(obData.Bids))
+		var bids, asks []gmodels.OrderBookLevel
+		bids = make([]gmodels.OrderBookLevel, len(obData.Bids), len(obData.Bids))
 		for i, bid := range obData.Bids {
-			bids[i] = gorderbook.OrderBookLevel{
+			bids[i] = gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Qty,
 				Bid:      true,
 			}
 		}
-		asks = make([]gorderbook.OrderBookLevel, len(obData.Asks), len(obData.Asks))
+		asks = make([]gmodels.OrderBookLevel, len(obData.Asks), len(obData.Asks))
 		for i, ask := range obData.Asks {
-			asks[i] = gorderbook.OrderBookLevel{
+			asks[i] = gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Qty,
 				Bid:      false,
@@ -345,7 +346,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 		instr.lastUpdateID = obData.Seq
 
-		level := gorderbook.OrderBookLevel{
+		level := gmodels.OrderBookLevel{
 			Price:    obData.Price,
 			Quantity: obData.Qty,
 			Bid:      obData.Side == "buy",
@@ -354,7 +355,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr.orderBook.UpdateOrderBookLevel(level)
 
 		obDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{level},
+			Levels:    []gmodels.OrderBookLevel{level},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}

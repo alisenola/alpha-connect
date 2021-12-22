@@ -12,7 +12,7 @@ import (
 	models "gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
@@ -330,15 +330,15 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
-		var bids []gorderbook.OrderBookLevel
-		var asks []gorderbook.OrderBookLevel
+		var bids []gmodels.OrderBookLevel
+		var asks []gmodels.OrderBookLevel
 		// TS is float in seconds, * 1000 + rounding to get millisecond
 		var ts uint64 = 0
 		for _, bid := range obData.Bids {
 			if uint64(bid.Timestamp*1000) > ts {
 				ts = uint64(bid.Timestamp * 1000)
 			}
-			bids = append(bids, gorderbook.OrderBookLevel{
+			bids = append(bids, gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Amount,
 				Bid:      true,
@@ -348,7 +348,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			if uint64(ask.Timestamp*1000) > ts {
 				ts = uint64(ask.Timestamp * 1000)
 			}
-			asks = append(asks, gorderbook.OrderBookLevel{
+			asks = append(asks, gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Amount,
 				Bid:      false,

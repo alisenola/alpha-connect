@@ -11,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
@@ -29,7 +30,7 @@ type InstrumentDataL3 struct {
 	lastHBTime     time.Time
 	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
-	levelDeltas    []gorderbook.OrderBookLevel
+	levelDeltas    []gmodels.OrderBookLevel
 }
 
 // OBType: OBL3
@@ -326,7 +327,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 	case bitstamp.WSCreatedOrder:
 		o := msg.Message.(bitstamp.WSCreatedOrder)
-		order := gorderbook.Order{
+		order := gmodels.Order{
 			Price:    o.Price,
 			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
@@ -345,7 +346,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			} else {
 				quantity = state.instrumentData.orderBook.GetAsk(order.Price)
 			}
-			levelDelta := gorderbook.OrderBookLevel{
+			levelDelta := gmodels.OrderBookLevel{
 				Price:    o.Price,
 				Quantity: quantity,
 				Bid:      o.OrderType == 0,
@@ -360,7 +361,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 	case bitstamp.WSChangedOrder:
 		o := msg.Message.(bitstamp.WSChangedOrder)
-		order := gorderbook.Order{
+		order := gmodels.Order{
 			Price:    o.Price,
 			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
@@ -380,7 +381,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 					quantity = state.instrumentData.orderBook.GetAsk(oldO.Price)
 				}
 
-				state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gorderbook.OrderBookLevel{
+				state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
 					Price:    oldO.Price,
 					Quantity: quantity,
 					Bid:      oldO.Bid,
@@ -394,7 +395,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		} else {
 			quantity = state.instrumentData.orderBook.GetAsk(o.Price)
 		}
-		state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gorderbook.OrderBookLevel{
+		state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
 			Price:    o.Price,
 			Quantity: quantity,
 			Bid:      order.Bid,
@@ -418,7 +419,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 				quantity = state.instrumentData.orderBook.GetAsk(oldO.Price)
 			}
 
-			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gorderbook.OrderBookLevel{
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
 				Price:    oldO.Price,
 				Quantity: quantity,
 				Bid:      o.OrderType == 0,
@@ -533,8 +534,8 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 
 	if len(state.instrumentData.levelDeltas) > 1 {
 		// Aggregate
-		bids := make(map[uint64]gorderbook.OrderBookLevel)
-		asks := make(map[uint64]gorderbook.OrderBookLevel)
+		bids := make(map[uint64]gmodels.OrderBookLevel)
+		asks := make(map[uint64]gmodels.OrderBookLevel)
 		for _, l := range state.instrumentData.levelDeltas {
 			k := uint64(math.Round(l.Price * float64(state.instrumentData.tickPrecision)))
 			if l.Bid {

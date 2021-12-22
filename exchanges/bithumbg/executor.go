@@ -13,7 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bithumbg"
@@ -297,7 +297,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			}
 
 			bidst, askst := obData.ToBidAsk()
-			var bids, asks []gorderbook.OrderBookLevel
+			var bids, asks []gmodels.OrderBookLevel
 			for _, b := range bidst {
 				if b.Quantity == 0. {
 					continue

@@ -10,6 +10,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftxus"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -196,12 +197,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("was expecting WSOrderBookGroupedUpdate, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
-	var bids, asks []gorderbook.OrderBookLevel
+	var bids, asks []gmodels.OrderBookLevel
 	for _, bid := range obUpdate.Snapshot.Bids {
 		if bid.Quantity == 0 {
 			continue
 		}
-		bids = append(bids, gorderbook.OrderBookLevel{
+		bids = append(bids, gmodels.OrderBookLevel{
 			Price:    bid.Price,
 			Quantity: bid.Quantity,
 			Bid:      true,
@@ -211,7 +212,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if ask.Quantity == 0 {
 			continue
 		}
-		asks = append(asks, gorderbook.OrderBookLevel{
+		asks = append(asks, gmodels.OrderBookLevel{
 			Price:    ask.Price,
 			Quantity: ask.Quantity,
 			Bid:      false,
@@ -298,14 +299,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
-			Levels:    make([]gorderbook.OrderBookLevel, nLevels, nLevels),
+			Levels:    make([]gmodels.OrderBookLevel, nLevels, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
 
 		lvlIdx := 0
 		for _, bid := range obData.Snapshot.Bids {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Quantity,
 				Bid:      true,
@@ -315,7 +316,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			instr.orderBook.UpdateOrderBookLevel(level)
 		}
 		for _, ask := range obData.Snapshot.Asks {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Quantity,
 				Bid:      false,

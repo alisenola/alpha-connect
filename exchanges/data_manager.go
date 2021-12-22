@@ -14,7 +14,7 @@ import (
 // The market data manager spawns an instrument listener and multiplex its messages
 // to actors who subscribed
 
-type MarketDataManager struct {
+type DataManager struct {
 	subscribers map[uint64]*actor.PID
 	listener    *actor.PID
 	security    *models.Security
@@ -22,21 +22,21 @@ type MarketDataManager struct {
 	logger      *log.Logger
 }
 
-func NewMarketDataManagerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
+func NewDataManagerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewMarketDataManager(security, dialerPool)
+		return NewDataManager(security, dialerPool)
 	}
 }
 
-func NewMarketDataManager(security *models.Security, dialerPool *utils.DialerPool) actor.Actor {
-	return &MarketDataManager{
+func NewDataManager(security *models.Security, dialerPool *utils.DialerPool) actor.Actor {
+	return &DataManager{
 		security:   security,
 		dialerPool: dialerPool,
 		logger:     nil,
 	}
 }
 
-func (state *MarketDataManager) Receive(context actor.Context) {
+func (state *DataManager) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -69,14 +69,32 @@ func (state *MarketDataManager) Receive(context actor.Context) {
 		}
 
 	case *messages.MarketDataResponse:
-		if err := state.OnMarketDataSnapshot(context); err != nil {
-			state.logger.Error("error processing OnMarketDataSnapshot", log.Error(err))
+		if err := state.OnMarketDataResponse(context); err != nil {
+			state.logger.Error("error processing OnMarketDataResponse", log.Error(err))
 			panic(err)
 		}
 
 	case *messages.MarketDataIncrementalRefresh:
 		if err := state.OnMarketDataIncrementalRefresh(context); err != nil {
 			state.logger.Error("error processing OnMarketDataIncrementalRefresh", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.UnipoolV3DataRequest:
+		if err := state.OnUnipoolV3DataRequest(context); err != nil {
+			state.logger.Error("error processing OnUnipoolV3DataRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.UnipoolV3DataResponse:
+		if err := state.OnUnipoolV3DataResponse(context); err != nil {
+			state.logger.Error("error processing OnUnipoolV3DataResponse", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.UnipoolV3DataIncrementalRefresh:
+		if err := state.OnUnipoolV3DataIncrementalRefresh(context); err != nil {
+			state.logger.Error("error processing OnUnipoolV3DataIncrementalRefresh", log.Error(err))
 			panic(err)
 		}
 
@@ -88,7 +106,7 @@ func (state *MarketDataManager) Receive(context actor.Context) {
 	}
 }
 
-func (state *MarketDataManager) Initialize(context actor.Context) error {
+func (state *DataManager) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -106,11 +124,11 @@ func (state *MarketDataManager) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *MarketDataManager) Clean(context actor.Context) error {
+func (state *DataManager) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *MarketDataManager) OnMarketDataRequest(context actor.Context) error {
+func (state *DataManager) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
 
 	if request.Subscribe {
@@ -123,7 +141,20 @@ func (state *MarketDataManager) OnMarketDataRequest(context actor.Context) error
 	return nil
 }
 
-func (state *MarketDataManager) OnMarketDataSnapshot(context actor.Context) error {
+func (state *DataManager) OnUnipoolV3DataRequest(context actor.Context) error {
+	request := context.Message().(*messages.UnipoolV3DataRequest)
+
+	if request.Subscribe {
+		state.subscribers[request.RequestID] = request.Subscriber
+		context.Watch(request.Subscriber)
+	}
+
+	context.Forward(state.listener)
+
+	return nil
+}
+
+func (state *DataManager) OnMarketDataResponse(context actor.Context) error {
 	snapshot := context.Message().(*messages.MarketDataResponse)
 	for k, v := range state.subscribers {
 		forward := &messages.MarketDataResponse{
@@ -138,7 +169,7 @@ func (state *MarketDataManager) OnMarketDataSnapshot(context actor.Context) erro
 	return nil
 }
 
-func (state *MarketDataManager) OnMarketDataIncrementalRefresh(context actor.Context) error {
+func (state *DataManager) OnMarketDataIncrementalRefresh(context actor.Context) error {
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
 	for k, v := range state.subscribers {
 		forward := &messages.MarketDataIncrementalRefresh{
@@ -157,7 +188,34 @@ func (state *MarketDataManager) OnMarketDataIncrementalRefresh(context actor.Con
 	return nil
 }
 
-func (state *MarketDataManager) OnTerminated(context actor.Context) error {
+func (state *DataManager) OnUnipoolV3DataResponse(context actor.Context) error {
+	snapshot := context.Message().(*messages.UnipoolV3DataResponse)
+	for k, v := range state.subscribers {
+		forward := &messages.UnipoolV3DataResponse{
+			RequestID:  k,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Snapshot:   snapshot.Snapshot,
+		}
+		context.Send(v, forward)
+	}
+	return nil
+}
+
+func (state *DataManager) OnUnipoolV3DataIncrementalRefresh(context actor.Context) error {
+	refresh := context.Message().(*messages.UnipoolV3DataIncrementalRefresh)
+	for k, v := range state.subscribers {
+		forward := &messages.UnipoolV3DataIncrementalRefresh{
+			RequestID:  k,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Update:     refresh.Update,
+			SeqNum:     refresh.SeqNum,
+		}
+		context.Send(v, forward)
+	}
+	return nil
+}
+
+func (state *DataManager) OnTerminated(context actor.Context) error {
 	// Handle subscriber krash
 	msg := context.Message().(*actor.Terminated)
 	for k, v := range state.subscribers {

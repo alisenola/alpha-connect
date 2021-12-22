@@ -290,7 +290,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 			if state.instrumentData.obDelta == nil {
 				ts := uint64(msg.Time.UnixNano() / 1000000)
 				state.instrumentData.obDelta = &models.OBL2Update{
-					Levels:    []gorderbook.OrderBookLevel{},
+					Levels:    []gmodels.OrderBookLevel{},
 					Timestamp: utils.MilliToTimestamp(ts),
 					Trade:     false,
 				}
@@ -309,7 +309,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 					} else {
 						quantity = state.instrumentData.orderBook.GetAsk(obOrder.Price)
 					}
-					levelDelta := gorderbook.OrderBookLevel{
+					levelDelta := gmodels.OrderBookLevel{
 						Price:    obOrder.Price,
 						Quantity: quantity,
 						Bid:      order.Bid,
@@ -338,16 +338,16 @@ func (state *Listener) readSocket(context actor.Context) error {
 					rawOrder := state.instrumentData.orderBook.GetRawOrder(order.ID)
 
 					if lastRawOrder.Price == rawOrder.Price {
-						var levelDelta gorderbook.OrderBookLevel
+						var levelDelta gmodels.OrderBookLevel
 						price := float64(rawOrder.Price) / float64(state.instrumentData.orderBook.TickPrecision)
 						if rawOrder.Bid {
-							levelDelta = gorderbook.OrderBookLevel{
+							levelDelta = gmodels.OrderBookLevel{
 								Price:    price,
 								Quantity: state.instrumentData.orderBook.GetBid(price),
 								Bid:      true,
 							}
 						} else {
-							levelDelta = gorderbook.OrderBookLevel{
+							levelDelta = gmodels.OrderBookLevel{
 								Price:    price,
 								Quantity: state.instrumentData.orderBook.GetAsk(price),
 								Bid:      false,
@@ -365,7 +365,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 						} else {
 							quantity = state.instrumentData.orderBook.GetAsk(price)
 						}
-						oldLevelDelta := gorderbook.OrderBookLevel{
+						oldLevelDelta := gmodels.OrderBookLevel{
 							Price:    price,
 							Quantity: quantity,
 							Bid:      lastRawOrder.Bid,
@@ -378,7 +378,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 						} else {
 							quantity = state.instrumentData.orderBook.GetAsk(price)
 						}
-						newLevelDelta := gorderbook.OrderBookLevel{
+						newLevelDelta := gmodels.OrderBookLevel{
 							Price:    price,
 							Quantity: quantity,
 							Bid:      rawOrder.Bid,
@@ -396,7 +396,7 @@ func (state *Listener) readSocket(context actor.Context) error {
 					} else {
 						quantity = state.instrumentData.orderBook.GetAsk(order.Price)
 					}
-					levelDelta := gorderbook.OrderBookLevel{
+					levelDelta := gmodels.OrderBookLevel{
 						Price:    order.Price,
 						Quantity: quantity,
 						Bid:      order.Bid,

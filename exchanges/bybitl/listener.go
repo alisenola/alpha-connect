@@ -13,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -320,7 +321,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		for _, l := range update.Insert {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    l.Price,
 				Quantity: l.Size,
 				Bid:      l.Side == "Buy",
@@ -329,7 +330,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			obDelta.Levels = append(obDelta.Levels, level)
 		}
 		for _, l := range update.Update {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    l.Price,
 				Quantity: l.Size,
 				Bid:      l.Side == "Buy",
@@ -338,7 +339,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			obDelta.Levels = append(obDelta.Levels, level)
 		}
 		for _, l := range update.Delete {
-			level := gorderbook.OrderBookLevel{
+			level := gmodels.OrderBookLevel{
 				Price:    l.Price,
 				Quantity: 0.,
 				Bid:      l.Side == "Buy",

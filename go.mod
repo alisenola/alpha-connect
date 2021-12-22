@@ -10,12 +10,12 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e
-	gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f
+	gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff
+	gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20211221094613-18de0b95b76c
+	gitlab.com/alphaticks/xchanger v0.0.0-20211222103411-79377a244cef
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0

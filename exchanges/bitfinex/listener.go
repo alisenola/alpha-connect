@@ -12,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
@@ -440,7 +441,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		obDelta := &models.OBL2Update{
-			Levels:    []gorderbook.OrderBookLevel{level},
+			Levels:    []gmodels.OrderBookLevel{level},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
