@@ -463,8 +463,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 func (state *Listener) checkSockets(context actor.Context) error {
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
-		// "Ping" by resubscribing to the topic
-		// TODO find a way to ping, can be re-subscribing to symobl OB and trade
+		_ = state.obWs.Ping()
+		_ = state.tradeWs.Ping()
 		state.lastPingTime = time.Now()
 	}
 
