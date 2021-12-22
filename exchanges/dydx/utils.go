@@ -123,14 +123,19 @@ func buildCreateOrderParams(symbol string, o *messages.NewOrder) *dydx.CreateOrd
 	case models.TrailingStopLimit:
 		typ = dydx.TRAILING_STOP
 	}
-	switch o.TimeInForce {
-	case models.GoodTillCancel:
-		tif = dydx.GOOD_TIL_TIME
-	case models.FillOrKill:
-		tif = dydx.FILL_OR_KILL
-	case models.ImmediateOrCancel:
+	if o.OrderType != models.Market {
+		switch o.TimeInForce {
+		case models.GoodTillCancel:
+			tif = dydx.GOOD_TIL_TIME
+		case models.FillOrKill:
+			tif = dydx.FILL_OR_KILL
+		case models.ImmediateOrCancel:
+			tif = dydx.IMMEDIATE_OR_CANCEL
+		}
+	} else {
 		tif = dydx.IMMEDIATE_OR_CANCEL
 	}
+
 	for _, exec := range o.ExecutionInstructions {
 		if exec == models.ParticipateDoNotInitiate {
 			postOnly = true

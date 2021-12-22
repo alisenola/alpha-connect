@@ -64,6 +64,8 @@ func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Coll
 		return func() actor.Actor { return ftx.NewAccountListener(account, txs, execs) }
 	case constants.FTXUS.ID:
 		return func() actor.Actor { return ftxus.NewAccountListener(account) }
+	case constants.DYDX.ID:
+		return func() actor.Actor { return dydx.NewAccountListener(account, txs, execs) }
 	default:
 		return nil
 	}

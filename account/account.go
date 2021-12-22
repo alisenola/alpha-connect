@@ -96,6 +96,9 @@ func NewAccount(account *models.Account) (*Account, error) {
 	case constants.FTX.ID:
 		accnt.MarginCurrency = &constants.DOLLAR
 		accnt.MarginPrecision = 100000000
+	case constants.DYDX.ID:
+		accnt.MarginCurrency = &constants.USDC
+		accnt.MarginPrecision = 1e6
 	}
 	if accnt.MarginCurrency != nil {
 		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
