@@ -1,9 +1,9 @@
 package jobs
 
 import (
+	goContext "context"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"io/ioutil"
-	"net/http"
+	"github.com/hasura/go-graphql-client"
 )
 
 // An api query actor execute a query and fits the result back into a given types
@@ -12,27 +12,28 @@ import (
 // The query actor doesn't panic when the request was successful but the server
 // returned an error (client or server error)
 
-type PerformHTTPQueryRequest struct {
-	Request *http.Request
+type PerformGraphQueryRequest struct {
+	Query     interface{}
+	Variables map[string]interface{}
+	Options   []graphql.Option
 }
 
 // We allow this query to fail without crashing
 // because the failure is outside the system
 // We are not responsible for the failure
-type PerformQueryResponse struct {
-	StatusCode int64
-	Response   []byte
+type PerformGraphQueryResponse struct {
+	Error error
 }
 
-type APIQuery struct {
-	client *http.Client
+type GraphQuery struct {
+	client *graphql.Client
 }
 
-func NewAPIQuery(client *http.Client) actor.Actor {
-	return &APIQuery{client}
+func NewGraphQuery(client *graphql.Client) actor.Actor {
+	return &GraphQuery{client}
 }
 
-func (q *APIQuery) Receive(context actor.Context) {
+func (q *GraphQuery) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		err := q.Initialize(context)
@@ -50,36 +51,28 @@ func (q *APIQuery) Receive(context actor.Context) {
 			// Attention, no panic in restarting or infinite loop
 		}
 
-	case *PerformHTTPQueryRequest:
+	case *PerformGraphQueryRequest:
 		//Set API credentials
-		err := q.PerformHTTPQueryRequest(context)
+		err := q.PerformGraphQueryRequest(context)
 		if err != nil {
 			panic(err)
 		}
 	}
 }
 
-func (q *APIQuery) Initialize(context actor.Context) error {
+func (q *GraphQuery) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (q *APIQuery) Clean(context actor.Context) error {
+func (q *GraphQuery) Clean(context actor.Context) error {
 	return nil
 }
 
-func (q *APIQuery) PerformHTTPQueryRequest(context actor.Context) error {
-	msg := context.Message().(*PerformHTTPQueryRequest)
+func (q *GraphQuery) PerformGraphQueryRequest(context actor.Context) error {
+	msg := context.Message().(*PerformGraphQueryRequest)
 	go func(sender *actor.PID) {
-		queryResponse := PerformQueryResponse{}
-		resp, err := q.client.Do(msg.Request)
-		if err != nil {
-			queryResponse.Response = nil
-			queryResponse.StatusCode = 500
-		} else {
-			defer resp.Body.Close()
-			queryResponse.StatusCode = int64(resp.StatusCode)
-			queryResponse.Response, _ = ioutil.ReadAll(resp.Body)
-		}
+		queryResponse := PerformGraphQueryResponse{}
+		queryResponse.Error = q.client.Query(goContext.Background(), msg.Query, msg.Variables, msg.Options...)
 		context.Send(sender, &queryResponse)
 	}(context.Sender())
 

@@ -3,6 +3,7 @@ package gate
 import (
 	"encoding/json"
 	"fmt"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"math/rand"
 	"net/http"
@@ -33,13 +34,15 @@ type Executor struct {
 	extypes.BaseExecutor
 	securities   []*models.Security
 	queryRunners []*QueryRunner
+	dialerPool   *xutils.DialerPool
 	logger       *log.Logger
 }
 
-func NewExecutor() actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
 		queryRunners: nil,
 		logger:       nil,
+		dialerPool:   dialerPool,
 	}
 }
 
@@ -71,20 +74,23 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid: context.Spawn(props),
+		})
 	}
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(client)
-	})
-	state.queryRunners = append(state.queryRunners, &QueryRunner{
-		pid:       context.Spawn(props),
-		rateLimit: exchanges.NewRateLimit(6, time.Second),
-	})
 	return state.UpdateSecurityList(context)
 }
 
@@ -106,7 +112,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -244,7 +250,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	qr.rateLimit.Request(w)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("http client error", log.Error(err))

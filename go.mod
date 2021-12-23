@@ -15,7 +15,7 @@ require (
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20211222103411-79377a244cef
+	gitlab.com/alphaticks/xchanger v0.0.0-20211222112046-1be3719a4f0b
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
@@ -34,10 +34,12 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/uuid v1.1.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/hasura/go-graphql-client v0.6.0 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
-	github.com/klauspost/compress v1.9.5 // indirect
+	github.com/klauspost/compress v1.10.3 // indirect
 	github.com/melaurent/gotickfile v0.0.0-20210921084211-01142566a54d // indirect
 	github.com/orcaman/concurrent-map v0.0.0-20190107190726-7ed82d9cb717 // indirect
 	github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2 // indirect
@@ -60,6 +62,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
+	nhooyr.io/websocket v1.8.6 // indirect
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger

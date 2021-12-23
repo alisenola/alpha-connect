@@ -133,7 +133,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	qr.symbolsRateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -288,7 +288,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	}
 	qr.obRateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http client error", log.Error(err))

@@ -88,7 +88,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunner = context.Spawn(props)
 
 	request, weight, err := binance.GetExchangeInfo()
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (state *Executor) updateExchangeInfos(context actor.Context) error {
 
 	// Launch an APIQuery actor with the given request and target
 	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res types{}, err error) {
 
@@ -197,7 +197,7 @@ func (state *Executor) GetOrderBookL2Request(context actor.Context) error {
 	}
 
 	state.globalRateLimit.Request(weight)
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res types{}, err error) {
 		if err != nil {
