@@ -92,8 +92,6 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
-	// https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2
-
 	var securities []*models.Security
 
 	query := uniswap.Pools{}
@@ -155,7 +153,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
-	var snapshot *models.OBL2Snapshot
 	msg := context.Message().(*messages.UnipoolV3DataRequest)
 	response := &messages.UnipoolV3DataResponse{
 		RequestID:  msg.RequestID,
@@ -173,7 +170,8 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		return nil
 	}
 	symbol := msg.Instrument.Symbol.Value
-	query := uniswap.PoolSnapshot
+	// Symbol is pool id
+	query := uniswap.NewPoolSnapshot(symbol)
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -194,7 +192,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			response.RejectionReason = messages.GraphQLError
 			context.Respond(response)
 		}
-		snapshot = &models.UPV3Snapshot{
+		response.Snapshot = &models.UPV3Snapshot{
 			Ticks:                 nil, // TODO
 			Positions:             nil, // TODO
 			Liquidity:             nil, // TODO
@@ -204,8 +202,8 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			Tick:                  nil, // TODO
 		}
 		response.Success = true
-		response.SeqNum =
-			context.Respond(response)
+		response.SeqNum = 0 // TODO
+		context.Respond(response)
 	})
 
 	return nil
