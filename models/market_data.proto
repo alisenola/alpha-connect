@@ -69,6 +69,11 @@ message OBL3Snapshot {
 message UPV3Snapshot {
     repeated gorderbook.models.UPV3Tick ticks = 1;
     repeated gorderbook.models.UPV3Position positions = 2;
+    bytes liquidity = 3;
+    bytes sqrt_price = 4;
+    bytes fee_growth_global_0x128 = 5;
+    bytes fee_growth_global_1x128 = 6;
+    bytes tick = 7;
 }
 
 message UPV3Update {

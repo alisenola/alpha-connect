@@ -23,15 +23,15 @@ import (
 )
 
 type QueryRunner struct {
-	pid       *actor.PID
+	pid *actor.PID
 }
 
 type Executor struct {
 	extypes.BaseExecutor
-	securities  []*models.Security
+	securities   []*models.Security
 	queryRunners []*QueryRunner
 	dialerPool   *xutils.DialerPool
-	logger      *log.Logger
+	logger       *log.Logger
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
@@ -80,7 +80,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return jobs.NewGraphQuery(uniClient)
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
-			pid:             context.Spawn(props),
+			pid: context.Spawn(props),
 		})
 	}
 	return state.UpdateSecurityList(context)
@@ -127,8 +127,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 			security.MinPriceIncrement = &types.DoubleValue{Value: pool.TickSize} // TODO in bps ?
-			security.RoundLot = &types.DoubleValue{Value: pool.SizeIncrement} // TODO Token precision ?
-			security.TakerFee = // TODO pool fees
+			security.RoundLot = &types.DoubleValue{Value: pool.SizeIncrement}     // TODO Token precision ?
+			security.TakerFee = nil                                               // TODO pool fees
 			securities = append(securities, &security)
 		}
 
@@ -150,6 +150,63 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: state.securities})
+
+	return nil
+}
+
+func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
+	var snapshot *models.OBL2Snapshot
+	msg := context.Message().(*messages.UnipoolV3DataRequest)
+	response := &messages.UnipoolV3DataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	if msg.Subscribe {
+		response.RejectionReason = messages.UnsupportedSubscription
+		context.Respond(response)
+		return nil
+	}
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
+	}
+	symbol := msg.Instrument.Symbol.Value
+	query := uniswap.PoolSnapshot
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		return fmt.Errorf("rate limited")
+	}
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
+	context.AwaitFuture(future, func(resp interface{}, err error) {
+		if err != nil {
+			state.logger.Info("graphql client error", log.Error(err))
+			response.RejectionReason = messages.GraphQLError
+			context.Respond(response)
+			return
+		}
+		queryResponse := resp.(*jobs.PerformGraphQueryResponse)
+		if queryResponse.Error != nil {
+			state.logger.Info("graphql client error", log.Error(queryResponse.Error))
+			response.RejectionReason = messages.GraphQLError
+			context.Respond(response)
+		}
+		snapshot = &models.UPV3Snapshot{
+			Ticks:                 nil, // TODO
+			Positions:             nil, // TODO
+			Liquidity:             nil, // TODO
+			SqrtPrice:             nil, // TODO
+			FeeGrowthGlobal_0X128: nil, // TODO
+			FeeGrowthGlobal_1X128: nil, // TODO
+			Tick:                  nil, // TODO
+		}
+		response.Success = true
+		response.SeqNum =
+			context.Respond(response)
+	})
 
 	return nil
 }

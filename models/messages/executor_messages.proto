@@ -58,6 +58,7 @@ enum RejectionReason {
     UnsupportedRequest = 24;
     UnknownAccount = 25;
     UnknownExchange = 26;
+    GraphQLError = 27;
 }
 
 enum FeeType {
