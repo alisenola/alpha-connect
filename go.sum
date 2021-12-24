@@ -664,6 +664,8 @@ gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88 h1:ea6Ly
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
 gitlab.com/alphaticks/xchanger v0.0.0-20211222103411-79377a244cef h1:Z4V5UNyGfbRLiiTpAxP3BBb1ks8P4aeG0EstPE4DYFI=
 gitlab.com/alphaticks/xchanger v0.0.0-20211222103411-79377a244cef/go.mod h1:ISid09nheXvu/SW2MjgObk0D/qxVQTp3MxPszK/rCyA=
+gitlab.com/alphaticks/xchanger v0.0.0-20211222134253-97108608f29d h1:PA/4KevPE6J/HWEpxp5819Wb4QlgAn/A6RpnhXRFsmM=
+gitlab.com/alphaticks/xchanger v0.0.0-20211222134253-97108608f29d/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
