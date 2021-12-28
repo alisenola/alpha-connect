@@ -169,11 +169,13 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.tradeWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+		state.tradeWs = nil
 	}
 	if state.obWs != nil {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+		state.obWs = nil
 	}
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
@@ -412,6 +414,9 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			})
 
 	case gate.WSSpotOrderBookUpdate:
+		if state.obWs == nil || msg.WSID != state.obWs.ID {
+			return nil
+		}
 		symbol := res.CurrencyPair
 		// Check depth continuity
 		if state.instrumentData.lastUpdateID+1 != res.FirstUpdateId {
