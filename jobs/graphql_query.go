@@ -3,7 +3,7 @@ package jobs
 import (
 	goContext "context"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/hasura/go-graphql-client"
+	"gitlab.com/alphaticks/go-graphql-client"
 )
 
 // An api query actor execute a query and fits the result back into a given types
