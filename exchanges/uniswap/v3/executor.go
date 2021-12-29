@@ -2,24 +2,25 @@ package v3
 
 import (
 	"fmt"
+	"math/rand"
+	"net/http"
+	"reflect"
+	"sort"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
-	"github.com/hasura/go-graphql-client"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/uniswap"
+	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
-	"math/rand"
-	"net/http"
-	"reflect"
-	"sort"
-	"time"
 )
 
 type QueryRunner struct {
@@ -75,7 +76,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			},
 			Timeout: 10 * time.Second,
 		}
-		uniClient := graphql.NewClient(uniswap.APIURL, httpClient)
+		uniClient := graphql.NewClient(uniswap.GRAPHQL_URL, httpClient)
 		props := actor.PropsFromProducer(func() actor.Actor {
 			return jobs.NewGraphQuery(uniClient)
 		})
@@ -94,7 +95,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 
-	query := uniswap.Pools{}
+	query := uniswap.PoolsState{}
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
@@ -103,19 +104,21 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		for _, pool := range query.Pools {
-			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0)
+			baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
 			if !ok {
 				//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
 				continue
 			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(pool.Token1)
+			quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
 			if !ok {
 				//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
 				continue
 			}
-
+			if err := pool.GetTickSpacing(); err != nil {
+				continue
+			}
 			security := models.Security{}
-			security.Symbol = fmt.Sprintf("%s/%s", pool.Token0.Symbol, pool.Token1.Symbol)
+			security.Symbol = fmt.Sprintf("%s", pool.Id)
 			security.Underlying = baseCurrency
 			security.QuoteCurrency = quoteCurrency
 			security.Status = models.Trading
@@ -124,9 +127,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecurityType = enum.SecurityType_CRYPTO_AMM
 			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &types.DoubleValue{Value: pool.TickSize} // TODO in bps ?
-			security.RoundLot = &types.DoubleValue{Value: pool.SizeIncrement}     // TODO Token precision ?
-			security.TakerFee = nil                                               // TODO pool fees
+			security.MinPriceIncrement = &types.DoubleValue{Value: float64(pool.TickSpacing)} // TODO in bps ?
+			security.RoundLot = nil                                                           // TODO Token precision ?
+			security.TakerFee = nil                                                           // TODO pool fees
 			securities = append(securities, &security)
 		}
 
@@ -171,7 +174,10 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query := uniswap.NewPoolSnapshot(symbol)
+	query, err := uniswap.GetPoolSnapshotQuery(symbol)
+	if err != nil {
+		return fmt.Errorf("error ")
+	}
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -192,14 +198,17 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			response.RejectionReason = messages.GraphQLError
 			context.Respond(response)
 		}
+
+		ticks := &
+
 		response.Snapshot = &models.UPV3Snapshot{
 			Ticks:                 nil, // TODO
 			Positions:             nil, // TODO
-			Liquidity:             nil, // TODO
-			SqrtPrice:             nil, // TODO
-			FeeGrowthGlobal_0X128: nil, // TODO
-			FeeGrowthGlobal_1X128: nil, // TODO
-			Tick:                  nil, // TODO
+			Liquidity:             query.Pool.Liquidity.Bytes(),
+			SqrtPrice:             query.Pool.SqrtPrice.Bytes(), 
+			FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(), 
+			FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(), 
+			Tick:                  query.Pool.Tick.Bytes(), 
 		}
 		response.Success = true
 		response.SeqNum = 0 // TODO
