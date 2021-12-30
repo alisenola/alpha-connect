@@ -3,13 +3,14 @@ package gate
 import (
 	"encoding/json"
 	"fmt"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"math/rand"
 	"net/http"
 	"reflect"
 	"sort"
 	"time"
+
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
