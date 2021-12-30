@@ -707,6 +707,7 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211223143450-2f12d40b6d24 h1:NlCDMavjS7eUAY5ADIXh6qBSsqUoa9RmOS0Vwt0/Xt4=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211223143450-2f12d40b6d24/go.mod h1:eETrxwjoJI//736YP88T6QXJJv+4iWNGfwKb4BcWdPw=
+gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211228112154-2dbf1f49dfd4/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e/go.mod h1:Q7czYSyXyw4eo76eHe+BlHzC4stXLlZ5Ap6mkGy79uE=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff h1:yarZq5ZrRFDiOdd3U4ItHT/pYDyoUtQpmCOG9X6Zd8s=
@@ -726,6 +727,10 @@ gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88 h1:ea6Ly
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
 gitlab.com/alphaticks/xchanger v0.0.0-20211223151452-b0f3b73de284 h1:DaEf8oiu0rgsBqfxqoq9dUag2IGZUWTm/b/me5HIcG0=
 gitlab.com/alphaticks/xchanger v0.0.0-20211223151452-b0f3b73de284/go.mod h1:Q5HHphspcQxS6SR0VKhSD5oQP8SSsp9emlZS8TewuCY=
+gitlab.com/alphaticks/xchanger v0.0.0-20211228094502-5203e90e1766 h1:ibDD/wu+tHdfJT5FB06O3M9ejCVjaflzXOjTe6SS2CI=
+gitlab.com/alphaticks/xchanger v0.0.0-20211228094502-5203e90e1766/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
+gitlab.com/alphaticks/xchanger v0.0.0-20211230082938-f6ec3c251728 h1:23A/kb6hz5ddpAg7/4N60RFlT7qQaQrfa9oQrDE0Rrk=
+gitlab.com/alphaticks/xchanger v0.0.0-20211230082938-f6ec3c251728/go.mod h1:n9QCEAhTUOzEk6x1O2ql4OfITRbvcXBA3R9TyTCQjgo=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

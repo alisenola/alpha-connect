@@ -95,7 +95,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 
-	query := uniswap.PoolsState{}
+	query := uniswap.PoolDefinitions{}
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
@@ -174,7 +174,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query, err := uniswap.GetPoolSnapshotQuery(symbol)
+	query, err := uniswap.GetPoolSnapshotQuery(symbol, nil)
 	if err != nil {
 		return fmt.Errorf("error ")
 	}
@@ -199,16 +199,14 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			context.Respond(response)
 		}
 
-		ticks := &
-
 		response.Snapshot = &models.UPV3Snapshot{
 			Ticks:                 nil, // TODO
 			Positions:             nil, // TODO
 			Liquidity:             query.Pool.Liquidity.Bytes(),
-			SqrtPrice:             query.Pool.SqrtPrice.Bytes(), 
-			FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(), 
-			FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(), 
-			Tick:                  query.Pool.Tick.Bytes(), 
+			SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
+			FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
+			FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
+			Tick:                  nil, //query.Pool.Tick.Bytes(),
 		}
 		response.Success = true
 		response.SeqNum = 0 // TODO
