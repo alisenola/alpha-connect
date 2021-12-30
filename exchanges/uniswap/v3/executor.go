@@ -5,7 +5,6 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
-	"github.com/hasura/go-graphql-client"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -13,7 +12,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/uniswap"
+	"gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math/rand"
 	"net/http"
@@ -75,7 +74,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			},
 			Timeout: 10 * time.Second,
 		}
-		uniClient := graphql.NewClient(uniswap.APIURL, httpClient)
+		uniClient := uniswap.NewClient(httpClient)
 		props := actor.PropsFromProducer(func() actor.Actor {
 			return jobs.NewGraphQuery(uniClient)
 		})
@@ -94,49 +93,56 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 
-	query := uniswap.Pools{}
+	query := uniswap.PoolQuery{}
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
-	context.AwaitFuture(future, func(resp interface{}, err error) {
-		for _, pool := range query.Pools {
-			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0)
-			if !ok {
-				//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
-				continue
-			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(pool.Token1)
-			if !ok {
-				//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
-				continue
-			}
-
-			security := models.Security{}
-			security.Symbol = fmt.Sprintf("%s/%s", pool.Token0.Symbol, pool.Token1.Symbol)
-			security.Underlying = baseCurrency
-			security.QuoteCurrency = quoteCurrency
-			security.Status = models.Trading
-			security.Exchange = &constants.UNISWAPV3
-			security.IsInverse = false
-			security.SecurityType = enum.SecurityType_CRYPTO_AMM
-			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &types.DoubleValue{Value: pool.TickSize} // TODO in bps ?
-			security.RoundLot = &types.DoubleValue{Value: pool.SizeIncrement}     // TODO Token precision ?
-			security.TakerFee = nil                                               // TODO pool fees
-			securities = append(securities, &security)
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("graphql client error: %v", err)
+	}
+	resp := res.(*jobs.PerformGraphQueryResponse)
+	if resp.Error != nil {
+		return fmt.Errorf("graphql client error: %v", resp.Error)
+	}
+	for _, pool := range query.Pools {
+		baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
+		if !ok {
+			state.logger.Info("unknown symbol " + string(pool.Token0.Symbol))
+			continue
+		}
+		quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
+		if !ok {
+			state.logger.Info("unknown symbol " + string(pool.Token1.Symbol))
+			continue
 		}
 
-		state.securities = securities
+		security := models.Security{}
+		security.Symbol = fmt.Sprintf("%s/%s", pool.Token0.Symbol, pool.Token1.Symbol)
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
+		security.Status = models.Trading
+		security.Exchange = &constants.UNISWAPV3
+		security.IsInverse = false
+		security.SecurityType = enum.SecurityType_CRYPTO_AMM
+		security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
+		//security.MinPriceIncrement = &types.DoubleValue{Value: pool.TickSize} // TODO in bps ?
+		//security.RoundLot = &types.DoubleValue{Value: pool.SizeIncrement}     // TODO Token precision ?
+		security.TakerFee = nil // TODO pool fees
+		securities = append(securities, &security)
+	}
 
-		context.Send(context.Parent(), &messages.SecurityList{
-			ResponseID: uint64(time.Now().UnixNano()),
-			Success:    true,
-			Securities: state.securities})
-	})
+	fmt.Println(securities)
+	state.securities = securities
+
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Securities: state.securities})
 
 	return nil
 }
@@ -171,14 +177,17 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query := uniswap.NewPoolSnapshot(symbol)
+	query, variables := uniswap.GetPoolSnapshotQuery(symbol)
 
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{
+		Query:     &query,
+		Variables: variables,
+	}, 10*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Info("graphql client error", log.Error(err))

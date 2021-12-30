@@ -70,7 +70,7 @@ type GetStat struct {
 	OBUpdates int
 }
 
-type OBChecker struct {
+type MDChecker struct {
 	test          MDTest
 	security      *models.Security
 	orderbook     *gorderbook.OrderBookL2
@@ -85,14 +85,14 @@ type OBChecker struct {
 	err           error
 }
 
-func NewOBCheckerProducer(security *models.Security, test MDTest) actor.Producer {
+func NewMDCheckerProducer(security *models.Security, test MDTest) actor.Producer {
 	return func() actor.Actor {
-		return NewOBChecker(security, test)
+		return NewMDChecker(security, test)
 	}
 }
 
-func NewOBChecker(security *models.Security, test MDTest) actor.Actor {
-	return &OBChecker{
+func NewMDChecker(security *models.Security, test MDTest) actor.Actor {
+	return &MDChecker{
 		test:        test,
 		security:    security,
 		orderbook:   nil,
@@ -106,7 +106,7 @@ func NewOBChecker(security *models.Security, test MDTest) actor.Actor {
 	}
 }
 
-func (state *OBChecker) Receive(context actor.Context) {
+func (state *MDChecker) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		fmt.Println("INITIALIZING")
@@ -132,7 +132,7 @@ func (state *OBChecker) Receive(context actor.Context) {
 	}
 }
 
-func (state *OBChecker) Initialize(context actor.Context) error {
+func (state *MDChecker) Initialize(context actor.Context) error {
 	executor := context.ActorSystem().NewLocalPID("executor")
 	res, err := context.RequestFuture(executor, &messages.MarketDataRequest{
 		RequestID:  0,
@@ -212,7 +212,7 @@ func (state *OBChecker) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) error {
+func (state *MDChecker) OnMarketDataIncrementalRefresh(context actor.Context) error {
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
 
 	if !state.synced && refresh.SeqNum <= state.seqNum {
@@ -278,6 +278,116 @@ func (state *OBChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 	return nil
 }
 
-func (state *OBChecker) OnMarketDataSnapshot(context actor.Context) error {
+func (state *MDChecker) OnMarketDataSnapshot(context actor.Context) error {
+	return nil
+}
+
+type PoolV3Checker struct {
+	test          MDTest
+	security      *models.Security
+	pool          *gorderbook.UnipoolV3
+	tickPrecision uint64
+	lotPrecision  uint64
+	seqNum        uint64
+	synced        bool
+	trades        int
+	aggTrades     int
+	aggTradeIDs   map[uint64]bool
+	OBUpdates     int
+	err           error
+}
+
+func NewPoolV3CheckerProducer(security *models.Security, test MDTest) actor.Producer {
+	return func() actor.Actor {
+		return NewPoolV3Checker(security, test)
+	}
+}
+
+func NewPoolV3Checker(security *models.Security, test MDTest) actor.Actor {
+	return &PoolV3Checker{
+		test:        test,
+		security:    security,
+		pool:        nil,
+		seqNum:      0,
+		synced:      false,
+		trades:      0,
+		aggTrades:   0,
+		aggTradeIDs: make(map[uint64]bool),
+		OBUpdates:   0,
+		err:         nil,
+	}
+}
+
+func (state *PoolV3Checker) Receive(context actor.Context) {
+	switch context.Message().(type) {
+	case *actor.Started:
+		fmt.Println("INITIALIZING")
+		if err := state.Initialize(context); err != nil {
+			state.err = err
+		}
+		fmt.Println("INITIALIZED")
+
+	case *messages.UnipoolV3DataIncrementalRefresh:
+		if state.err == nil {
+			if err := state.OnUnipoolV3DataIncrementalRefresh(context); err != nil {
+				state.err = err
+			}
+		}
+
+	case *GetStat:
+		context.Respond(&GetStat{
+			Error:     state.err,
+			Trades:    state.trades,
+			AggTrades: state.aggTrades,
+			OBUpdates: state.OBUpdates,
+		})
+	}
+}
+
+func (state *PoolV3Checker) Initialize(context actor.Context) error {
+	executor := context.ActorSystem().NewLocalPID("executor")
+	res, err := context.RequestFuture(executor, &messages.UnipoolV3DataRequest{
+		RequestID:  0,
+		Subscribe:  true,
+		Subscriber: context.Self(),
+		Instrument: &models.Instrument{
+			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+			Exchange:   state.security.Exchange,
+			Symbol:     &types.StringValue{Value: state.security.Symbol},
+		},
+	}, 80*time.Second).Result()
+	if err != nil {
+		return err
+	}
+	response, ok := res.(*messages.UnipoolV3DataResponse)
+	if !ok {
+		return fmt.Errorf("was expecting market data snapshot, got %s", reflect.TypeOf(res).String())
+	}
+
+	state.OBUpdates += 1
+	feeTier := int32(state.security.TakerFee.Value * 1e6)
+	state.pool = gorderbook.NewUnipoolV3(feeTier)
+	state.seqNum = response.SeqNum
+	return nil
+}
+
+func (state *PoolV3Checker) OnUnipoolV3DataIncrementalRefresh(context actor.Context) error {
+	refresh := context.Message().(*messages.UnipoolV3DataIncrementalRefresh)
+
+	if !state.synced && refresh.SeqNum <= state.seqNum {
+		//fmt.Println("SKIPPING", refresh.SeqNum, state.securityInfo.seqNum)
+		return nil
+	}
+	state.synced = true
+	if state.seqNum+1 != refresh.SeqNum {
+		//fmt.Println("OUT OF SYNC", state.securityInfo.seqNum, refresh.SeqNum)
+		return fmt.Errorf("out of order sequence %d %d", state.seqNum, refresh.SeqNum)
+	}
+
+	state.seqNum = refresh.SeqNum
+	return nil
+}
+
+func (state *PoolV3Checker) OnMarketDataSnapshot(context actor.Context) error {
 	return nil
 }

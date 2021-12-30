@@ -28,48 +28,9 @@ type MDTest struct {
 	Status             models.InstrumentStatus
 }
 
-func MarketData(t *testing.T, test MDTest) {
-	//t.Parallel()
-	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
-	defer clean()
-	var obChecker *actor.PID
-	defer func() {
-		if obChecker != nil {
-			_ = as.Root.PoisonFuture(obChecker).Wait()
-		}
-	}()
-	securityID := []uint64{
-		test.SecurityID,
-	}
-	testedSecurities := make(map[uint64]*models.Security)
-
-	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	securityList, ok := res.(*messages.SecurityList)
-	if !ok {
-		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
-	}
-	if !securityList.Success {
-		t.Fatal(securityList.RejectionReason.String())
-	}
-	for _, s := range securityList.Securities {
-		tested := false
-		for _, secID := range securityID {
-			if secID == s.SecurityID {
-				tested = true
-				break
-			}
-		}
-		if tested {
-			testedSecurities[s.SecurityID] = s
-		}
-	}
-
+func checkSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 	// Test
-	sec, ok := testedSecurities[test.SecurityID]
-	if !ok {
+	if sec == nil {
 		t.Fatalf("security not found")
 	}
 	if sec.Symbol != test.Symbol {
@@ -102,8 +63,86 @@ func MarketData(t *testing.T, test MDTest) {
 	if (sec.MaturityDate != nil) != test.HasMaturityDate {
 		t.Fatalf("was expecting different maturity date")
 	}
+}
 
-	obChecker = as.Root.Spawn(actor.PropsFromProducer(NewOBCheckerProducer(sec, test)))
+func MarketData(t *testing.T, test MDTest) {
+	//t.Parallel()
+	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
+	defer clean()
+
+	securityID := []uint64{
+		test.SecurityID,
+	}
+
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
+	}
+	var sec *models.Security
+	for _, s := range securityList.Securities {
+		for _, secID := range securityID {
+			if secID == s.SecurityID {
+				sec = s
+			}
+		}
+	}
+
+	checkSecurityDefinition(t, sec, test)
+	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewMDCheckerProducer(sec, test)))
+	defer as.Root.PoisonFuture(obChecker)
+
+	time.Sleep(80 * time.Second)
+	res, err = as.Root.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := res.(*GetStat)
+	t.Logf("Trades: %d | OBUpdates: %d", stats.Trades, stats.OBUpdates)
+	if stats.Error != nil {
+		t.Fatal(stats.Error)
+	}
+}
+
+func PoolData(t *testing.T, test MDTest) {
+	//t.Parallel()
+	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
+	defer clean()
+
+	securityID := []uint64{
+		test.SecurityID,
+	}
+
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityList, ok := res.(*messages.SecurityList)
+	if !ok {
+		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+	}
+	if !securityList.Success {
+		t.Fatal(securityList.RejectionReason.String())
+	}
+	var sec *models.Security
+	for _, s := range securityList.Securities {
+		for _, secID := range securityID {
+			if secID == s.SecurityID {
+				sec = s
+			}
+		}
+	}
+
+	checkSecurityDefinition(t, sec, test)
+	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewPoolV3CheckerProducer(sec, test)))
+	defer as.Root.PoisonFuture(obChecker)
+
 	time.Sleep(80 * time.Second)
 	res, err = as.Root.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
 	if err != nil {
