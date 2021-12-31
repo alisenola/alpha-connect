@@ -9,7 +9,7 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
-	tests.MarketData(t, tests.MDTest{
+	tests.PoolData(t, tests.MDTest{
 		IgnoreSizeResidue: true,
 		SecurityID:        8096593996930596547,
 		Symbol:            "BTC_USDT",

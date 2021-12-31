@@ -106,12 +106,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		for _, pool := range query.Pools {
 			baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
 			if !ok {
-				//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
+				state.logger.Info("unknown symbol " + pool.Token0.Symbol)
 				continue
 			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
+			quoteCurrency, ok := constants.GetAssetBySymbol(pool.Token1.Symbol)
 			if !ok {
-				//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
+				state.logger.Info("unknown symbol " + pool.Token1.Symbol)
 				continue
 			}
 			if err := pool.GetTickSpacing(); err != nil {
@@ -206,7 +206,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
 			FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
 			FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
-			Tick:                  nil, //query.Pool.Tick.Bytes(),
+			Tick:                  0, //query.Pool.Tick.Bytes(),
 		}
 		response.Success = true
 		response.SeqNum = 0 // TODO

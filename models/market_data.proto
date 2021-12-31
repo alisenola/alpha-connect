@@ -73,7 +73,7 @@ message UPV3Snapshot {
     bytes sqrt_price = 4;
     bytes fee_growth_global_0x128 = 5;
     bytes fee_growth_global_1x128 = 6;
-    bytes tick = 7;
+    int32 tick = 7;
 }
 
 message UPV3Update {
