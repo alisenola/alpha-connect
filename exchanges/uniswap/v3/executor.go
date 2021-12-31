@@ -103,45 +103,51 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
-	context.AwaitFuture(future, func(resp interface{}, err error) {
-		for _, pool := range query.Pools {
-			baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
-			if !ok {
-				//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
-				continue
-			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
-			if !ok {
-				//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
-				continue
-			}
-			tickSpacing, err := pool.GetTickSpacing()
-			if err != nil {
-				continue
-			}
-			security := models.Security{}
-			security.Symbol = fmt.Sprintf("%s", pool.Id)
-			security.Underlying = baseCurrency
-			security.QuoteCurrency = quoteCurrency
-			security.Status = models.Trading
-			security.Exchange = &constants.UNISWAPV3
-			security.IsInverse = false
-			security.SecurityType = enum.SecurityType_CRYPTO_AMM
-			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
-			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)} // TODO in bps ?
-			security.RoundLot = nil                                                      // TODO Token precision ?
-			security.TakerFee = nil                                                      // TODO pool fees
-			securities = append(securities, &security)
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("error updating security list: %v", err)
+	}
+	gqr := res.(*jobs.PerformGraphQueryResponse)
+	if gqr.Error != nil {
+		return fmt.Errorf("error updating security list: %v", gqr.Error)
+	}
+	for _, pool := range query.Pools {
+		baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
+		if !ok {
+			state.logger.Info("unknown symbol " + pool.Token0.Symbol)
+			continue
 		}
+		quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
+		if !ok {
+			state.logger.Info("unknown symbol " + pool.Token1.Symbol)
+			continue
+		}
+		tickSpacing, err := pool.GetTickSpacing()
+		if err != nil {
+			continue
+		}
+		security := models.Security{}
+		security.Symbol = fmt.Sprintf("%s", pool.Id)
+		security.Underlying = baseCurrency
+		security.QuoteCurrency = quoteCurrency
+		security.Status = models.Trading
+		security.Exchange = &constants.UNISWAPV3
+		security.IsInverse = false
+		security.SecurityType = enum.SecurityType_CRYPTO_AMM
+		security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
+		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
+		security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)} // TODO in bps ?
+		security.RoundLot = nil                                                      // TODO Token precision ?
+		security.TakerFee = nil                                                      // TODO pool fees
+		securities = append(securities, &security)
+	}
 
-		state.securities = securities
+	state.securities = securities
 
-		context.Send(context.Parent(), &messages.SecurityList{
-			ResponseID: uint64(time.Now().UnixNano()),
-			Success:    true,
-			Securities: state.securities})
-	})
+	context.Send(context.Parent(), &messages.SecurityList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Securities: state.securities})
 
 	return nil
 }
@@ -176,7 +182,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query, variables := uniswap.GetPoolSnapshotQuery(graphql.ID(symbol), graphql.Int(0))
+	query, variables := uniswap.GetPoolSnapshotQuery(symbol, 0)
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -227,8 +233,6 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			}
 		}
 
-		tick := make([]byte, 4)
-		err = binary.
 		response.Snapshot = &models.UPV3Snapshot{
 			Ticks:                 t,
 			Positions:             nil, // TODO

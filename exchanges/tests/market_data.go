@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -87,6 +88,7 @@ func MarketData(t *testing.T, test MDTest) {
 	}
 	var sec *models.Security
 	for _, s := range securityList.Securities {
+		fmt.Println(s)
 		for _, secID := range securityID {
 			if secID == s.SecurityID {
 				sec = s
@@ -130,6 +132,8 @@ func PoolData(t *testing.T, test MDTest) {
 	if !securityList.Success {
 		t.Fatal(securityList.RejectionReason.String())
 	}
+	fmt.Println("GOT SEC", len(securityList.Securities))
+
 	var sec *models.Security
 	for _, s := range securityList.Securities {
 		for _, secID := range securityID {
