@@ -11,7 +11,7 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211228112154-2dbf1f49dfd4
+	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211230174557-1ab7ddd0f41c
 	gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff
 	gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
@@ -73,6 +73,7 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-//replace gitlab.com/alphaticks/xchanger => ../xchanger
+replace gitlab.com/alphaticks/xchanger => ../xchanger
+replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
 
 //replace gitlab.com/alphaticks/tickstore => ../tickstore

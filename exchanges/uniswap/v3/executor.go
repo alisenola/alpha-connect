@@ -18,6 +18,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/go-graphql-client"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
@@ -114,7 +115,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
 				continue
 			}
-			if err := pool.GetTickSpacing(); err != nil {
+			tickSpacing, err := pool.GetTickSpacing()
+			if err != nil {
 				continue
 			}
 			security := models.Security{}
@@ -127,9 +129,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecurityType = enum.SecurityType_CRYPTO_AMM
 			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &types.DoubleValue{Value: float64(pool.TickSpacing)} // TODO in bps ?
-			security.RoundLot = nil                                                           // TODO Token precision ?
-			security.TakerFee = nil                                                           // TODO pool fees
+			security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)} // TODO in bps ?
+			security.RoundLot = nil                                                      // TODO Token precision ?
+			security.TakerFee = nil                                                      // TODO pool fees
 			securities = append(securities, &security)
 		}
 
@@ -174,17 +176,14 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query, err := uniswap.GetPoolSnapshotQuery(symbol, nil)
-	if err != nil {
-		return fmt.Errorf("error ")
-	}
+	query, variables := uniswap.GetPoolSnapshotQuery(graphql.ID(symbol), graphql.Int(0))
 
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Info("graphql client error", log.Error(err))
@@ -199,14 +198,45 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			context.Respond(response)
 		}
 
+		qp, vp := uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0))
+		qrun := state.getQueryRunner()
+		if qrun == nil {
+			response.RejectionReason = messages.RateLimitExceeded
+			context.Respond(response)
+			return
+		}
+
+		f := context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
+		context.AwaitFuture(f, func(respP interface{}, err error) {
+			if err != nil {
+				state.logger.Info("graphql client error", log.Error(err))
+				response.RejectionReason = messages.GraphQLError
+				context.Respond(response)
+				return
+			}
+		})
+
+		// Store all ticks in gorderbook.UPV3Tick structures
+		t := make([]*gorderbook.UPV3Tick, len(query.Pool.Ticks))
+		for i, tick := range query.Pool.Ticks {
+			t[i] = &gorderbook.UPV3Tick{
+				LiquidityNet:          tick.LiquidityNet.Bytes(),
+				LiquidityGross:        tick.LiquidityGross.Bytes(),
+				FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
+				FeeGrowthOutside1X128: tick.FeeGrowthOutside1X128.Bytes(),
+			}
+		}
+
+		tick := make([]byte, 4)
+		err = binary.
 		response.Snapshot = &models.UPV3Snapshot{
-			Ticks:                 nil, // TODO
+			Ticks:                 t,
 			Positions:             nil, // TODO
 			Liquidity:             query.Pool.Liquidity.Bytes(),
 			SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
 			FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
 			FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
-			Tick:                  nil, //query.Pool.Tick.Bytes(),
+			Tick:                  query.Pool.Tick,
 		}
 		response.Success = true
 		response.SeqNum = 0 // TODO
