@@ -14,33 +14,10 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 )
 
 func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
-	assets := map[uint32]xchangerModels.Asset{
-		constants.DOLLAR.ID:           constants.DOLLAR,
-		constants.EURO.ID:             constants.EURO,
-		constants.POUND.ID:            constants.POUND,
-		constants.CANADIAN_DOLLAR.ID:  constants.CANADIAN_DOLLAR,
-		constants.JAPENESE_YEN.ID:     constants.JAPENESE_YEN,
-		constants.BITCOIN.ID:          constants.BITCOIN,
-		constants.LITECOIN.ID:         constants.LITECOIN,
-		constants.ETHEREUM.ID:         constants.ETHEREUM,
-		constants.RIPPLE.ID:           constants.RIPPLE,
-		constants.TETHER.ID:           constants.TETHER,
-		constants.SOUTH_KOREAN_WON.ID: constants.SOUTH_KOREAN_WON,
-		constants.USDC.ID:             constants.USDC,
-		constants.DASH.ID:             constants.DASH,
-		50: xchangerModels.Asset{
-			Symbol: "BTT",
-			Name:   "",
-			ID:     50,
-		},
-	}
-
-	_ = constants.LoadAssets(assets)
 	exch := []*xchangerModels.Exchange{
 		exchange,
 	}

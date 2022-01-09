@@ -10,6 +10,8 @@ import (
 	"sort"
 	"time"
 
+	xutils "gitlab.com/alphaticks/xchanger/utils"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
@@ -34,12 +36,14 @@ type Executor struct {
 	securities   []*models.Security
 	queryRunners []*QueryRunner
 	logger       *log.Logger
+	dialerPool   *xutils.DialerPool
 }
 
-func NewExecutor() actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
 		queryRunners: nil,
 		logger:       nil,
+		dialerPool:   dialerPool,
 	}
 }
 
@@ -71,20 +75,24 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		client := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewAPIQuery(client)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid:       context.Spawn(props),
+			rateLimit: exchanges.NewRateLimit(100, time.Minute),
+		})
 	}
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(client)
-	})
-	state.queryRunners = append(state.queryRunners, &QueryRunner{
-		pid:       context.Spawn(props),
-		rateLimit: exchanges.NewRateLimit(6, time.Second),
-	})
 	return state.UpdateSecurityList(context)
 }
 
@@ -103,8 +111,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
-
-	qr.rateLimit.Request(weight)
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
 
