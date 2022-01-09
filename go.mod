@@ -10,7 +10,7 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220109093018-7fc7e896f424
 	gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a

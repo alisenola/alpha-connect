@@ -207,7 +207,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
 	ob := gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
 	ob.Sync(bids, asks)
-
+	if ob.Crossed() {
+		return fmt.Errorf("cossed order book")
+	}
 	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts

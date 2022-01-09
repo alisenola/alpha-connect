@@ -36,7 +36,7 @@ var MDTests = []MDTest{
 		BaseCurrency:      constants.BITCOIN,
 		QuoteCurrency:     constants.TETHER,
 		MinPriceIncrement: 0.01,
-		RoundLot:          0.000010,
+		RoundLot:          0.000001,
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.Trading,
