@@ -112,7 +112,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return fmt.Errorf("error updating security list: %v", gqr.Error)
 	}
 	for _, pool := range query.Pools {
-		baseCurrency, ok := constants.GetAssetBySymbol(string(pool.Token0.Symbol))
+		baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
 		if !ok {
 			state.logger.Info("unknown symbol " + pool.Token0.Symbol)
 			continue
