@@ -233,11 +233,13 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	bestAsk := msg.SnapshotL2.Asks[0].Price
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-
-	if depth > 10000 {
-		depth = 10000
+	depth := 10000
+	if len(msg.SnapshotL2.Asks) > 0 {
+		bestAsk := msg.SnapshotL2.Asks[0].Price
+		depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+		if depth > 10000 {
+			depth = 10000
+		}
 	}
 
 	ob := gorderbook.NewOrderBookL2(
