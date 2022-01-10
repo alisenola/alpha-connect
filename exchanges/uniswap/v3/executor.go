@@ -202,6 +202,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			state.logger.Info("graphql client error", log.Error(queryResponse.Error))
 			response.RejectionReason = messages.GraphQLError
 			context.Respond(response)
+			return
 		}
 
 		qp, vp := uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0))
