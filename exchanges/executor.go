@@ -262,7 +262,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Subscribe: true,
 	}
 	for _, pid := range state.executors {
-		fut := context.RequestFuture(pid, request, 5*time.Second)
+		fut := context.RequestFuture(pid, request, 20*time.Second)
 		futures = append(futures, fut)
 	}
 
