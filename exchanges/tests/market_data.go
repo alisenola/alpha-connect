@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"reflect"
 	"testing"
@@ -114,6 +115,23 @@ func MarketData(t *testing.T, test MDTest) {
 
 func PoolData(t *testing.T, test MDTest) {
 	//t.Parallel()
+	constants.LoadAssets(map[uint32]xchangerModels.Asset{
+		0: {
+			Symbol: "WETH",
+			Name:   "wrapped-ether",
+			ID:     0,
+		},
+		1: {
+			Symbol: "USDC",
+			Name:   "usdc",
+			ID:     1,
+		},
+		2: {
+			Symbol: "BUSD",
+			Name:   "binance-usd",
+			ID:     2,
+		},
+	})
 	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
 	defer clean()
 
