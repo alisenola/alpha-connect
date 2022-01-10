@@ -2,11 +2,12 @@ package tests
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 	"reflect"
 	"testing"
 	"time"
+
+	"gitlab.com/alphaticks/xchanger/constants"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -139,7 +140,7 @@ func PoolData(t *testing.T, test MDTest) {
 		test.SecurityID,
 	}
 
-	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 30*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
