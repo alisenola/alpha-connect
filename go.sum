@@ -659,6 +659,10 @@ gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f h1:gvGF7HWQ
 gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f/go.mod h1:tAB9hrPkrzTt3QmqPlV4gX9SBgUbC5maWkhBQR2iZYQ=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570 h1:HdLyQ4pIQFaNHUs2+jURnWjnZAQA+qz47ezs+qY6Nfs=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570/go.mod h1:WGEV6Hi12Vfl02KTuqV1COnTl2mNiQ7h+DwwMFPfcxI=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220109090923-9d42555c1bb2 h1:3j57rvcqH/tOI1aUfyoBMuN6YFJ9VXx0VqtlbaZv69w=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220109090923-9d42555c1bb2/go.mod h1:Yz0cutXSB6G2AIYb1HyWuEGDcsgNdSlRZ26sDh5RJ98=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220111125739-02f1602ea0a1 h1:tr8G55kePmgNud5pGcJeTUoihPIkfIT4Ae2JdIpnsUM=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220111125739-02f1602ea0a1/go.mod h1:Yz0cutXSB6G2AIYb1HyWuEGDcsgNdSlRZ26sDh5RJ98=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a h1:V+DZdg24zUFSOpFYAyAZfrJIbTKZ+2dv4FogzB2N/Ns=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a/go.mod h1:rlQohdpxxxNy7hPNw6xIQUesRmlEtzdlJCvhod8qzoE=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a h1:xFMFACJmtiTWmbu0ngjmk5+cdN7b4SjJ8+ahhzfvTo4=
