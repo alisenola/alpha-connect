@@ -694,7 +694,6 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211230174557-1ab7ddd0f41c/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774/go.mod h1:kb12VCWNgSG+/PqiLzhkMZFqTlYVLVtB2q5cQCjIXpI=
@@ -714,8 +713,6 @@ gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a/go.
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88 h1:ea6Ly/xXPp9U85b8xPQILfAY1/k1yNgKIx8fPki4+Q4=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
-gitlab.com/alphaticks/xchanger v0.0.0-20211231140824-4dd898129f4d h1:zrF9wgJCN6pfnkdYy1g/g0RIJ0TWVG6mVHgcXpjTJ2k=
-gitlab.com/alphaticks/xchanger v0.0.0-20211231140824-4dd898129f4d/go.mod h1:8Jq8WmKu53rIW3KwAaMdOmbdbskv7NKhwxPHYagyhaI=
 gitlab.com/alphaticks/xchanger v0.0.0-20220112135752-6b746b61bf2c h1:gP7R1Exx0LKgWZTEGdvKM5pylvAZxx+cfhr8m1JA+QM=
 gitlab.com/alphaticks/xchanger v0.0.0-20220112135752-6b746b61bf2c/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=

@@ -108,7 +108,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.lastPingTime = time.Now()
-	state.uniExectutor = actor.NewPID(context.ActorSystem().Address(), "exectutor/"+constants.UNISWAPV3.Name+"_executor")
+	state.uniExectutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.UNISWAPV3.Name+"_executor")
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
