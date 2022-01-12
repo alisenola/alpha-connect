@@ -1,25 +1,27 @@
 package v3
 
 import (
-	"container/list"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/gogo/protobuf/types"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/exchanges/okex"
+	"gitlab.com/alphaticks/xchanger/constants"
+	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
-	"reflect"
-	"time"
 )
 
 type checkSockets struct{}
 type postAggTrade struct{}
 
 type InstrumentData struct {
-	orderBook      *gorderbook.OrderBookL2
+	orderBook      []*gorderbook.UnipoolV3
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
@@ -29,14 +31,13 @@ type InstrumentData struct {
 
 type Listener struct {
 	extypes.Listener
-	obWs           *okex.Websocket
-	tradeWs        *okex.Websocket
+	poolWs         *uniswap.Websocket
 	security       *models.Security
 	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
-	stashedTrades  *list.List
+	uniExectutor   *actor.PID
 	socketTicker   *time.Ticker
 }
 
@@ -48,8 +49,7 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		obWs:           nil,
-		tradeWs:        nil,
+		poolWs:         nil,
 		security:       security,
 		dialerPool:     dialerPool,
 		instrumentData: nil,
@@ -108,6 +108,15 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.lastPingTime = time.Now()
+	state.uniExectutor = actor.NewPID(context.ActorSystem().Address(), "exectutor/"+constants.UNISWAPV3.Name+"_executor")
+
+	state.instrumentData = &InstrumentData{
+		orderBook:      nil,
+		seqNum:         uint64(time.Now().UnixNano()),
+		lastUpdateTime: 0,
+		lastHBTime:     time.Now(),
+		lastAggTradeTs: 0,
+	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
 	state.socketTicker = socketTicker
@@ -128,6 +137,45 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	req := context.Message().(*messages.UnipoolV3DataRequest)
+	if state.poolWs != nil {
+		_ = state.poolWs.Disconnect()
+	}
+	state.poolWs = uniswap.NewWebsocket()
+
+	state.poolWs.NewSubscriptionClient()
+	if err := state.poolWs.Connect(); err != nil {
+		return fmt.Errorf("error connecting to websocket: %v", err)
+	}
+
+	// state.poolWs.SubscribePoolSnapshot()
+	fmt.Println("got at the listener")
+	time.Sleep(1 * time.Second)
+	future := context.RequestFuture(
+		state.uniExectutor,
+		&messages.UnipoolV3DataRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Subscribe: false,
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Exchange:   state.security.Exchange,
+			},
+		},
+		60*time.Second)
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("error getting pool snapshot %v", err)
+	}
+	msg, ok := res.(*messages.UnipoolV3DataResponse)
+	if !ok {
+		return fmt.Errorf("was expecting UnipoolV3DataResponse, got %s", reflect.TypeOf(msg).String())
+	}
+	if !msg.Success {
+		return fmt.Errorf("error fetching the pool snapshot %s", msg.RejectionReason.String())
+	}
+	if msg.Snapshot == nil {
+		return fmt.Errorf("pool has empty snapshot")
+	}
 	fmt.Println(req)
 	return nil
 }

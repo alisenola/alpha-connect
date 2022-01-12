@@ -137,6 +137,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return okexp.NewListener(security, dialerPool) }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewListener(security, dialerPool) }
+	case constants.UNISWAPV3.ID:
+		return func() actor.Actor { return v3.NewListener(security, dialerPool) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }

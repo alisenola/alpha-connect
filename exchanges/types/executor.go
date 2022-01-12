@@ -1,11 +1,12 @@
 package types
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"math/rand"
-	"time"
 )
 
 type updateSecurityList struct{}
@@ -28,6 +29,7 @@ type Executor interface {
 	OnOrderBulkReplaceRequest(context actor.Context) error
 	OnOrderCancelRequest(context actor.Context) error
 	OnOrderMassCancelRequest(context actor.Context) error
+	OnUnipoolV3DataRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -154,6 +156,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 	case *messages.OrderMassCancelRequest:
 		if err := state.OnOrderMassCancelRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnOrderMassCancelRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.UnipoolV3DataRequest:
+		if err := state.OnUnipoolV3DataRequest(context); err != nil {
+			state.GetLogger().Error("error processing UnipoolV3DataRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -338,6 +346,17 @@ func (state *BaseExecutor) OnOrderCancelRequest(context actor.Context) error {
 func (state *BaseExecutor) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
 	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnUnipoolV3DataRequest(context actor.Context) error {
+	req := context.Message().(*messages.UnipoolV3DataRequest)
+	context.Respond(&messages.UnipoolV3DataResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,

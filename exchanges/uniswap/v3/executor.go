@@ -53,6 +53,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
+	fmt.Println("received")
 	extypes.ReceiveExecutor(state, context)
 }
 
@@ -96,10 +97,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 
-	query, variables, err := uniswap.GetPoolDefinitionsQuery(graphql.Int(1000), graphql.ID(""))
-	if err != nil {
-		return fmt.Errorf("query error %v", err)
-	}
+	query, variables := uniswap.GetPoolDefinitionsQuery(graphql.ID(""))
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
@@ -114,10 +112,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	if gqr.Error != nil {
 		return fmt.Errorf("error updating security list: %v", gqr.Error)
 	}
-	i := 0
-	for len(query.Pools) != 0 {
+	done := false
+	for !done {
 		for _, pool := range query.Pools {
-			i++
 			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
 			if !ok {
 				state.logger.Info("unknown symbol " + pool.Token0.Symbol)
@@ -147,10 +144,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.TakerFee = nil                                                      // TODO pool fees
 			securities = append(securities, &security)
 		}
-		query, variables, err = uniswap.GetPoolDefinitionsQuery(graphql.Int(1000), graphql.ID(query.Pools[len(query.Pools)-1].Id))
-		if err != nil {
-			return fmt.Errorf("query error %v", err)
+		if len(query.Pools) != 1000 {
+			done = true
+			continue
 		}
+		nextID := query.Pools[len(query.Pools)-1].Id
+		query, variables = uniswap.GetPoolDefinitionsQuery(graphql.ID(nextID))
 		qr = state.getQueryRunner()
 		if qr == nil {
 			return fmt.Errorf("rate limited")
@@ -207,7 +206,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	symbol := msg.Instrument.Symbol.Value
 	// Symbol is pool id
-	query, variables := uniswap.GetPoolSnapshotQuery(symbol, 0)
+	query, variables := uniswap.GetPoolSnapshotQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(""))
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -215,86 +214,116 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
-	context.AwaitFuture(future, func(resp interface{}, err error) {
+	res, err := future.Result()
+	if err != nil {
+		return fmt.Errorf("error getting pool snapshot %v", err)
+	}
+	qresp := res.(*jobs.PerformGraphQueryResponse)
+	if qresp.Error != nil {
+		return fmt.Errorf("error getting pool snapshot %v", err)
+	}
+	done := false
+	var t []*gorderbook.UPV3Tick
+	for !done {
+		// Store all ticks in gorderbook.UPV3Tick structures
+		for _, tick := range query.Pool.Ticks {
+			t = append(t, &gorderbook.UPV3Tick{
+				LiquidityNet:          tick.LiquidityNet.Bytes(),
+				LiquidityGross:        tick.LiquidityGross.Bytes(),
+				FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
+				FeeGrowthOutside1X128: tick.FeeGrowthOutside1X128.Bytes(),
+			})
+		}
+
+		if len(query.Pool.Ticks) != 1000 {
+			done = true
+			continue
+		}
+		nextID := query.Pool.Ticks[len(query.Pool.Ticks)-1]
+		query, variables = uniswap.GetPoolSnapshotQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(nextID))
+
+		qr = state.getQueryRunner()
+		if qr == nil {
+			return fmt.Errorf("rate limited")
+		}
+
+		future = context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
+		res, err = future.Result()
 		if err != nil {
-			state.logger.Info("graphql client error", log.Error(err))
-			response.RejectionReason = messages.GraphQLError
-			context.Respond(response)
-			return
+			return fmt.Errorf("error getting pool snapshot %v", err)
 		}
-		queryResponse := resp.(*jobs.PerformGraphQueryResponse)
-		if queryResponse.Error != nil {
-			state.logger.Info("graphql client error", log.Error(queryResponse.Error))
-			response.RejectionReason = messages.GraphQLError
-			context.Respond(response)
-			return
+		qresp = res.(*jobs.PerformGraphQueryResponse)
+		if qresp.Error != nil {
+			return fmt.Errorf("error getting pool snapshot %v", err)
 		}
+	}
 
-		qp, vp := uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0))
-		qrun := state.getQueryRunner()
-		if qrun == nil {
-			response.RejectionReason = messages.RateLimitExceeded
-			context.Respond(response)
-			return
-		}
+	qp, vp := uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(""))
+	qrun := state.getQueryRunner()
+	if qrun == nil {
+		return fmt.Errorf("rate limited")
+	}
 
-		f := context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
-		context.AwaitFuture(f, func(respP interface{}, err error) {
+	f := context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
+	resp, err := f.Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions %v", err)
+	}
+	qrespP := resp.(*jobs.PerformGraphQueryResponse)
+	if qrespP.Error != nil {
+		return fmt.Errorf("error getting pool snapshot %v", err)
+	}
+	done = false
+	var pos []*gorderbook.UPV3Position
+	for !done {
+		// Store all the positions in gorderbook.UPV3Position structures
+		for _, p := range qp.Positions {
+			idByte, ownerByte, err := p.StringToBytes()
 			if err != nil {
-				state.logger.Info("graphql client error", log.Error(err))
-				response.RejectionReason = messages.GraphQLError
-				context.Respond(response)
-				return
+				continue
 			}
+			pos = append(pos, &gorderbook.UPV3Position{
+				ID:        idByte,
+				Owner:     ownerByte,
+				TickLower: p.TickLower.TickIdx,
+				TickUpper: p.TickUpper.TickIdx,
+			})
+		}
+		if len(qp.Positions) != 1000 {
+			done = true
+			continue
+		}
+		nextID := qp.Positions[len(qp.Positions)-1]
+		qp, vp = uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(nextID))
+		qrun = state.getQueryRunner()
+		if qrun == nil {
+			return fmt.Errorf("rate limited")
+		}
 
-			queryPositionResponse := respP.(*jobs.PerformGraphQueryResponse)
-			if queryPositionResponse.Error != nil {
-				state.logger.Info("graphql client error", log.Error(err))
-				response.RejectionReason = messages.GraphQLError
-				context.Respond(response)
-				return
-			}
+		f = context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
+		resp, err = f.Result()
+		if err != nil {
+			return fmt.Errorf("error getting positions %v", err)
+		}
+		qrespP = resp.(*jobs.PerformGraphQueryResponse)
+		if qrespP.Error != nil {
+			return fmt.Errorf("error getting pool snapshot %v", err)
+		}
+	}
 
-			// Stote all the positions in gorderbook.UPV3Position structures
-			pos := make([]*gorderbook.UPV3Position, len(qp.Positions))
-			for i, p := range qp.Positions {
-				idByte, ownerByte, err := p.StringToBytes()
-				if err != nil {
-					continue
-				}
-				pos[i] = &gorderbook.UPV3Position{
-					ID:        idByte,
-					Owner:     ownerByte,
-					TickLower: p.TickLower.TickIdx,
-					TickUpper: p.TickUpper.TickIdx,
-				}
-			}
-
-			// Store all ticks in gorderbook.UPV3Tick structures
-			t := make([]*gorderbook.UPV3Tick, len(query.Pool.Ticks))
-			for i, tick := range query.Pool.Ticks {
-				t[i] = &gorderbook.UPV3Tick{
-					LiquidityNet:          tick.LiquidityNet.Bytes(),
-					LiquidityGross:        tick.LiquidityGross.Bytes(),
-					FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
-					FeeGrowthOutside1X128: tick.FeeGrowthOutside1X128.Bytes(),
-				}
-			}
-
-			response.Snapshot = &models.UPV3Snapshot{
-				Ticks:                 t,
-				Positions:             pos,
-				Liquidity:             query.Pool.Liquidity.Bytes(),
-				SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
-				FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
-				FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
-				Tick:                  query.Pool.Tick,
-			}
-			response.Success = true
-			response.SeqNum = 0 // TODO
-			context.Respond(response)
-		})
-	})
+	response.Snapshot = &models.UPV3Snapshot{
+		Ticks:                 t,
+		Positions:             pos,
+		Liquidity:             query.Pool.Liquidity.Bytes(),
+		SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
+		FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
+		FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
+		Tick:                  query.Pool.Tick,
+	}
+	response.Success = true
+	response.SeqNum = 0 // TODO
+	fmt.Printf("got this %+v", response)
+	context.Respond(response)
 
 	return nil
 }

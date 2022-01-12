@@ -11,13 +11,13 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211230174557-1ab7ddd0f41c
+	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff
 	gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20211231140824-4dd898129f4d
+	gitlab.com/alphaticks/xchanger v0.0.0-20220112135752-6b746b61bf2c
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
@@ -73,8 +73,8 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-replace gitlab.com/alphaticks/xchanger => ../xchanger
+// replace gitlab.com/alphaticks/xchanger => ../xchanger
 
-replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
+// replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
 
 //replace gitlab.com/alphaticks/tickstore => ../tickstore

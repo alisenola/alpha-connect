@@ -90,7 +90,6 @@ func MarketData(t *testing.T, test MDTest) {
 	}
 	var sec *models.Security
 	for _, s := range securityList.Securities {
-		fmt.Println(s)
 		for _, secID := range securityID {
 			if secID == s.SecurityID {
 				sec = s

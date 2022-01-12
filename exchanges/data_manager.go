@@ -2,13 +2,14 @@ package exchanges
 
 import (
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/utils"
-	"reflect"
-	"time"
 )
 
 // The market data manager spawns an instrument listener and multiplex its messages

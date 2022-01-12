@@ -4,10 +4,11 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"math"
 	"reflect"
 	"time"
+
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
