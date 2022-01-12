@@ -297,7 +297,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			ob.UpdateOrderBookLevel(ask)
 		}
 		state.instrumentData.lastUpdateID = obUpdate.LastUpdateId
-		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000)
+		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 		sync = true
 	}
 	state.instrumentData.orderBook = ob
