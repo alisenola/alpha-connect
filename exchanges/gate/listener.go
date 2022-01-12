@@ -381,7 +381,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			aggregateID += 1
 		}
 
-		ts := uint64(msg.ClientTime.UnixMilli())
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
 			if state.instrumentData.lastAggTradeTs >= ts {
 				ts = state.instrumentData.lastAggTradeTs + 1
@@ -502,7 +502,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 }
 
 func (state *Listener) postAggTrade(context actor.Context) {
-	nowMilli := uint64(time.Now().UnixMilli())
+	nowMilli := uint64(time.Now().UnixNano() / 1000000)
 
 	for el := state.stashedTrades.Front(); el != nil; el = state.stashedTrades.Front() {
 		trd := el.Value.(*models.AggregatedTrade)
