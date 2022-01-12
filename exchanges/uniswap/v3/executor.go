@@ -216,7 +216,10 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
-		return fmt.Errorf("error getting pool snapshot %v", err)
+		state.logger.Warn("error getting pool snapshot", log.Error(err))
+		response.RejectionReason = messages.ExchangeAPIError
+		context.Respond(response)
+		return nil
 	}
 	qresp := res.(*jobs.PerformGraphQueryResponse)
 	if qresp.Error != nil {
