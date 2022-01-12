@@ -11,6 +11,7 @@ import (
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger/constants"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
@@ -147,8 +148,7 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 		return fmt.Errorf("error connecting to websocket: %v", err)
 	}
 
-	// state.poolWs.SubscribePoolSnapshot()
-	fmt.Println("got at the listener")
+	fmt.Println("LISTENER UNIPOOL DATA REQUEST")
 	time.Sleep(1 * time.Second)
 	future := context.RequestFuture(
 		state.uniExectutor,
@@ -175,6 +175,55 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	if msg.Snapshot == nil {
 		return fmt.Errorf("pool has empty snapshot")
+	}
+
+	// TODO subscribe to the swaps of the pool only
+	if _, err := state.poolWs.SubscribeMints(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
+		return fmt.Errorf("error subscribing to the pool mints %v", err)
+	}
+	if _, err := state.poolWs.SubscribeBurns(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
+		return fmt.Errorf("error subscribing to the pool burns %v", err)
+	}
+	if _, err := state.poolWs.SubscribeSwaps(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
+		return fmt.Errorf("error subscribing to the pool swaps %v", err)
+	}
+	if _, err := state.poolWs.SubscribeCollects(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
+		return fmt.Errorf("error subscribing to the pool collects %v", err)
+	}
+	//TODO Order the swaps, burns mints and collects before syncing
+	sync := false
+	for !sync {
+		if !state.poolWs.ReadMessage() {
+			return fmt.Errorf("error reading the message %v", err)
+		}
+		if mints, ok := state.poolWs.Msg.Message.(*uniswap.Mints); ok {
+			for _, m := range mints.Mints {
+				if int64(m.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+					//TODO compute the mints using the gorderbook.UniswapV3
+				}
+			}
+		}
+		if burns, ok := state.poolWs.Msg.Message.(*uniswap.Burns); ok {
+			for _, b := range burns.Burns {
+				if int64(b.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+					//TODO compute the burn using the gorderbook.UniswapV3
+				}
+			}
+		}
+		if swaps, ok := state.poolWs.Msg.Message.(*uniswap.Swaps); ok {
+			for _, s := range swaps.Swaps {
+				if int64(s.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+					//TODO compute the swap using the gorderbook.UniswapV3
+				}
+			}
+		}
+		if collects, ok := state.poolWs.Msg.Message.(*uniswap.Collects); ok {
+			for _, c := range collects.Collects {
+				if int64(c.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+					//TODO compute the collects using the gorderbook.UniswapV3
+				}
+			}
+		}
 	}
 	fmt.Println(req)
 	return nil

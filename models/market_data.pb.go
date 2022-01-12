@@ -4,16 +4,17 @@ import (
 	bytes "bytes"
 	encoding_binary "encoding/binary"
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	types "github.com/gogo/protobuf/types"
-	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	io "io"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strconv "strconv"
 	strings "strings"
+
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
+	types "github.com/gogo/protobuf/types"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -493,6 +494,10 @@ type UPV3Snapshot struct {
 	FeeGrowthGlobal_0X128 []byte                     `protobuf:"bytes,5,opt,name=fee_growth_global_0x128,json=feeGrowthGlobal0x128,proto3" json:"fee_growth_global_0x128,omitempty"`
 	FeeGrowthGlobal_1X128 []byte                     `protobuf:"bytes,6,opt,name=fee_growth_global_1x128,json=feeGrowthGlobal1x128,proto3" json:"fee_growth_global_1x128,omitempty"`
 	Tick                  int32                      `protobuf:"varint,7,opt,name=tick,proto3" json:"tick,omitempty"`
+	LastMintTs            *types.Timestamp           `protobuf:"bytes,8,opt,name=lastmintts,proto3" json:"lastmintts,omitempty"`
+	LastBurnTs            *types.Timestamp           `protobuf:"bytes,9,opt,name=lastburnts,proto3" json:"lastburnts,omitempty"`
+	LastSwapTs            *types.Timestamp           `protobuf:"bytes,10,opt,name=lastburnts,proto3" json:"lastswapts,omitempty"`
+	LastCollectTs         *types.Timestamp           `protobuf:"bytes,11,opt,name=lastcollectts,proto3" json:"lastcollectts,omitempty"`
 }
 
 func (m *UPV3Snapshot) Reset()      { *m = UPV3Snapshot{} }
@@ -574,6 +579,34 @@ func (m *UPV3Snapshot) GetTick() int32 {
 		return m.Tick
 	}
 	return 0
+}
+
+func (m *UPV3Snapshot) GetLastMintTs() *types.Timestamp {
+	if m != nil {
+		return m.LastMintTs
+	}
+	return &types.Timestamp{}
+}
+
+func (m *UPV3Snapshot) GetLastBurnTs() *types.Timestamp {
+	if m != nil {
+		return m.LastBurnTs
+	}
+	return &types.Timestamp{}
+}
+
+func (m *UPV3Snapshot) GetLastSwapTs() *types.Timestamp {
+	if m != nil {
+		return m.LastSwapTs
+	}
+	return &types.Timestamp{}
+}
+
+func (m *UPV3Snapshot) GetLastCollectTs() *types.Timestamp {
+	if m != nil {
+		return m.LastCollectTs
+	}
+	return &types.Timestamp{}
 }
 
 type UPV3Update struct {

@@ -53,7 +53,6 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	fmt.Println("received")
 	extypes.ReceiveExecutor(state, context)
 }
 
@@ -141,7 +140,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 			security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)} // TODO in bps ?
 			security.RoundLot = nil                                                      // TODO Token precision ?
-			security.TakerFee = nil                                                      // TODO pool fees
+			security.TakerFee = &types.DoubleValue{Value: float64(pool.FeeTier)}         // TODO pool fees
 			securities = append(securities, &security)
 		}
 		if len(query.Pools) != 1000 {
@@ -188,6 +187,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
+	fmt.Println("got at executor")
 	msg := context.Message().(*messages.UnipoolV3DataRequest)
 	response := &messages.UnipoolV3DataResponse{
 		RequestID:  msg.RequestID,
@@ -216,14 +216,14 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	future := context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
-		state.logger.Warn("error getting pool snapshot", log.Error(err))
+		state.logger.Warn("error getting first pool snapshot", log.Error(err))
 		response.RejectionReason = messages.ExchangeAPIError
 		context.Respond(response)
 		return nil
 	}
 	qresp := res.(*jobs.PerformGraphQueryResponse)
 	if qresp.Error != nil {
-		state.logger.Warn("error getting pool snapshot", log.Error(qresp.Error))
+		state.logger.Warn("error in query response", log.Error(qresp.Error))
 		response.RejectionReason = messages.ExchangeAPIError
 		context.Respond(response)
 		return nil
@@ -256,11 +256,17 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		future = context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
 		res, err = future.Result()
 		if err != nil {
-			return fmt.Errorf("error getting pool snapshot %v", err)
+			state.logger.Warn("error getting following pool snapshot", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return nil
 		}
 		qresp = res.(*jobs.PerformGraphQueryResponse)
 		if qresp.Error != nil {
-			return fmt.Errorf("error getting pool snapshot %v", err)
+			state.logger.Warn("error in query response", log.Error(qresp.Error))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return nil
 		}
 	}
 
@@ -270,14 +276,20 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		return fmt.Errorf("rate limited")
 	}
 
-	f := context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
+	f := context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: &qp, Variables: vp}, 10*time.Second)
 	resp, err := f.Result()
 	if err != nil {
-		return fmt.Errorf("error getting positions %v", err)
+		state.logger.Warn("error getting positions", log.Error(err))
+		response.RejectionReason = messages.ExchangeAPIError
+		context.Respond(response)
+		return nil
 	}
 	qrespP := resp.(*jobs.PerformGraphQueryResponse)
 	if qrespP.Error != nil {
-		return fmt.Errorf("error getting pool snapshot %v", err)
+		state.logger.Warn("error in query response", log.Error(qrespP.Error))
+		response.RejectionReason = messages.ExchangeAPIError
+		context.Respond(response)
+		return nil
 	}
 	done = false
 	var pos []*gorderbook.UPV3Position
@@ -306,15 +318,38 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			return fmt.Errorf("rate limited")
 		}
 
-		f = context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: qp, Variables: vp}, 10*time.Second)
+		f = context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: &qp, Variables: vp}, 10*time.Second)
 		resp, err = f.Result()
 		if err != nil {
-			return fmt.Errorf("error getting positions %v", err)
+			state.logger.Warn("error getting following positions", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return nil
 		}
 		qrespP = resp.(*jobs.PerformGraphQueryResponse)
 		if qrespP.Error != nil {
-			return fmt.Errorf("error getting pool snapshot %v", err)
+			state.logger.Warn("error in query response", log.Error(qrespP.Error))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return nil
 		}
+	}
+
+	var mintTs = &types.Timestamp{Seconds: time.Now().Unix()}
+	var burnTs = &types.Timestamp{Seconds: time.Now().Unix()}
+	var swapTs = &types.Timestamp{Seconds: time.Now().Unix()}
+	var collectTs = &types.Timestamp{Seconds: time.Now().Unix()}
+	if len(query.Pool.Mints) > 0 {
+		mintTs = &types.Timestamp{Seconds: int64(query.Pool.Mints[0].Timestamp)}
+	}
+	if len(query.Pool.Burns) > 0 {
+		burnTs = &types.Timestamp{Seconds: int64(query.Pool.Burns[0].Timestamp)}
+	}
+	if len(query.Pool.Swaps) > 0 {
+		swapTs = &types.Timestamp{Seconds: int64(query.Pool.Swaps[0].Timestamp)}
+	}
+	if len(query.Pool.Collects) > 0 {
+		collectTs = &types.Timestamp{Seconds: int64(query.Pool.Collects[0].Timestamp)}
 	}
 
 	response.Snapshot = &models.UPV3Snapshot{
@@ -325,10 +360,14 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
 		FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
 		Tick:                  query.Pool.Tick,
+		LastMintTs:            mintTs,
+		LastBurnTs:            burnTs,
+		LastSwapTs:            swapTs,
+		LastCollectTs:         collectTs,
 	}
+
 	response.Success = true
-	response.SeqNum = 0 // TODO
-	fmt.Printf("got this %+v", response)
+	response.SeqNum = uint64(time.Now().UnixNano())
 	context.Respond(response)
 
 	return nil
