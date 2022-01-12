@@ -223,7 +223,10 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 	qresp := res.(*jobs.PerformGraphQueryResponse)
 	if qresp.Error != nil {
-		return fmt.Errorf("error getting pool snapshot %v", err)
+		state.logger.Warn("error getting pool snapshot", log.Error(qresp.Error))
+		response.RejectionReason = messages.ExchangeAPIError
+		context.Respond(response)
+		return nil
 	}
 	done := false
 	var t []*gorderbook.UPV3Tick
