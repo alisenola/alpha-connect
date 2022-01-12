@@ -385,7 +385,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			aggregateID += 1
 		}
 
-		ts := uint64(msg.ClientTime.UnixMilli() / 1000000)
+		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
 			if state.instrumentData.lastAggTradeTs >= ts {
 				ts = state.instrumentData.lastAggTradeTs + 1
