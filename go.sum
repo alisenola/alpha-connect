@@ -700,6 +700,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20210511100305-c60684b48774/go.mod h1:kb
 gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e/go.mod h1:Q7czYSyXyw4eo76eHe+BlHzC4stXLlZ5Ap6mkGy79uE=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff h1:yarZq5ZrRFDiOdd3U4ItHT/pYDyoUtQpmCOG9X6Zd8s=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220113145739-d5cbccbdb165 h1:1Swc4+hOOdHqJqpNK4NBFjgPmeA4QFfwhLO8i/fm5ro=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220113145739-d5cbccbdb165/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
@@ -717,6 +719,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220112135752-6b746b61bf2c h1:gP7R1Exx0LK
 gitlab.com/alphaticks/xchanger v0.0.0-20220112135752-6b746b61bf2c/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
 gitlab.com/alphaticks/xchanger v0.0.0-20220112183057-91d5d6ebc92a h1:5QPj+SDHhmxJJ4HT3nVqBCcATXusBRjqDMugPUDp8ys=
 gitlab.com/alphaticks/xchanger v0.0.0-20220112183057-91d5d6ebc92a/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
+gitlab.com/alphaticks/xchanger v0.0.0-20220113142547-8512346543b8 h1:rgllWsbkiPiPeQ1Q8IV5sk99jIlHBaQPNF57b+TBpOM=
+gitlab.com/alphaticks/xchanger v0.0.0-20220113142547-8512346543b8/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

@@ -233,6 +233,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	// Store all ticks in gorderbook.UPV3Tick structures
 	for _, tick := range query.Pool.Ticks {
 		t = append(t, &gorderbook.UPV3Tick{
+			ID:                    tick.TickIdx,
 			LiquidityNet:          tick.LiquidityNet.Bytes(),
 			LiquidityGross:        tick.LiquidityGross.Bytes(),
 			FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
