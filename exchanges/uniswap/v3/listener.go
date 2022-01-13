@@ -141,15 +141,15 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	if state.poolWs != nil {
 		_ = state.poolWs.Disconnect()
 	}
-	state.poolWs = uniswap.NewWebsocket()
+	ws := uniswap.NewWebsocket()
 
-	state.poolWs.NewSubscriptionClient()
-	if err := state.poolWs.Connect(); err != nil {
+	ws.NewSubscriptionClient()
+	if err := ws.Connect(); err != nil {
 		return fmt.Errorf("error connecting to websocket: %v", err)
 	}
 
 	fmt.Println("LISTENER UNIPOOL DATA REQUEST")
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 	future := context.RequestFuture(
 		state.uniExectutor,
 		&messages.UnipoolV3DataRequest{
@@ -177,53 +177,66 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 		return fmt.Errorf("pool has empty snapshot")
 	}
 
-	// TODO subscribe to the swaps of the pool only
-	if _, err := state.poolWs.SubscribeMints(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
-		return fmt.Errorf("error subscribing to the pool mints %v", err)
+	if _, err := ws.SubscribeTransactions(graphql.Int(msg.Snapshot.Timestamp.Seconds), graphql.ID(state.security.Symbol)); err != nil {
+		return fmt.Errorf("error subscribing to the pool transactions: %v", err)
 	}
-	if _, err := state.poolWs.SubscribeBurns(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
-		return fmt.Errorf("error subscribing to the pool burns %v", err)
-	}
-	if _, err := state.poolWs.SubscribeSwaps(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
-		return fmt.Errorf("error subscribing to the pool swaps %v", err)
-	}
-	if _, err := state.poolWs.SubscribeCollects(graphql.Int(msg.Snapshot.LastMintTs.Seconds)); err != nil {
-		return fmt.Errorf("error subscribing to the pool collects %v", err)
-	}
+	state.poolWs = ws
+
+	unipoolV3 := gorderbook.NewUnipoolV3(
+		int32(state.security.TakerFee.Value),
+	)
+
 	//TODO Order the swaps, burns mints and collects before syncing
 	sync := false
 	for !sync {
 		if !state.poolWs.ReadMessage() {
 			return fmt.Errorf("error reading the message %v", err)
 		}
-		if mints, ok := state.poolWs.Msg.Message.(*uniswap.Mints); ok {
-			for _, m := range mints.Mints {
-				if int64(m.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-					//TODO compute the mints using the gorderbook.UniswapV3
+		transactions, ok := state.poolWs.Msg.Message.(*uniswap.Transactions)
+		if !ok {
+			return fmt.Errorf("incorrect message type %v", err)
+		}
+		if len(transactions.Transactions) == 0 {
+			state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000)
+			sync = true
+		}
+		for _, t := range transactions.Transactions {
+			orderedT := t.OrderTransaction()
+			for _, oT := range orderedT.Transaction {
+				switch oT.(type) {
+				case uniswap.Mints:
+					poolSnapshot.	
 				}
 			}
 		}
-		if burns, ok := state.poolWs.Msg.Message.(*uniswap.Burns); ok {
-			for _, b := range burns.Burns {
-				if int64(b.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-					//TODO compute the burn using the gorderbook.UniswapV3
-				}
-			}
-		}
-		if swaps, ok := state.poolWs.Msg.Message.(*uniswap.Swaps); ok {
-			for _, s := range swaps.Swaps {
-				if int64(s.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-					//TODO compute the swap using the gorderbook.UniswapV3
-				}
-			}
-		}
-		if collects, ok := state.poolWs.Msg.Message.(*uniswap.Collects); ok {
-			for _, c := range collects.Collects {
-				if int64(c.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-					//TODO compute the collects using the gorderbook.UniswapV3
-				}
-			}
-		}
+		// if mints, ok := state.poolWs.Msg.Message.(*uniswap.Mints); ok {
+		// 	for _, m := range mints.Mints {
+		// 		if int64(m.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+		// 			//TODO compute the mints using the gorderbook.UniswapV3
+		// 		}
+		// 	}
+		// }
+		// if burns, ok := state.poolWs.Msg.Message.(*uniswap.Burns); ok {
+		// 	for _, b := range burns.Burns {
+		// 		if int64(b.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+		// 			//TODO compute the burn using the gorderbook.UniswapV3
+		// 		}
+		// 	}
+		// }
+		// if swaps, ok := state.poolWs.Msg.Message.(*uniswap.Swaps); ok {
+		// 	for _, s := range swaps.Swaps {
+		// 		if int64(s.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+		// 			//TODO compute the swap using the gorderbook.UniswapV3
+		// 		}
+		// 	}
+		// }
+		// if collects, ok := state.poolWs.Msg.Message.(*uniswap.Collects); ok {
+		// 	for _, c := range collects.Collects {
+		// 		if int64(c.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
+		// 			//TODO compute the collects using the gorderbook.UniswapV3
+		// 		}
+		// 	}
+		// }
 	}
 	fmt.Println(req)
 	return nil

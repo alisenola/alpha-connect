@@ -494,10 +494,7 @@ type UPV3Snapshot struct {
 	FeeGrowthGlobal_0X128 []byte                     `protobuf:"bytes,5,opt,name=fee_growth_global_0x128,json=feeGrowthGlobal0x128,proto3" json:"fee_growth_global_0x128,omitempty"`
 	FeeGrowthGlobal_1X128 []byte                     `protobuf:"bytes,6,opt,name=fee_growth_global_1x128,json=feeGrowthGlobal1x128,proto3" json:"fee_growth_global_1x128,omitempty"`
 	Tick                  int32                      `protobuf:"varint,7,opt,name=tick,proto3" json:"tick,omitempty"`
-	LastMintTs            *types.Timestamp           `protobuf:"bytes,8,opt,name=lastmintts,proto3" json:"lastmintts,omitempty"`
-	LastBurnTs            *types.Timestamp           `protobuf:"bytes,9,opt,name=lastburnts,proto3" json:"lastburnts,omitempty"`
-	LastSwapTs            *types.Timestamp           `protobuf:"bytes,10,opt,name=lastburnts,proto3" json:"lastswapts,omitempty"`
-	LastCollectTs         *types.Timestamp           `protobuf:"bytes,11,opt,name=lastcollectts,proto3" json:"lastcollectts,omitempty"`
+	Timestamp             *types.Timestamp           `protobuf:"bytes,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
 func (m *UPV3Snapshot) Reset()      { *m = UPV3Snapshot{} }
@@ -581,30 +578,9 @@ func (m *UPV3Snapshot) GetTick() int32 {
 	return 0
 }
 
-func (m *UPV3Snapshot) GetLastMintTs() *types.Timestamp {
+func (m *UPV3Snapshot) GetTimestamp() *types.Timestamp {
 	if m != nil {
-		return m.LastMintTs
-	}
-	return &types.Timestamp{}
-}
-
-func (m *UPV3Snapshot) GetLastBurnTs() *types.Timestamp {
-	if m != nil {
-		return m.LastBurnTs
-	}
-	return &types.Timestamp{}
-}
-
-func (m *UPV3Snapshot) GetLastSwapTs() *types.Timestamp {
-	if m != nil {
-		return m.LastSwapTs
-	}
-	return &types.Timestamp{}
-}
-
-func (m *UPV3Snapshot) GetLastCollectTs() *types.Timestamp {
-	if m != nil {
-		return m.LastCollectTs
+		return m.Timestamp
 	}
 	return &types.Timestamp{}
 }

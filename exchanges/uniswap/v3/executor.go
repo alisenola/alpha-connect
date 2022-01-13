@@ -228,46 +228,16 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	done := false
+
 	var t []*gorderbook.UPV3Tick
-	for !done {
-		// Store all ticks in gorderbook.UPV3Tick structures
-		for _, tick := range query.Pool.Ticks {
-			t = append(t, &gorderbook.UPV3Tick{
-				LiquidityNet:          tick.LiquidityNet.Bytes(),
-				LiquidityGross:        tick.LiquidityGross.Bytes(),
-				FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
-				FeeGrowthOutside1X128: tick.FeeGrowthOutside1X128.Bytes(),
-			})
-		}
-
-		if len(query.Pool.Ticks) != 1000 {
-			done = true
-			continue
-		}
-		nextID := query.Pool.Ticks[len(query.Pool.Ticks)-1]
-		query, variables = uniswap.GetPoolSnapshotQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(nextID))
-
-		qr = state.getQueryRunner()
-		if qr == nil {
-			return fmt.Errorf("rate limited")
-		}
-
-		future = context.RequestFuture(qr.pid, &jobs.PerformGraphQueryRequest{Query: &query, Variables: variables}, 10*time.Second)
-		res, err = future.Result()
-		if err != nil {
-			state.logger.Warn("error getting following pool snapshot", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return nil
-		}
-		qresp = res.(*jobs.PerformGraphQueryResponse)
-		if qresp.Error != nil {
-			state.logger.Warn("error in query response", log.Error(qresp.Error))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return nil
-		}
+	// Store all ticks in gorderbook.UPV3Tick structures
+	for _, tick := range query.Pool.Ticks {
+		t = append(t, &gorderbook.UPV3Tick{
+			LiquidityNet:          tick.LiquidityNet.Bytes(),
+			LiquidityGross:        tick.LiquidityGross.Bytes(),
+			FeeGrowthOutside0X128: tick.FeeGrowthOutside0X128.Bytes(),
+			FeeGrowthOutside1X128: tick.FeeGrowthOutside1X128.Bytes(),
+		})
 	}
 
 	qp, vp := uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(""))
@@ -291,65 +261,39 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	done = false
+
 	var pos []*gorderbook.UPV3Position
-	for !done {
-		// Store all the positions in gorderbook.UPV3Position structures
-		for _, p := range qp.Positions {
-			idByte, ownerByte, err := p.StringToBytes()
-			if err != nil {
-				continue
-			}
-			pos = append(pos, &gorderbook.UPV3Position{
-				ID:        idByte,
-				Owner:     ownerByte,
-				TickLower: p.TickLower.TickIdx,
-				TickUpper: p.TickUpper.TickIdx,
-			})
-		}
-		if len(qp.Positions) != 1000 {
-			done = true
+	for _, p := range qp.Positions {
+		idByte, ownerByte, err := p.StringToBytes()
+		if err != nil {
 			continue
 		}
-		nextID := qp.Positions[len(qp.Positions)-1]
-		qp, vp = uniswap.GetPositionsQuery(graphql.ID(symbol), graphql.Int(0), graphql.ID(nextID))
-		qrun = state.getQueryRunner()
-		if qrun == nil {
-			return fmt.Errorf("rate limited")
-		}
-
-		f = context.RequestFuture(qrun.pid, &jobs.PerformGraphQueryRequest{Query: &qp, Variables: vp}, 10*time.Second)
-		resp, err = f.Result()
-		if err != nil {
-			state.logger.Warn("error getting following positions", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return nil
-		}
-		qrespP = resp.(*jobs.PerformGraphQueryResponse)
-		if qrespP.Error != nil {
-			state.logger.Warn("error in query response", log.Error(qrespP.Error))
-			response.RejectionReason = messages.ExchangeAPIError
-			context.Respond(response)
-			return nil
-		}
+		pos = append(pos, &gorderbook.UPV3Position{
+			ID:        idByte,
+			Owner:     ownerByte,
+			TickLower: p.TickLower.TickIdx,
+			TickUpper: p.TickUpper.TickIdx,
+		})
 	}
 
-	var mintTs = &types.Timestamp{Seconds: time.Now().Unix()}
-	var burnTs = &types.Timestamp{Seconds: time.Now().Unix()}
-	var swapTs = &types.Timestamp{Seconds: time.Now().Unix()}
-	var collectTs = &types.Timestamp{Seconds: time.Now().Unix()}
+	var timestamps = []int32{}
 	if len(query.Pool.Mints) > 0 {
-		mintTs = &types.Timestamp{Seconds: int64(query.Pool.Mints[0].Timestamp)}
+		timestamps = append(timestamps, query.Pool.Mints[0].Timestamp)
 	}
 	if len(query.Pool.Burns) > 0 {
-		burnTs = &types.Timestamp{Seconds: int64(query.Pool.Burns[0].Timestamp)}
+		timestamps = append(timestamps, query.Pool.Burns[0].Timestamp)
 	}
 	if len(query.Pool.Swaps) > 0 {
-		swapTs = &types.Timestamp{Seconds: int64(query.Pool.Swaps[0].Timestamp)}
+		timestamps = append(timestamps, query.Pool.Swaps[0].Timestamp)
 	}
 	if len(query.Pool.Collects) > 0 {
-		collectTs = &types.Timestamp{Seconds: int64(query.Pool.Collects[0].Timestamp)}
+		timestamps = append(timestamps, query.Pool.Collects[0].Timestamp)
+	}
+	var minTime = int32(^uint32(0) >> 1)
+	for _, time := range timestamps {
+		if time < minTime {
+			minTime = time
+		}
 	}
 
 	response.Snapshot = &models.UPV3Snapshot{
@@ -360,10 +304,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
 		FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
 		Tick:                  query.Pool.Tick,
-		LastMintTs:            mintTs,
-		LastBurnTs:            burnTs,
-		LastSwapTs:            swapTs,
-		LastCollectTs:         collectTs,
+		Timestamp:             &types.Timestamp{Seconds: int64(minTime)},
 	}
 
 	response.Success = true
