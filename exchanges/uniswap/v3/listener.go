@@ -185,8 +185,9 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	unipoolV3 := gorderbook.NewUnipoolV3(
 		int32(state.security.TakerFee.Value),
 	)
-
-	//TODO Order the swaps, burns mints and collects before syncing
+	//TODO Call sync method on unipoolV3 in order to sync with msg.Snapshot
+	//TODO Make function in xchanger in order to compute all the transactions inside transactions.Transactions
+	//TODO Check for tokensOwed0 and tokensOwed1 from the position structure in uniswap contract in theGraph
 	sync := false
 	for !sync {
 		if !state.poolWs.ReadMessage() {
@@ -203,40 +204,11 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 		for _, t := range transactions.Transactions {
 			orderedT := t.OrderTransaction()
 			for _, oT := range orderedT.Transaction {
-				switch oT.(type) {
-				case uniswap.Mints:
-					poolSnapshot.	
+				if m, ok := oT.(*uniswap.Mint); ok {
+					unipoolV3.Mint(m.Owner)
 				}
 			}
 		}
-		// if mints, ok := state.poolWs.Msg.Message.(*uniswap.Mints); ok {
-		// 	for _, m := range mints.Mints {
-		// 		if int64(m.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-		// 			//TODO compute the mints using the gorderbook.UniswapV3
-		// 		}
-		// 	}
-		// }
-		// if burns, ok := state.poolWs.Msg.Message.(*uniswap.Burns); ok {
-		// 	for _, b := range burns.Burns {
-		// 		if int64(b.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-		// 			//TODO compute the burn using the gorderbook.UniswapV3
-		// 		}
-		// 	}
-		// }
-		// if swaps, ok := state.poolWs.Msg.Message.(*uniswap.Swaps); ok {
-		// 	for _, s := range swaps.Swaps {
-		// 		if int64(s.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-		// 			//TODO compute the swap using the gorderbook.UniswapV3
-		// 		}
-		// 	}
-		// }
-		// if collects, ok := state.poolWs.Msg.Message.(*uniswap.Collects); ok {
-		// 	for _, c := range collects.Collects {
-		// 		if int64(c.Timestamp) >= msg.Snapshot.LastMintTs.Seconds {
-		// 			//TODO compute the collects using the gorderbook.UniswapV3
-		// 		}
-		// 	}
-		// }
 	}
 	fmt.Println(req)
 	return nil
