@@ -271,13 +271,15 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		}
 		//TODO update the proto in order to have the correct values
 		pos = append(pos, &gorderbook.UPV3Position{
-			ID:                       idByte,
-			Owner:                    ownerByte,
-			TickLower:                p.TickLower.TickIdx,
-			TickUpper:                p.TickUpper.TickIdx,
-			Liquidity:                p.Liquidity.Bytes(),
-			FeeGrowthInside0LastX128: p.FeeGrowthInside0LastX128.Bytes(),
-			FeeGrowthInside1LastX128: p.FeeGrowthInside1LastX128.Bytes(),
+			ID:                        idByte,
+			Owner:                     ownerByte,
+			TickLower:                 p.TickLower.TickIdx,
+			TickUpper:                 p.TickUpper.TickIdx,
+			Liquidity:                 p.Liquidity.Bytes(),
+			FeeGrowthInside_0LastX128: p.FeeGrowthInside0LastX128.Bytes(),
+			FeeGrowthInside_1LastX128: p.FeeGrowthInside1LastX128.Bytes(),
+			TokensOwed0:               []byte{},
+			TokensOwed1:               []byte{},
 		})
 	}
 
