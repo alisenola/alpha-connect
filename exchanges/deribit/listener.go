@@ -177,7 +177,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return err
 	}
 
-	if err, _ := ws.SubscribeOrderBook(state.security.Symbol, deribit.Interval0ms); err != nil {
+	if err, _ := ws.SubscribeOrderBook(state.security.Symbol, deribit.Interval100ms); err != nil {
 		return err
 	}
 
@@ -244,11 +244,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.lastUpdateID = update.ChangeID
 
-	if err, _ := ws.SubscribeTrade(state.security.Symbol, deribit.Interval0ms); err != nil {
+	if err, _ := ws.SubscribeTrade(state.security.Symbol, deribit.Interval100ms); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
-	if err, _ := ws.SubscribeTicker(state.security.Symbol, deribit.Interval0ms); err != nil {
+	if err, _ := ws.SubscribeTicker(state.security.Symbol, deribit.Interval100ms); err != nil {
 		return fmt.Errorf("error subscribing to ticker stream: %v", err)
 	}
 
