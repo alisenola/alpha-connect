@@ -188,6 +188,13 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}); err != nil {
 			return err
 		}
+		if !ws.ReadMessage() {
+			return ws.Err
+		}
+		_, ok := ws.Msg.Message.(deribit.Auth)
+		if !ok {
+			return fmt.Errorf("error casting message to Auth")
+		}
 	} else {
 		interval = deribit.Interval100ms
 	}
