@@ -14,8 +14,10 @@ import (
 	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/deribit"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -176,8 +178,20 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err != nil {
 		return err
 	}
+	var interval string
+	if os.Getenv("DERIBIT_KEY") != "" {
+		interval = deribit.Interval0ms
+		if err, _ := ws.Auth(&xchangerModels.APICredentials{
+			APIKey:    os.Getenv("DERIBIT_KEY"),
+			APISecret: os.Getenv("DERIBIT_SECRET"),
+		}); err != nil {
+			return err
+		}
+	} else {
+		interval = deribit.Interval100ms
+	}
 
-	if err, _ := ws.SubscribeOrderBook(state.security.Symbol, deribit.Interval100ms); err != nil {
+	if err, _ := ws.SubscribeOrderBook(state.security.Symbol, interval); err != nil {
 		return err
 	}
 
@@ -244,11 +258,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.lastUpdateID = update.ChangeID
 
-	if err, _ := ws.SubscribeTrade(state.security.Symbol, deribit.Interval100ms); err != nil {
+	if err, _ := ws.SubscribeTrade(state.security.Symbol, interval); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
-	if err, _ := ws.SubscribeTicker(state.security.Symbol, deribit.Interval100ms); err != nil {
+	if err, _ := ws.SubscribeTicker(state.security.Symbol, interval); err != nil {
 		return fmt.Errorf("error subscribing to ticker stream: %v", err)
 	}
 

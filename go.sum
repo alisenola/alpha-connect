@@ -682,6 +682,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220113141245-b3171a3bf836 h1:ESrtdiLj3GS
 gitlab.com/alphaticks/xchanger v0.0.0-20220113141245-b3171a3bf836/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
 gitlab.com/alphaticks/xchanger v0.0.0-20220113144430-10c635eb52ad h1:4KCS10z1pJmM9oTGPFvqxHzJFP7FoY7OiXt8m4iG1+s=
 gitlab.com/alphaticks/xchanger v0.0.0-20220113144430-10c635eb52ad/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
+gitlab.com/alphaticks/xchanger v0.0.0-20220115213034-73d283a028e0 h1:NJP7dB2issq2cVpxMtzeSjG8M9RtPUTZlrBZFo1GfnM=
+gitlab.com/alphaticks/xchanger v0.0.0-20220115213034-73d283a028e0/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
