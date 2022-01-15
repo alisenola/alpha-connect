@@ -180,6 +180,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 	var interval string
 	if os.Getenv("DERIBIT_KEY") != "" {
+		fmt.Println("SUBSCRIBE RAW")
 		interval = deribit.Interval0ms
 		if err, _ := ws.Auth(&xchangerModels.APICredentials{
 			APIKey:    os.Getenv("DERIBIT_KEY"),
