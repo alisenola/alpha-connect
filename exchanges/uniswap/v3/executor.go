@@ -10,6 +10,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
@@ -186,8 +187,38 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
+	fmt.Println("EXECUTOR HISTORICAL DATA REQUEST")
+	msg := context.Message().(*messages.HistoricalUnipoolV3EventRequest)
+	response := &messages.HistoricalUnipoolV3EventResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	if msg.Subscribe {
+		response.RejectionReason = messages.UnsupportedSubscription
+		context.Respond(response)
+		return nil
+	}
+	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
+	}
+
+	symbol := msg.Instrument.Symbol
+	client, err := ethclient.Dial("wss://eth-mainnet.alchemyapi.io/v2/hdodrT8DMC-Ow9rd6qIOcjpZgr5_Ixdg")
+	if err != nil {
+		state.logger.Warn("error dialing eth client", log.Error(err))
+		response.RejectionReason = messages.ExchangeAPIError
+		context.Respond(response)
+		return nil
+	}
+}
+
 func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
-	fmt.Println("got at executor")
+	fmt.Println("EXECUTOR UNIPOOLV3 DATA REQUEST")
 	msg := context.Message().(*messages.UnipoolV3DataRequest)
 	response := &messages.UnipoolV3DataResponse{
 		RequestID:  msg.RequestID,
@@ -278,8 +309,8 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 			Liquidity:                 p.Liquidity.Bytes(),
 			FeeGrowthInside_0LastX128: p.FeeGrowthInside0LastX128.Bytes(),
 			FeeGrowthInside_1LastX128: p.FeeGrowthInside1LastX128.Bytes(),
-			TokensOwed0:               []byte{},
-			TokensOwed1:               []byte{},
+			TokensOwed0:               p.TokensOwed0.Bytes(),
+			TokensOwed1:               p.TokensOwed1.Bytes(),
 		})
 	}
 
@@ -304,15 +335,21 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	}
 
 	response.Snapshot = &models.UPV3Snapshot{
-		Ticks:                 t,
-		Positions:             pos,
-		Liquidity:             query.Pool.Liquidity.Bytes(),
-		SqrtPrice:             query.Pool.SqrtPrice.Bytes(),
-		FeeGrowthGlobal_0X128: query.Pool.FeeGrowthGlobal0X128.Bytes(),
-		FeeGrowthGlobal_1X128: query.Pool.FeeGrowthGlobal1X128.Bytes(),
-		Tick:                  query.Pool.Tick,
-		Timestamp:             &types.Timestamp{Seconds: int64(minTime)},
+		Ticks:                   t,
+		Positions:               pos,
+		Liquidity:               query.Pool.Liquidity.Bytes(),
+		SqrtPrice:               query.Pool.SqrtPrice.Bytes(),
+		FeeGrowthGlobal_0X128:   query.Pool.FeeGrowthGlobal0X128.Bytes(),
+		FeeGrowthGlobal_1X128:   query.Pool.FeeGrowthGlobal1X128.Bytes(),
+		ProtocolFees_0:          query.Pool.ProtocolFees0.Bytes(),
+		ProtocolFees_1:          query.Pool.ProtocolFees1.Bytes(),
+		TotalValueLockedToken_0: query.Pool.TotalValueLockedToken0.Bytes(),
+		TotalValueLockedToken_1: query.Pool.TotalValueLockedToken1.Bytes(),
+		Tick:                    query.Pool.Tick,
+		FeeTier:                 query.Pool.FeeTier,
+		Timestamp:               &types.Timestamp{Seconds: int64(minTime)},
 	}
+	fmt.Println("TIMESTAMP", response.Snapshot.Timestamp)
 
 	response.Success = true
 	response.SeqNum = uint64(time.Now().UnixNano())

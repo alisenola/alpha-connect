@@ -13,8 +13,8 @@ import (
 func TestMarketData(t *testing.T) {
 	tests.PoolData(t, tests.MDTest{
 		IgnoreSizeResidue: true,
-		SecurityID:        6115381056087219401,
-		Symbol:            "0x000ea4a83acefdd62b1b43e9ccc281f442651520",
+		SecurityID:        3923210566889873515,
+		Symbol:            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 		SecurityType:      enum.SecurityType_CRYPTO_AMM,
 		Exchange:          constants.UNISWAPV3,
 		QuoteCurrency: xchangerModels.Asset{
@@ -23,13 +23,13 @@ func TestMarketData(t *testing.T) {
 			ID:     0,
 		},
 		BaseCurrency: xchangerModels.Asset{
-			Symbol: "BUSD",
-			Name:   "binance-usd",
-			ID:     2,
+			Symbol: "USDC",
+			Name:   "usdc",
+			ID:     1,
 		},
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.Trading,
-		MinPriceIncrement: 60,
+		MinPriceIncrement: 10,
 	})
 }

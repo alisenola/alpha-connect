@@ -73,8 +73,13 @@ message UPV3Snapshot {
     bytes sqrt_price = 4;
     bytes fee_growth_global_0x128 = 5;
     bytes fee_growth_global_1x128 = 6;
-    int32 tick = 7;
-    google.protobuf.Timestamp timestamp = 8;
+    bytes protocol_fees_0 = 7;
+    bytes protocol_fees_1 = 8;
+    bytes total_value_locked_token_0 = 9;
+    bytes total_value_locked_token_1 = 10;
+    int32 tick = 11;
+    int32 fee_tier = 12;
+    google.protobuf.Timestamp timestamp = 13;
 }
 
 message UPV3Update {

@@ -126,11 +126,6 @@ func PoolData(t *testing.T, test MDTest) {
 			Name:   "usdc",
 			ID:     1,
 		},
-		2: {
-			Symbol: "BUSD",
-			Name:   "binance-usd",
-			ID:     2,
-		},
 	})
 	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
 	defer clean()

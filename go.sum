@@ -704,6 +704,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20220113145739-d5cbccbdb165 h1:1Swc4+hOO
 gitlab.com/alphaticks/gorderbook v0.0.0-20220113145739-d5cbccbdb165/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220114101809-2c7d45d2c503 h1:bsbxGqFczMFfZvzXnQtqE93SJpDsThtMzturhJ5RmLI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220114101809-2c7d45d2c503/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220118122400-5b324787e70a h1:rgifLCU1K+YgBtnrarMstvaxwECi6qpL+Oj2XMnOyyo=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220118122400-5b324787e70a/go.mod h1:j3gktKAh0v+7NeCytk1pvyHA7Apta6C4UOCx1KDaqlk=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
@@ -725,6 +727,10 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220113142547-8512346543b8 h1:rgllWsbkiPi
 gitlab.com/alphaticks/xchanger v0.0.0-20220113142547-8512346543b8/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
 gitlab.com/alphaticks/xchanger v0.0.0-20220113175843-cf9e98d8130e h1:KMfvcsf0n9RHTCDEKg0To749WhNONIEJJHbKH1EEby4=
 gitlab.com/alphaticks/xchanger v0.0.0-20220113175843-cf9e98d8130e/go.mod h1:6gpN2BH31jMt/L0BT+7Me2THUQh3ThwsDkjoVhUTMv8=
+gitlab.com/alphaticks/xchanger v0.0.0-20220114181558-ffa1cee69a30 h1:7WA4/cCZn5yz+LGkgbpjugS6dO5DcqaLJWqWInk5RVQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20220114181558-ffa1cee69a30/go.mod h1:8bVzXnodl+N2kCuWS8jCVCtpmhdR5wX9DQxQd65Ks1Y=
+gitlab.com/alphaticks/xchanger v0.0.0-20220115213034-73d283a028e0 h1:NJP7dB2issq2cVpxMtzeSjG8M9RtPUTZlrBZFo1GfnM=
+gitlab.com/alphaticks/xchanger v0.0.0-20220115213034-73d283a028e0/go.mod h1:pSGzB5jI1Yaw/kSkzsWQeLsY1pa3r2v7434R6aMFhRg=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

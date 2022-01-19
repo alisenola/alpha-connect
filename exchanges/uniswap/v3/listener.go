@@ -27,7 +27,6 @@ type InstrumentData struct {
 	seqNum         uint64
 	lastUpdateTime uint64
 	lastHBTime     time.Time
-	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
 }
 
@@ -138,7 +137,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
-	req := context.Message().(*messages.UnipoolV3DataRequest)
 	if state.poolWs != nil {
 		_ = state.poolWs.Disconnect()
 	}
@@ -186,21 +184,22 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	unipoolV3 := gorderbook.NewUnipoolV3(
 		int32(state.security.TakerFee.Value),
 	)
+	fmt.Println("INITIALIZING")
 	unipoolV3.Initialize(big.NewInt(1).SetBytes(msg.Snapshot.SqrtPrice), msg.Snapshot.Tick)
+	fmt.Println("SYNCING")
 	unipoolV3.Sync(
 		msg.Snapshot.Ticks,
 		msg.Snapshot.Liquidity,
-		msg.Snapshot.ProtocolFees0,
-		msg.Snapshot.ProtocolFees1,
+		msg.Snapshot.ProtocolFees_0,
+		msg.Snapshot.ProtocolFees_1,
 		msg.Snapshot.FeeGrowthGlobal_0X128,
 		msg.Snapshot.FeeGrowthGlobal_1X128,
-		msg.Snapshot.Tvl0,
-		msg.Snapshot.Tvl1,
+		msg.Snapshot.TotalValueLockedToken_0,
+		msg.Snapshot.TotalValueLockedToken_1,
 		msg.Snapshot.FeeTier,
 		msg.Snapshot.Positions,
 	)
-	//TODO Call sync method on unipoolV3 in order to sync with msg.Snapshot
-	//TODO Make function in xchanger in order to compute all the transactions inside transactions.Transactions
+	//TODO Make function in listener_utils in order to compute all the transactions inside transactions.Transactions
 	//TODO Check for tokensOwed0 and tokensOwed1 from the position structure in uniswap contract in theGraph
 	sync := false
 	for !sync {
@@ -215,41 +214,15 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 			state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000)
 			sync = true
 		}
-
-		for _, t := range transactions.Transactions {
-			orderedT := t.OrderTransaction()
-			for _, oT := range orderedT.Transaction {
-				if m, ok := oT.(*uniswap.Mint); ok {
-					owner, err := big.NewInt(1).SetString(m.Owner[2:], 16)
-					if err != nil {
-						continue
-					}
-					unipoolV3.Mint(owner.Bytes(), m.TickLower, m.TickUpper, m.Amount, m.Amount0, m.Amount1)
-				}
-				if b, ok := oT.(*uniswap.Burn); ok {
-					owner, err := big.NewInt(1).SetString(b.Owner[2:], 16)
-					if err != nil {
-						continue
-					}
-					unipoolV3.Burn(owner.Bytes(), b.TickLower, b.TickUpper, b.Amount, b.Amount0, b.Amount1)
-				}
-				if s, ok := oT.(*uniswap.Swap); ok {
-					unipoolV3.Swap(s.Amount0, s.Amount1)
-				}
-				if c, ok := oT.(*uniswap.Collect); ok {
-					owner, err := big.NewInt(1).SetString(c.Owner[2:], 16)
-					if err != nil {
-						continue
-					}
-					unipoolV3.Collect(owner.Bytes(), c.TickLower, c.TickUpper, c.Amount0, c.Amount1)
-				}
-				if f, ok := oT.(*uniswap.Flash); ok {
-					unipoolV3.Flash(f.Amount0, f.Amount1)
-				}
-			}
-		}
+		fmt.Println("PROCESSING", transactions.Transactions, len(transactions.Transactions))
+		fmt.Printf("INSIDE %+v \n", transactions.Transactions[999])
+		processTransactions(transactions, unipoolV3)
 	}
-	fmt.Println(req)
+	go func(ws *uniswap.Websocket, actor *actor.PID) {
+		for ws.ReadMessage() {
+			context.Send(actor, ws.Msg)
+		}
+	}(state.poolWs, context.Self())
 	return nil
 }
 
