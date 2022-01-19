@@ -83,10 +83,13 @@ message UPV3Snapshot {
 }
 
 message UPV3Update {
-    gorderbook.models.UPV3Mint mint = 1;
-    gorderbook.models.UPV3Burn burn = 2;
-    gorderbook.models.UPV3Swap swap = 3;
-    google.protobuf.Timestamp timestamp = 4;
+    gorderbook.models.UPV3Initialize initialize = 1;
+    gorderbook.models.UPV3Mint mint = 2;
+    gorderbook.models.UPV3Burn burn = 3;
+    gorderbook.models.UPV3Swap swap = 4;
+    gorderbook.models.UPV3Collect collect = 5;
+    gorderbook.models.UPV3Flash flash = 6;
+    google.protobuf.Timestamp timestamp = 7;
 }
 
 message Trade {
