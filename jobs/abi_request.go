@@ -2,12 +2,10 @@ package jobs
 
 import (
 	goContext "context"
-
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"gitlab.com/alphaticks/xchanger/exchanges/uniswap/v3"
 )
 
 // An api query actor execute a query and fits the result back into a given types
@@ -16,27 +14,16 @@ import (
 // The query actor doesn't panic when the request was successful but the server
 // returned an error (client or server error)
 
-type PerformABIRequest struct {
-	Address common.Address
-	Start   uint64
-	End     uint64
+type PerformLogsQueryRequest struct {
+	Query ethereum.FilterQuery
 }
 
 // We allow this query to fail without crashing
 // because the failure is outside the system
 // We are not responsible for the failure
-type PerformABIResponse struct {
-	Error    error
-	Response *ABIResponse
-}
-
-type ABIResponse struct {
-	Initialize *uniswap.UniswapInitializeIterator
-	Mints      *uniswap.UniswapMintIterator
-	Burns      *uniswap.UniswapBurnIterator
-	Swaps      *uniswap.UniswapSwapIterator
-	Collects   *uniswap.UniswapCollectIterator
-	Flashes    *uniswap.UniswapFlashIterator
+type PerformLogsQueryResponse struct {
+	Error error
+	Logs  []types.Log
 }
 
 type ABIQuery struct {
@@ -65,9 +52,9 @@ func (q *ABIQuery) Receive(context actor.Context) {
 			// Attention, no panic in restarting or infinite loop
 		}
 
-	case *PerformABIRequest:
+	case *PerformLogsQueryRequest:
 		//Set API credentials
-		err := q.PerformABIRequest(context)
+		err := q.PerformLogsQueryRequest(context)
 		if err != nil {
 			panic(err)
 		}
@@ -82,57 +69,15 @@ func (q *ABIQuery) Clean(context actor.Context) error {
 	return nil
 }
 
-func (q *ABIQuery) PerformABIRequest(context actor.Context) error {
-	msg := context.Message().(*PerformABIRequest)
+func (q *ABIQuery) PerformLogsQueryRequest(context actor.Context) error {
+	msg := context.Message().(*PerformLogsQueryRequest)
 	go func(sender *actor.PID) {
-		queryResponse := PerformABIResponse{
-			Response: &ABIResponse{},
-		}
-		instance, err := uniswap.NewUniswap(msg.Address, q.client)
+		queryResponse := PerformLogsQueryResponse{}
+		logs, err := q.client.FilterLogs(goContext.Background(), msg.Query)
 		if err != nil {
 			queryResponse.Error = err
 		} else {
-			iit, err := instance.FilterInitialize(&bind.FilterOpts{
-				Start:   msg.Start,
-				End:     &msg.End,
-				Context: goContext.Background(),
-			})
-			if err == nil {
-				queryResponse.Response.Initialize = iit
-			}
-			mit, err := instance.FilterMint(&bind.FilterOpts{
-				Start:   msg.Start,
-				End:     &msg.End,
-				Context: goContext.Background(),
-			}, nil, nil, nil)
-			if err == nil {
-				queryResponse.Response.Mints = mit
-			}
-			bit, err := instance.FilterBurn(&bind.FilterOpts{
-				Start:   msg.Start,
-				End:     &msg.End,
-				Context: goContext.Background(),
-			}, nil, nil, nil)
-			if err == nil {
-				queryResponse.Response.Burns = bit
-			}
-			cit, err := instance.FilterCollect(&bind.FilterOpts{
-				Start:   msg.Start,
-				End:     &msg.End,
-				Context: goContext.Background(),
-			}, nil, nil, nil)
-			if err == nil {
-				queryResponse.Response.Collects = cit
-			}
-			fit, err := instance.FilterFlash(&bind.FilterOpts{
-				Start:   msg.Start,
-				End:     &msg.End,
-				Context: goContext.Background(),
-			}, nil, nil)
-			if err == nil {
-				queryResponse.Response.Flashes = fit
-			}
-
+			queryResponse.Logs = logs
 		}
 		context.Send(sender, &queryResponse)
 	}(context.Sender())
