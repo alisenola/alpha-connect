@@ -30,6 +30,7 @@ type Executor interface {
 	OnOrderCancelRequest(context actor.Context) error
 	OnOrderMassCancelRequest(context actor.Context) error
 	OnUnipoolV3DataRequest(context actor.Context) error
+	OnHistoricalUnipoolV3EventRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -161,6 +162,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 
 	case *messages.UnipoolV3DataRequest:
 		if err := state.OnUnipoolV3DataRequest(context); err != nil {
+			state.GetLogger().Error("error processing UnipoolV3DataRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalUnipoolV3EventRequest:
+		if err := state.OnHistoricalUnipoolV3EventRequest(context); err != nil {
 			state.GetLogger().Error("error processing UnipoolV3DataRequest", log.Error(err))
 			panic(err)
 		}
@@ -357,6 +364,17 @@ func (state *BaseExecutor) OnOrderMassCancelRequest(context actor.Context) error
 func (state *BaseExecutor) OnUnipoolV3DataRequest(context actor.Context) error {
 	req := context.Message().(*messages.UnipoolV3DataRequest)
 	context.Respond(&messages.UnipoolV3DataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalUnipoolV3EventRequest)
+	context.Respond(&messages.HistoricalUnipoolV3EventResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,

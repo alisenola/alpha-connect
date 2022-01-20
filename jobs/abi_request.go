@@ -2,6 +2,7 @@ package jobs
 
 import (
 	goContext "context"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"

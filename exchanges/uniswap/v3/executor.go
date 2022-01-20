@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"net/http"
 	"reflect"
 	"sort"
 	"time"
@@ -34,17 +35,19 @@ type QueryRunner struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	securities   []*models.Security
-	queryRunners []*QueryRunner
-	dialerPool   *xutils.DialerPool
-	logger       *log.Logger
+	securities     []*models.Security
+	queryRunnerETH *QueryRunner
+	queryRunners   []*QueryRunner
+	dialerPool     *xutils.DialerPool
+	logger         *log.Logger
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		queryRunners: nil,
-		logger:       nil,
-		dialerPool:   dialerPool,
+		queryRunnerETH: nil,
+		queryRunners:   nil,
+		logger:         nil,
+		dialerPool:     dialerPool,
 	}
 }
 
@@ -71,7 +74,25 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	ETH_CLIENT_URL := "wss://eth-mainnet.alchemyapi.io/v2/hdodrT8DMC-Ow9rd6qIOcjpZgr5_Ixdg"
+	dialers := state.dialerPool.GetDialers()
+	for _, dialer := range dialers {
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+				DialContext:         dialer.DialContext,
+			},
+			Timeout: 10 * time.Second,
+		}
+		uniClient := graphql.NewClient(uniswap.GRAPHQL_URL, httpClient)
+		props := actor.PropsFromProducer(func() actor.Actor {
+			return jobs.NewGraphQuery(uniClient)
+		})
+		state.queryRunners = append(state.queryRunners, &QueryRunner{
+			pid: context.Spawn(props),
+		})
+	}
+
 	client, err := ethclient.Dial(ETH_CLIENT_URL)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
@@ -79,9 +100,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return jobs.NewABIQuery(client)
 	})
-	state.queryRunners = append(state.queryRunners, &QueryRunner{
+	state.queryRunnerETH = &QueryRunner{
 		pid: context.Spawn(props),
-	})
+	}
 	return state.UpdateSecurityList(context)
 }
 
@@ -184,7 +205,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
-	fmt.Println("EXECUTOR HISTORICAL DATA REQUEST")
 	msg := context.Message().(*messages.HistoricalUnipoolV3EventRequest)
 	response := &messages.HistoricalUnipoolV3EventResponse{
 		RequestID:  msg.RequestID,
@@ -231,10 +251,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 		Topics:    topics,
 	}
 
-	qr := state.getQueryRunner()
-	if qr == nil {
-		return fmt.Errorf("rate limited")
-	}
+	qr := state.queryRunnerETH
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 20*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
@@ -251,13 +268,12 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 			context.Respond(response)
 			return
 		}
-		//TODO Order the logs based on block and txIndex
 		logs := queryResponse.Logs
 		for _, l := range logs {
 			switch l.Topics[0] {
 			case uabi.Events["Initialize"].ID:
 				event := uniswap.UniswapInitialize{}
-				if err := uabi.UnpackIntoInterface(&event, "Initialize", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Initialize", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -268,11 +284,12 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 						Tick:         int32(event.Tick.Int64()),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Mint"].ID:
 				event := uniswap.UniswapMint{}
-				if err := uabi.UnpackIntoInterface(&event, "Mint", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Mint", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -287,11 +304,12 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Burns"].ID:
 				event := uniswap.UniswapBurn{}
-				if err := uabi.UnpackIntoInterface(&event, "Burn", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Burn", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -306,11 +324,12 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Swap"].ID:
 				event := uniswap.UniswapSwap{}
-				if err := uabi.UnpackIntoInterface(&event, "Swap", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Swap", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -323,11 +342,12 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:      event.Amount0.Bytes(),
 						Amount1:      event.Amount1.Bytes(),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Collect"].ID:
 				event := uniswap.UniswapCollect{}
-				if err := uabi.UnpackIntoInterface(&event, "Collect", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Collect", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -335,17 +355,18 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				}
 				update := &models.UPV3Update{
 					Collect: &gorderbook.UPV3Collect{
-						Owner:            event.Owner.Bytes(),
+						Owner:            event.Recipient[:],
 						TickLower:        int32(event.TickLower.Int64()),
 						TickUpper:        int32(event.TickUpper.Int64()),
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Flash"].ID:
 				event := uniswap.UniswapFlash{}
-				if err := uabi.UnpackIntoInterface(&event, "Flash", l.Data); err != nil {
+				if err := uniswap.UnpackLog(uabi, &event, "Flash", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -356,6 +377,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0: event.Amount0.Bytes(),
 						Amount1: event.Amount1.Bytes(),
 					},
+					Block: event.Raw.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			}

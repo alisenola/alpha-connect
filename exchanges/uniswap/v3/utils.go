@@ -7,6 +7,10 @@ import (
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 )
 
+const (
+	ETH_CLIENT_URL = "wss://eth-mainnet.alchemyapi.io/v2/hdodrT8DMC-Ow9rd6qIOcjpZgr5_Ixdg"
+)
+
 func processTransactions(transactions *uniswap.Transactions, unipoolV3 *gorderbook.UnipoolV3) {
 	for _, t := range transactions.Transactions {
 		orderedT := t.OrderTransaction()

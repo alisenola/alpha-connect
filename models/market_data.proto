@@ -89,7 +89,7 @@ message UPV3Update {
     gorderbook.models.UPV3Swap swap = 4;
     gorderbook.models.UPV3Collect collect = 5;
     gorderbook.models.UPV3Flash flash = 6;
-    google.protobuf.Timestamp timestamp = 7;
+    uint64 block = 7;
 }
 
 message Trade {
