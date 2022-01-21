@@ -161,7 +161,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	}
 	uabi, err := uniswap.UniswapMetaData.GetAbi()
 	if err != nil {
-		fmt.Errorf("error getting contract abi %v", err)
+		return fmt.Errorf("error getting contract abi %v", err)
 	}
 	query := append([][]interface{}{{
 		uabi.Events["Mint"].ID,
@@ -172,7 +172,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	}})
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
-		fmt.Errorf("error getting topics %v", err)
+		return fmt.Errorf("error getting topics %v", err)
 	}
 	fQuery := ethereum.FilterQuery{
 		Addresses: []common.Address{common.HexToAddress(symbol)},
@@ -204,7 +204,7 @@ func (state *Listener) onLog(context actor.Context) error {
 	msg := context.Message().(*types.Log)
 	uabi, err := uniswap.UniswapMetaData.GetAbi()
 	if err != nil {
-		fmt.Errorf("error getting contract abi %v", err)
+		return fmt.Errorf("error getting contract abi %v", err)
 	}
 	updt := &models.UPV3Update{}
 	switch msg.Topics[0] {
