@@ -1357,5 +1357,10 @@
     "symbol": "GHST",
     "name": "aavegotchi",
     "ID": 272
+  },
+  "273": {
+    "symbol": "MINA",
+    "name": "mina",
+    "ID": 273
   }
 }
