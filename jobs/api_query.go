@@ -12,7 +12,7 @@ import (
 // The query actor doesn't panic when the request was successful but the server
 // returned an error (client or server error)
 
-type PerformQueryRequest struct {
+type PerformHTTPQueryRequest struct {
 	Request *http.Request
 }
 
@@ -50,9 +50,9 @@ func (q *APIQuery) Receive(context actor.Context) {
 			// Attention, no panic in restarting or infinite loop
 		}
 
-	case *PerformQueryRequest:
+	case *PerformHTTPQueryRequest:
 		//Set API credentials
-		err := q.PerformQueryRequest(context)
+		err := q.PerformHTTPQueryRequest(context)
 		if err != nil {
 			panic(err)
 		}
@@ -67,8 +67,8 @@ func (q *APIQuery) Clean(context actor.Context) error {
 	return nil
 }
 
-func (q *APIQuery) PerformQueryRequest(context actor.Context) error {
-	msg := context.Message().(*PerformQueryRequest)
+func (q *APIQuery) PerformHTTPQueryRequest(context actor.Context) error {
+	msg := context.Message().(*PerformHTTPQueryRequest)
 	go func(sender *actor.PID) {
 		queryResponse := PerformQueryResponse{}
 		resp, err := q.client.Do(msg.Request)

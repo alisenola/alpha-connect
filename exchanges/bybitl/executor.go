@@ -112,7 +112,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
 		return fmt.Errorf("http client error: %v", err)
@@ -298,7 +298,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {

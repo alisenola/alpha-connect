@@ -145,7 +145,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -359,7 +359,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	qr.rateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -540,7 +540,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	}
 
 	qr.rateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -649,7 +649,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	}
 
 	qr.rateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -835,7 +835,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	state.orderRateLimit.Request(1)
 	qr.rateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
@@ -921,7 +921,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	state.orderRateLimit.Request(1)
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
@@ -997,7 +997,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	qr.rateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))

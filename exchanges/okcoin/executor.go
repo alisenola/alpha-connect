@@ -85,7 +85,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 	qr := state.queryRunner
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {

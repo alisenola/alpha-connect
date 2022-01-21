@@ -29,6 +29,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okcoin"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okex"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okexp"
+	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/upbit"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -136,6 +137,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return okexp.NewListener(security, dialerPool) }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewListener(security, dialerPool) }
+	case constants.UNISWAPV3.ID:
+		return func() actor.Actor { return v3.NewListener(security, dialerPool) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }
@@ -201,6 +204,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 		return func() actor.Actor { return okexp.NewExecutor() }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewExecutor(dialerPool) }
+	case constants.UNISWAPV3.ID:
+		return func() actor.Actor { return v3.NewExecutor(dialerPool) }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }

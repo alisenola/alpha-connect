@@ -126,7 +126,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	request, weight, err := fbinance.GetExchangeInfo()
 
-	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -360,7 +360,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 
 			qr.globalRateLimit.Request(weight)
 
-			res, err := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: req}, 10*time.Second).Result()
+			res, err := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 10*time.Second).Result()
 			if err != nil {
 				state.logger.Warn("http client error", log.Error(err))
 				response.RejectionReason = messages.HTTPError
@@ -455,7 +455,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 	qr.globalRateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -592,7 +592,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -765,7 +765,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -928,7 +928,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -1028,7 +1028,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -1131,7 +1131,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -1262,7 +1262,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	state.secondOrderRateLimit.Request(1)
 	state.minuteOrderRateLimit.Request(1)
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
@@ -1360,7 +1360,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
@@ -1476,7 +1476,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))

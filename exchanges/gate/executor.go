@@ -35,8 +35,8 @@ type Executor struct {
 	extypes.BaseExecutor
 	securities   []*models.Security
 	queryRunners []*QueryRunner
-	logger       *log.Logger
 	dialerPool   *xutils.DialerPool
+	logger       *log.Logger
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
@@ -89,8 +89,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return jobs.NewAPIQuery(client)
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
-			pid:       context.Spawn(props),
-			rateLimit: exchanges.NewRateLimit(100, time.Minute),
+			pid: context.Spawn(props),
 		})
 	}
 	return state.UpdateSecurityList(context)
@@ -112,7 +111,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return fmt.Errorf("rate limited")
 	}
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	qr.rateLimit.Request(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -250,7 +251,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	qr.rateLimit.Request(w)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("http client error", log.Error(err))

@@ -85,7 +85,7 @@ func (state *Executor) GetInstrumentsRequest(context actor.Context) error {
 	}
 	// TODO Rate limit
 
-	future := context.RequestFuture(state.queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res types{}, err error) {
 		if err != nil {

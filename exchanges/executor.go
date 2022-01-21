@@ -4,6 +4,9 @@ import (
 	goContext "context"
 	"errors"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
@@ -16,8 +19,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"reflect"
-	"time"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
@@ -98,6 +99,12 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.UnipoolV3DataRequest:
 		if err := state.OnUnipoolV3DataRequest(context); err != nil {
 			state.logger.Error("error processing OnUnipoolV3DataRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalUnipoolV3DataRequest:
+		if err := state.OnHistoricalUnipoolV3EventRequest(context); err != nil {
+			state.logger.Error("error processing OnHistoricalUnipoolV3EventRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -262,7 +269,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Subscribe: true,
 	}
 	for _, pid := range state.executors {
-		fut := context.RequestFuture(pid, request, 5*time.Second)
+		fut := context.RequestFuture(pid, request, 20*time.Second)
 		futures = append(futures, fut)
 	}
 
@@ -429,6 +436,30 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 		state.instruments[sec.SecurityID] = pid
 		context.Forward(pid)
 	}
+
+	return nil
+}
+
+func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
+	request := context.Message().(*messages.HistoricalUnipoolV3DataRequest)
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.HistoricalUnipoolV3DataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	exchange, ok := state.executors[sec.Exchange.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalUnipoolV3DataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownExchange,
+		})
+	}
+	context.Forward(exchange)
 
 	return nil
 }

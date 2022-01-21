@@ -47,7 +47,6 @@ type QueryRunner struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	client               *http.Client
 	securities           map[uint64]*models.Security
 	symbolToSec          map[string]*models.Security
 	queryRunners         []*QueryRunner
@@ -59,7 +58,6 @@ type Executor struct {
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		client:       nil,
 		queryRunners: nil,
 		dialerPool:   dialerPool,
 	}
@@ -96,14 +94,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
-	}
-
 	dialers := state.dialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
@@ -126,7 +116,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	request, weight, err := binance.GetExchangeInfo()
 	// Launch an APIQuery actor with the given request and target
 
-	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
 	if err != nil {
 		return err
@@ -183,7 +173,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	qr.globalRateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	res, err := future.Result()
 	if err != nil {
@@ -341,7 +331,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		return nil
 	}
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -489,7 +479,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -605,7 +595,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -741,7 +731,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	state.secondOrderRateLimit.Request(1)
 	state.dayOrderRateLimit.Request(1)
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
@@ -834,7 +824,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	qr.globalRateLimit.Request(weight)
-	future := context.RequestFuture(qr.pid, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))

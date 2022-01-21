@@ -274,7 +274,7 @@ func (state *PublicExecutor) OnMarketDataRequest(context actor.Context) error {
 		state.rateLimit.Request(weight)
 		queryRunner := state.queryRunners[state.qrIdx]
 		state.qrIdx = (state.qrIdx + 1) % len(state.queryRunners)
-		future := context.RequestFuture(queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+		future := context.RequestFuture(queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
@@ -338,7 +338,7 @@ func (state *PublicExecutor) OnMarketDataRequest(context actor.Context) error {
 		state.rateLimit.Request(weight)
 		queryRunner := state.queryRunners[state.qrIdx]
 		state.qrIdx = (state.qrIdx + 1) % len(state.queryRunners)
-		future := context.RequestFuture(queryRunner, &jobs.PerformQueryRequest{Request: request}, 10*time.Second)
+		future := context.RequestFuture(queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
 		context.AwaitFuture(future, func(res interface{}, err error) {
 			if err != nil {
