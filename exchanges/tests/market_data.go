@@ -32,7 +32,7 @@ type MDTest struct {
 	Status             models.InstrumentStatus
 }
 
-func checkSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
+func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 	// Test
 	if sec == nil {
 		t.Fatalf("security not found")
@@ -98,7 +98,7 @@ func MarketData(t *testing.T, test MDTest) {
 		}
 	}
 
-	checkSecurityDefinition(t, sec, test)
+	CheckSecurityDefinition(t, sec, test)
 	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewMDCheckerProducer(sec, test)))
 	defer as.Root.PoisonFuture(obChecker)
 
@@ -181,7 +181,7 @@ func PoolData(t *testing.T, test MDTest) {
 	if !updates.Success {
 		t.Fatal(updates.RejectionReason.String())
 	}
-	checkSecurityDefinition(t, sec, test)
+	CheckSecurityDefinition(t, sec, test)
 	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewPoolV3CheckerProducer(sec, test)))
 	defer as.Root.PoisonFuture(obChecker)
 
