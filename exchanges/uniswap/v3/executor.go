@@ -2,6 +2,7 @@ package v3
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/xchanger/eth"
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -273,7 +274,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 			switch l.Topics[0] {
 			case uabi.Events["Initialize"].ID:
 				event := uniswap.UniswapInitialize{}
-				if err := uniswap.UnpackLog(uabi, &event, "Initialize", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Initialize", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -289,7 +290,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				response.Events = append(response.Events, update)
 			case uabi.Events["Mint"].ID:
 				event := uniswap.UniswapMint{}
-				if err := uniswap.UnpackLog(uabi, &event, "Mint", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Mint", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -309,7 +310,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				response.Events = append(response.Events, update)
 			case uabi.Events["Burns"].ID:
 				event := uniswap.UniswapBurn{}
-				if err := uniswap.UnpackLog(uabi, &event, "Burn", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Burn", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -329,7 +330,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				response.Events = append(response.Events, update)
 			case uabi.Events["Swap"].ID:
 				event := uniswap.UniswapSwap{}
-				if err := uniswap.UnpackLog(uabi, &event, "Swap", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Swap", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -347,7 +348,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				response.Events = append(response.Events, update)
 			case uabi.Events["Collect"].ID:
 				event := uniswap.UniswapCollect{}
-				if err := uniswap.UnpackLog(uabi, &event, "Collect", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Collect", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
@@ -366,7 +367,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 				response.Events = append(response.Events, update)
 			case uabi.Events["Flash"].ID:
 				event := uniswap.UniswapFlash{}
-				if err := uniswap.UnpackLog(uabi, &event, "Flash", l); err != nil {
+				if err := eth.UnpackLog(uabi, &event, "Flash", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
 					response.RejectionReason = messages.EthRPCError
 					context.Respond(response)
