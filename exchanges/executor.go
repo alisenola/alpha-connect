@@ -102,7 +102,7 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.HistoricalUnipoolV3EventRequest:
+	case *messages.HistoricalUnipoolV3DataRequest:
 		if err := state.OnHistoricalUnipoolV3EventRequest(context); err != nil {
 			state.logger.Error("error processing OnHistoricalUnipoolV3EventRequest", log.Error(err))
 			panic(err)
@@ -441,10 +441,10 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
-	request := context.Message().(*messages.HistoricalUnipoolV3EventRequest)
+	request := context.Message().(*messages.HistoricalUnipoolV3DataRequest)
 	sec, rej := state.getSecurity(request.Instrument)
 	if rej != nil {
-		context.Respond(&messages.HistoricalUnipoolV3EventResponse{
+		context.Respond(&messages.HistoricalUnipoolV3DataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
 			RejectionReason: *rej,
@@ -453,7 +453,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 	}
 	exchange, ok := state.executors[sec.Exchange.ID]
 	if !ok {
-		context.Respond(&messages.HistoricalUnipoolV3EventResponse{
+		context.Respond(&messages.HistoricalUnipoolV3DataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
 			RejectionReason: messages.UnknownExchange,

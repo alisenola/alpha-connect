@@ -340,7 +340,7 @@ func (state *PoolV3Checker) Initialize(context actor.Context) error {
 	if !ok {
 		return fmt.Errorf("was expecting market data snapshot, got %s", reflect.TypeOf(res).String())
 	}
-
+	fmt.Printf("GOT THE FOLLOWING UPDATE %+v", response.Update)
 	state.OBUpdates += 1
 	feeTier := int32(state.security.TakerFee.Value * 1e6)
 	state.pool = gorderbook.NewUnipoolV3(feeTier)

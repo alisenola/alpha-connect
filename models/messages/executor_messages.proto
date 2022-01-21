@@ -117,14 +117,14 @@ message HistoricalLiquidationsResponse {
     RejectionReason rejection_reason = 5;
 }
 
-message HistoricalUnipoolV3EventRequest {
+message HistoricalUnipoolV3DataRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
     uint64 start = 3;
     uint64 end = 4;
 }
 
-message HistoricalUnipoolV3EventResponse {
+message HistoricalUnipoolV3DataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     repeated models.UPV3Update events = 3;  
@@ -191,7 +191,7 @@ message UnipoolV3DataRequest {
 message UnipoolV3DataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    models.UPV3Snapshot snapshot = 3;
+    repeated models.UPV3Update update = 3;
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;

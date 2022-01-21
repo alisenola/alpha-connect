@@ -1,20 +1,23 @@
 package v3
 
 import (
+	goContext "context"
 	"fmt"
-	"math/big"
 	"reflect"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/go-graphql-client"
-	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/xchanger/constants"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/eth"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 )
@@ -23,22 +26,18 @@ type checkSockets struct{}
 type postAggTrade struct{}
 
 type InstrumentData struct {
-	orderBook      []*gorderbook.UnipoolV3
-	seqNum         uint64
-	lastUpdateTime uint64
-	lastHBTime     time.Time
-	lastAggTradeTs uint64
+	events          []*models.UPV3Update
+	seqNum          uint64
+	lastBlockUpdate uint64
 }
 
 type Listener struct {
 	extypes.Listener
-	poolWs         *uniswap.Websocket
+	iterator       *eth.LogIterator
 	security       *models.Security
 	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
-	lastPingTime   time.Time
-	uniExectutor   *actor.PID
 	socketTicker   *time.Ticker
 }
 
@@ -50,7 +49,7 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		poolWs:         nil,
+		iterator:       nil,
 		security:       security,
 		dialerPool:     dialerPool,
 		instrumentData: nil,
@@ -91,9 +90,9 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *checkSockets:
-		if err := state.checkSockets(context); err != nil {
-			state.logger.Error("error checking socket", log.Error(err))
+	case *types.Log:
+		if err := state.onLog(context); err != nil {
+			state.logger.Error("error processing log", log.Error(err))
 			panic(err)
 		}
 	}
@@ -108,15 +107,14 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.lastPingTime = time.Now()
-	state.uniExectutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.UNISWAPV3.Name+"_executor")
-
 	state.instrumentData = &InstrumentData{
-		orderBook:      nil,
-		seqNum:         uint64(time.Now().UnixNano()),
-		lastUpdateTime: 0,
-		lastHBTime:     time.Now(),
-		lastAggTradeTs: 0,
+		events:          []*models.UPV3Update{},
+		seqNum:          uint64(time.Now().UnixNano()),
+		lastBlockUpdate: 0,
+	}
+
+	if err := state.subscribeLogs(context); err != nil {
+		return fmt.Errorf("error subscribing to logs %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -137,92 +135,59 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
-	if state.poolWs != nil {
-		_ = state.poolWs.Disconnect()
+	msg := context.Message().(*messages.UnipoolV3DataRequest)
+	resp := &messages.UnipoolV3DataResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Update:     state.instrumentData.events,
+		Success:    true,
+		SeqNum:     state.instrumentData.seqNum,
 	}
-	ws := uniswap.NewWebsocket()
 
-	ws.NewSubscriptionClient()
-	if err := ws.Connect(); err != nil {
-		return fmt.Errorf("error connecting to websocket: %v", err)
+	context.Respond(resp)
+	return nil
+}
+
+func (state *Listener) subscribeLogs(context actor.Context) error {
+	if state.iterator != nil {
+		state.iterator.Close()
 	}
 
-	fmt.Println("LISTENER UNIPOOL DATA REQUEST")
-	time.Sleep(10 * time.Second)
-	future := context.RequestFuture(
-		state.uniExectutor,
-		&messages.UnipoolV3DataRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			Subscribe: false,
-			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
-				Exchange:   state.security.Exchange,
-			},
-		},
-		60*time.Second)
-	res, err := future.Result()
+	symbol := state.security.Symbol
+
+	client, err := ethclient.Dial(ETH_CLIENT_URL)
 	if err != nil {
-		return fmt.Errorf("error getting pool snapshot %v", err)
+		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
-	msg, ok := res.(*messages.UnipoolV3DataResponse)
-	if !ok {
-		return fmt.Errorf("was expecting UnipoolV3DataResponse, got %s", reflect.TypeOf(msg).String())
+	uabi, err := uniswap.UniswapMetaData.GetAbi()
+	if err != nil {
+		fmt.Errorf("error getting contract abi %v", err)
 	}
-	if !msg.Success {
-		return fmt.Errorf("error fetching the pool snapshot %s", msg.RejectionReason.String())
+	query := append([][]interface{}{{
+		uabi.Events["Mint"].ID,
+		uabi.Events["Swap"].ID,
+		uabi.Events["Burn"].ID,
+		uabi.Events["Collect"].ID,
+		uabi.Events["Flash"].ID,
+	}})
+	topics, err := abi.MakeTopics(query...)
+	if err != nil {
+		fmt.Errorf("error getting topics %v", err)
 	}
-	if msg.Snapshot == nil {
-		return fmt.Errorf("pool has empty snapshot")
+	fQuery := ethereum.FilterQuery{
+		Addresses: []common.Address{common.HexToAddress(symbol)},
+		Topics:    topics,
 	}
+	it := eth.NewLogIterator(uabi)
+	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	it.WatchLogs(client, ctx, fQuery)
 
-	if _, err := ws.SubscribeTransactions(graphql.Int(msg.Snapshot.Timestamp.Seconds), graphql.ID(state.security.Symbol)); err != nil {
-		return fmt.Errorf("error subscribing to the pool transactions: %v", err)
-	}
-	state.poolWs = ws
+	go func(it *eth.LogIterator, pid *actor.PID) {
+		for it.Next() {
+			context.Send(pid, it.Log)
+		}
+	}(it, context.Self())
 
-	unipoolV3 := gorderbook.NewUnipoolV3(
-		int32(state.security.TakerFee.Value),
-	)
-	fmt.Println("INITIALIZING")
-	unipoolV3.Initialize(big.NewInt(1).SetBytes(msg.Snapshot.SqrtPrice), msg.Snapshot.Tick)
-	fmt.Println("SYNCING")
-	unipoolV3.Sync(
-		msg.Snapshot.Ticks,
-		msg.Snapshot.Liquidity,
-		msg.Snapshot.ProtocolFees_0,
-		msg.Snapshot.ProtocolFees_1,
-		msg.Snapshot.FeeGrowthGlobal_0X128,
-		msg.Snapshot.FeeGrowthGlobal_1X128,
-		msg.Snapshot.TotalValueLockedToken_0,
-		msg.Snapshot.TotalValueLockedToken_1,
-		msg.Snapshot.FeeTier,
-		msg.Snapshot.Positions,
-	)
-	//TODO Make function in listener_utils in order to compute all the transactions inside transactions.Transactions
-	//TODO Check for tokensOwed0 and tokensOwed1 from the position structure in uniswap contract in theGraph
-	sync := false
-	for !sync {
-		if !state.poolWs.ReadMessage() {
-			return fmt.Errorf("error reading the message %v", err)
-		}
-		transactions, ok := state.poolWs.Msg.Message.(*uniswap.Transactions)
-		if !ok {
-			return fmt.Errorf("incorrect message type %v", err)
-		}
-		if len(transactions.Transactions) == 0 {
-			state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000)
-			sync = true
-		}
-		fmt.Println("PROCESSING", transactions.Transactions, len(transactions.Transactions))
-		fmt.Printf("INSIDE %+v \n", transactions.Transactions[999])
-		processTransactions(transactions, unipoolV3)
-	}
-	go func(ws *uniswap.Websocket, actor *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(actor, ws.Msg)
-		}
-	}(state.poolWs, context.Self())
 	return nil
 }
 
@@ -235,7 +200,100 @@ func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) checkSockets(context actor.Context) error {
+func (state *Listener) onLog(context actor.Context) error {
+	msg := context.Message().(*types.Log)
+	uabi, err := uniswap.UniswapMetaData.GetAbi()
+	if err != nil {
+		fmt.Errorf("error getting contract abi %v", err)
+	}
+	updt := &models.UPV3Update{}
+	switch msg.Topics[0] {
+	case uabi.Events["Mint"].ID:
+		event := new(uniswap.UniswapMint)
+		if err := eth.UnpackLog(uabi, event, "Mint", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Mint: &gorderbook.UPV3Mint{
+				Owner:     event.Owner[:],
+				TickLower: int32(event.TickLower.Int64()),
+				TickUpper: int32(event.TickUpper.Int64()),
+				Amount:    event.Amount.Bytes(),
+				Amount0:   event.Amount0.Bytes(),
+				Amount1:   event.Amount1.Bytes(),
+			},
+			Block: event.Raw.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["Burn"].ID:
+		event := new(uniswap.UniswapBurn)
+		if err := eth.UnpackLog(uabi, event, "Burn", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Burn: &gorderbook.UPV3Burn{
+				Owner:     event.Owner[:],
+				TickLower: int32(event.TickLower.Int64()),
+				TickUpper: int32(event.TickUpper.Int64()),
+				Amount:    event.Amount.Bytes(),
+				Amount0:   event.Amount0.Bytes(),
+				Amount1:   event.Amount1.Bytes(),
+			},
+			Block: event.Raw.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["Swap"].ID:
+		event := new(uniswap.UniswapSwap)
+		if err := eth.UnpackLog(uabi, event, "Swap", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Swap: &gorderbook.UPV3Swap{
+				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
+				Tick:         int32(event.Tick.Int64()),
+				Amount0:      event.Amount0.Bytes(),
+				Amount1:      event.Amount1.Bytes(),
+			},
+			Block: event.Raw.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["Collect"].ID:
+		event := new(uniswap.UniswapCollect)
+		if err := eth.UnpackLog(uabi, event, "Collect", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Collect: &gorderbook.UPV3Collect{
+				Owner:            event.Recipient[:],
+				TickLower:        int32(event.TickLower.Int64()),
+				TickUpper:        int32(event.TickUpper.Int64()),
+				AmountRequested0: event.Amount0.Bytes(),
+				AmountRequested1: event.Amount1.Bytes(),
+			},
+			Block: event.Raw.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["Flash"].ID:
+		event := new(uniswap.UniswapFlash)
+		if err := eth.UnpackLog(uabi, event, "Flash", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Flash: &gorderbook.UPV3Flash{
+				Amount0: event.Amount0.Bytes(),
+				Amount1: event.Amount1.Bytes(),
+			},
+			Block: event.Raw.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	}
+
+	state.instrumentData.lastBlockUpdate = msg.BlockNumber
+	context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
+		SeqNum: state.instrumentData.seqNum + 1,
+		Update: updt,
+	})
+	state.instrumentData.seqNum += 1
 
 	return nil
 }

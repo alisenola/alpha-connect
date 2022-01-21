@@ -190,12 +190,12 @@ func (state *DataManager) OnMarketDataIncrementalRefresh(context actor.Context) 
 }
 
 func (state *DataManager) OnUnipoolV3DataResponse(context actor.Context) error {
-	snapshot := context.Message().(*messages.UnipoolV3DataResponse)
+	update := context.Message().(*messages.UnipoolV3DataResponse)
 	for k, v := range state.subscribers {
 		forward := &messages.UnipoolV3DataResponse{
 			RequestID:  k,
 			ResponseID: uint64(time.Now().UnixNano()),
-			Snapshot:   snapshot.Snapshot,
+			Update:     update.Update,
 		}
 		context.Send(v, forward)
 	}

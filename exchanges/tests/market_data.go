@@ -157,7 +157,7 @@ func PoolData(t *testing.T, test MDTest) {
 		}
 	}
 
-	res, err = as.Root.RequestFuture(executor, &messages.HistoricalUnipoolV3EventRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.HistoricalUnipoolV3DataRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Instrument: &models.Instrument{
 			SecurityID: &types.UInt64Value{Value: sec.SecurityID},
@@ -167,11 +167,10 @@ func PoolData(t *testing.T, test MDTest) {
 		Start: 14038263,
 		End:   14040263,
 	}, 50*time.Second).Result()
-	fmt.Println("got here")
 	if err != nil {
 		t.Fatal(err)
 	}
-	updates, ok := res.(*messages.HistoricalUnipoolV3EventResponse)
+	updates, ok := res.(*messages.HistoricalUnipoolV3DataResponse)
 	if !ok {
 		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 	}
