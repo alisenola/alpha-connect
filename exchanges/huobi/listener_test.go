@@ -5,6 +5,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"testing"
 )
 
@@ -21,5 +22,28 @@ func TestMarketData(t *testing.T) {
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.Trading,
+		IgnoreSizeResidue: true,
+	})
+
+}
+
+func TestSlowMarketData(t *testing.T) {
+	tests.MarketData(t, tests.MDTest{
+		SecurityID:   4304365894942658747,
+		Symbol:       "kaneth",
+		SecurityType: enum.SecurityType_CRYPTO_SPOT,
+		Exchange:     constants.HUOBI,
+		BaseCurrency: xchangerModels.Asset{
+			Symbol: "KAN",
+			Name:   "bitkan",
+			ID:     220,
+		},
+		QuoteCurrency:     constants.ETHEREUM,
+		MinPriceIncrement: 1e-10,
+		RoundLot:          0.01,
+		HasMaturityDate:   false,
+		IsInverse:         false,
+		Status:            models.Trading,
+		IgnoreSizeResidue: true,
 	})
 }

@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"reflect"
 	"testing"
@@ -70,13 +72,21 @@ func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 }
 
 func MarketData(t *testing.T, test MDTest) {
-	//t.Parallel()
+	t.Parallel()
+	b, err := ioutil.ReadFile("../../assets.json")
+	if err != nil {
+		t.Fatalf("failed to load assets: %v", err)
+	}
+	assets := make(map[uint32]xchangerModels.Asset)
+	err = json.Unmarshal(b, &assets)
+	if err != nil {
+		t.Fatalf("error parsing assets: %v", err)
+	}
+	if err := constants.LoadAssets(assets); err != nil {
+		t.Fatalf("error loading assets: %v", err)
+	}
 	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
 	defer clean()
-
-	securityID := []uint64{
-		test.SecurityID,
-	}
 
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
@@ -91,11 +101,13 @@ func MarketData(t *testing.T, test MDTest) {
 	}
 	var sec *models.Security
 	for _, s := range securityList.Securities {
-		for _, secID := range securityID {
-			if secID == s.SecurityID {
-				sec = s
-			}
+		if test.SecurityID == s.SecurityID {
+			sec = s
 		}
+	}
+
+	if sec == nil {
+		t.Fatalf("security not found")
 	}
 
 	CheckSecurityDefinition(t, sec, test)
