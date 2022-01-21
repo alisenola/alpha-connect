@@ -116,7 +116,7 @@ func MarketData(t *testing.T, test MDTest) {
 
 func PoolData(t *testing.T, test MDTest) {
 	//t.Parallel()
-	constants.LoadAssets(map[uint32]xchangerModels.Asset{
+	_ = constants.LoadAssets(map[uint32]xchangerModels.Asset{
 		0: {
 			Symbol: "WETH",
 			Name:   "wrapped-ether",
@@ -157,6 +157,10 @@ func PoolData(t *testing.T, test MDTest) {
 		}
 	}
 
+	if sec == nil {
+		t.Fatal("security not found")
+	}
+
 	res, err = as.Root.RequestFuture(executor, &messages.HistoricalUnipoolV3DataRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Instrument: &models.Instrument{
@@ -172,7 +176,7 @@ func PoolData(t *testing.T, test MDTest) {
 	}
 	updates, ok := res.(*messages.HistoricalUnipoolV3DataResponse)
 	if !ok {
-		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+		t.Fatalf("was expecting *messages.HistoricalUnipoolV3DataResponse, got %s", reflect.TypeOf(res).String())
 	}
 	if !updates.Success {
 		t.Fatal(updates.RejectionReason.String())
