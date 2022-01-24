@@ -2,13 +2,14 @@ package v3
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/xchanger/eth"
 	"math/big"
 	"math/rand"
 	"net/http"
 	"reflect"
 	"sort"
 	"time"
+
+	"gitlab.com/alphaticks/xchanger/eth"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -285,7 +286,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 						Tick:         int32(event.Tick.Int64()),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Mint"].ID:
@@ -305,10 +306,10 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
-			case uabi.Events["Burns"].ID:
+			case uabi.Events["Burn"].ID:
 				event := uniswap.UniswapBurn{}
 				if err := eth.UnpackLog(uabi, &event, "Burn", l); err != nil {
 					state.logger.Warn("error unpacking the log", log.Error(err))
@@ -325,7 +326,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Swap"].ID:
@@ -343,7 +344,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:      event.Amount0.Bytes(),
 						Amount1:      event.Amount1.Bytes(),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Collect"].ID:
@@ -362,7 +363,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Flash"].ID:
@@ -378,7 +379,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0: event.Amount0.Bytes(),
 						Amount1: event.Amount1.Bytes(),
 					},
-					Block: event.Raw.BlockNumber,
+					Block: l.BlockNumber,
 				}
 				response.Events = append(response.Events, update)
 			}
