@@ -218,9 +218,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		lotPrecision,
 		10000)
 
-	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
-		return fmt.Errorf("error syncing: %v", err)
-	}
+	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
 	if ob.Crossed() {
 		return fmt.Errorf("crossed order book")
 	}

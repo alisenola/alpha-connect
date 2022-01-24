@@ -229,10 +229,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		lotPrecision,
 		10000)
 
-	if err := ob.Sync(bids, asks); err != nil {
-		return fmt.Errorf("error syncing order book: %v", err)
+	ob.Sync(bids, asks)
+	if ob.Crossed() {
+		return fmt.Errorf("crossed orderbook")
 	}
-
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts

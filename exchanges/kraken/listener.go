@@ -261,7 +261,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	ob := gorderbook.NewOrderBookL2(tickPrecision, lotPrecision, 10000)
 
 	ob.Sync(bids, asks)
-
+	if ob.Crossed() {
+		return fmt.Errorf("cossed order book")
+	}
 	ts := uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())

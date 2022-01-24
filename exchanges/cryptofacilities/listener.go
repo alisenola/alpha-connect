@@ -244,8 +244,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			lotPrecision,
 			10000)
 
-		if err := ob.Sync(bids, asks); err != nil {
-			return fmt.Errorf("error syncing order book: %v", err)
+		ob.Sync(bids, asks)
+		if ob.Crossed() {
+			return fmt.Errorf("crossed orderbook")
 		}
 		state.instrumentData.orderBook = ob
 		state.instrumentData.lastUpdateID = obData.Seq

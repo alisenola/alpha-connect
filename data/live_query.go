@@ -157,10 +157,7 @@ func (lq *LiveQuery) next() bool {
 				tickPrecision,
 				lotPrecision,
 				10000)
-			if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
-				lq.err = fmt.Errorf("error syncing OBL2")
-				return false
-			}
+			ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
 
 			snapshot := market.NewRawOrderBook(ob).ToSnapshot()
 

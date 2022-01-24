@@ -223,7 +223,9 @@ func (state *ListenerL2) subscribeOrderBook(context actor.Context) error {
 		state.instrumentData.lotPrecision,
 		1000)
 	ob.Sync(bids, asks)
-
+	if ob.Crossed() {
+		return fmt.Errorf("crossed orderbook")
+	}
 	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000
 
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())

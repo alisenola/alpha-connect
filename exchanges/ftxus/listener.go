@@ -234,11 +234,8 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	if err := ob.Sync(bids, asks); err != nil {
-		return fmt.Errorf("error syncing book: %v", err)
-	}
+	ob.Sync(bids, asks)
 	if ob.Crossed() {
-		fmt.Println(ob)
 		return fmt.Errorf("crossed order book")
 	}
 	state.instrumentData.orderBook = ob

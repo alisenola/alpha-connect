@@ -170,11 +170,13 @@ func (state *Listener) Clean(context actor.Context) error {
 		if err := state.tradeWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+		state.tradeWs = nil
 	}
 	if state.obWs != nil {
 		if err := state.obWs.Disconnect(); err != nil {
 			state.logger.Info("error disconnecting socket", log.Error(err))
 		}
+		state.obWs = nil
 	}
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
@@ -232,11 +234,13 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	bestAsk := msg.SnapshotL2.Asks[0].Price
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-
-	if depth > 10000 {
-		depth = 10000
+	depth := 10000
+	if len(msg.SnapshotL2.Asks) > 0 {
+		bestAsk := msg.SnapshotL2.Asks[0].Price
+		depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+		if depth > 10000 {
+			depth = 10000
+		}
 	}
 
 	ob := gorderbook.NewOrderBookL2(
@@ -245,8 +249,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		depth,
 	)
 
-	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
-		return fmt.Errorf("error syncing ob: %v", err)
+	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+	if ob.Crossed() {
+		return fmt.Errorf("crossed orderbook")
 	}
 	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
@@ -293,7 +298,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 			ob.UpdateOrderBookLevel(ask)
 		}
 		state.instrumentData.lastUpdateID = obUpdate.LastUpdateId
-		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000)
+		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
 		sync = true
 	}
 	state.instrumentData.orderBook = ob
@@ -413,6 +418,9 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			})
 
 	case gate.WSSpotOrderBookUpdate:
+		if state.obWs == nil || msg.WSID != state.obWs.ID {
+			return nil
+		}
 		symbol := res.CurrencyPair
 		// Check depth continuity
 		if state.instrumentData.lastUpdateID+1 != res.FirstUpdateId {

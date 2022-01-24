@@ -57,7 +57,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 			return q
 		}
 	}
-	return &QueryRunner{}
+	return nil
 }
 
 func (state *Executor) Receive(context actor.Context) {

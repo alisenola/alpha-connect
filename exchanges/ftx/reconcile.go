@@ -121,8 +121,8 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		case "TRADE":
 			if tx.Fill.SecurityID != "" {
 				secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
-				sec := state.securities[secID]
-				if sec.SecurityType == "CRPERP" {
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
 					if tx.Fill.Quantity < 0 {
 						state.positions[tx.Fill.SecurityID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
 					} else {

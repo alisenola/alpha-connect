@@ -258,12 +258,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	if err := ob.Sync(bids, asks); err != nil {
-		return fmt.Errorf("error syncing book: %v", err)
-	}
+	ob.Sync(bids, asks)
 	if ob.Crossed() {
-		fmt.Println(ob)
-		return fmt.Errorf("crossed order book")
+		return fmt.Errorf("crossed orderbook")
 	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
@@ -396,7 +393,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		var aggTrade *models.AggregatedTrade
 		for _, trade := range tradeData.Trades {
 			if trade.Liquidation {
-				fmt.Println("LIQUIDATION", trade)
 				// Liquidation limit order, so was on the bid if order.Side == "sell"
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					Liquidation: &models.Liquidation{

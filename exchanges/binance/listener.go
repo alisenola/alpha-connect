@@ -242,8 +242,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		depth,
 	)
 
-	if err := ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks); err != nil {
-		return fmt.Errorf("error syncing ob: %v", err)
+	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+	if ob.Crossed() {
+		return fmt.Errorf("crossed orderbook")
 	}
 	state.instrumentData.lastUpdateID = msg.SeqNum
 	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
