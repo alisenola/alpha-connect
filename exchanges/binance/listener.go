@@ -185,121 +185,164 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := binance.NewWebsocket()
-	symbol := strings.ToLower(state.security.Symbol)
-	err := ws.Connect(
-		symbol,
-		[]string{binance.WSDepthStream100ms, binance.WSTradeStream},
-		state.dialerPool.GetDialer())
-	if err != nil {
-		return err
-	}
-
-	state.ws = ws
-
-	time.Sleep(5 * time.Second)
-	fut := context.RequestFuture(
-		state.binanceExecutor,
-		&messages.MarketDataRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			Subscribe: false,
-			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
-				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
-			},
-			Aggregation: models.L2,
-		},
-		20*time.Second)
-
-	res, err := fut.Result()
-	if err != nil {
-		return fmt.Errorf("error getting OBL2")
-	}
-	msg, ok := res.(*messages.MarketDataResponse)
-	if !ok {
-		return fmt.Errorf("was expecting MarketDataSnapshot, got %s", reflect.TypeOf(msg).String())
-	}
-	if !msg.Success {
-		return fmt.Errorf("error fetching snapshot: %s", msg.RejectionReason.String())
-	}
-	if msg.SnapshotL2 == nil {
-		return fmt.Errorf("market data snapshot has no OBL2")
-	}
-
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	bestAsk := msg.SnapshotL2.Asks[0].Price
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-
-	if depth > 10000 {
-		depth = 10000
-	}
-
-	ob := gorderbook.NewOrderBookL2(
-		tickPrecision,
-		lotPrecision,
-		depth,
-	)
-
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
-	if ob.Crossed() {
-		return fmt.Errorf("crossed orderbook")
-	}
-	state.instrumentData.lastUpdateID = msg.SeqNum
-	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
-
-	hb := false
-	synced := false
-	for !synced {
-		if !hb {
-			if err := ws.ListSubscriptions(); err != nil {
-				return fmt.Errorf("error request list subscriptions: %v", err)
-			}
-			hb = true
-		}
-		if !ws.ReadMessage() {
-			return fmt.Errorf("error reading message: %v", ws.Err)
-		}
-		depthData, ok := ws.Msg.Message.(binance.WSDepthData)
-		if !ok {
-			if _, ok := ws.Msg.Message.(binance.WSResponse); ok {
-				hb = false
-			}
-			// Trade message
-			context.Send(context.Self(), ws.Msg)
-		}
-
-		if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
-			continue
-		}
-
-		bids, asks, err := depthData.ToBidAsk()
+	connect := func() error {
+		ws := binance.NewWebsocket()
+		symbol := strings.ToLower(state.security.Symbol)
+		err := ws.Connect(
+			symbol,
+			[]string{binance.WSDepthStream100ms, binance.WSTradeStream},
+			state.dialerPool.GetDialer())
 		if err != nil {
-			return fmt.Errorf("error converting depth data: %s ", err.Error())
-		}
-		for _, bid := range bids {
-			ob.UpdateOrderBookLevel(bid)
-		}
-		for _, ask := range asks {
-			ob.UpdateOrderBookLevel(ask)
+			return err
 		}
 
-		state.instrumentData.lastUpdateID = depthData.FinalUpdateID
-		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
+		state.ws = ws
 
-		synced = true
+		time.Sleep(5 * time.Second)
+		fut := context.RequestFuture(
+			state.binanceExecutor,
+			&messages.MarketDataRequest{
+				RequestID: uint64(time.Now().UnixNano()),
+				Subscribe: false,
+				Instrument: &models.Instrument{
+					SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+					Exchange:   state.security.Exchange,
+					Symbol:     &types.StringValue{Value: state.security.Symbol},
+				},
+				Aggregation: models.L2,
+			},
+			20*time.Second)
+
+		res, err := fut.Result()
+		if err != nil {
+			return fmt.Errorf("error getting OBL2")
+		}
+		msg, ok := res.(*messages.MarketDataResponse)
+		if !ok {
+			return fmt.Errorf("was expecting MarketDataSnapshot, got %s", reflect.TypeOf(msg).String())
+		}
+		if !msg.Success {
+			return fmt.Errorf("error fetching snapshot: %s", msg.RejectionReason.String())
+		}
+		if msg.SnapshotL2 == nil {
+			return fmt.Errorf("market data snapshot has no OBL2")
+		}
+
+		tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+		lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
+		bestAsk := msg.SnapshotL2.Asks[0].Price
+		depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+
+		if depth > 10000 {
+			depth = 10000
+		}
+
+		if state.instrumentData.orderBook != nil {
+			// save orderbook
+			fmt.Println("BEFORE", len(msg.SnapshotL2.Bids), len(msg.SnapshotL2.Asks))
+			worstBid := msg.SnapshotL2.Bids[0].Price
+			worstAsk := msg.SnapshotL2.Asks[0].Price
+			for _, b := range msg.SnapshotL2.Bids {
+				if b.Price < worstBid {
+					worstBid = b.Price
+				}
+			}
+			for _, a := range msg.SnapshotL2.Asks {
+				if a.Price > worstAsk {
+					worstAsk = a.Price
+				}
+			}
+			oldBids := state.instrumentData.orderBook.GetBids(-1)
+			oldAsks := state.instrumentData.orderBook.GetAsks(-1)
+
+			for _, b := range oldBids {
+				if b.Price < worstBid {
+					// Keep it
+					msg.SnapshotL2.Bids = append(msg.SnapshotL2.Bids, b)
+				}
+			}
+			for _, a := range oldAsks {
+				if a.Price > worstAsk {
+					msg.SnapshotL2.Asks = append(msg.SnapshotL2.Asks, a)
+				}
+			}
+			fmt.Println("AFTER", len(msg.SnapshotL2.Bids), len(msg.SnapshotL2.Asks))
+		}
+
+		ob := gorderbook.NewOrderBookL2(
+			tickPrecision,
+			lotPrecision,
+			depth,
+		)
+
+		ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
+		if ob.Crossed() {
+			return fmt.Errorf("crossed orderbook")
+		}
+		state.instrumentData.lastUpdateID = msg.SeqNum
+		state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
+
+		hb := false
+		synced := false
+		for !synced {
+			if !hb {
+				if err := ws.ListSubscriptions(); err != nil {
+					return fmt.Errorf("error request list subscriptions: %v", err)
+				}
+				hb = true
+			}
+			if !ws.ReadMessage() {
+				return fmt.Errorf("error reading message: %v", ws.Err)
+			}
+			depthData, ok := ws.Msg.Message.(binance.WSDepthData)
+			if !ok {
+				if _, ok := ws.Msg.Message.(binance.WSResponse); ok {
+					hb = false
+				}
+				// Trade message
+				context.Send(context.Self(), ws.Msg)
+			}
+
+			if depthData.FinalUpdateID <= state.instrumentData.lastUpdateID {
+				continue
+			}
+
+			bids, asks, err := depthData.ToBidAsk()
+			if err != nil {
+				return fmt.Errorf("error converting depth data: %s ", err.Error())
+			}
+			for _, bid := range bids {
+				ob.UpdateOrderBookLevel(bid)
+			}
+			for _, ask := range asks {
+				ob.UpdateOrderBookLevel(ask)
+			}
+
+			state.instrumentData.lastUpdateID = depthData.FinalUpdateID
+			state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
+
+			synced = true
+		}
+
+		state.instrumentData.orderBook = ob
+		state.instrumentData.seqNum = uint64(time.Now().UnixNano())
+
+		return nil
 	}
-
-	state.instrumentData.orderBook = ob
-	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
-
+	trials := 0
+	for err := connect(); err != nil; {
+		trials += 1
+		if trials > 15 {
+			return err
+		}
+		time.Sleep(1 * time.Second)
+		err = connect()
+	}
 	go func(ws *binance.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
-	}(ws, context.Self())
-
+	}(state.ws, context.Self())
 	return nil
 }
 
