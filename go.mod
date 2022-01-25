@@ -83,7 +83,7 @@ require (
 )
 
 // replace gitlab.com/alphaticks/xchanger => ../xchanger
-// replace gitlab.com/alphaticks/gorderbook => ../gorderbook
+replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
 // replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
+	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/go-graphql-client"
@@ -74,87 +75,9 @@ func TestPoolData(t *testing.T) {
 
 	fmt.Println(updates.Events)
 	pool := gorderbook.NewUnipoolV3(int32(sec.TakerFee.Value))
-	delta := 0
+	delta := -1
 	for _, ev := range updates.Events {
-		if i := ev.Initialize; i != nil {
-			sqrt := big.NewInt(1).SetBytes(i.SqrtPriceX96)
-			pool.Initialize(
-				sqrt,
-				i.Tick,
-			)
-		}
-		if m := ev.Mint; m != nil {
-			var own [20]byte
-			copy(own[:], m.Owner)
-			amount := big.NewInt(1).SetBytes(m.Amount)
-			amount0 := big.NewInt(1).SetBytes(m.Amount0)
-			amount1 := big.NewInt(1).SetBytes(m.Amount1)
-			pool.Mint(
-				own,
-				m.TickLower,
-				m.TickUpper,
-				amount,
-				amount0,
-				amount1,
-			)
-		}
-		if b := ev.Burn; b != nil {
-			var own [20]byte
-			copy(own[:], b.Owner)
-			amount := big.NewInt(1).SetBytes(b.Amount)
-			amount0 := big.NewInt(1).SetBytes(b.Amount0)
-			amount1 := big.NewInt(1).SetBytes(b.Amount1)
-			pool.Burn(
-				own,
-				b.TickLower,
-				b.TickUpper,
-				amount,
-				amount0,
-				amount1,
-			)
-		}
-		if s := ev.Swap; s != nil {
-			amount0 := big.NewInt(1).SetBytes(s.Amount0)
-			amount1 := big.NewInt(1).SetBytes(s.Amount1)
-			sqrt := big.NewInt(1).SetBytes(s.SqrtPriceX96)
-			sqrtPrev := pool.GetSqrtPrice()
-			if sqrt.Cmp(sqrtPrev) > 0 {
-				sqrt.Add(sqrt, big.NewInt(1))
-				delta = -1
-				amount0.Neg(amount0)
-			} else {
-				sqrt.Sub(sqrt, big.NewInt(1))
-				delta = 1
-				amount1.Neg(amount1)
-			}
-			pool.Swap(
-				amount0,
-				amount1,
-				sqrt,
-				s.Tick,
-			)
-		}
-		if c := ev.Collect; c != nil {
-			var own [20]byte
-			copy(own[:], c.Owner)
-			amount0 := big.NewInt(1).SetBytes(c.AmountRequested0)
-			amount1 := big.NewInt(1).SetBytes(c.AmountRequested1)
-			pool.Collect(
-				own,
-				c.TickLower,
-				c.TickUpper,
-				amount0,
-				amount1,
-			)
-		}
-		if f := ev.Flash; f != nil {
-			amount0 := big.NewInt(1).SetBytes(f.Amount0)
-			amount1 := big.NewInt(1).SetBytes(f.Amount1)
-			pool.Flash(
-				amount0,
-				amount1,
-			)
-		}
+		v3.ProcessUpdate(pool, ev)
 	}
 
 	graph := graphql.NewClient(uniswap.GRAPHQL_URL, nil)
@@ -192,5 +115,14 @@ func TestPoolData(t *testing.T) {
 			snapshot.SqrtPriceX96.String(),
 			query.Pool.SqrtPrice.String(),
 		)
+	}
+
+	for k, _ := range snapshot.Ticks {
+		fmt.Println("tick", k)
+		tick := pool.GetTickValue(k)
+		fmt.Println("FeeGrowthOutside0X128", tick.FeeGrowthOutside0X128)
+		fmt.Println("FeeGrowthOutside1X128", tick.FeeGrowthOutside1X128)
+		fmt.Println("Liquidity Net", tick.LiquidityNet)
+		fmt.Println("Liquidity Gross", tick.LiquidityGross)
 	}
 }

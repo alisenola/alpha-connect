@@ -163,13 +163,14 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
-	query := append([][]interface{}{{
+	query := [][]interface{}{{
+		uabi.Events["Initialize"].ID,
 		uabi.Events["Mint"].ID,
 		uabi.Events["Swap"].ID,
 		uabi.Events["Burn"].ID,
 		uabi.Events["Collect"].ID,
 		uabi.Events["Flash"].ID,
-	}})
+	}}
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
 		return fmt.Errorf("error getting topics %v", err)
@@ -208,6 +209,19 @@ func (state *Listener) onLog(context actor.Context) error {
 	}
 	updt := &models.UPV3Update{}
 	switch msg.Topics[0] {
+	case uabi.Events["Initialize"].ID:
+		event := new(uniswap.UniswapInitialize)
+		if err := eth.UnpackLog(uabi, event, "Initialize", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			Initialize: &gorderbook.UPV3Initialize{
+				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
+				Tick:         int32(event.Tick.Int64()),
+			},
+			Block: msg.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Mint"].ID:
 		event := new(uniswap.UniswapMint)
 		if err := eth.UnpackLog(uabi, event, "Mint", *msg); err != nil {
@@ -222,7 +236,7 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: event.Raw.BlockNumber,
+			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Burn"].ID:
@@ -239,7 +253,7 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: event.Raw.BlockNumber,
+			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Swap"].ID:
@@ -254,7 +268,7 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:      event.Amount0.Bytes(),
 				Amount1:      event.Amount1.Bytes(),
 			},
-			Block: event.Raw.BlockNumber,
+			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Collect"].ID:
@@ -270,7 +284,7 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Block: event.Raw.BlockNumber,
+			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Flash"].ID:
@@ -283,7 +297,7 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
-			Block: event.Raw.BlockNumber,
+			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
