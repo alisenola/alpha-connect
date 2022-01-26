@@ -300,6 +300,31 @@ func (state *Listener) onLog(context actor.Context) error {
 			Block: msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["SetFeeProtocol"].ID:
+		event := new(uniswap.UniswapSetFeeProtocol)
+		if err := eth.UnpackLog(uabi, event, "SetFeeProtocol", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
+				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
+			},
+			Block: msg.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
+	case uabi.Events["CollectProtocol"].ID:
+		event := new(uniswap.UniswapCollectProtocol)
+		if err := eth.UnpackLog(uabi, event, "CollectProtocol", *msg); err != nil {
+			return fmt.Errorf("error unpacking the log %v", err)
+		}
+		updt = &models.UPV3Update{
+			CollectProtocol: &gorderbook.UPV3CollectProtocol{
+				AmountRequested0: event.Amount0.Bytes(),
+				AmountRequested1: event.Amount1.Bytes(),
+			},
+			Block: msg.BlockNumber,
+		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
 
 	state.instrumentData.lastBlockUpdate = msg.BlockNumber

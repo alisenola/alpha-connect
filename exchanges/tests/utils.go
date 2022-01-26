@@ -11,7 +11,6 @@ import (
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
@@ -366,7 +365,6 @@ func (state *PoolV3Checker) OnUnipoolV3DataIncrementalRefresh(context actor.Cont
 	}
 
 	fmt.Println("GOT REFRESH", refresh)
-	v3.ProcessUpdate(state.pool, refresh.Update)
 	state.seqNum = refresh.SeqNum
 	return nil
 }

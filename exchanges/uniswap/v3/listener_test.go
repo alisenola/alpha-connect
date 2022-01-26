@@ -3,6 +3,7 @@ package v3_test
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/gorderbook"
-	mod "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -60,19 +60,28 @@ func TestMarketData(t *testing.T) {
 		t.Fatal()
 	}
 	feeTier := query.Pool.FeeTier
-	ticks := make([]*mod.UPV3Tick, 0)
+	pool := gorderbook.NewUnipoolV3(feeTier)
+	pool.Initialize(query.Pool.SqrtPrice, feeTier)
+	snap := gorderbook.PoolSnapShot{
+		Tick:                 query.Pool.Tick,
+		FeeTier:              query.Pool.FeeTier,
+		Liquidity:            query.Pool.Liquidity,
+		SqrtPriceX96:         query.Pool.SqrtPrice,
+		ProtocolFees0:        big.NewInt(0),
+		ProtocolFees1:        big.NewInt(0),
+		FeeGrowthGlobal0X128: query.Pool.FeeGrowthGlobal0X128,
+		FeeGrowthGlobal1X128: query.Pool.FeeGrowthGlobal1X128,
+		Tvl0:                 big.NewInt(0),
+		Tvl1:                 big.NewInt(0),
+		FeeProtocol:          0,
+		Ticks:                make(map[int32]*gorderbook.UnipoolV3Tick),
+		Positions:            make(map[[32]byte]*gorderbook.UnipoolV3Position),
+	}
+	ticks := make(map[int32]*gorderbook.UnipoolV3Tick, 0)
 	for len(query.Pool.Ticks) == 1000 {
 		fmt.Println("last tick is", query.Pool.Ticks[999])
 		for _, t := range query.Pool.Ticks {
-			ticks = append(
-				ticks,
-				&mod.UPV3Tick{
-					FeeGrowthOutside0X128: t.FeeGrowthOutside0X128.Bytes(),
-					FeeGrowthOutside1X128: t.FeeGrowthOutside0X128.Bytes(),
-					LiquidityNet:          t.LiquidityNet.Bytes(),
-					LiquidityGross:        t.LiquidityGross.Bytes(),
-				},
-			)
+			snap.SetTick(t.TickIdx, t.FeeGrowthOutside0X128, t.FeeGrowthOutside1X128, t.LiquidityNet, t.LiquidityGross)
 		}
 		query, variables = uniswap.GetPoolSnapshotQuery(graphql.ID(sec.Symbol), graphql.Int(12976959), graphql.ID(query.Pool.Ticks[999].Id))
 		err = client.Query(context.Background(), &query, variables)
@@ -81,22 +90,12 @@ func TestMarketData(t *testing.T) {
 		}
 	}
 	for _, t := range query.Pool.Ticks {
-		ticks = append(
-			ticks,
-			&mod.UPV3Tick{
-				FeeGrowthOutside0X128: t.FeeGrowthOutside0X128.Bytes(),
-				FeeGrowthOutside1X128: t.FeeGrowthOutside0X128.Bytes(),
-				LiquidityNet:          t.LiquidityNet.Bytes(),
-				LiquidityGross:        t.LiquidityGross.Bytes(),
-			},
-		)
+		snap.SetTick(t.TickIdx, t.FeeGrowthOutside0X128, t.FeeGrowthOutside1X128, t.LiquidityNet, t.LiquidityGross)
 	}
 	fmt.Println("GOT", len(ticks), "ticks")
 	fmt.Println("Fee tier", feeTier)
 
-	pool := gorderbook.NewUnipoolV3(feeTier)
-	pool.Initialize(query.Pool.SqrtPrice, feeTier)
-	pool.Sync(ticks, query.Pool.Liquidity.Bytes(), make([]byte, 0), make([]byte, 0), query.Pool.FeeGrowthGlobal0X128.Bytes(), query.Pool.FeeGrowthGlobal1X128.Bytes(), make([]byte, 0), make([]byte, 0), feeTier, make([]*mod.UPV3Position, 0))
+	pool.Sync(&snap)
 
 	test := tests.MDTest{
 		IgnoreSizeResidue: true,

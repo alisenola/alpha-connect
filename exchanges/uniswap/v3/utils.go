@@ -89,5 +89,15 @@ func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error 
 			amount1,
 		)
 	}
+	if sf := update.SetFeeProtocol; sf != nil {
+		fee0 := sf.FeesProtocol % 16
+		fee1 := sf.FeesProtocol >> 8
+		pool.SetFeeProtocol(uint8(fee0), uint8(fee1))
+	}
+	if cp := update.CollectProtocol; cp != nil {
+		amount0 := big.NewInt(1).SetBytes(cp.AmountRequested0)
+		amount1 := big.NewInt(1).SetBytes(cp.AmountRequested1)
+		pool.CollectProtocol(amount0, amount1)
+	}
 	return nil
 }
