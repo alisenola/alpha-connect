@@ -1362,5 +1362,10 @@
     "symbol": "MINA",
     "name": "mina",
     "ID": 273
+  },
+  "274": {
+    "symbol": "LOOKS",
+    "name": "looksrare",
+    "ID": 274
   }
 }
