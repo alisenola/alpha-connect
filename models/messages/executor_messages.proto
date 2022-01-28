@@ -1,0 +1,545 @@
+syntax = "proto3";
+package messages;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+
+import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
+
+import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
+
+enum ExecutionType {
+    New = 0;
+    Done = 1;
+    Canceled = 2;
+    Replaced = 3;
+    PendingCancel = 4;
+    Stopped = 5;
+    Rejected = 6;
+    Suspended = 7;
+    PendingNew = 8;
+    Calculated = 9;
+    Expired = 10;
+    PendingReplace = 11;
+    Trade = 12;
+    OrderStatus = 13;
+    Settlement = 14;
+}
+
+enum RejectionReason {
+    Other = 0;
+    UnknownSymbol = 1;
+    UnknownSecurityID = 2;
+    UnsupportedOrderCharacteristic = 3;
+    IncorrectQuantity = 4;
+    ExchangeClosed = 5;
+    DuplicateOrder = 6;
+    InvalidAccount = 7;
+    TooLateToCancel = 8;
+    UnknownOrder = 9;
+    CancelAlreadyPending = 10;
+    DifferentSymbols = 11;
+    InvalidRequest = 12;
+    ExchangeAPIError = 13;
+    InvalidOrder = 14;
+    RateLimitExceeded = 15;
+    UnsupportedSubscription = 16;
+    MissingInstrument = 17;
+    HTTPError = 18;
+    NonReplaceableOrder = 19;
+    NonCancelableOrder = 20;
+    UnsupportedFilter = 21;
+    UnsupportedOrderType = 22;
+    UnsupportedOrderTimeInForce = 23;
+    UnsupportedRequest = 24;
+    UnknownAccount = 25;
+    UnknownExchange = 26;
+    GraphQLError = 27;
+    ABIError = 28;
+    EthRPCError = 29;
+}
+
+enum FeeType {
+    Regulatory = 0;
+    Tax = 1;
+    LocalCommission = 2;
+    ExchangeFees = 3;
+}
+
+enum FeeBasis {
+    Absolute = 0;
+    PerUnit = 1;
+    Percentage = 2;
+}
+
+enum AccountMovementType {
+    Unknown = 0;
+    FundingFee = 1;
+    Exchange = 2;
+    Deposit = 3;
+    Withdrawal = 4;
+    RealizedPnl = 5;
+    Commission = 6;
+    WelcomeBonus = 7;
+}
+
+message HistoricalOpenInterestsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
+}
+
+message HistoricalOpenInterestsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Stat interests = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message HistoricalLiquidationsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
+}
+
+message HistoricalLiquidationsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Liquidation liquidations = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message HistoricalUnipoolV3DataRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    uint64 start = 3;
+    uint64 end = 4;
+}
+
+message HistoricalUnipoolV3DataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.UPV3Update events = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message MarketStatisticsRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    repeated models.StatType statistics = 3;
+}
+
+message MarketStatisticsResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Stat statistics = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message MarketDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
+    models.OrderBookAggregation aggregation = 5;
+    repeated models.StatType stats = 6;
+}
+
+message MarketDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.OBL1Snapshot snapshotL1 = 3;
+    models.OBL2Snapshot snapshotL2 = 4;
+    models.OBL3Snapshot snapshotL3 = 5;
+    repeated models.AggregatedTrade trades = 6;
+    uint64 seq_num = 7;
+    bool success = 8;
+    RejectionReason rejection_reason = 9;
+}
+
+message MarketDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.OBL1Update updateL1 = 4;
+    models.OBL2Update updateL2 = 5;
+    models.OBL3Update updateL3 = 6;
+    repeated models.AggregatedTrade trades = 7;
+    models.Liquidation liquidation = 8;
+    models.Funding funding = 9;
+    repeated models.Stat stats = 10;
+}
+
+message UnipoolV3DataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
+}
+
+message UnipoolV3DataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.UPV3Update update = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message UnipoolV3DataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.UPV3Update update = 4;
+}
+
+message AccountDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Account account = 4;
+}
+
+message AccountDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Security securities = 3;
+    repeated models.Order orders = 4;
+    repeated models.Position positions = 5;
+    repeated models.Balance balances = 6;
+    google.protobuf.DoubleValue maker_fee = 7;
+    google.protobuf.DoubleValue taker_fee = 8;
+    bool success = 9;
+    RejectionReason rejection_reason = 10;
+    uint64 seq_num = 11;
+}
+
+message AccountDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    ExecutionReport report = 3;
+}
+
+message AccountMovement {
+    models.Asset asset = 1;
+    double change = 2;
+    AccountMovementType type = 3;
+    string subtype = 4;
+    string movementID = 5;
+    google.protobuf.Timestamp time = 6;
+}
+
+message AccountMovementRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    AccountMovementType type = 3;
+    AccountMovementFilter filter = 4;
+}
+
+message AccountMovementFilter {
+    models.Instrument instrument = 1;
+    google.protobuf.Timestamp from = 2;
+    google.protobuf.Timestamp to = 3;
+}
+
+message AccountMovementResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated AccountMovement movements = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message TradeCaptureReportRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    TradeCaptureReportFilter filter = 3;
+}
+
+message TradeCaptureReportFilter {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    models.Instrument instrument = 3;
+    SideValue side = 4;
+    google.protobuf.Timestamp from = 5;
+    google.protobuf.Timestamp to = 6;
+    google.protobuf.StringValue fromID = 7;
+}
+
+message TradeCaptureReport {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.TradeCapture trades = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message SecurityDefinitionRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+}
+
+message SecurityDefinitionResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.Security security = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message SecurityListRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message SecurityList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Security securities = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message ExecutionReport {
+    uint64 seq_num = 1;
+    string orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    string executionID = 4;
+    ExecutionType execution_type = 5;
+    models.OrderStatus order_status = 6;
+    models.Instrument instrument = 7;
+    double leaves_quantity = 9;
+    double cum_quantity = 10;
+    google.protobuf.Timestamp transaction_time = 11;
+    google.protobuf.StringValue tradeID = 12;
+    google.protobuf.DoubleValue fill_price = 13;
+    google.protobuf.DoubleValue fill_quantity = 14;
+    google.protobuf.DoubleValue fee_amount = 15;
+    models.Asset fee_currency = 16;
+    FeeType fee_type = 17;
+    FeeBasis fee_basis = 18;
+    RejectionReason rejection_reason = 19;
+}
+
+message AccountUpdate {
+    AccountMovementType type = 1;
+    models.Asset asset = 2;
+    double balance = 3;
+}
+
+message SideValue {
+    models.Side value = 1;
+}
+
+message OrderStatusValue {
+    models.OrderStatus value = 1;
+}
+
+message OrderFilter {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue client_orderID = 2;
+    models.Instrument instrument = 3;
+    SideValue side = 4;
+    OrderStatusValue order_status = 5;
+}
+
+message OrderStatusRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Account account = 4;
+    OrderFilter filter = 5;
+}
+
+message OrderList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    repeated models.Order orders = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message PositionsRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+}
+
+message PositionList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Position positions = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message BalancesRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.Asset asset = 4;
+    models.Account account = 5;
+}
+
+message BalanceList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Balance balances = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message NewOrder {
+    string client_orderID = 1;
+    models.Instrument instrument = 2;
+    models.OrderType order_type = 5;
+    models.Side order_side = 6;
+    models.TimeInForce time_in_force = 7;
+    double quantity = 8;
+    google.protobuf.DoubleValue price = 9;
+    repeated models.ExecutionInstruction execution_instructions = 10;
+    string tag = 11;
+}
+
+message NewOrderSingleRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    NewOrder order = 3;
+}
+
+message NewOrderSingleResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    string orderID = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message NewOrderBulkRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    repeated NewOrder orders = 3;
+}
+
+message NewOrderBulkResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated string orderIDs = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message OrderUpdate {
+    google.protobuf.StringValue orderID = 1;
+    google.protobuf.StringValue orig_client_orderID = 2;
+    google.protobuf.DoubleValue quantity = 3;
+    google.protobuf.DoubleValue price = 4;
+}
+
+message OrderReplaceRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+    OrderUpdate update = 4;
+}
+
+message OrderReplaceResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    string orderID = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message OrderBulkReplaceRequest {
+    uint64 requestID = 1;
+    models.Instrument instrument = 2;
+    models.Account account = 3;
+    repeated OrderUpdate updates = 4;
+}
+
+message OrderBulkReplaceResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message OrderCancelRequest {
+    uint64 requestID = 1;
+    google.protobuf.StringValue orderID = 2;
+    google.protobuf.StringValue client_orderID = 3;
+    models.Instrument instrument = 4;
+    models.Account account = 5;
+}
+
+message OrderCancelResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message OrderMassCancelRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+    OrderFilter filter = 3;
+}
+
+message OrderMassCancelResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message CollectionList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    bool success = 3;
+    RejectionReason rejection_reason = 4;
+}
+
+message TransferDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message TransferDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+service ExchangeExecutor {
+    rpc MarketData (MarketDataRequest) returns (stream MarketDataIncrementalRefresh) {}
+    rpc AccountData (AccountDataRequest) returns (stream AccountDataIncrementalRefresh) {}
+    rpc SecurityDefinition(SecurityDefinitionRequest) returns (SecurityDefinitionResponse) {}
+    rpc Securities(SecurityListRequest) returns (SecurityList) {}
+    rpc Orders(OrderStatusRequest) returns (OrderList) {}
+    rpc Positions(PositionsRequest) returns (PositionList) {}
+    rpc Balances(BalancesRequest) returns (BalanceList) {}
+    rpc NewOrderSingle(NewOrderSingleRequest) returns (NewOrderSingleResponse) {}
+    rpc NewOrderBulk(NewOrderBulkRequest) returns (NewOrderBulkResponse) {}
+    rpc OrderReplace(OrderReplaceRequest) returns (OrderReplaceResponse) {}
+    rpc OrderBulkReplace(OrderBulkReplaceRequest) returns (OrderBulkReplaceResponse) {}
+    rpc OrderCancel(OrderCancelRequest) returns (OrderCancelResponse) {}
+    rpc OrderMassCancel(OrderMassCancelRequest) returns (OrderMassCancelResponse) {}
+}
