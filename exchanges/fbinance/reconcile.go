@@ -323,7 +323,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				tradeIDInt, _ := strconv.ParseUint(strings.Split(trd.TradeID, "-")[0], 10, 64)
 				if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
 					// TODO
-					return fmt.Errorf("error inserting: %v", err)
+					//return fmt.Errorf("error inserting: %v", err)
 				} else {
 					state.lastTradeID[sec.SecurityID] = tradeIDInt
 					progress = true

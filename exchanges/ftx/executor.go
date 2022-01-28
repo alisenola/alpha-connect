@@ -725,19 +725,12 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		for _, t := range trades.Result {
 			quantityMul := 1.
 			var instrument *models.Instrument
-			if t.Market != "" {
-				sec, ok := state.symbolToSec[t.Market]
+			if _, ok := state.symbolToSec[t.Market]; ok {
+				sec := state.symbolToSec[t.Market]
 				instrument = &models.Instrument{
 					Exchange:   &constants.FTX,
 					Symbol:     &types.StringValue{Value: t.Market},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
-				}
-				if !ok {
-					err := fmt.Errorf("unknown symbol %s", t.Market)
-					state.logger.Info("http error", log.Error(err))
-					response.RejectionReason = messages.ExchangeAPIError
-					context.Respond(response)
-					return
 				}
 			} else {
 				instrument = &models.Instrument{
