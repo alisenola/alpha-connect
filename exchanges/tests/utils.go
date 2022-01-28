@@ -259,6 +259,11 @@ func (state *MDChecker) OnMarketDataSnapshot(context actor.Context) error {
 	return nil
 }
 
+type GetPool struct {
+	Error error
+	Pool  *gorderbook.UnipoolV3
+}
+
 type PoolV3Checker struct {
 	test          MDTest
 	security      *models.Security
@@ -296,6 +301,7 @@ func NewPoolV3Checker(security *models.Security, test MDTest) actor.Actor {
 }
 
 func (state *PoolV3Checker) Receive(context actor.Context) {
+	fmt.Printf("GOT %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		fmt.Println("INITIALIZING")
@@ -311,12 +317,10 @@ func (state *PoolV3Checker) Receive(context actor.Context) {
 			}
 		}
 
-	case *GetStat:
-		context.Respond(&GetStat{
-			Error:     state.err,
-			Trades:    state.trades,
-			AggTrades: state.aggTrades,
-			OBUpdates: state.OBUpdates,
+	case *GetPool:
+		context.Respond(&GetPool{
+			Error: state.err,
+			Pool:  state.pool,
 		})
 	}
 }
@@ -340,7 +344,6 @@ func (state *PoolV3Checker) Initialize(context actor.Context) error {
 	if !ok {
 		return fmt.Errorf("was expecting market data snapshot, got %s", reflect.TypeOf(res).String())
 	}
-	fmt.Printf("GOT THE FOLLOWING UPDATE %+v", response.Update)
 	state.OBUpdates += 1
 	feeTier := int32(state.security.TakerFee.Value * 1e6)
 	state.pool = gorderbook.NewUnipoolV3(feeTier)
@@ -361,6 +364,7 @@ func (state *PoolV3Checker) OnUnipoolV3DataIncrementalRefresh(context actor.Cont
 		return fmt.Errorf("out of order sequence %d %d", state.seqNum, refresh.SeqNum)
 	}
 
+	fmt.Println("GOT REFRESH", refresh)
 	state.seqNum = refresh.SeqNum
 	return nil
 }

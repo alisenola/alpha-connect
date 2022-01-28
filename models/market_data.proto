@@ -89,7 +89,9 @@ message UPV3Update {
     gorderbook.models.UPV3Swap swap = 4;
     gorderbook.models.UPV3Collect collect = 5;
     gorderbook.models.UPV3Flash flash = 6;
-    uint64 block = 7;
+    gorderbook.models.UPV3SetFeeProtocol set_fee_protocol = 7;
+    gorderbook.models.UPV3CollectProtocol collect_protocol = 8;
+    uint64 block = 9;
 }
 
 message Trade {

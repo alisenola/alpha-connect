@@ -328,6 +328,7 @@ github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/google/go-cmp v0.5.7/go.mod h1:n+brtR0CgQNWTVd5ZUFpTBC8YFBDLK/h/bpaJ8/DtOE=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/gofuzz v1.1.1-0.20200604201612-c04b05f3adfa/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/martian v2.1.0+incompatible h1:/CP5g8u/VJHijgedC/Legn3BAbAaWPgecwXBIDzw5no=
@@ -719,12 +720,16 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e/go.mod h1:Q7
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220124142626-eae5ade7ce4c h1:uCnTdGW8NJB/lr3g3Hf+mZsbddju0sJSVOC/7zYUkxg=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220124142626-eae5ade7ce4c/go.mod h1:sJNJa1AtxZbdT1G2+ZPx2mIc1haqp8OI69Hv6D6QL7U=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4 h1:pGBlD0aOlxrcmwE4u/ZYqI5/+24ph3VvTVXrMxtOGrE=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4/go.mod h1:hpaRSFP2pbELGXtMSjejiC0zjdVF3FPdDOBeVtps3jg=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f/go.mod h1:tAB9hrPkrzTt3QmqPlV4gX9SBgUbC5maWkhBQR2iZYQ=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570 h1:HdLyQ4pIQFaNHUs2+jURnWjnZAQA+qz47ezs+qY6Nfs=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570/go.mod h1:WGEV6Hi12Vfl02KTuqV1COnTl2mNiQ7h+DwwMFPfcxI=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b h1:zs3fLANVzqnlLb2Skz4R1gUwdWwfXiz3waPaOYcvf2o=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b/go.mod h1:Yz0cutXSB6G2AIYb1HyWuEGDcsgNdSlRZ26sDh5RJ98=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a h1:V+DZdg24zUFSOpFYAyAZfrJIbTKZ+2dv4FogzB2N/Ns=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a/go.mod h1:rlQohdpxxxNy7hPNw6xIQUesRmlEtzdlJCvhod8qzoE=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a h1:xFMFACJmtiTWmbu0ngjmk5+cdN7b4SjJ8+ahhzfvTo4=

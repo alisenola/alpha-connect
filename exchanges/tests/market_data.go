@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math"
 	"reflect"
@@ -12,7 +11,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -124,87 +122,4 @@ func MarketData(t *testing.T, test MDTest) {
 	if stats.Error != nil {
 		t.Fatal(stats.Error)
 	}
-}
-
-func PoolData(t *testing.T, test MDTest) {
-	//t.Parallel()
-	_ = constants.LoadAssets(map[uint32]xchangerModels.Asset{
-		0: {
-			Symbol: "WETH",
-			Name:   "wrapped-ether",
-			ID:     0,
-		},
-		1: {
-			Symbol: "USDC",
-			Name:   "usdc",
-			ID:     1,
-		},
-	})
-	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
-	defer clean()
-
-	securityID := []uint64{
-		test.SecurityID,
-	}
-
-	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 30*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	securityList, ok := res.(*messages.SecurityList)
-	if !ok {
-		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
-	}
-	if !securityList.Success {
-		t.Fatal(securityList.RejectionReason.String())
-	}
-	fmt.Println("GOT SEC", len(securityList.Securities))
-
-	var sec *models.Security
-	for _, s := range securityList.Securities {
-		for _, secID := range securityID {
-			if secID == s.SecurityID {
-				sec = s
-			}
-		}
-	}
-
-	if sec == nil {
-		t.Fatal("security not found")
-	}
-
-	res, err = as.Root.RequestFuture(executor, &messages.HistoricalUnipoolV3DataRequest{
-		RequestID: uint64(time.Now().UnixNano()),
-		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: sec.SecurityID},
-			Exchange:   sec.Exchange,
-			Symbol:     &types.StringValue{Value: sec.Symbol},
-		},
-		Start: 14038263,
-		End:   14040263,
-	}, 50*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	updates, ok := res.(*messages.HistoricalUnipoolV3DataResponse)
-	if !ok {
-		t.Fatalf("was expecting *messages.HistoricalUnipoolV3DataResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if !updates.Success {
-		t.Fatal(updates.RejectionReason.String())
-	}
-	CheckSecurityDefinition(t, sec, test)
-	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewPoolV3CheckerProducer(sec, test)))
-	defer as.Root.PoisonFuture(obChecker)
-
-	time.Sleep(80 * time.Second)
-	// res, err = as.Root.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// stats := res.(*GetStat)
-	// t.Logf("Trades: %d | OBUpdates: %d", stats.Trades, stats.OBUpdates)
-	// if stats.Error != nil {
-	// 	t.Fatal(stats.Error)
-	// }
 }

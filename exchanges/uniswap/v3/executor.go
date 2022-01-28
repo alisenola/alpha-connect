@@ -136,12 +136,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		for _, pool := range query.Pools {
 			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
 			if !ok {
-				state.logger.Info("unknown symbol " + pool.Token0.Symbol)
+				// state.logger.Info("unknown symbol " + pool.Token0.Symbol)
 				continue
 			}
 			quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
 			if !ok {
-				state.logger.Info("unknown symbol " + pool.Token1.Symbol)
+				// state.logger.Info("unknown symbol " + pool.Token1.Symbol)
 				continue
 			}
 			tickSpacing, err := pool.GetTickSpacing()
@@ -235,6 +235,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 		uabi.Events["Burn"].ID,
 		uabi.Events["Collect"].ID,
 		uabi.Events["Flash"].ID,
+		uabi.Events["SetFeeProtocol"].ID,
+		uabi.Events["CollectProtocol"].ID,
 	}})
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
@@ -378,6 +380,37 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 					Flash: &gorderbook.UPV3Flash{
 						Amount0: event.Amount0.Bytes(),
 						Amount1: event.Amount1.Bytes(),
+					},
+					Block: l.BlockNumber,
+				}
+				response.Events = append(response.Events, update)
+			case uabi.Events["SetFeeProtocol"].ID:
+				event := uniswap.UniswapSetFeeProtocol{}
+				if err := eth.UnpackLog(uabi, &event, "SetFeeProtocol", l); err != nil {
+					state.logger.Warn("error unpacking the log", log.Error(err))
+					response.RejectionReason = messages.EthRPCError
+					context.Respond(response)
+					return
+				}
+				update := &models.UPV3Update{
+					SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
+						FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
+					},
+					Block: l.BlockNumber,
+				}
+				response.Events = append(response.Events, update)
+			case uabi.Events["CollectProtocol"].ID:
+				event := uniswap.UniswapCollectProtocol{}
+				if err := eth.UnpackLog(uabi, &event, "CollectProtocol", l); err != nil {
+					state.logger.Warn("error unpacking the log", log.Error(err))
+					response.RejectionReason = messages.EthRPCError
+					context.Respond(response)
+					return
+				}
+				update := &models.UPV3Update{
+					CollectProtocol: &gorderbook.UPV3CollectProtocol{
+						AmountRequested0: event.Amount0.Bytes(),
+						AmountRequested1: event.Amount1.Bytes(),
 					},
 					Block: l.BlockNumber,
 				}
