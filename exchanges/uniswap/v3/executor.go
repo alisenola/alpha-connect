@@ -159,8 +159,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 			security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)} // TODO in bps ?
-			security.RoundLot = nil                                                      // TODO Token precision ?
 			security.TakerFee = &types.DoubleValue{Value: float64(pool.FeeTier)}         // TODO pool fees
+			security.CreationBlock = &types.UInt64Value{Value: pool.CreatedAtBlockNumber.Uint64()}
 			securities = append(securities, &security)
 		}
 		if len(query.Pools) != 1000 {

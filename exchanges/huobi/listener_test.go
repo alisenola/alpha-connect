@@ -24,7 +24,6 @@ func TestMarketData(t *testing.T) {
 		Status:            models.Trading,
 		IgnoreSizeResidue: true,
 	})
-
 }
 
 func TestSlowMarketData(t *testing.T) {
