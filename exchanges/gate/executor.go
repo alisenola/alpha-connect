@@ -89,7 +89,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return jobs.NewAPIQuery(client)
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
-			pid: context.Spawn(props),
+			pid:       context.Spawn(props),
+			rateLimit: exchanges.NewRateLimit(100, time.Minute),
 		})
 	}
 	return state.UpdateSecurityList(context)
