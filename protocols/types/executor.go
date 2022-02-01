@@ -5,6 +5,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
 type updateCollectionList struct{}
@@ -12,6 +13,7 @@ type updateCollectionList struct{}
 type Executor interface {
 	actor.Actor
 	UpdateCollectionList(context actor.Context) error
+	OnHistoricalNftTransferDataRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
@@ -58,12 +60,28 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			time.Sleep(time.Minute)
 			context.Send(pid, &updateCollectionList{})
 		}(context.Self())
+	case *messages.HistoricalNftTransferDataRequest:
+		if err := state.OnHistoricalNftTransferDataRequest(context); err != nil {
+			state.GetLogger().Error("error processing HistoricalNftTransferDataRequest", log.Error(err))
+		}
 	}
 
 	return
 }
 
 func (state *BaseExecutor) UpdateCollectionList(context actor.Context) error {
+	return nil
+}
+
+func (state *BaseExecutor) OnHistoricalNftTransferDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalNftTransferDataRequest)
+	resp := &messages.HistoricalNftTransferDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	}
+	context.Respond(resp)
 	return nil
 }
 

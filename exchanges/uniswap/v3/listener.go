@@ -155,7 +155,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 
 	symbol := state.security.Symbol
 
-	client, err := ethclient.Dial(ETH_CLIENT_URL)
+	client, err := ethclient.Dial(ETH_CLIENT_WS)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -170,6 +170,8 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		uabi.Events["Burn"].ID,
 		uabi.Events["Collect"].ID,
 		uabi.Events["Flash"].ID,
+		uabi.Events["SetFeeProtocol"].ID,
+		uabi.Events["CollectProtocol"].ID,
 	}}
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
@@ -219,7 +221,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Mint"].ID:
@@ -236,7 +239,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Burn"].ID:
@@ -253,7 +257,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Swap"].ID:
@@ -268,7 +273,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:      event.Amount0.Bytes(),
 				Amount1:      event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Collect"].ID:
@@ -284,7 +290,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Flash"].ID:
@@ -297,7 +304,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["SetFeeProtocol"].ID:
@@ -309,7 +317,8 @@ func (state *Listener) onLog(context actor.Context) error {
 			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["CollectProtocol"].ID:
@@ -322,7 +331,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}

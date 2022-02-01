@@ -12,13 +12,13 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220128191131-ce646c14562f
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20220121190906-738977a3d8b3
-	go.mongodb.org/mongo-driver v1.7.2
+	gitlab.com/alphaticks/xchanger v0.0.0-20220128173540-2c2716e7e6db
+	go.mongodb.org/mongo-driver v1.8.1
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
 )
@@ -47,7 +47,7 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
-	github.com/klauspost/compress v1.10.3 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/melaurent/gotickfile v0.0.0-20210921084211-01142566a54d // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect

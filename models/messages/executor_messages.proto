@@ -9,6 +9,7 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/nft_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
@@ -128,6 +129,22 @@ message HistoricalUnipoolV3DataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     repeated models.UPV3Update events = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message HistoricalNftTransferDataRequest {
+    uint64 requestID = 1;
+    models.Collection collection = 2;
+    uint64 start = 3;
+    uint64 stop = 4;
+}
+
+message HistoricalNftTransferDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.NftTransfer transfers = 3;
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;
@@ -507,13 +524,6 @@ message OrderMassCancelResponse {
     RejectionReason rejection_reason = 4;
 }
 
-message CollectionList {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    bool success = 3;
-    RejectionReason rejection_reason = 4;
-}
-
 message TransferDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
@@ -527,6 +537,7 @@ message TransferDataResponse {
     bool success = 4;
     RejectionReason rejection_reason = 5;
 }
+
 
 service ExchangeExecutor {
     rpc MarketData (MarketDataRequest) returns (stream MarketDataIncrementalRefresh) {}

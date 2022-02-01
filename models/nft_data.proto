@@ -1,0 +1,9 @@
+syntax = "proto3";
+package models;
+
+message Collection {
+    bytes address = 1;
+    string name = 2;
+    string symbol = 3;
+    bytes total_supply = 4;
+}
