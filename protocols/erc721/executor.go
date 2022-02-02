@@ -33,7 +33,7 @@ type Executor struct {
 	logger         *log.Logger
 }
 
-func NewExecutor() actor.Actor {
+func NewExecutor(config *protocols.ExecutorConfig) actor.Actor {
 	return &Executor{
 		queryRunnerETH: nil,
 		collection:     nil,
