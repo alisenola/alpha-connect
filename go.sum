@@ -688,6 +688,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4 h1:pGBlD0aOl
 gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4/go.mod h1:hpaRSFP2pbELGXtMSjejiC0zjdVF3FPdDOBeVtps3jg=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220128191131-ce646c14562f h1:MHLEdq8LQvq/hx2TzxeX6Cg6TcBjlWgm8VMN4sEM6kI=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220128191131-ce646c14562f/go.mod h1:hpaRSFP2pbELGXtMSjejiC0zjdVF3FPdDOBeVtps3jg=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220201182839-2fe6ecd13783 h1:OJ0tPa4pQtk1tvpOfqsf5cZEQcEbNOBkx8IE2iB/+bk=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220201182839-2fe6ecd13783/go.mod h1:hpaRSFP2pbELGXtMSjejiC0zjdVF3FPdDOBeVtps3jg=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=

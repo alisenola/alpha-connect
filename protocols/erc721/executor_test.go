@@ -54,6 +54,7 @@ func TestExecutor(t *testing.T) {
 	if !ok {
 		t.Fatal("error in conversion from string to hexa")
 	}
+	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		ex,
 		&messages.HistoricalNftTransferDataRequest{
@@ -76,13 +77,13 @@ func TestExecutor(t *testing.T) {
 	if !response.Success {
 		t.Fatal("error in the transfers request")
 	}
-
+	//Execute the graphql query for the same period querying transfers for the BAYC contract
 	client := graphql.NewClient("https://api.thegraph.com/subgraphs/name/ryry79261/mainnet-erc721-erc1155", nil)
 	query := ERC721Contract{}
 	variables := map[string]interface{}{
 		"id":        graphql.ID("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"),
 		"number":    graphql.Int(12300000),
-		"timestamp": graphql.Int(1619228194),
+		"timestamp": graphql.Int(1619228194), //Exact cut off time for block 12300000
 	}
 	err = client.Query(context.Background(), &query, variables)
 	if err != nil {
@@ -93,7 +94,7 @@ func TestExecutor(t *testing.T) {
 			t.Fatal()
 		}
 	}
-
+	//Run the transfers using the nft tracker
 	tracker := gorderbook.NewNftTracker()
 	for _, t := range response.Transfers {
 		var from [20]byte
@@ -104,9 +105,30 @@ func TestExecutor(t *testing.T) {
 		tokenID.SetBytes(t.Transfer.TokenId)
 		tracker.TransferFromNft(from, to, tokenID)
 	}
+	//Capture snapshot of the tracker and extract owners and nft amount
 	snap := tracker.GetNftTrackerSnapshot()
+	owners := make(map[[20]byte]int32)
 	for k, v := range snap.Coins {
+		owners[v.Owner] += 1
 		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.Bytes2Hex(v.Owner[:]))
+	}
+	//Check owners using the transfers, from graphql
+	ownersCheck := make(map[[20]byte]int32)
+	for _, t := range query.ERC721Contract.Transfers {
+		toOther, _ := big.NewInt(1).SetString(t.To.Id[2:], 16)
+		fromOther, _ := big.NewInt(1).SetString(t.From.Id[2:], 16)
+		var addTo [20]byte
+		var addFrom [20]byte
+		copy(addTo[:], toOther.Bytes())
+		copy(addFrom[:], fromOther.Bytes())
+		ownersCheck[addTo] += 1
+		ownersCheck[addFrom] -= 1
+	}
+	//Compare the final amount of owners and amount of token owned
+	for k, v := range owners {
+		if ownersCheck[k] != v {
+			fmt.Println("error with", common.Bytes2Hex(k[:]))
+		}
 	}
 }
 
