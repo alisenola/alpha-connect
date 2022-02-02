@@ -2,6 +2,7 @@ package erc721
 
 import (
 	"fmt"
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"math/big"
 	"reflect"
 	"time"
@@ -33,7 +34,7 @@ type Executor struct {
 	logger         *log.Logger
 }
 
-func NewExecutor(config *protocols.ExecutorConfig) actor.Actor {
+func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
 		queryRunnerETH: nil,
 		collection:     nil,

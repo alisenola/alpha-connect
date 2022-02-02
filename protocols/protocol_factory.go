@@ -10,7 +10,7 @@ import (
 func NewProtocolExecutorProducer(protocol *models2.Protocol, config *ExecutorConfig) actor.Producer {
 	switch protocol.ID {
 	case constants.ERC721.ID:
-		return func() actor.Actor { return erc721.NewExecutor(config) }
+		return func() actor.Actor { return erc721.NewExecutor(config.Registry) }
 	default:
 		return nil
 	}
