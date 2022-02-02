@@ -206,7 +206,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
+func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalUnipoolV3DataRequest)
 	response := &messages.HistoricalUnipoolV3DataResponse{
 		RequestID:  msg.RequestID,
@@ -273,7 +273,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 			return
 		}
 		logs := queryResponse.Logs
-		for _, l := range logs {
+		for i, l := range logs {
 			switch l.Topics[0] {
 			case uabi.Events["Initialize"].ID:
 				event := uniswap.UniswapInitialize{}
@@ -288,7 +288,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 						Tick:         int32(event.Tick.Int64()),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Mint"].ID:
@@ -308,7 +309,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Burn"].ID:
@@ -328,7 +330,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Swap"].ID:
@@ -346,7 +349,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0:      event.Amount0.Bytes(),
 						Amount1:      event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Collect"].ID:
@@ -365,7 +369,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Flash"].ID:
@@ -381,7 +386,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						Amount0: event.Amount0.Bytes(),
 						Amount1: event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["SetFeeProtocol"].ID:
@@ -396,7 +402,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 					SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 						FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["CollectProtocol"].ID:
@@ -412,7 +419,8 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
-					Block: l.BlockNumber,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
 			}

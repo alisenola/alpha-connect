@@ -92,6 +92,7 @@ message UPV3Update {
     gorderbook.models.UPV3SetFeeProtocol set_fee_protocol = 7;
     gorderbook.models.UPV3CollectProtocol collect_protocol = 8;
     uint64 block = 9;
+    google.protobuf.Timestamp timestamp = 10;
 }
 
 message Trade {

@@ -77,7 +77,10 @@ func TestPoolData(t *testing.T) {
 	pool := gorderbook.NewUnipoolV3(int32(sec.TakerFee.Value))
 	delta := -1
 	for _, ev := range updates.Events {
-		v3.ProcessUpdate(pool, ev)
+		fmt.Println(ev.Timestamp)
+		if err := v3.ProcessUpdate(pool, ev); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	graph := graphql.NewClient(uniswap.GRAPHQL_URL, nil)

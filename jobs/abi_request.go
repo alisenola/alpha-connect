@@ -2,6 +2,7 @@ package jobs
 
 import (
 	goContext "context"
+	"math/big"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum"
@@ -25,6 +26,7 @@ type PerformLogsQueryRequest struct {
 type PerformLogsQueryResponse struct {
 	Error error
 	Logs  []types.Log
+	Times []uint64
 }
 
 type ABIQuery struct {
@@ -77,8 +79,25 @@ func (q *ABIQuery) PerformLogsQueryRequest(context actor.Context) error {
 		logs, err := q.client.FilterLogs(goContext.Background(), msg.Query)
 		if err != nil {
 			queryResponse.Error = err
+			context.Send(sender, &queryResponse)
+			return
 		} else {
 			queryResponse.Logs = logs
+		}
+		var lastBlock uint64 = 0
+		var lastTime uint64 = 0
+		for _, l := range logs {
+			if lastBlock != l.BlockNumber {
+				block, err := q.client.BlockByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
+				if err != nil {
+					queryResponse.Error = err
+					context.Send(sender, &queryResponse)
+					return
+				}
+				lastTime = block.Time()
+				lastBlock = l.BlockNumber
+			}
+			queryResponse.Times = append(queryResponse.Times, lastTime)
 		}
 		context.Send(sender, &queryResponse)
 	}(context.Sender())
