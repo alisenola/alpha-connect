@@ -23,22 +23,23 @@ import (
 )
 
 type checkSockets struct{}
-type postAggTrade struct{}
 
 type InstrumentData struct {
 	events          []*models.UPV3Update
 	seqNum          uint64
 	lastBlockUpdate uint64
+	lastHB          time.Time
 }
 
 type Listener struct {
 	extypes.Listener
+	client         *ethclient.Client
 	iterator       *eth.LogIterator
 	security       *models.Security
-	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	socketTicker   *time.Ticker
+	lastPingTime   time.Time
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -49,9 +50,9 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
+		client:         nil,
 		iterator:       nil,
 		security:       security,
-		dialerPool:     dialerPool,
 		instrumentData: nil,
 		logger:         nil,
 		socketTicker:   nil,
@@ -95,6 +96,12 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing log", log.Error(err))
 			panic(err)
 		}
+
+	case *checkSockets:
+		if err := state.onCheckSockets(context); err != nil {
+			state.logger.Error("error checking sockets", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -113,6 +120,12 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastBlockUpdate: 0,
 	}
 
+	client, err := ethclient.Dial(ETH_CLIENT_WS)
+	if err != nil {
+		return fmt.Errorf("error while dialing eth rpc client %v", err)
+	}
+	state.client = client
+
 	if err := state.subscribeLogs(context); err != nil {
 		return fmt.Errorf("error subscribing to logs %v", err)
 	}
@@ -122,7 +135,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -155,10 +168,6 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 
 	symbol := state.security.Symbol
 
-	client, err := ethclient.Dial(ETH_CLIENT_URL)
-	if err != nil {
-		return fmt.Errorf("error while dialing eth rpc client %v", err)
-	}
 	uabi, err := uniswap.UniswapMetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
@@ -170,6 +179,8 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		uabi.Events["Burn"].ID,
 		uabi.Events["Collect"].ID,
 		uabi.Events["Flash"].ID,
+		uabi.Events["SetFeeProtocol"].ID,
+		uabi.Events["CollectProtocol"].ID,
 	}}
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
@@ -181,7 +192,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	}
 	it := eth.NewLogIterator(uabi)
 	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
-	it.WatchLogs(client, ctx, fQuery)
+	it.WatchLogs(state.client, ctx, fQuery)
 
 	go func(it *eth.LogIterator, pid *actor.PID) {
 		for it.Next() {
@@ -219,7 +230,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Mint"].ID:
@@ -236,7 +248,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Burn"].ID:
@@ -253,7 +266,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Swap"].ID:
@@ -268,7 +282,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:      event.Amount0.Bytes(),
 				Amount1:      event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Collect"].ID:
@@ -284,7 +299,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Flash"].ID:
@@ -297,7 +313,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["SetFeeProtocol"].ID:
@@ -309,7 +326,8 @@ func (state *Listener) onLog(context actor.Context) error {
 			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["CollectProtocol"].ID:
@@ -322,7 +340,8 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Block: msg.BlockNumber,
+			Removed: msg.Removed,
+			Block:   msg.BlockNumber,
 		}
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
@@ -334,5 +353,28 @@ func (state *Listener) onLog(context actor.Context) error {
 	})
 	state.instrumentData.seqNum += 1
 
+	return nil
+}
+
+func (state *Listener) onCheckSockets(context actor.Context) error {
+	if time.Since(state.lastPingTime) > 5*time.Second {
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 5*time.Second)
+		defer cancel()
+		_, err := state.client.BlockNumber(ctx)
+		if err != nil {
+			state.logger.Info("eth client err", log.Error(err))
+			if err := state.subscribeLogs(context); err != nil {
+				return fmt.Errorf("error subscribing to logs: %v", err)
+			}
+		}
+	}
+
+	if time.Since(state.instrumentData.lastHB) > 2*time.Second {
+		context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHB = time.Now()
+	}
 	return nil
 }
