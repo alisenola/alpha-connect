@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -29,7 +31,13 @@ func (state *BaseListener) Clean(context actor.Context) error {
 }
 
 func (state *BaseListener) OnTransferDataRequest(context actor.Context) error {
-
+	req := context.Message().(*messages.TransferDataRequest)
+	context.Respond(&messages.TransferDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
 	return nil
 }
 

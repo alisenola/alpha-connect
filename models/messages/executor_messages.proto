@@ -221,6 +221,13 @@ message UnipoolV3DataIncrementalRefresh {
     models.UPV3Update update = 4;
 }
 
+message Erc721DataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.AssetTransfer update = 4;
+}
+
 message AccountDataRequest {
     uint64 requestID = 1;
     bool subscribe = 2;

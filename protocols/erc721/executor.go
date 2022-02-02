@@ -2,10 +2,11 @@ package erc721
 
 import (
 	"fmt"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"math/big"
 	"reflect"
 	"time"
+
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -14,8 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	utils "gitlab.com/alphaticks/xchanger/protocols"
 
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
@@ -53,7 +54,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(protocols.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(utils.ETH_CLIENT_WS)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -66,8 +67,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	return state.UpdateCollectionList(context)
 }
 
-func (state *Executor) OnHistoricalAssetTransferDataRequest(context actor.Context) error {
-	fmt.Println("STARTING HISTORICAL NFT TRANSFER REQUEST")
+func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) error {
 	req := context.Message().(*messages.HistoricalAssetTransferRequest)
 	msg := &messages.HistoricalAssetTransferResponse{
 		RequestID:  req.RequestID,
@@ -100,11 +100,9 @@ func (state *Executor) OnHistoricalAssetTransferDataRequest(context actor.Contex
 		ToBlock:   big.NewInt(1).SetUint64(req.Stop),
 		Topics:    topics,
 	}
-	fmt.Println("request", fQuery)
 	qr := state.queryRunnerETH
 	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 15*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
-		fmt.Println("IN THE FUTURE REQUEST")
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
 			msg.RejectionReason = messages.EthRPCError
@@ -164,3 +162,5 @@ func (state *Executor) GetLogger() *log.Logger {
 func (state *Executor) UpdateCollectionList(context actor.Context) error {
 	return nil
 }
+
+//add an assetListRequest message

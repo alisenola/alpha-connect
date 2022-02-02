@@ -8,11 +8,12 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
-type updateCollectionList struct{}
+type updateAssetList struct{}
 
 type Executor interface {
 	actor.Actor
-	UpdateCollectionList(context actor.Context) error
+	UpdateAssetList(context actor.Context) error
+	OnAssetListRequest(context actor.Context) error
 	OnHistoricalAssetTransferRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -32,7 +33,7 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		state.GetLogger().Info("actor started")
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
-			context.Send(pid, &updateCollectionList{})
+			context.Send(pid, &updateAssetList{})
 		}(context.Self())
 
 	case *actor.Stopping:
@@ -52,25 +53,35 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		}
 		state.GetLogger().Info("actor restarting")
 
-	case *updateCollectionList:
-		if err := state.UpdateCollectionList(context); err != nil {
+	case *updateAssetList:
+		if err := state.UpdateAssetList(context); err != nil {
 			state.GetLogger().Info("error updating security list", log.Error(err))
 		}
 		go func(pid *actor.PID) {
-			time.Sleep(time.Minute)
-			context.Send(pid, &updateCollectionList{})
+			time.Sleep(10 * time.Minute)
+			context.Send(pid, &updateAssetList{})
 		}(context.Self())
 	case *messages.HistoricalAssetTransferRequest:
 		if err := state.OnHistoricalAssetTransferRequest(context); err != nil {
 			state.GetLogger().Error("error processing HistoricalNftTransferDataRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.AssetListRequest:
+		if err := state.OnAssetListRequest(context); err != nil {
+			state.GetLogger().Error("error getting security list", log.Error(err))
+			panic(err)
 		}
 	}
 
 	return
 }
 
-func (state *BaseExecutor) UpdateCollectionList(context actor.Context) error {
+func (state *BaseExecutor) UpdateAssetList(context actor.Context) error {
 	return nil
+}
+
+func (state *BaseExecutor) OnAssetListRequest(context actor.Context) error {
+	req
 }
 
 func (state *BaseExecutor) OnHistoricalAssetTransferRequest(context actor.Context) error {

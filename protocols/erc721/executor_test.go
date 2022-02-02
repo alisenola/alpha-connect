@@ -44,7 +44,7 @@ func TestExecutor(t *testing.T) {
 	as := actor.NewActorSystem()
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(
 		func() actor.Actor {
-			return NewExecutor()
+			return NewExecutor(nil)
 		},
 	), "executor_erc")
 	if err != nil {
@@ -57,7 +57,7 @@ func TestExecutor(t *testing.T) {
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		ex,
-		&messages.HistoricalNftTransferDataRequest{
+		&messages.HistoricalAssetTransferRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Collection: &models.Collection{
 				Address:     contract.Bytes(),
@@ -73,9 +73,9 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
-	response, _ := resp.(*messages.HistoricalNftTransferDataResponse)
+	response, _ := resp.(*messages.HistoricalAssetTransferResponse)
 	if !response.Success {
-		t.Fatal("error in the transfers request")
+		t.Fatal("error in the transfers request", response.RejectionReason)
 	}
 	//Execute the graphql query for the same period querying transfers for the BAYC contract
 	client := graphql.NewClient("https://api.thegraph.com/subgraphs/name/ryry79261/mainnet-erc721-erc1155", nil)
@@ -103,10 +103,10 @@ func TestExecutor(t *testing.T) {
 		copy(from[:], t.Transfer.From)
 		copy(to[:], t.Transfer.To)
 		tokenID.SetBytes(t.Transfer.TokenId)
-		tracker.TransferFromNft(from, to, tokenID)
+		tracker.TransferFrom(from, to, tokenID)
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
-	snap := tracker.GetNftTrackerSnapshot()
+	snap := tracker.GetSnapshot()
 	owners := make(map[[20]byte]int32)
 	for k, v := range snap.Coins {
 		owners[v.Owner] += 1
@@ -132,7 +132,7 @@ func TestExecutor(t *testing.T) {
 	}
 }
 
-func find(t *models.NftTransfer, arr []*Transfer) bool {
+func find(t *models.AssetTransfer, arr []*Transfer) bool {
 	from := big.NewInt(1).SetBytes(t.Transfer.From)
 	to := big.NewInt(1).SetBytes(t.Transfer.To)
 	for _, tOther := range arr {
