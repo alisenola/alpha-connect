@@ -134,17 +134,17 @@ message HistoricalUnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
-message HistoricalNftTransferDataRequest {
+message HistoricalAssetTransferRequest {
     uint64 requestID = 1;
     models.Collection collection = 2;
     uint64 start = 3;
     uint64 stop = 4;
 }
 
-message HistoricalNftTransferDataResponse {
+message HistoricalAssetTransferResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    repeated models.NftTransfer transfers = 3;
+    repeated models.AssetTransfer transfers = 3;
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;

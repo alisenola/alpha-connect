@@ -13,7 +13,7 @@ type updateCollectionList struct{}
 type Executor interface {
 	actor.Actor
 	UpdateCollectionList(context actor.Context) error
-	OnHistoricalNftTransferDataRequest(context actor.Context) error
+	OnHistoricalAssetTransferRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
@@ -60,8 +60,8 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			time.Sleep(time.Minute)
 			context.Send(pid, &updateCollectionList{})
 		}(context.Self())
-	case *messages.HistoricalNftTransferDataRequest:
-		if err := state.OnHistoricalNftTransferDataRequest(context); err != nil {
+	case *messages.HistoricalAssetTransferRequest:
+		if err := state.OnHistoricalAssetTransferRequest(context); err != nil {
 			state.GetLogger().Error("error processing HistoricalNftTransferDataRequest", log.Error(err))
 		}
 	}
@@ -73,9 +73,9 @@ func (state *BaseExecutor) UpdateCollectionList(context actor.Context) error {
 	return nil
 }
 
-func (state *BaseExecutor) OnHistoricalNftTransferDataRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalNftTransferDataRequest)
-	resp := &messages.HistoricalNftTransferDataResponse{
+func (state *BaseExecutor) OnHistoricalAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalAssetTransferRequest)
+	resp := &messages.HistoricalAssetTransferResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,

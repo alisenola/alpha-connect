@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220201182839-2fe6ecd13783
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220202122802-256bc35514b6
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a

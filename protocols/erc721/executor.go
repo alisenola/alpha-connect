@@ -65,10 +65,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 	return state.UpdateCollectionList(context)
 }
 
-func (state *Executor) OnHistoricalNftTransferDataRequest(context actor.Context) error {
+func (state *Executor) OnHistoricalAssetTransferDataRequest(context actor.Context) error {
 	fmt.Println("STARTING HISTORICAL NFT TRANSFER REQUEST")
-	req := context.Message().(*messages.HistoricalNftTransferDataRequest)
-	msg := &messages.HistoricalNftTransferDataResponse{
+	req := context.Message().(*messages.HistoricalAssetTransferRequest)
+	msg := &messages.HistoricalAssetTransferResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
@@ -119,7 +119,7 @@ func (state *Executor) OnHistoricalNftTransferDataRequest(context actor.Context)
 			return
 		}
 
-		events := make([]*models.NftTransfer, 0)
+		events := make([]*models.AssetTransfer, 0)
 		for _, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
@@ -130,8 +130,8 @@ func (state *Executor) OnHistoricalNftTransferDataRequest(context actor.Context)
 					context.Respond(msg)
 					return
 				}
-				t := &models.NftTransfer{
-					Transfer: &gorderbook.NftTransfer{
+				t := &models.AssetTransfer{
+					Transfer: &gorderbook.AssetTransfer{
 						From:    event.From[:],
 						To:      event.To[:],
 						TokenId: event.TokenId.Bytes(),
