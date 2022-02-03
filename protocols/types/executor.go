@@ -61,6 +61,7 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			time.Sleep(10 * time.Minute)
 			context.Send(pid, &updateAssetList{})
 		}(context.Self())
+
 	case *messages.HistoricalAssetTransferRequest:
 		if err := state.OnHistoricalAssetTransferRequest(context); err != nil {
 			state.GetLogger().Error("error processing HistoricalNftTransferDataRequest", log.Error(err))
@@ -72,8 +73,6 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			panic(err)
 		}
 	}
-
-	return
 }
 
 func (state *BaseExecutor) UpdateAssetList(context actor.Context) error {
@@ -81,18 +80,24 @@ func (state *BaseExecutor) UpdateAssetList(context actor.Context) error {
 }
 
 func (state *BaseExecutor) OnAssetListRequest(context actor.Context) error {
-	req
-}
-
-func (state *BaseExecutor) OnHistoricalAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalAssetTransferRequest)
-	resp := &messages.HistoricalAssetTransferResponse{
+	req := context.Message().(*messages.AssetListRequest)
+	context.Respond(&messages.AssetListResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
 		RejectionReason: messages.UnsupportedRequest,
-	}
-	context.Respond(resp)
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnHistoricalAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalAssetTransferRequest)
+	context.Respond(&messages.HistoricalAssetTransferResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
 	return nil
 }
 

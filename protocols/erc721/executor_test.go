@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -11,8 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/gorderbook"
+	"google.golang.org/grpc"
 )
 
 type ERC721Data struct {
@@ -42,28 +45,52 @@ type ERC721Contract struct {
 
 func TestExecutor(t *testing.T) {
 	as := actor.NewActorSystem()
+	registryAddress := "registry.alphaticks.io:7001"
+	if os.Getenv("REGISTRY_ADDRESS") != "" {
+		registryAddress = os.Getenv("REGISTRY_ADDRESS")
+	}
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
+	}
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(
 		func() actor.Actor {
-			return NewExecutor(nil)
+			return NewExecutor(registry.NewPublicRegistryClient(conn))
 		},
 	), "executor_erc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	contract, ok := big.NewInt(1).SetString("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d", 16)
-	if !ok {
-		t.Fatal("error in conversion from string to hexa")
+	testAsset := []models.Collection{{
+		Symbol: "BAYC",
+	}}
+	res, err := as.Root.RequestFuture(ex, &messages.AssetListRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
 	}
+	assets, ok := res.(*messages.AssetListResponse)
+	if !ok {
+		t.Fatal("incorrect typying")
+	}
+	var coll models.Collection
+	for _, asset := range assets.Collections {
+		for _, c := range testAsset {
+			if asset.Symbol == c.Symbol {
+				coll = *asset
+			}
+		}
+	}
+
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		ex,
 		&messages.HistoricalAssetTransferRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Collection: &models.Collection{
-				Address:     contract.Bytes(),
-				Name:        "BoredApeYachtClub",
-				Symbol:      "BAYC",
-				TotalSupply: big.NewInt(10000).Bytes(),
+				Address:     coll.Address,
+				Name:        coll.Name,
+				Symbol:      coll.Symbol,
+				TotalSupply: big.NewInt(0).Bytes(),
 			},
 			Start: 12200000,
 			Stop:  12300000,

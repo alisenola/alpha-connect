@@ -1,6 +1,7 @@
 package erc721
 
 import (
+	goContext "context"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -31,15 +32,17 @@ type QueryRunner struct {
 type Executor struct {
 	extype.BaseExecutor
 	queryRunnerETH *QueryRunner
-	collection     []*models.Collection
+	collections    []*models.Collection
 	logger         *log.Logger
+	registry       registry.PublicRegistryClient
 }
 
 func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
 		queryRunnerETH: nil,
-		collection:     nil,
+		collections:    nil,
 		logger:         nil,
+		registry:       registry,
 	}
 }
 
@@ -64,7 +67,53 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunnerETH = &QueryRunner{
 		pid: context.Spawn(props),
 	}
-	return state.UpdateCollectionList(context)
+	return state.UpdateAssetList(context)
+}
+
+func (state *Executor) UpdateAssetList(context actor.Context) error {
+	collections := make([]*models.Collection, 0)
+	reg := state.registry
+
+	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	defer cancel()
+	filter := registry.AssetFilter{
+		Protocol: []string{"ERC-721"},
+		Fungible: false,
+	}
+	in := registry.AssetsRequest{
+		Filter: &filter,
+	}
+	response, err := reg.Assets(ctx, &in)
+	if err != nil {
+		return fmt.Errorf("error updating asset list: %v", err)
+	}
+	assets := response.Assets
+	for _, asset := range assets {
+		add, ok := big.NewInt(1).SetString(asset.Meta["address"][2:], 16)
+		if !ok {
+			continue
+		}
+		collections = append(
+			collections,
+			&models.Collection{
+				Address: add.Bytes(),
+				Name:    asset.Name,
+				Symbol:  asset.Symbol,
+			})
+	}
+	state.collections = collections
+	return nil
+}
+
+func (state *Executor) OnAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.AssetListRequest)
+	context.Respond(&messages.AssetListResponse{
+		RequestID:   req.RequestID,
+		ResponseID:  uint64(time.Now().UnixNano()),
+		Success:     true,
+		Collections: state.collections,
+	})
+	return nil
 }
 
 func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) error {
@@ -157,10 +206,6 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) GetLogger() *log.Logger {
 	return state.logger
-}
-
-func (state *Executor) UpdateCollectionList(context actor.Context) error {
-	return nil
 }
 
 //add an assetListRequest message
