@@ -117,7 +117,7 @@ func TestPoolData(t *testing.T) {
 		)
 	}
 
-	for k, _ := range snapshot.Ticks {
+	for k := range snapshot.Ticks {
 		fmt.Println("tick", k)
 		tick := pool.GetTickValue(k)
 		fmt.Println("FeeGrowthOutside0X128", tick.FeeGrowthOutside0X128)

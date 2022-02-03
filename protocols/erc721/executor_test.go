@@ -1,21 +1,19 @@
-package erc721
+package erc721_test
 
 import (
 	"context"
 	"fmt"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	"gitlab.com/alphaticks/alpha-connect/protocols/tests"
 	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/gorderbook"
-	"google.golang.org/grpc"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
 type ERC721Data struct {
@@ -44,27 +42,14 @@ type ERC721Contract struct {
 }
 
 func TestExecutor(t *testing.T) {
-	as := actor.NewActorSystem()
-	registryAddress := "registry.alphaticks.io:7001"
-	if os.Getenv("REGISTRY_ADDRESS") != "" {
-		registryAddress = os.Getenv("REGISTRY_ADDRESS")
-	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(
-		func() actor.Actor {
-			return NewExecutor(registry.NewPublicRegistryClient(conn))
-		},
-	), "executor_erc")
-	if err != nil {
-		t.Fatal(err)
-	}
-	testAsset := []models.Collection{{
+	as, executor, cancel := tests.StartExecutor(t, &models2.Protocol{Name: "ERC-721", ID: 0x01})
+	defer cancel()
+
+	testAsset := []models.ProtocolAsset{{
 		Symbol: "BAYC",
 	}}
-	res, err := as.Root.RequestFuture(ex, &messages.AssetListRequest{}, 10*time.Second).Result()
+	//TODO Complete the function for main executor OnAssetListRequest
+	res, err := as.Root.RequestFuture(executor, &messages.AssetListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +57,8 @@ func TestExecutor(t *testing.T) {
 	if !ok {
 		t.Fatal("incorrect typying")
 	}
-	var coll models.Collection
-	for _, asset := range assets.Collections {
+	var coll models.ProtocolAsset
+	for _, asset := range assets.Assets {
 		for _, c := range testAsset {
 			if asset.Symbol == c.Symbol {
 				coll = *asset
@@ -83,10 +68,10 @@ func TestExecutor(t *testing.T) {
 
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
-		ex,
+		executor,
 		&messages.HistoricalAssetTransferRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Collection: &models.Collection{
+			Asset: &models.ProtocolAsset{
 				Address:     coll.Address,
 				Name:        coll.Name,
 				Symbol:      coll.Symbol,
@@ -159,7 +144,7 @@ func TestExecutor(t *testing.T) {
 	}
 }
 
-func find(t *models.AssetTransfer, arr []*Transfer) bool {
+func find(t *models.AssetUpdate, arr []*Transfer) bool {
 	from := big.NewInt(1).SetBytes(t.Transfer.From)
 	to := big.NewInt(1).SetBytes(t.Transfer.To)
 	for _, tOther := range arr {

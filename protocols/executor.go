@@ -2,13 +2,16 @@ package protocols
 
 import (
 	goContext "context"
+	"errors"
 	"fmt"
-	models2 "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"time"
 
+	models2 "gitlab.com/alphaticks/xchanger/models"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,17 +22,19 @@ import (
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
 type ExecutorConfig struct {
-	Db       *mongo.Database
-	Registry registry.PublicRegistryClient
-	Strict   bool
+	Db        *mongo.Database
+	Registry  registry.PublicRegistryClient
+	Strict    bool
+	Protocols []*models2.Protocol
 }
 
 type Executor struct {
 	*ExecutorConfig
-	protocols []*models2.Protocol
-	executors map[uint32]*actor.PID // A map from exchange ID to executor
-	logger    *log.Logger
-	strict    bool
+	executors  map[uint32]*actor.PID // A map from exchange ID to executor
+	assets     map[[20]byte]*models.ProtocolAsset
+	symToAsset map[uint32]map[string]*models.ProtocolAsset
+	logger     *log.Logger
+	strict     bool
 }
 
 func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
@@ -75,6 +80,10 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnTerminated", log.Error(err))
 			panic(err)
 		}
+	case *messages.AssetListRequest:
+		if err := state.OnAssetListRequest(context); err != nil {
+			state.logger.Error("error processing AssetListRequest", log.Error(err))
+		}
 	}
 }
 
@@ -104,7 +113,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
-	for _, protocol := range state.protocols {
+	for _, protocol := range state.ExecutorConfig.Protocols {
 		producer := NewProtocolExecutorProducer(protocol, state.ExecutorConfig)
 		if producer == nil {
 			return fmt.Errorf("unknown protocol %s", protocol.Name)
@@ -116,7 +125,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Request securities for each one of them
 	var futures []*actor.Future
-	request := &messages.SecurityListRequest{
+	request := &messages.AssetListRequest{
 		RequestID: 0,
 		Subscribe: true,
 	}
@@ -125,7 +134,44 @@ func (state *Executor) Initialize(context actor.Context) error {
 		futures = append(futures, fut)
 	}
 
+	state.symToAsset = make(map[uint32]map[string]*models.ProtocolAsset)
+	state.assets = make(map[[20]byte]*models.ProtocolAsset)
+	for _, fut := range futures {
+		res, err := fut.Result()
+		if err != nil {
+			if state.strict {
+				return fmt.Errorf("error fetching assets for one venue: %v", err)
+			} else {
+				state.logger.Error("error fetching assets for one venue: %v", log.Error(err))
+			}
+		}
+		result, ok := res.(*messages.AssetListResponse)
+		if !ok {
+			return fmt.Errorf("was expecting AssetListResponse, got %s", reflect.TypeOf(res).String())
+		}
+		if !result.Success {
+			return errors.New(result.RejectionReason.String())
+		}
+
+		symToAsset := make(map[string]*models.ProtocolAsset)
+		var protoID uint32
+		for _, asset := range result.Assets {
+			var add [20]byte
+			copy(add[:], asset.Address)
+			if asset2, ok := state.assets[add]; ok {
+				return fmt.Errorf("got two assets with the same contract address: %s and %s", asset2.Symbol, asset.Symbol)
+			}
+			state.assets[add] = asset
+			symToAsset[asset.Symbol] = asset
+			protoID = asset.Protocol.ID
+		}
+		state.symToAsset[protoID] = symToAsset
+	}
 	return nil
+}
+
+func (state *Executor) OnAssetListRequest(context actor.Context) error {
+
 }
 
 func (state *Executor) Clean(context actor.Context) error {

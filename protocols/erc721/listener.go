@@ -16,7 +16,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols/types"
+	gorderbook_models "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/eth"
+	utils "gitlab.com/alphaticks/xchanger/eth"
 	"gitlab.com/alphaticks/xchanger/protocols"
 	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
 )
@@ -26,7 +28,7 @@ type checkSockets struct{}
 //Check socket for uniswap also
 
 type InstrumentData struct {
-	events          []*models.AssetTransfer
+	events          []*models.AssetUpdate
 	seqNum          uint64
 	lastBlockUpdate uint64
 	lastHB          time.Time
@@ -37,19 +39,19 @@ type Listener struct {
 	client       *ethclient.Client
 	instrument   *InstrumentData
 	iterator     *eth.LogIterator
-	collection   *models.Collection
+	collection   *models.ProtocolAsset
 	logger       *log.Logger
 	socketTicker *time.Ticker
 	lastPingTime time.Time
 }
 
-func NewListenerProducer(collection *models.Collection) actor.Producer {
+func NewListenerProducer(collection *models.ProtocolAsset) actor.Producer {
 	return func() actor.Actor {
 		return NewListener(collection)
 	}
 }
 
-func NewListener(collection *models.Collection) actor.Actor {
+func NewListener(collection *models.ProtocolAsset) actor.Actor {
 	return &Listener{
 		instrument:   nil,
 		iterator:     nil,
@@ -87,7 +89,7 @@ func (state *Listener) Receive(context actor.Context) {
 		}
 	case *ethTypes.Log:
 		if err := state.onLog(context); err != nil {
-			state.logger.Error("error processing log", err)
+			state.logger.Error("error processing log", log.Error(err))
 		}
 	}
 }
@@ -104,7 +106,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	)
 
 	state.instrument = &InstrumentData{
-		events:          make([]*models.AssetTransfer, 0),
+		events:          make([]*models.AssetUpdate, 0),
 		seqNum:          uint64(time.Now().UnixNano()),
 		lastBlockUpdate: 0,
 	}
@@ -116,7 +118,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.client = client
 
 	if err := state.subscribeLogs(context); err != nil {
-		return fmt.Errorf("error subscribing to logs %v", err)
+		return fmt.Errorf("error subscribing to logs: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -140,7 +142,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	address := common.BytesToAddress(state.collection.Address)
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
-		return fmt.Errorf("error getting abi %v", err)
+		return fmt.Errorf("error getting abi: %v", err)
 	}
 	it := eth.NewLogIterator(eabi)
 
@@ -172,6 +174,44 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) onLog(context actor.Context) error {
+	req := context.Message().(*ethTypes.Log)
+	eabi, err := nft.ERC721MetaData.GetAbi()
+	if err != nil {
+		return fmt.Errorf("error getting abi: %v", err)
+	}
+
+	var updt *models.AssetUpdate
+	switch req.Topics[0] {
+	case eabi.Events["Transfer"].ID:
+		event := nft.ERC721Transfer{}
+		if err := utils.UnpackLog(eabi, &event, "Transfer", *req); err != nil {
+			return fmt.Errorf("error unpacking log: %v", err)
+		}
+		updt = &models.AssetUpdate{
+			Transfer: &gorderbook_models.AssetTransfer{
+				From:    event.From[:],
+				To:      event.To[:],
+				TokenId: event.TokenId.Bytes(),
+			},
+			Block:   event.Raw.BlockNumber,
+			Removed: event.Raw.Removed,
+		}
+	}
+
+	context.Send(
+		context.Parent(),
+		&messages.AssetDataIncrementalRefresh{
+			ResponseID: uint64(time.Now().UnixNano()),
+			SeqNum:     state.instrument.seqNum + 1,
+			Update:     updt,
+		})
+
+	state.instrument.lastBlockUpdate = updt.Block
+	state.instrument.seqNum += 1
+	return nil
+}
+
 func (state *Listener) onCheckSockets(context actor.Context) error {
 	if time.Since(state.lastPingTime) > 5*time.Second {
 		ctx, cancel := goContext.WithTimeout(goContext.Background(), 5*time.Second)
@@ -186,7 +226,7 @@ func (state *Listener) onCheckSockets(context actor.Context) error {
 	}
 
 	if time.Since(state.instrument.lastHB) > 2*time.Second {
-		context.Send(context.Parent(), &messages.Erc721DataIncrementalRefresh{
+		context.Send(context.Parent(), &messages.AssetDataIncrementalRefresh{
 			SeqNum: state.instrument.seqNum + 1,
 		})
 		state.instrument.seqNum += 1

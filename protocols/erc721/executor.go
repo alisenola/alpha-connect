@@ -17,6 +17,8 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/constants"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 	utils "gitlab.com/alphaticks/xchanger/protocols"
 
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -32,7 +34,7 @@ type QueryRunner struct {
 type Executor struct {
 	extype.BaseExecutor
 	queryRunnerETH *QueryRunner
-	collections    []*models.Collection
+	assets         []*models.ProtocolAsset
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
@@ -40,7 +42,7 @@ type Executor struct {
 func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
 		queryRunnerETH: nil,
-		collections:    nil,
+		assets:         nil,
 		logger:         nil,
 		registry:       registry,
 	}
@@ -71,7 +73,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 }
 
 func (state *Executor) UpdateAssetList(context actor.Context) error {
-	collections := make([]*models.Collection, 0)
+	assets := make([]*models.ProtocolAsset, 0)
 	reg := state.registry
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
@@ -83,35 +85,39 @@ func (state *Executor) UpdateAssetList(context actor.Context) error {
 	in := registry.AssetsRequest{
 		Filter: &filter,
 	}
-	response, err := reg.Assets(ctx, &in)
+	res, err := reg.Assets(ctx, &in)
 	if err != nil {
 		return fmt.Errorf("error updating asset list: %v", err)
 	}
-	assets := response.Assets
-	for _, asset := range assets {
+	response := res.Assets
+	for _, asset := range response {
 		add, ok := big.NewInt(1).SetString(asset.Meta["address"][2:], 16)
 		if !ok {
 			continue
 		}
-		collections = append(
-			collections,
-			&models.Collection{
+		assets = append(
+			assets,
+			&models.ProtocolAsset{
 				Address: add.Bytes(),
 				Name:    asset.Name,
 				Symbol:  asset.Symbol,
+				Protocol: &models2.Protocol{
+					ID:   constants.ERC721.ID,
+					Name: "ERC-721",
+				},
 			})
 	}
-	state.collections = collections
+	state.assets = assets
 	return nil
 }
 
 func (state *Executor) OnAssetListRequest(context actor.Context) error {
 	req := context.Message().(*messages.AssetListRequest)
 	context.Respond(&messages.AssetListResponse{
-		RequestID:   req.RequestID,
-		ResponseID:  uint64(time.Now().UnixNano()),
-		Success:     true,
-		Collections: state.collections,
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Assets:     state.assets,
 	})
 	return nil
 }
@@ -124,7 +130,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 		Success:    false,
 	}
 
-	if req.Collection == nil || req.Collection.Address == nil {
+	if req.Asset == nil || req.Asset.Address == nil {
 		msg.RejectionReason = messages.MissingInstrument
 		context.Respond(msg)
 		return nil
@@ -142,7 +148,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 		eabi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
-	copy(address[:], req.Collection.Address)
+	copy(address[:], req.Asset.Address)
 	fQuery := ethereum.FilterQuery{
 		Addresses: []common.Address{address},
 		FromBlock: big.NewInt(1).SetUint64(req.Start),
@@ -167,7 +173,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 			return
 		}
 
-		events := make([]*models.AssetTransfer, 0)
+		events := make([]*models.AssetUpdate, 0)
 		for _, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
@@ -178,7 +184,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 					context.Respond(msg)
 					return
 				}
-				t := &models.AssetTransfer{
+				t := &models.AssetUpdate{
 					Transfer: &gorderbook.AssetTransfer{
 						From:    event.From[:],
 						To:      event.To[:],

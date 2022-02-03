@@ -95,7 +95,7 @@ message UPV3Update {
     uint64 block = 10;
 }
 
-message AssetTransfer {
+message AssetUpdate {
     gorderbook.models.AssetTransfer transfer = 1;
     bool removed = 2;
     uint64 block = 3;

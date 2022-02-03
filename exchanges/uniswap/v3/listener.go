@@ -352,11 +352,11 @@ func (state *Listener) onLog(context actor.Context) error {
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
 
-	state.instrumentData.lastBlockUpdate = msg.BlockNumber
 	context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
 		SeqNum: state.instrumentData.seqNum + 1,
 		Update: updt,
 	})
+	state.instrumentData.lastBlockUpdate = updt.Block
 	state.instrumentData.seqNum += 1
 
 	return nil
