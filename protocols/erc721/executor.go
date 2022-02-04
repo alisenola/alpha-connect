@@ -108,6 +108,13 @@ func (state *Executor) UpdateAssetList(context actor.Context) error {
 			})
 	}
 	state.assets = assets
+
+	context.Send(context.Parent(), &messages.AssetList{
+		ResponseID: uint64(time.Now().UnixNano()),
+		Assets:     assets,
+		Success:    true,
+	})
+
 	return nil
 }
 

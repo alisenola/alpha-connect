@@ -48,8 +48,7 @@ func TestExecutor(t *testing.T) {
 	testAsset := []models.ProtocolAsset{{
 		Symbol: "BAYC",
 	}}
-	//TODO Complete the function for main executor OnAssetListRequest
-	res, err := as.Root.RequestFuture(executor, &messages.AssetListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.AssetListRequest{}, 20*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +64,6 @@ func TestExecutor(t *testing.T) {
 			}
 		}
 	}
-
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		executor,

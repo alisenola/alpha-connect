@@ -559,6 +559,14 @@ message AssetListResponse {
     RejectionReason rejection_reason = 5;
 }
 
+message AssetList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAsset assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
 service ExchangeExecutor {
     rpc MarketData (MarketDataRequest) returns (stream MarketDataIncrementalRefresh) {}
     rpc AccountData (AccountDataRequest) returns (stream AccountDataIncrementalRefresh) {}

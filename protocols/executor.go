@@ -30,11 +30,12 @@ type ExecutorConfig struct {
 
 type Executor struct {
 	*ExecutorConfig
-	executors  map[uint32]*actor.PID // A map from exchange ID to executor
-	assets     map[[20]byte]*models.ProtocolAsset
-	symToAsset map[uint32]map[string]*models.ProtocolAsset
-	logger     *log.Logger
-	strict     bool
+	executors     map[uint32]*actor.PID // A map from exchange ID to executor
+	assets        map[[20]byte]*models.ProtocolAsset
+	symToAsset    map[uint32]map[string]*models.ProtocolAsset
+	alSubscribers map[uint64]*actor.PID
+	logger        *log.Logger
+	strict        bool
 }
 
 func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
@@ -81,8 +82,14 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 	case *messages.AssetListRequest:
+		fmt.Println("got asset list request")
 		if err := state.OnAssetListRequest(context); err != nil {
 			state.logger.Error("error processing AssetListRequest", log.Error(err))
+		}
+	case *messages.AssetList:
+		fmt.Println("got asset list")
+		if err := state.OnAssetList(context); err != nil {
+			state.logger.Error("error processing AssetList", log.Error(err))
 		}
 	}
 }
@@ -171,7 +178,53 @@ func (state *Executor) Initialize(context actor.Context) error {
 }
 
 func (state *Executor) OnAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.AssetListRequest)
+	assets := make([]*models.ProtocolAsset, 0)
+	for _, asset := range state.assets {
+		assets = append(assets, asset)
+	}
+	response := &messages.AssetListResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Assets:     assets,
+	}
+	if req.Subscribe {
+		context.Watch(req.Subscriber)
+		state.alSubscribers[req.RequestID] = req.Subscriber
+	}
+	context.Respond(response)
+	return nil
+}
 
+func (state *Executor) OnAssetList(context actor.Context) error {
+	msg := context.Message().(*messages.AssetList)
+	proto := msg.Assets[0].Protocol.ID
+
+	for k, v := range state.assets {
+		if v.Protocol.ID == proto {
+			delete(state.assets, k)
+		}
+	}
+	for _, asset := range msg.Assets {
+		var add [20]byte
+		copy(add[:], asset.Address)
+		state.assets[add] = asset
+	}
+	var assets []*models.ProtocolAsset
+	for _, v := range state.assets {
+		assets = append(assets, v)
+	}
+	for k, v := range state.alSubscribers {
+		context.Send(v,
+			&messages.AssetList{
+				RequestID:  k,
+				ResponseID: uint64(time.Now().UnixNano()),
+				Assets:     assets,
+				Success:    true,
+			})
+	}
+	return nil
 }
 
 func (state *Executor) Clean(context actor.Context) error {
