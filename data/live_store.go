@@ -135,6 +135,9 @@ func (lt *LiveStore) NewQuery(qs *query.Settings) (tickstore_go_client.Tickstore
 	// Place in map[securityID]Functor, use security ID as object ID
 	feeds := make(map[uint64]*Feed)
 	for _, s := range inputSecurities {
+		if s.Status != models.Trading {
+			continue
+		}
 		sec := lt.securities[s.SecurityID]
 		tags := map[string]string{
 			"ID":       fmt.Sprintf("%d", sec.SecurityID),
