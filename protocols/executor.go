@@ -33,7 +33,8 @@ type Executor struct {
 	executors     map[uint32]*actor.PID // A map from exchange ID to executor
 	assets        map[[20]byte]*models.ProtocolAsset
 	symToAsset    map[uint32]map[string]*models.ProtocolAsset
-	alSubscribers map[uint64]*actor.PID
+	alSubscribers map[uint64]*actor.PID // A map from request ID to asset list subscriber
+	dataManagers  map[uint64]*actor.PID // A map from asset ID to data manager
 	logger        *log.Logger
 	strict        bool
 }
@@ -82,14 +83,19 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 	case *messages.AssetListRequest:
-		fmt.Println("got asset list request")
 		if err := state.OnAssetListRequest(context); err != nil {
 			state.logger.Error("error processing AssetListRequest", log.Error(err))
+			panic(err)
 		}
 	case *messages.AssetList:
-		fmt.Println("got asset list")
 		if err := state.OnAssetList(context); err != nil {
 			state.logger.Error("error processing AssetList", log.Error(err))
+			panic(err)
+		}
+	case *messages.HistoricalAssetTransferRequest:
+		if err := state.OnHistoricalAssetTransferRequest(context); err != nil {
+			state.logger.Error("error processing HistoricalAssetTransferRequest", log.Error(err))
+			panic(err)
 		}
 	}
 }
@@ -227,13 +233,78 @@ func (state *Executor) OnAssetList(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalAssetTransferRequest)
+	asset, rej := state.getAsset(req.Asset)
+	if rej != nil {
+		context.Respond(&messages.HistoricalAssetTransferResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *rej,
+			Success:         false,
+		})
+	}
+	ex, ok := state.executors[asset.Protocol.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalAssetTransferResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: messages.UnknowProtocol,
+			Success:         false,
+		})
+	}
+	context.Forward(ex)
+	return nil
+}
+
+func (state *Executor) getAsset(asset *models.ProtocolAsset) (*models.ProtocolAsset, *messages.RejectionReason) {
+	if asset == nil {
+		rej := messages.MissingAsset
+		return nil, &rej
+	}
+	if len(asset.Address) == 20 {
+		var add [20]byte
+		copy(add[:], asset.Address)
+		if a, ok := state.assets[add]; !ok {
+			rej := messages.UnknownAsset
+			return nil, &rej
+		} else {
+			return a, nil
+		}
+	} else if asset.Protocol != nil {
+		p, ok := state.symToAsset[asset.Protocol.ID]
+		if !ok {
+			rej := messages.UnknowProtocol
+			return nil, &rej
+		}
+		a, ok := p[asset.Symbol]
+		if !ok {
+			rej := messages.UnknownSymbol
+			return nil, &rej
+		}
+		return a, nil
+	} else {
+		rej := messages.MissingAsset
+		return nil, &rej
+	}
+}
+
 func (state *Executor) Clean(context actor.Context) error {
 	return nil
 }
 
 func (state *Executor) OnTerminated(context actor.Context) error {
 	// Handle subscriber krash
-	// TODO
+	req := context.Message().(*actor.Terminated)
+	for k, v := range state.alSubscribers {
+		if v.Id == req.Who.Id {
+			delete(state.alSubscribers, k)
+		}
+	}
+
+	for k, v := range state.dataManagers {
+		if v.Id == req.Who.Id {
+			delete(state.dataManagers, k)
+		}
+	}
 
 	return nil
 }
