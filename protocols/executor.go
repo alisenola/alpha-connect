@@ -13,6 +13,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,7 +35,7 @@ type Executor struct {
 	assets        map[[20]byte]*models.ProtocolAsset
 	symToAsset    map[uint32]map[string]*models.ProtocolAsset
 	alSubscribers map[uint64]*actor.PID // A map from request ID to asset list subscriber
-	dataManagers  map[uint64]*actor.PID // A map from asset ID to data manager
+	dataManagers  map[uint32]*actor.PID // A map from asset ID to data manager
 	logger        *log.Logger
 	strict        bool
 }
@@ -52,6 +53,7 @@ func NewExecutor(cfg *ExecutorConfig) actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
+	fmt.Printf("got at main executor %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -97,6 +99,11 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing HistoricalAssetTransferRequest", log.Error(err))
 			panic(err)
 		}
+	case *messages.AssetTransferRequest:
+		if err := state.OnAssetTransferRequest(context); err != nil {
+			state.logger.Error("error processing AssetTransferRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -123,9 +130,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return fmt.Errorf("error creating index on executions: %v", err)
 		}
 	}
+	state.symToAsset = make(map[uint32]map[string]*models.ProtocolAsset)
+	state.assets = make(map[[20]byte]*models.ProtocolAsset)
+	state.executors = make(map[uint32]*actor.PID)
+	state.dataManagers = make(map[uint32]*actor.PID)
 
 	// Spawn all exchange executors
-	state.executors = make(map[uint32]*actor.PID)
 	for _, protocol := range state.ExecutorConfig.Protocols {
 		producer := NewProtocolExecutorProducer(protocol, state.ExecutorConfig)
 		if producer == nil {
@@ -147,8 +157,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		futures = append(futures, fut)
 	}
 
-	state.symToAsset = make(map[uint32]map[string]*models.ProtocolAsset)
-	state.assets = make(map[[20]byte]*models.ProtocolAsset)
 	for _, fut := range futures {
 		res, err := fut.Result()
 		if err != nil {
@@ -229,6 +237,28 @@ func (state *Executor) OnAssetList(context actor.Context) error {
 				Assets:     assets,
 				Success:    true,
 			})
+	}
+	return nil
+}
+
+func (state *Executor) OnAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.AssetTransferRequest)
+	a, rej := state.getAsset(req.Asset)
+	if rej != nil {
+		context.Respond(&messages.AssetListResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *rej,
+			Success:         false,
+		})
+	}
+	if pid, ok := state.dataManagers[a.Protocol.ID]; ok {
+		context.Send(pid, req)
+	} else {
+		props := actor.PropsFromProducer(NewDataManagerProducer(a)).WithSupervisor(
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
+		pid := context.Spawn(props)
+		state.dataManagers[a.Protocol.ID] = pid
+		context.Send(pid, req)
 	}
 	return nil
 }

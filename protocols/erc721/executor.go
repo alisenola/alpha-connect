@@ -220,5 +220,3 @@ func (state *Executor) Clean(context actor.Context) error {
 func (state *Executor) GetLogger() *log.Logger {
 	return state.logger
 }
-
-//add an assetListRequest message

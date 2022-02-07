@@ -62,6 +62,7 @@ func NewListener(collection *models.ProtocolAsset) actor.Actor {
 }
 
 func (state *Listener) Receive(context actor.Context) {
+	fmt.Printf("got at listener %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -80,16 +81,22 @@ func (state *Listener) Receive(context actor.Context) {
 	case *actor.Restarting:
 		if err := state.Clean(context); err != nil {
 			state.logger.Error("error restarting", log.Error(err))
-			panic(err)
+			// No panic or we get an infinite loop
 		}
 		state.logger.Info("actor restarting")
 	case *checkSockets:
 		if err := state.onCheckSockets(context); err != nil {
 			state.logger.Error("error checking sockets", log.Error(err))
+			panic(err)
 		}
 	case *ethTypes.Log:
 		if err := state.onLog(context); err != nil {
 			state.logger.Error("error processing log", log.Error(err))
+			panic(err)
+		}
+	case *messages.AssetTransferRequest:
+		if err := state.OnAssetTransferRequest(context); err != nil {
+			state.logger.Error("error processing AssetTransferRequest", log.Error(err))
 		}
 	}
 }
@@ -101,8 +108,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
-		log.String("protocol", state.collection.Name),
-		log.String("symbol", address),
+		log.String("protocol", "ERC-721"),
+		log.String("contract", address),
 	)
 
 	state.instrument = &InstrumentData{
@@ -131,6 +138,18 @@ func (state *Listener) Initialize(context actor.Context) error {
 			return
 		}
 	}(context.Self())
+	return nil
+}
+
+func (state *Listener) OnAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.AssetTransferRequest)
+	context.Respond(&messages.AssetTransferResponse{
+		RequestID:    req.RequestID,
+		ResponseID:   uint64(time.Now().UnixNano()),
+		AssetUpdated: state.instrument.events,
+		Success:      true,
+		SeqNum:       state.instrument.seqNum,
+	})
 	return nil
 }
 
@@ -206,7 +225,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			SeqNum:     state.instrument.seqNum + 1,
 			Update:     updt,
 		})
-
+	fmt.Println("got at on Logs")
 	state.instrument.lastBlockUpdate = updt.Block
 	state.instrument.seqNum += 1
 	return nil

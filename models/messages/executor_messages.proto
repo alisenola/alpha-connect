@@ -217,6 +217,22 @@ message UnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
+message AssetTransferRequest{
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.ProtocolAsset asset = 4;
+}
+
+message AssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.AssetUpdate asset_updated = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
 message UnipoolV3DataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
