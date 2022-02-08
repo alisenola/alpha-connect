@@ -113,7 +113,7 @@ func TestExecutor(t *testing.T) {
 		copy(from[:], t.Transfer.From)
 		copy(to[:], t.Transfer.To)
 		tokenID.SetBytes(t.Transfer.TokenId)
-		tracker.TransferFrom(from, to, tokenID)
+		tracker.TransferFrom(from, to, tokenID, "")
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
 	snap := tracker.GetSnapshot()
