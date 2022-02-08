@@ -252,13 +252,13 @@ func (state *Executor) OnAssetTransferRequest(context actor.Context) error {
 		})
 	}
 	if pid, ok := state.dataManagers[a.Protocol.ID]; ok {
-		context.Send(pid, req)
+		context.Forward(pid)
 	} else {
 		props := actor.PropsFromProducer(NewDataManagerProducer(a)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.dataManagers[a.Protocol.ID] = pid
-		context.Send(pid, req)
+		context.Forward(pid)
 	}
 	return nil
 }

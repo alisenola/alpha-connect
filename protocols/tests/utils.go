@@ -34,10 +34,8 @@ func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem
 		Protocols: []*models2.Protocol{protocol},
 	}
 	config := actor.Config{}
-	config = config.WithDeveloperSupervisionLogging(true)
-	config = config.WithDeadLetterRequestLogging(true)
+	config = config.WithDeveloperSupervisionLogging(true).WithDeadLetterRequestLogging(true)
 	as := actor.NewActorSystemWithConfig(config)
-	fmt.Printf("%+v", as.Config)
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(protocols.NewExecutorProducer(&cfg)), "executor")
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +90,7 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	)
 	executor := context.ActorSystem().NewLocalPID("executor")
 	res, err := context.RequestFuture(executor, &messages.AssetTransferRequest{
-		RequestID:  uint64(time.Now().UnixNano()),
+		RequestID:  0,
 		Asset:      state.asset,
 		Subscriber: context.Self(),
 		Subscribe:  true,
@@ -105,14 +103,13 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 		return fmt.Errorf("error for type assertion %v", err)
 	}
 	state.updates = updt.AssetUpdated
-	fmt.Println(state.updates)
 	return nil
 }
 
 func (state *ERC721Checker) OnAssetDataIncrementalRefresh(context actor.Context) error {
 	res := context.Message().(*messages.AssetDataIncrementalRefresh)
 	if res.Update == nil {
-		return fmt.Errorf("error in incremental data")
+		return nil
 	}
 	if state.seqNum > res.SeqNum {
 		return nil

@@ -225,7 +225,6 @@ func (state *Listener) onLog(context actor.Context) error {
 			SeqNum:     state.instrument.seqNum + 1,
 			Update:     updt,
 		})
-	fmt.Println("got at on Logs")
 	state.instrument.lastBlockUpdate = updt.Block
 	state.instrument.seqNum += 1
 	return nil
@@ -251,5 +250,9 @@ func (state *Listener) onCheckSockets(context actor.Context) error {
 		state.instrument.seqNum += 1
 		state.instrument.lastHB = time.Now()
 	}
+	return nil
+}
+
+func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
