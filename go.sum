@@ -722,6 +722,8 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20220124142626-eae5ade7ce4c h1:uCnTdGW8N
 gitlab.com/alphaticks/gorderbook v0.0.0-20220124142626-eae5ade7ce4c/go.mod h1:sJNJa1AtxZbdT1G2+ZPx2mIc1haqp8OI69Hv6D6QL7U=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4 h1:pGBlD0aOlxrcmwE4u/ZYqI5/+24ph3VvTVXrMxtOGrE=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4/go.mod h1:hpaRSFP2pbELGXtMSjejiC0zjdVF3FPdDOBeVtps3jg=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220203080643-69f380edc730 h1:npDwNyM1gbQiVucjTonEo8CKhL8gW3q/zp4alzwgXXQ=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220203080643-69f380edc730/go.mod h1:mnr7LQ6au0Oha9lFWHg6EbaOaOpKb6IdDZ6UH9KPLjU=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
@@ -730,6 +732,8 @@ gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570 h1:HdLyQ4pI
 gitlab.com/alphaticks/tickobjects v0.0.0-20211222104755-62bda2315570/go.mod h1:WGEV6Hi12Vfl02KTuqV1COnTl2mNiQ7h+DwwMFPfcxI=
 gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b h1:zs3fLANVzqnlLb2Skz4R1gUwdWwfXiz3waPaOYcvf2o=
 gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b/go.mod h1:Yz0cutXSB6G2AIYb1HyWuEGDcsgNdSlRZ26sDh5RJ98=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220203080756-aa4a9051aa13 h1:ITtXLxlOPVFgIeparJETCqw7Eat8oTV4X9h07bIYq08=
+gitlab.com/alphaticks/tickobjects v0.0.0-20220203080756-aa4a9051aa13/go.mod h1:WqNjnD9tKZXMS4WYKJ7Amys8fLQ15TPycIP/hqbfE3c=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a h1:V+DZdg24zUFSOpFYAyAZfrJIbTKZ+2dv4FogzB2N/Ns=
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a/go.mod h1:rlQohdpxxxNy7hPNw6xIQUesRmlEtzdlJCvhod8qzoE=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a h1:xFMFACJmtiTWmbu0ngjmk5+cdN7b4SjJ8+ahhzfvTo4=
