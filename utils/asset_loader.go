@@ -1,20 +1,14 @@
 package utils
 
 import (
-	"cloud.google.com/go/storage"
 	goContext "context"
-	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
-	"google.golang.org/api/option"
-	"io/ioutil"
-	"os"
 	"reflect"
-	"strings"
 	"time"
 )
 
@@ -22,21 +16,20 @@ type checkAsset struct{}
 type Ready struct{}
 
 type AssetLoader struct {
-	assetFile string
-	assetMD5  string
-	logger    *log.Logger
-	ticker    *time.Ticker
+	registry registry.PublicRegistryClient
+	logger   *log.Logger
+	ticker   *time.Ticker
 }
 
-func NewAssetLoaderProducer(assetFile string) actor.Producer {
+func NewAssetLoaderProducer(rgstry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewAssetLoader(assetFile)
+		return NewAssetLoader(rgstry)
 	}
 }
 
-func NewAssetLoader(assetFile string) actor.Actor {
+func NewAssetLoader(rgstry registry.PublicRegistryClient) actor.Actor {
 	return &AssetLoader{
-		assetFile: assetFile,
+		registry: rgstry,
 	}
 }
 
@@ -119,69 +112,22 @@ func (state *AssetLoader) onReady(context actor.Context) error {
 }
 
 func (state *AssetLoader) checkAsset(context actor.Context) error {
-	var data []byte
-	if state.assetFile[0:5] == "gs://" {
-		ctx := goContext.Background()
-		var client *storage.Client
-		var err error
-		if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
-			client, err = storage.NewClient(ctx, option.WithoutAuthentication())
-			if err != nil {
-				return err
-			}
-		} else {
-			client, err = storage.NewClient(ctx)
-			if err != nil {
-				return err
-			}
-		}
-
-		splits := strings.Split(state.assetFile[5:], "/")
-		bucketName := splits[0]
-		if bucketName == "" {
-			return fmt.Errorf("configurator bucket name not set")
-		}
-		bucket := client.Bucket(bucketName)
-
-		configHandle := bucket.Object(splits[1])
-		attrs, err := configHandle.Attrs(ctx)
-		if err != nil {
-			return fmt.Errorf("error getting attribute: %v", err)
-		}
-		if string(attrs.MD5) == state.assetMD5 {
-			return nil
-		}
-
-		rc, err := configHandle.NewReader(ctx)
-		if err != nil {
-			return err
-		}
-		bytes, err := ioutil.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			return err
-		}
-		data = bytes
-	} else {
-		file, err := ioutil.ReadFile(state.assetFile)
-		if err != nil {
-			return fmt.Errorf("failed to read configuration: %v", err)
-		}
-		data = file
+	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{}, nil)
+	if err != nil {
+		return fmt.Errorf("error fetching assets: %v", err)
 	}
 	assets := make(map[uint32]models.Asset)
-	err := json.Unmarshal(data, &assets)
-	if err != nil {
-		return fmt.Errorf("error parsing config: %v", err)
+	for _, a := range res.Assets {
+		assets[a.AssetId] = models.Asset{
+			Symbol: a.Symbol,
+			Name:   a.Name,
+			ID:     a.AssetId,
+		}
 	}
 
 	if err := constants.LoadAssets(assets); err != nil {
 		return err
 	}
-
-	hash := md5.New()
-	hash.Write(data)
-	state.assetMD5 = string(hash.Sum(nil))
 
 	return nil
 }
