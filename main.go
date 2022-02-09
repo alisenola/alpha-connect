@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/rpc"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	tickstore_grpc "gitlab.com/alphaticks/tickstore-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
@@ -92,8 +93,18 @@ func main() {
 		&constants.OKEXP,
 	}
 	// EXECUTOR //
-	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("./assets.json")))
-	_, err := ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	registryAddress := "registry.alphaticks.io:7001"
+	if os.Getenv("REGISTRY_ADDRESS") != "" {
+		registryAddress = os.Getenv("REGISTRY_ADDRESS")
+	}
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		err := fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
+		panic(err)
+	}
+	rgstr := registry.NewPublicRegistryClient(conn)
+	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(rgstr)))
+	_, err = ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}
