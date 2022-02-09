@@ -112,7 +112,11 @@ func (state *AssetLoader) onReady(context actor.Context) error {
 }
 
 func (state *AssetLoader) checkAsset(context actor.Context) error {
-	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{}, nil)
+	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{
+		Filter: &registry.AssetFilter{
+			Fungible: true,
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
 	}
