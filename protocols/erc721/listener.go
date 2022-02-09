@@ -17,7 +17,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols/types"
 	gorderbook_models "gitlab.com/alphaticks/gorderbook/gorderbook.models"
-	"gitlab.com/alphaticks/xchanger/eth"
 	utils "gitlab.com/alphaticks/xchanger/eth"
 	"gitlab.com/alphaticks/xchanger/protocols"
 	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
@@ -38,7 +37,7 @@ type Listener struct {
 	types.Listener
 	client       *ethclient.Client
 	instrument   *InstrumentData
-	iterator     *eth.LogIterator
+	iterator     *utils.LogIterator
 	collection   *models.ProtocolAsset
 	logger       *log.Logger
 	socketTicker *time.Ticker
@@ -62,7 +61,6 @@ func NewListener(collection *models.ProtocolAsset) actor.Actor {
 }
 
 func (state *Listener) Receive(context actor.Context) {
-	fmt.Printf("got at listener %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -163,7 +161,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
-	it := eth.NewLogIterator(eabi)
+	it := utils.NewLogIterator(eabi)
 
 	query := [][]interface{}{{
 		eabi.Events["Transfer"].ID,

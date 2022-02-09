@@ -35,7 +35,6 @@ func NewDataManager(protocol *models.ProtocolAsset) actor.Actor {
 }
 
 func (state *DataManager) Receive(context actor.Context) {
-	fmt.Printf("got at data manager %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {

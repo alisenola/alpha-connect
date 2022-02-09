@@ -13,12 +13,12 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220202101316-e58df9aa3b58
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220202122802-256bc35514b6
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220208173917-53e4b806b7ea
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b
 	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20220202144908-629382ceb030
+	gitlab.com/alphaticks/xchanger v0.0.0-20220208173735-0c432a469dd1
 	go.mongodb.org/mongo-driver v1.8.1
 	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0

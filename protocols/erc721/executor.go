@@ -138,7 +138,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 	}
 
 	if req.Asset == nil || req.Asset.Address == nil {
-		msg.RejectionReason = messages.MissingInstrument
+		msg.RejectionReason = messages.MissingAsset
 		context.Respond(msg)
 		return nil
 	}

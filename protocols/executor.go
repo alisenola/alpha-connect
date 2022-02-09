@@ -53,7 +53,6 @@ func NewExecutor(cfg *ExecutorConfig) actor.Actor {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	fmt.Printf("got at main executor %T \n", context.Message())
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
