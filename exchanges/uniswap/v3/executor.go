@@ -95,7 +95,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 	}
 
-	client, err := ethclient.Dial(ETH_CLIENT_URL)
+	client, err := ethclient.Dial(eth.ETH_CLIENT_WS)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}

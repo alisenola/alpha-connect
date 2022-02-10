@@ -7,10 +7,6 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 )
 
-const (
-	ETH_CLIENT_URL = "wss://eth-mainnet.alchemyapi.io/v2/hdodrT8DMC-Ow9rd6qIOcjpZgr5_Ixdg"
-)
-
 func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error {
 	if i := update.Initialize; i != nil {
 		sqrt := big.NewInt(1).SetBytes(i.SqrtPriceX96)
