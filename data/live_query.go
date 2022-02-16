@@ -68,7 +68,7 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 	// Spawn listener
 	// Let them push events in the chan
 	lq := &LiveQuery{
-		ch:            make(chan interface{}, 1000),
+		ch:            make(chan interface{}, 10000),
 		subscriptions: make(map[uint64]*Feed),
 		objects:       make(map[uint64]tickobjects.TickFunctor),
 		tick:          0,

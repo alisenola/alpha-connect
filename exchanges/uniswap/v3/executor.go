@@ -257,7 +257,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 
 	qr := state.queryRunnerETH
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 20*time.Second)
+	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 50*time.Second)
 	context.AwaitFuture(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
