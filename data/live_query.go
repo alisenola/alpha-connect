@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -50,6 +51,7 @@ func ConstructFunctor(f parsing.Functor) (tickobjects.TickFunctor, reflect.Type,
 }
 
 type LiveQuery struct {
+	sync.RWMutex
 	pid           *actor.PID
 	ch            chan interface{}
 	subscriptions map[uint64]*Feed
@@ -96,10 +98,14 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 }
 
 func (lq *LiveQuery) SetNextDeadline(time time.Time) {
+	lq.Lock()
+	defer lq.Unlock()
 	lq.nextDeadline = &time
 }
 
 func (lq *LiveQuery) Next() bool {
+	lq.Lock()
+	defer lq.Unlock()
 	res := lq.next()
 	lq.nextDeadline = nil
 	return res
@@ -315,6 +321,8 @@ func (lq *LiveQuery) next() bool {
 }
 
 func (lq *LiveQuery) Progress(end uint64) bool {
+	lq.Lock()
+	defer lq.Unlock()
 	for end < lq.tick {
 		lq.next()
 	}
@@ -322,15 +330,21 @@ func (lq *LiveQuery) Progress(end uint64) bool {
 }
 
 func (lq *LiveQuery) Read() (uint64, tickobjects.TickObject, uint64) {
+	lq.RLock()
+	defer lq.RUnlock()
 	return lq.tick, lq.objects[lq.groupID], lq.groupID
 }
 
 func (lq *LiveQuery) Tags() map[string]string {
 	// TODO
+	lq.RLock()
+	defer lq.RUnlock()
 	return make(map[string]string)
 }
 
 func (lq *LiveQuery) Close() error {
+	lq.Lock()
+	defer lq.Unlock()
 	for _, f := range lq.subscriptions {
 		if f.receiver != nil {
 			f.receiver.Close()
@@ -343,5 +357,7 @@ func (lq *LiveQuery) Close() error {
 }
 
 func (lq *LiveQuery) Err() error {
+	lq.RLock()
+	defer lq.RUnlock()
 	return lq.err
 }
