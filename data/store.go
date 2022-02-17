@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/melaurent/kafero"
 	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
+	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore/storage"
 	"gitlab.com/alphaticks/tickstore/store"
 	"gitlab.com/alphaticks/tickstore/utils"
@@ -21,7 +22,7 @@ const (
 )
 
 type DataClient interface {
-	GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error)
+	GetClient(freq int64) (types.TickstoreClient, int64, error)
 	Close() error
 }
 
@@ -138,7 +139,7 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, int64, error) {
 	return s.stores[cfreq], cfreq, nil
 }
 
-func (s *StorageClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error) {
+func (s *StorageClient) GetClient(freq int64) (types.TickstoreClient, int64, error) {
 	str, cfreq, err := s.GetStore(freq)
 	if err != nil {
 		return nil, cfreq, err
@@ -187,7 +188,7 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 	return s, nil
 }
 
-func (s *StoreClient) GetClient(freq int64) (tickstore_go_client.TickstoreClient, int64, error) {
+func (s *StoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
 	for f := range s.stores {

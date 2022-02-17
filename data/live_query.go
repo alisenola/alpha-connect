@@ -9,8 +9,8 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/tickobjects"
 	"gitlab.com/alphaticks/tickobjects/market"
+	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"math"
 	"reflect"
@@ -263,12 +263,16 @@ func (lq *LiveQuery) next() bool {
 					rawPrice := uint64(math.Round(float64(feed.security.tickPrecision) * trade.Price))
 					rawQuantity := uint64(math.Round(float64(feed.security.lotPrecision) * trade.Quantity))
 					// Create delta
-					tradeDeltas = append(tradeDeltas, market.NewRawTradeDelta(
+					dlt, err := market.NewRawTradeDelta(
 						rawPrice,
 						rawQuantity,
 						trade.ID,
 						aggTrade.AggregateID,
-						aggTrade.Bid))
+						aggTrade.Bid)
+					if err != nil {
+						lq.err = fmt.Errorf("error creating raw trade delta: %v", err)
+					}
+					tradeDeltas = append(tradeDeltas, dlt)
 				}
 			}
 

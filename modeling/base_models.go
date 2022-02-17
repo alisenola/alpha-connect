@@ -1,7 +1,7 @@
 package modeling
 
 import (
-	"gitlab.com/alphaticks/tickobjects"
+	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"math"
 	"math/rand"
 	"sync"

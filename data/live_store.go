@@ -3,12 +3,11 @@ package data
 import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	pbtypes "github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
-	"gitlab.com/alphaticks/tickstore-go-client/query"
+	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"sync"
 	"time"
@@ -16,8 +15,8 @@ import (
 
 type SecurityInfo struct {
 	securityID        uint64
-	minPriceIncrement *types.DoubleValue
-	roundLot          *types.DoubleValue
+	minPriceIncrement *pbtypes.DoubleValue
+	roundLot          *pbtypes.DoubleValue
 	tickPrecision     uint64
 	lotPrecision      uint64
 }
@@ -97,11 +96,11 @@ func (lt *LiveStore) GetLastEventTime(measurement string, tags map[string]string
 	return uint64(time.Now().UnixNano()) / 1000000, nil
 }
 
-func (lt *LiveStore) NewTickWriter(measurement string, tags map[string]string, flushTime time.Duration) (tickstore_go_client.TickstoreWriter, error) {
+func (lt *LiveStore) NewTickWriter(measurement string, tags map[string]string, flushTime time.Duration) (types.TickstoreWriter, error) {
 	return nil, fmt.Errorf("no tick writer supported on live store")
 }
 
-func (lt *LiveStore) NewQuery(qs *query.Settings) (tickstore_go_client.TickstoreQuery, error) {
+func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, error) {
 	sel := parsing.Selector{}
 	if err := parsing.SelectorParser.ParseString(qs.Selector, &sel); err != nil {
 		return nil, fmt.Errorf("error parsing selector string: %v", err)

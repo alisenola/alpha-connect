@@ -3,35 +3,35 @@ module gitlab.com/alphaticks/alpha-connect
 go 1.17
 
 require (
-	cloud.google.com/go/storage v1.12.0
 	github.com/AsynkronIT/protoactor-go v0.0.0-20210901041048-df2fc305778c
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/gogo/protobuf v1.3.2
-	github.com/melaurent/gotickfile/v2 v2.0.0-20210406111104-845d7c5ec5dc
+	github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220207134548-2116f383c8e4
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220203080643-69f380edc730
-	gitlab.com/alphaticks/tickobjects v0.0.0-20220203080756-aa4a9051aa13
-	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
-	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220215145649-b8dd98d4d9e9
+	gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83
+	gitlab.com/alphaticks/tickstore v0.0.0-20220217062611-4279d3f0ea90
+	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217055607-e835886c15b9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
 	gitlab.com/alphaticks/xchanger v0.0.0-20220210092702-46e6dd8cd7c7
 	go.mongodb.org/mongo-driver v1.7.2
-	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
 )
 
 require (
 	cloud.google.com/go v0.72.0 // indirect
+	cloud.google.com/go/storage v1.12.0 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/Workiva/go-datastructures v1.0.53 // indirect
 	github.com/alecthomas/participle v0.4.4 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
 	github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
+	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
@@ -42,12 +42,23 @@ require (
 	github.com/google/uuid v1.1.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/improbable-eng/grpc-web v0.11.0 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/klauspost/compress v1.10.3 // indirect
-	github.com/melaurent/gotickfile v0.0.0-20210921084211-01142566a54d // indirect
+	github.com/magiconair/properties v1.8.0 // indirect
+	github.com/melaurent/gotickfile v0.0.0-20220126102058-08e9bfcfc230 // indirect
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/orcaman/concurrent-map v0.0.0-20190107190726-7ed82d9cb717 // indirect
+	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
+	github.com/spf13/afero v1.2.2 // indirect
+	github.com/spf13/cast v1.3.0 // indirect
+	github.com/spf13/jwalterweatherman v1.0.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/viper v1.4.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2 // indirect
@@ -56,6 +67,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
+	gitlab.com/alphaticks/tickstore-types v0.0.0-20220216193750-c9d32c432117 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
@@ -67,10 +79,12 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/tools v0.1.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/api v0.36.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
