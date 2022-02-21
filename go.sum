@@ -737,10 +737,14 @@ gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a h1:V+DZdg24zU
 gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a/go.mod h1:rlQohdpxxxNy7hPNw6xIQUesRmlEtzdlJCvhod8qzoE=
 gitlab.com/alphaticks/tickstore v0.0.0-20220217062611-4279d3f0ea90 h1:fdahXAZPyBZ/2tawt44YX0m3tedBa9X8Yulz5vstOw8=
 gitlab.com/alphaticks/tickstore v0.0.0-20220217062611-4279d3f0ea90/go.mod h1:YBzPlgiTcRN5yQzilnUkcEjWNM3foB8Y8neXkPXCm20=
+gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae h1:3E4xyL9nbRGKEgjIoYb1UpAfZyil1Hh63jBil6G6STI=
+gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae/go.mod h1:o4U9CBlqtFvCsIvMJD/y1xLtwQjS1Ftiw+2bDORZSys=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a h1:xFMFACJmtiTWmbu0ngjmk5+cdN7b4SjJ8+ahhzfvTo4=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a/go.mod h1:ktuVHvokL1tkHJ2s1/K8Ky8WsFMssNXNyPKyuypWazI=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217055607-e835886c15b9 h1:QpQJcN9tBLB7ngW+dAO6hbgXT3JAz889rd5n9R/BOmQ=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217055607-e835886c15b9/go.mod h1:dMH10SCRtgZwiLvMh5sBEheCm+3XOulKGbm9RJxikI4=
+gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a h1:pOnWqOmr71AiJDmnZQD9MN3jbn4tR+c6WXfyx9N37iI=
+gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a/go.mod h1:dMH10SCRtgZwiLvMh5sBEheCm+3XOulKGbm9RJxikI4=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20210921083148-26dad7f5cbb0/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88 h1:ea6Ly/xXPp9U85b8xPQILfAY1/k1yNgKIx8fPki4+Q4=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=

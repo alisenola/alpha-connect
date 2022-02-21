@@ -14,8 +14,8 @@ require (
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220215145649-b8dd98d4d9e9
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83
-	gitlab.com/alphaticks/tickstore v0.0.0-20220217062611-4279d3f0ea90
-	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217055607-e835886c15b9
+	gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae
+	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
 	gitlab.com/alphaticks/xchanger v0.0.0-20220210092702-46e6dd8cd7c7
 	go.mongodb.org/mongo-driver v1.7.2
