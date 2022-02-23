@@ -292,6 +292,9 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
+	if state.ws == nil || msg.WSID != state.ws.ID {
+		return nil
+	}
 	switch msg.Message.(type) {
 
 	case error:
