@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/pkg/errors"
-	_ "gitlab.com/alphaticks/tickobjects/market"
+	_ "gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-grpc"
 	"gitlab.com/alphaticks/tickstore/actors/messages/remote/query"
 	"gitlab.com/alphaticks/tickstore/actors/messages/remote/store"

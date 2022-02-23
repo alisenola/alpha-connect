@@ -9,7 +9,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/tickobjects/market"
+	"gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"math"
