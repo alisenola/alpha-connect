@@ -126,6 +126,7 @@ func (state *AssetLoader) checkAsset(context actor.Context) error {
 			Symbol: a.Symbol,
 			Name:   a.Name,
 			ID:     a.AssetId,
+			Meta:   a.Meta,
 		}
 	}
 
