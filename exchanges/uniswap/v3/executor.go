@@ -134,12 +134,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	done := false
 	for !done {
 		for _, pool := range query.Pools {
-			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
+			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token1.Symbol)
 			if !ok {
 				// state.logger.Info("unknown symbol " + pool.Token0.Symbol)
 				continue
 			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(string(pool.Token1.Symbol))
+			quoteCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
 			if !ok {
 				// state.logger.Info("unknown symbol " + pool.Token1.Symbol)
 				continue
