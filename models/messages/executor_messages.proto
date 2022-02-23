@@ -9,6 +9,7 @@ import "gitlab.com/alphaticks/xchanger/models/protos.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
+import "gitlab.com/alphaticks/alpha-connect/models/asset_data.proto";
 
 import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 
@@ -61,6 +62,9 @@ enum RejectionReason {
     GraphQLError = 27;
     ABIError = 28;
     EthRPCError = 29;
+    UnknowProtocol = 30;
+    MissingAsset = 31;
+    UnknownAsset = 32;
 }
 
 enum FeeType {
@@ -127,7 +131,23 @@ message HistoricalUnipoolV3DataRequest {
 message HistoricalUnipoolV3DataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    repeated models.UPV3Update events = 3;  
+    repeated models.UPV3Update events = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message HistoricalAssetTransferRequest {
+    uint64 requestID = 1;
+    models.ProtocolAsset asset = 2;
+    uint64 start = 3;
+    uint64 stop = 4;
+}
+
+message HistoricalAssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.AssetUpdate transfers = 3;
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;
@@ -197,11 +217,34 @@ message UnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
+message AssetTransferRequest{
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    models.ProtocolAsset asset = 4;
+}
+
+message AssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.AssetUpdate asset_updated = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
 message UnipoolV3DataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
     uint64 seq_num = 3;
     models.UPV3Update update = 4;
+}
+
+message AssetDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.AssetUpdate update = 4;
 }
 
 message AccountDataRequest {
@@ -507,7 +550,43 @@ message OrderMassCancelResponse {
     RejectionReason rejection_reason = 4;
 }
 
-service Executor {
+message TransferDataRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message TransferDataResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message AssetListRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message AssetListResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAsset assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message AssetList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAsset assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+service ExchangeExecutor {
     rpc MarketData (MarketDataRequest) returns (stream MarketDataIncrementalRefresh) {}
     rpc AccountData (AccountDataRequest) returns (stream AccountDataIncrementalRefresh) {}
     rpc SecurityDefinition(SecurityDefinitionRequest) returns (SecurityDefinitionResponse) {}

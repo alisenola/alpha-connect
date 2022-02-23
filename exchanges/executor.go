@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"go.mongodb.org/mongo-driver/bson"
@@ -28,6 +29,7 @@ type ExecutorConfig struct {
 	Exchanges  []*xchangerModels.Exchange
 	Accounts   []*account.Account
 	DialerPool *xchangerUtils.DialerPool
+	Registry   registry.PublicRegistryClient
 	Strict     bool
 }
 
@@ -253,7 +255,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.Exchanges {
-		producer := NewExchangeExecutorProducer(exch, state.dialerPool)
+		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.ExecutorConfig)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}

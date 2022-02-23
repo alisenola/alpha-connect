@@ -172,6 +172,8 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
+	it := eth.NewLogIterator(uabi)
+
 	query := [][]interface{}{{
 		uabi.Events["Initialize"].ID,
 		uabi.Events["Mint"].ID,
@@ -190,15 +192,19 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		Addresses: []common.Address{common.HexToAddress(symbol)},
 		Topics:    topics,
 	}
-	it := eth.NewLogIterator(uabi)
-	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
-	it.WatchLogs(state.client, ctx, fQuery)
 
-	go func(it *eth.LogIterator, pid *actor.PID) {
-		for it.Next() {
-			context.Send(pid, it.Log)
+	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	err = it.WatchLogs(state.client, ctx, fQuery)
+	if err != nil {
+		return fmt.Errorf("error watching logs: %v", err)
+	}
+	state.iterator = it
+
+	go func(pid *actor.PID) {
+		for state.iterator.Next() {
+			context.Send(pid, state.iterator.Log)
 		}
-	}(it, context.Self())
+	}(context.Self())
 
 	return nil
 }
@@ -346,11 +352,11 @@ func (state *Listener) onLog(context actor.Context) error {
 		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
 
-	state.instrumentData.lastBlockUpdate = msg.BlockNumber
 	context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
 		SeqNum: state.instrumentData.seqNum + 1,
 		Update: updt,
 	})
+	state.instrumentData.lastBlockUpdate = updt.Block
 	state.instrumentData.seqNum += 1
 
 	return nil
