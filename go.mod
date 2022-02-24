@@ -12,7 +12,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220207134548-2116f383c8e4
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220215145649-b8dd98d4d9e9
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220224132020-0d4d06a0d257
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83
 	gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
@@ -67,7 +67,8 @@ require (
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
-	gitlab.com/alphaticks/tickstore-types v0.0.0-20220216193750-c9d32c432117 // indirect
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220224154220-2f5fff82505a // indirect
+	gitlab.com/alphaticks/tickstore-types v0.0.0-20220224114144-655d4401d88f // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect

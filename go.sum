@@ -727,8 +727,11 @@ gitlab.com/alphaticks/gorderbook v0.0.0-20211009212430-45ffdac78c6e/go.mod h1:Q7
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220215145649-b8dd98d4d9e9 h1:DpbT92bL/uncFynx/Zm1SFm4JDOdQZslZd0BCe3ncGU=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220215145649-b8dd98d4d9e9/go.mod h1:mnr7LQ6au0Oha9lFWHg6EbaOaOpKb6IdDZ6UH9KPLjU=
+gitlab.com/alphaticks/gorderbook v0.0.0-20220224132020-0d4d06a0d257/go.mod h1:mnr7LQ6au0Oha9lFWHg6EbaOaOpKb6IdDZ6UH9KPLjU=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 h1:wJo2F9oryny6xcjJLmSfgpBXsR4qCdD6hSJPIHpBVBE=
 gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991/go.mod h1:4UnQtZXr4V2h+r6fryOLUnlkGLaGEfjJsuVtmZDd+1Q=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220224154220-2f5fff82505a h1:AXqwJqoRBfGrEex49AAgq9VnGS8otu+oyBm3lhhD1ZQ=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220224154220-2f5fff82505a/go.mod h1:hSUKoRBgr7lMkdTkHeaXmKBR95IFK2N0yd/pYqEReR4=
 gitlab.com/alphaticks/tickobjects v0.0.0-20210921082758-753463aeda2a/go.mod h1:i1+a4W+yglQiwPg0eoVvbIUVWWD8z4p1x6qXRSwtMTc=
 gitlab.com/alphaticks/tickobjects v0.0.0-20211009212520-18d446a7dd7f/go.mod h1:tAB9hrPkrzTt3QmqPlV4gX9SBgUbC5maWkhBQR2iZYQ=
 gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83 h1:N1A0KcUSwmkWvkzCGaU9SeiA49znEJVyUTxwYiIhREY=
@@ -750,6 +753,8 @@ gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88 h1:ea6Ly
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220216193750-c9d32c432117 h1:sWNAAosRpyeUYlM0vJV6kstHOUt3GvyqVfAttDdVbwQ=
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220216193750-c9d32c432117/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
+gitlab.com/alphaticks/tickstore-types v0.0.0-20220224114144-655d4401d88f h1:xR4nohPEsudAYWecx/My4kaCYTtPgDoXvC5A3NgSy0U=
+gitlab.com/alphaticks/tickstore-types v0.0.0-20220224114144-655d4401d88f/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
 gitlab.com/alphaticks/xchanger v0.0.0-20220210092702-46e6dd8cd7c7 h1:EH7fji/B5V/mbpQFSmNTgJdQLDPX0XI+NH73RBhN3lk=
 gitlab.com/alphaticks/xchanger v0.0.0-20220210092702-46e6dd8cd7c7/go.mod h1:8bVzXnodl+N2kCuWS8jCVCtpmhdR5wX9DQxQd65Ks1Y=
 gitlab.com/alphaticks/xchanger v0.0.0-20220223110252-77b56c93a175 h1:KUfWbMOxv+6ZNZHTCmlAw8q9yu+IKOtfVklK15foDNg=
