@@ -27,7 +27,7 @@ type checkSockets struct{}
 //Check socket for uniswap also
 
 type InstrumentData struct {
-	events          []*models.AssetUpdate
+	events          []*models.ProtocolAssetUpdate
 	seqNum          uint64
 	lastBlockUpdate uint64
 	lastHB          time.Time
@@ -92,9 +92,9 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing log", log.Error(err))
 			panic(err)
 		}
-	case *messages.AssetTransferRequest:
-		if err := state.OnAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing AssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetTransferRequest:
+		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
+			state.logger.Error("error processing ProtocolAssetTransferRequest", log.Error(err))
 		}
 	}
 }
@@ -111,7 +111,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	)
 
 	state.instrument = &InstrumentData{
-		events:          make([]*models.AssetUpdate, 0),
+		events:          make([]*models.ProtocolAssetUpdate, 0),
 		seqNum:          uint64(time.Now().UnixNano()),
 		lastBlockUpdate: 0,
 	}
@@ -139,14 +139,14 @@ func (state *Listener) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) OnAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.AssetTransferRequest)
-	context.Respond(&messages.AssetTransferResponse{
-		RequestID:    req.RequestID,
-		ResponseID:   uint64(time.Now().UnixNano()),
-		AssetUpdated: state.instrument.events,
-		Success:      true,
-		SeqNum:       state.instrument.seqNum,
+func (state *Listener) OnProtocolAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetTransferRequest)
+	context.Respond(&messages.ProtocolAssetTransferResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Update:     state.instrument.events,
+		Success:    true,
+		SeqNum:     state.instrument.seqNum,
 	})
 	return nil
 }
@@ -181,7 +181,6 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		return fmt.Errorf("error watching logs: %v", err)
 	}
 	state.iterator = it
-
 	go func(pid *actor.PID) {
 		for state.iterator.Next() {
 			context.Send(pid, state.iterator.Log)
@@ -198,14 +197,14 @@ func (state *Listener) onLog(context actor.Context) error {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
 
-	var updt *models.AssetUpdate
+	var updt *models.ProtocolAssetUpdate
 	switch req.Topics[0] {
 	case eabi.Events["Transfer"].ID:
 		event := nft.ERC721Transfer{}
 		if err := utils.UnpackLog(eabi, &event, "Transfer", *req); err != nil {
 			return fmt.Errorf("error unpacking log: %v", err)
 		}
-		updt = &models.AssetUpdate{
+		updt = &models.ProtocolAssetUpdate{
 			Transfer: &gorderbook_models.AssetTransfer{
 				From:    event.From[:],
 				To:      event.To[:],
@@ -215,10 +214,9 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: event.Raw.Removed,
 		}
 	}
-
 	context.Send(
 		context.Parent(),
-		&messages.AssetDataIncrementalRefresh{
+		&messages.ProtocolAssetDataIncrementalRefresh{
 			ResponseID: uint64(time.Now().UnixNano()),
 			SeqNum:     state.instrument.seqNum + 1,
 			Update:     updt,
@@ -242,7 +240,7 @@ func (state *Listener) onCheckSockets(context actor.Context) error {
 	}
 
 	if time.Since(state.instrument.lastHB) > 2*time.Second {
-		context.Send(context.Parent(), &messages.AssetDataIncrementalRefresh{
+		context.Send(context.Parent(), &messages.ProtocolAssetDataIncrementalRefresh{
 			SeqNum: state.instrument.seqNum + 1,
 		})
 		state.instrument.seqNum += 1

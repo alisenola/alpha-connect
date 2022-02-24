@@ -34,7 +34,7 @@ type QueryRunner struct {
 type Executor struct {
 	extype.BaseExecutor
 	queryRunnerETH *QueryRunner
-	assets         []*models.ProtocolAsset
+	protocolAssets []*models.ProtocolAsset
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
@@ -42,7 +42,7 @@ type Executor struct {
 func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
 		queryRunnerETH: nil,
-		assets:         nil,
+		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
 	}
@@ -69,10 +69,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.queryRunnerETH = &QueryRunner{
 		pid: context.Spawn(props),
 	}
-	return state.UpdateAssetList(context)
+	return state.UpdateProtocolAssetList(context)
 }
 
-func (state *Executor) UpdateAssetList(context actor.Context) error {
+func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	assets := make([]*models.ProtocolAsset, 0)
 	reg := state.registry
 
@@ -107,38 +107,38 @@ func (state *Executor) UpdateAssetList(context actor.Context) error {
 				},
 			})
 	}
-	state.assets = assets
+	state.protocolAssets = assets
 
-	context.Send(context.Parent(), &messages.AssetList{
-		ResponseID: uint64(time.Now().UnixNano()),
-		Assets:     assets,
-		Success:    true,
+	context.Send(context.Parent(), &messages.ProtocolAssetList{
+		ResponseID:     uint64(time.Now().UnixNano()),
+		ProtocolAssets: assets,
+		Success:        true,
 	})
 
 	return nil
 }
 
-func (state *Executor) OnAssetListRequest(context actor.Context) error {
-	req := context.Message().(*messages.AssetListRequest)
-	context.Respond(&messages.AssetListResponse{
-		RequestID:  req.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Assets:     state.assets,
+func (state *Executor) OnProtocolAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetListRequest)
+	context.Respond(&messages.ProtocolAssetListResponse{
+		RequestID:      req.RequestID,
+		ResponseID:     uint64(time.Now().UnixNano()),
+		Success:        true,
+		ProtocolAssets: state.protocolAssets,
 	})
 	return nil
 }
 
-func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalAssetTransferRequest)
-	msg := &messages.HistoricalAssetTransferResponse{
+func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalProtocolAssetTransferRequest)
+	msg := &messages.HistoricalProtocolAssetTransferResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
 
-	if req.Asset == nil || req.Asset.Address == nil {
-		msg.RejectionReason = messages.MissingAsset
+	if req.ProtocolAsset == nil || req.ProtocolAsset.Address == nil {
+		msg.RejectionReason = messages.MissingProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
@@ -155,7 +155,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 		eabi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
-	copy(address[:], req.Asset.Address)
+	copy(address[:], req.ProtocolAsset.Address)
 	fQuery := ethereum.FilterQuery{
 		Addresses: []common.Address{address},
 		FromBlock: big.NewInt(1).SetUint64(req.Start),
@@ -180,7 +180,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 			return
 		}
 
-		events := make([]*models.AssetUpdate, 0)
+		events := make([]*models.ProtocolAssetUpdate, 0)
 		for _, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
@@ -191,7 +191,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 					context.Respond(msg)
 					return
 				}
-				t := &models.AssetUpdate{
+				t := &models.ProtocolAssetUpdate{
 					Transfer: &gorderbook.AssetTransfer{
 						From:    event.From[:],
 						To:      event.To[:],
@@ -203,7 +203,7 @@ func (state *Executor) OnHistoricalAssetTransferRequest(context actor.Context) e
 				events = append(events, t)
 			}
 		}
-		msg.Transfers = events
+		msg.Update = events
 		msg.Success = true
 		msg.SeqNum = uint64(time.Now().UnixNano())
 		context.Respond(msg)

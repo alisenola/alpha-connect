@@ -1,6 +1,7 @@
 package erc721_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,14 +17,14 @@ func TestListener(t *testing.T) {
 	as, ex, clean := tests.StartExecutor(t, &protocol)
 	defer clean()
 
-	res, err := as.Root.RequestFuture(ex, &messages.AssetListRequest{
+	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Subscribe: false,
 	}, 20*time.Second).Result()
 	if err != nil {
 		t.Fatal()
 	}
-	response, ok := res.(*messages.AssetListResponse)
+	response, ok := res.(*messages.ProtocolAssetListResponse)
 	if !ok {
 		t.Fatal("incorrect type assertion")
 	}
@@ -31,7 +32,7 @@ func TestListener(t *testing.T) {
 		Symbol: "BAYC",
 	}
 	var asset *models.ProtocolAsset
-	for _, a := range response.Assets {
+	for _, a := range response.ProtocolAssets {
 		if assetTest.Symbol == a.Symbol {
 			asset = a
 		}
@@ -39,6 +40,7 @@ func TestListener(t *testing.T) {
 	if asset == nil {
 		t.Fatal("asset not found")
 	}
+	fmt.Println("asset", asset)
 	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
 	checker := as.Root.Spawn(props)
 	defer as.Root.Poison(checker)

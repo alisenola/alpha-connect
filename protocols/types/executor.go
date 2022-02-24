@@ -8,13 +8,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
-type updateAssetList struct{}
+type updateProtocolAssetList struct{}
 
 type Executor interface {
 	actor.Actor
-	UpdateAssetList(context actor.Context) error
-	OnAssetListRequest(context actor.Context) error
-	OnHistoricalAssetTransferRequest(context actor.Context) error
+	UpdateProtocolAssetList(context actor.Context) error
+	OnProtocolAssetListRequest(context actor.Context) error
+	OnHistoricalProtocolAssetTransferRequest(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
@@ -33,7 +33,7 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		state.GetLogger().Info("actor started")
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
-			context.Send(pid, &updateAssetList{})
+			context.Send(pid, &updateProtocolAssetList{})
 		}(context.Self())
 
 	case *actor.Stopping:
@@ -53,35 +53,35 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		}
 		state.GetLogger().Info("actor restarting")
 
-	case *updateAssetList:
-		if err := state.UpdateAssetList(context); err != nil {
+	case *updateProtocolAssetList:
+		if err := state.UpdateProtocolAssetList(context); err != nil {
 			state.GetLogger().Info("error updating security list", log.Error(err))
 		}
 		go func(pid *actor.PID) {
 			time.Sleep(10 * time.Minute)
-			context.Send(pid, &updateAssetList{})
+			context.Send(pid, &updateProtocolAssetList{})
 		}(context.Self())
 
-	case *messages.HistoricalAssetTransferRequest:
-		if err := state.OnHistoricalAssetTransferRequest(context); err != nil {
-			state.GetLogger().Error("error processing HistoricalNftTransferDataRequest", log.Error(err))
+	case *messages.HistoricalProtocolAssetTransferRequest:
+		if err := state.OnHistoricalProtocolAssetTransferRequest(context); err != nil {
+			state.GetLogger().Error("error processing HistoricalProtocolAssetTransferRequest", log.Error(err))
 			panic(err)
 		}
-	case *messages.AssetListRequest:
-		if err := state.OnAssetListRequest(context); err != nil {
-			state.GetLogger().Error("error getting security list", log.Error(err))
+	case *messages.ProtocolAssetListRequest:
+		if err := state.OnProtocolAssetListRequest(context); err != nil {
+			state.GetLogger().Error("error processing ProtocolAssetListRequest", log.Error(err))
 			panic(err)
 		}
 	}
 }
 
-func (state *BaseExecutor) UpdateAssetList(context actor.Context) error {
+func (state *BaseExecutor) UpdateProtocolAssetList(context actor.Context) error {
 	return nil
 }
 
-func (state *BaseExecutor) OnAssetListRequest(context actor.Context) error {
-	req := context.Message().(*messages.AssetListRequest)
-	context.Respond(&messages.AssetListResponse{
+func (state *BaseExecutor) OnProtocolAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetListRequest)
+	context.Respond(&messages.ProtocolAssetListResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
@@ -90,9 +90,9 @@ func (state *BaseExecutor) OnAssetListRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *BaseExecutor) OnHistoricalAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalAssetTransferRequest)
-	context.Respond(&messages.HistoricalAssetTransferResponse{
+func (state *BaseExecutor) OnHistoricalProtocolAssetTransferRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalProtocolAssetTransferRequest)
+	context.Respond(&messages.HistoricalProtocolAssetTransferResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,

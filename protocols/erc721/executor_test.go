@@ -48,16 +48,16 @@ func TestExecutor(t *testing.T) {
 	testAsset := []models.ProtocolAsset{{
 		Symbol: "BAYC",
 	}}
-	res, err := as.Root.RequestFuture(executor, &messages.AssetListRequest{}, 20*time.Second).Result()
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assets, ok := res.(*messages.AssetListResponse)
+	assets, ok := res.(*messages.ProtocolAssetListResponse)
 	if !ok {
 		t.Fatal("incorrect typying")
 	}
 	var coll models.ProtocolAsset
-	for _, asset := range assets.Assets {
+	for _, asset := range assets.ProtocolAssets {
 		for _, c := range testAsset {
 			if asset.Symbol == c.Symbol {
 				coll = *asset
@@ -67,9 +67,9 @@ func TestExecutor(t *testing.T) {
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		executor,
-		&messages.HistoricalAssetTransferRequest{
+		&messages.HistoricalProtocolAssetTransferRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Asset: &models.ProtocolAsset{
+			ProtocolAsset: &models.ProtocolAsset{
 				Address:     coll.Address,
 				Name:        coll.Name,
 				Symbol:      coll.Symbol,
@@ -83,7 +83,7 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
-	response, _ := resp.(*messages.HistoricalAssetTransferResponse)
+	response, _ := resp.(*messages.HistoricalProtocolAssetTransferResponse)
 	if !response.Success {
 		t.Fatal("error in the transfers request", response.RejectionReason)
 	}
@@ -99,14 +99,14 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, resT := range response.Transfers {
+	for _, resT := range response.Update {
 		if ok := find(resT, query.ERC721Contract.Transfers); !ok {
 			t.Fatal()
 		}
 	}
 	//Run the transfers using the nft tracker
 	tracker := gorderbook.NewNftTracker()
-	for _, t := range response.Transfers {
+	for _, t := range response.Update {
 		var from [20]byte
 		var to [20]byte
 		tokenID := big.NewInt(1)
@@ -142,7 +142,7 @@ func TestExecutor(t *testing.T) {
 	}
 }
 
-func find(t *models.AssetUpdate, arr []*Transfer) bool {
+func find(t *models.ProtocolAssetUpdate, arr []*Transfer) bool {
 	from := big.NewInt(1).SetBytes(t.Transfer.From)
 	to := big.NewInt(1).SetBytes(t.Transfer.To)
 	for _, tOther := range arr {

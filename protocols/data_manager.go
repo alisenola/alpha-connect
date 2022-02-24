@@ -60,21 +60,21 @@ func (state *DataManager) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *messages.AssetTransferRequest:
-		if err := state.OnAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing OnAssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetTransferRequest:
+		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetTransferRequest", log.Error(err))
 			panic(err)
 		}
 
-	case *messages.AssetTransferResponse:
-		if err := state.OnAssetTransferResponse(context); err != nil {
-			state.logger.Error("error processing OnAssetTransferResponse", log.Error(err))
+	case *messages.ProtocolAssetTransferResponse:
+		if err := state.OnProtocolAssetTransferResponse(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetTransferResponse", log.Error(err))
 			panic(err)
 		}
 
-	case *messages.AssetDataIncrementalRefresh:
-		if err := state.OnAssetDataIncrementalRefresh(context); err != nil {
-			state.logger.Error("error processing AssetDataIncrementalRefresh", log.Error(err))
+	case *messages.ProtocolAssetDataIncrementalRefresh:
+		if err := state.OnProtocolAssetDataIncrementalRefresh(context); err != nil {
+			state.logger.Error("error processing ProtocolAssetDataIncrementalRefresh", log.Error(err))
 			panic(err)
 		}
 
@@ -104,8 +104,8 @@ func (state *DataManager) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *DataManager) OnAssetTransferRequest(context actor.Context) error {
-	request := context.Message().(*messages.AssetTransferRequest)
+func (state *DataManager) OnProtocolAssetTransferRequest(context actor.Context) error {
+	request := context.Message().(*messages.ProtocolAssetTransferRequest)
 
 	if request.Subscribe {
 		state.subscribers[request.RequestID] = request.Subscriber
@@ -117,23 +117,23 @@ func (state *DataManager) OnAssetTransferRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *DataManager) OnAssetTransferResponse(context actor.Context) error {
-	update := context.Message().(*messages.AssetTransferResponse)
+func (state *DataManager) OnProtocolAssetTransferResponse(context actor.Context) error {
+	update := context.Message().(*messages.ProtocolAssetTransferResponse)
 	for k, v := range state.subscribers {
-		forward := &messages.AssetTransferResponse{
-			RequestID:    k,
-			ResponseID:   uint64(time.Now().UnixNano()),
-			AssetUpdated: update.AssetUpdated,
+		forward := &messages.ProtocolAssetTransferResponse{
+			RequestID:  k,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Update:     update.Update,
 		}
 		context.Send(v, forward)
 	}
 	return nil
 }
 
-func (state *DataManager) OnAssetDataIncrementalRefresh(context actor.Context) error {
-	refresh := context.Message().(*messages.AssetDataIncrementalRefresh)
+func (state *DataManager) OnProtocolAssetDataIncrementalRefresh(context actor.Context) error {
+	refresh := context.Message().(*messages.ProtocolAssetDataIncrementalRefresh)
 	for k, v := range state.subscribers {
-		forward := &messages.AssetDataIncrementalRefresh{
+		forward := &messages.ProtocolAssetDataIncrementalRefresh{
 			RequestID:  k,
 			ResponseID: uint64(time.Now().UnixNano()),
 			Update:     refresh.Update,

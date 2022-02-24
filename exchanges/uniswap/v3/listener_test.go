@@ -74,8 +74,8 @@ func TestMarketData(t *testing.T) {
 		Tvl0:                 big.NewInt(0),
 		Tvl1:                 big.NewInt(0),
 		FeeProtocol:          0,
-		Ticks:                make(map[int32]*gorderbook.UnipoolV3Tick),
-		Positions:            make(map[[32]byte]*gorderbook.UnipoolV3Position),
+		Ticks:                make(map[int32]*gorderbook.TickSnapshot),
+		Positions:            make(map[[32]byte]*gorderbook.PositionSnapshot),
 	}
 	ticks := make(map[int32]*gorderbook.UnipoolV3Tick, 0)
 	for len(query.Pool.Ticks) == 1000 {

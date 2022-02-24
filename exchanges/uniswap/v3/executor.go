@@ -267,7 +267,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 		}
 		queryResponse := resp.(*jobs.PerformLogsQueryResponse)
 		if queryResponse.Error != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
+			state.logger.Warn("error at eth rpc server", log.Error(queryResponse.Error))
 			response.RejectionReason = messages.EthRPCError
 			context.Respond(response)
 			return
@@ -290,7 +290,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 					},
 					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
-					Removed: l.Removed,
+					Removed:   l.Removed,
 				}
 				response.Events = append(response.Events, update)
 			case uabi.Events["Mint"].ID:
@@ -310,8 +310,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -332,8 +332,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						Amount0:   event.Amount0.Bytes(),
 						Amount1:   event.Amount1.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -352,8 +352,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						Amount0:      event.Amount0.Bytes(),
 						Amount1:      event.Amount1.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -373,8 +373,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -391,8 +391,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						Amount0: event.Amount0.Bytes(),
 						Amount1: event.Amount1.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -408,8 +408,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 					SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 						FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)
@@ -426,8 +426,8 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 						AmountRequested0: event.Amount0.Bytes(),
 						AmountRequested1: event.Amount1.Bytes(),
 					},
-					Block:   l.BlockNumber,
-					Removed: l.Removed,
+					Block:     l.BlockNumber,
+					Removed:   l.Removed,
 					Timestamp: utils.SecondToTimestamp(queryResponse.Times[i]),
 				}
 				response.Events = append(response.Events, update)

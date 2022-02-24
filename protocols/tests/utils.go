@@ -47,7 +47,7 @@ func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem
 type ERC721Checker struct {
 	asset   *models.ProtocolAsset
 	logger  *log.Logger
-	updates []*models.AssetUpdate
+	updates []*models.ProtocolAssetUpdate
 	seqNum  uint64
 }
 
@@ -73,9 +73,9 @@ func (state *ERC721Checker) Receive(context actor.Context) {
 			state.logger.Error("error starting the actor", log.Error(err))
 			panic(err)
 		}
-	case *messages.AssetDataIncrementalRefresh:
-		if err := state.OnAssetDataIncrementalRefresh(context); err != nil {
-			state.logger.Error("error processing AssetDataIncrementalRefresh", log.Error(err))
+	case *messages.ProtocolAssetDataIncrementalRefresh:
+		if err := state.OnProtocolAssetDataIncrementalRefresh(context); err != nil {
+			state.logger.Error("error processing ProtocolAssetDataIncrementalRefresh", log.Error(err))
 			panic(err)
 		}
 	}
@@ -89,25 +89,25 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(state).String()),
 	)
 	executor := context.ActorSystem().NewLocalPID("executor")
-	res, err := context.RequestFuture(executor, &messages.AssetTransferRequest{
-		RequestID:  0,
-		Asset:      state.asset,
-		Subscriber: context.Self(),
-		Subscribe:  true,
+	res, err := context.RequestFuture(executor, &messages.ProtocolAssetTransferRequest{
+		RequestID:     0,
+		ProtocolAsset: state.asset,
+		Subscriber:    context.Self(),
+		Subscribe:     true,
 	}, 30*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching the asset transfer %v", err)
 	}
-	updt, ok := res.(*messages.AssetTransferResponse)
+	updt, ok := res.(*messages.ProtocolAssetTransferResponse)
 	if !ok {
 		return fmt.Errorf("error for type assertion %v", err)
 	}
-	state.updates = updt.AssetUpdated
+	state.updates = updt.Update
 	return nil
 }
 
-func (state *ERC721Checker) OnAssetDataIncrementalRefresh(context actor.Context) error {
-	res := context.Message().(*messages.AssetDataIncrementalRefresh)
+func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.Context) error {
+	res := context.Message().(*messages.ProtocolAssetDataIncrementalRefresh)
 	if res.Update == nil {
 		return nil
 	}
