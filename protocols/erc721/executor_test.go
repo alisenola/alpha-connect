@@ -46,7 +46,9 @@ func TestExecutor(t *testing.T) {
 	defer cancel()
 
 	testAsset := []models.ProtocolAsset{{
-		Symbol: "BAYC",
+		Asset: &models2.Asset{
+			Symbol: "BAYC",
+		},
 	}}
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
 	if err != nil {
@@ -54,26 +56,44 @@ func TestExecutor(t *testing.T) {
 	}
 	assets, ok := res.(*messages.ProtocolAssetListResponse)
 	if !ok {
-		t.Fatal("incorrect typying")
+		t.Fatal("incorrect for type assertion")
 	}
-	var coll models.ProtocolAsset
+	var coll *models.ProtocolAsset
 	for _, asset := range assets.ProtocolAssets {
 		for _, c := range testAsset {
-			if asset.Symbol == c.Symbol {
-				coll = *asset
+			if asset.Asset.Symbol == c.Asset.Symbol {
+				coll = asset
 			}
 		}
 	}
+	if coll == nil {
+		t.Fatal("missing collection")
+	}
+	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
+		RequestID:       uint64(time.Now().UnixNano()),
+		ProtocolAssetID: uint64(275)<<32 + 1,
+	}, 15*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
+	if !ok {
+		t.Fatal("error type asserting")
+	}
+	if !def.Success {
+		t.Fatal(def.RejectionReason)
+	}
+	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
 		executor,
 		&messages.HistoricalProtocolAssetTransferRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			ProtocolAsset: &models.ProtocolAsset{
-				Address:     coll.Address,
-				Name:        coll.Name,
-				Symbol:      coll.Symbol,
-				TotalSupply: big.NewInt(0).Bytes(),
+				Address:  coll.Address,
+				Asset:    &models2.Asset{ID: coll.Asset.ID},
+				Protocol: &models2.Protocol{ID: coll.Protocol.ID},
+				Meta:     coll.Meta,
 			},
 			Start: 12200000,
 			Stop:  12300000,

@@ -99,12 +99,16 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			assets,
 			&models.ProtocolAsset{
 				Address: add.Bytes(),
-				Name:    asset.Name,
-				Symbol:  asset.Symbol,
 				Protocol: &models2.Protocol{
 					ID:   constants.ERC721.ID,
 					Name: "ERC-721",
 				},
+				Asset: &models2.Asset{
+					Name:   asset.Name,
+					Symbol: asset.Symbol,
+					ID:     asset.AssetId,
+				},
+				Meta: asset.Meta,
 			})
 	}
 	state.protocolAssets = assets

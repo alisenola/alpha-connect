@@ -3,13 +3,14 @@ package utils
 import (
 	goContext "context"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	registry "gitlab.com/alphaticks/alpha-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
-	"reflect"
-	"time"
 )
 
 type checkAsset struct{}
@@ -126,7 +127,6 @@ func (state *AssetLoader) checkAsset(context actor.Context) error {
 			Symbol: a.Symbol,
 			Name:   a.Name,
 			ID:     a.AssetId,
-			Meta:   a.Meta,
 		}
 	}
 

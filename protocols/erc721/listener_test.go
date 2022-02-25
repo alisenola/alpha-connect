@@ -29,11 +29,13 @@ func TestListener(t *testing.T) {
 		t.Fatal("incorrect type assertion")
 	}
 	assetTest := models.ProtocolAsset{
-		Symbol: "BAYC",
+		Asset: &models2.Asset{
+			Symbol: "BAYC",
+		},
 	}
 	var asset *models.ProtocolAsset
 	for _, a := range response.ProtocolAssets {
-		if assetTest.Symbol == a.Symbol {
+		if assetTest.Asset.Symbol == a.Asset.Symbol {
 			asset = a
 		}
 	}
