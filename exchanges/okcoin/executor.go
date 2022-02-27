@@ -62,7 +62,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(client)
+		return jobs.NewHTTPQuery(client)
 	})
 	state.queryRunner = &QueryRunner{
 		pid:       context.Spawn(props),

@@ -24,15 +24,15 @@ type PerformQueryResponse struct {
 	Response   []byte
 }
 
-type APIQuery struct {
+type HTTPQuery struct {
 	client *http.Client
 }
 
-func NewAPIQuery(client *http.Client) actor.Actor {
-	return &APIQuery{client}
+func NewHTTPQuery(client *http.Client) actor.Actor {
+	return &HTTPQuery{client}
 }
 
-func (q *APIQuery) Receive(context actor.Context) {
+func (q *HTTPQuery) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		err := q.Initialize(context)
@@ -59,15 +59,15 @@ func (q *APIQuery) Receive(context actor.Context) {
 	}
 }
 
-func (q *APIQuery) Initialize(context actor.Context) error {
+func (q *HTTPQuery) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (q *APIQuery) Clean(context actor.Context) error {
+func (q *HTTPQuery) Clean(context actor.Context) error {
 	return nil
 }
 
-func (q *APIQuery) PerformHTTPQueryRequest(context actor.Context) error {
+func (q *HTTPQuery) PerformHTTPQueryRequest(context actor.Context) error {
 	msg := context.Message().(*PerformHTTPQueryRequest)
 	go func(sender *actor.PID) {
 		queryResponse := PerformQueryResponse{}

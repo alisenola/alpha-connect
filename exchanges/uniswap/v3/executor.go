@@ -100,7 +100,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewABIQuery(client)
+		return jobs.NewETHQuery(client)
 	})
 	state.queryRunnerETH = &QueryRunner{
 		pid: context.Spawn(props),
