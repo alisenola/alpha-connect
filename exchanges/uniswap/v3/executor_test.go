@@ -77,7 +77,10 @@ func TestPoolData(t *testing.T) {
 	pool := gorderbook.NewUnipoolV3(int32(sec.TakerFee.Value))
 	delta := -1
 	for _, ev := range updates.Events {
-		v3.ProcessUpdate(pool, ev)
+		fmt.Println(ev.Timestamp)
+		if err := v3.ProcessUpdate(pool, ev); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	graph := graphql.NewClient(uniswap.GRAPHQL_URL, nil)
@@ -87,21 +90,6 @@ func TestPoolData(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot := pool.GetSnapshot()
-	if query.Pool.FeeGrowthGlobal0X128.Cmp(snapshot.FeeGrowthGlobal0X128) != 0 {
-		t.Fatalf(
-			"different fee growth global 0: got %s for replay and %s for graph pool, with compare %d",
-			snapshot.FeeGrowthGlobal0X128.String(),
-			query.Pool.FeeGrowthGlobal0X128.String(),
-			query.Pool.FeeGrowthGlobal0X128.Cmp(snapshot.FeeGrowthGlobal0X128),
-		)
-	}
-	if query.Pool.FeeGrowthGlobal1X128.Cmp(snapshot.FeeGrowthGlobal1X128) != 0 {
-		t.Fatalf(
-			"different fee growth global 1: got %s for replay and %s for graph pool",
-			snapshot.FeeGrowthGlobal1X128.String(),
-			query.Pool.FeeGrowthGlobal1X128.String(),
-		)
-	}
 	if query.Pool.Liquidity.Cmp(snapshot.Liquidity) != 0 {
 		t.Fatalf(
 			"different liquidity: got %s for replay and %s for graph pool",
@@ -117,11 +105,9 @@ func TestPoolData(t *testing.T) {
 		)
 	}
 
-	for k, _ := range snapshot.Ticks {
+	for k := range snapshot.Ticks {
 		fmt.Println("tick", k)
 		tick := pool.GetTickValue(k)
-		fmt.Println("FeeGrowthOutside0X128", tick.FeeGrowthOutside0X128)
-		fmt.Println("FeeGrowthOutside1X128", tick.FeeGrowthOutside1X128)
 		fmt.Println("Liquidity Net", tick.LiquidityNet)
 		fmt.Println("Liquidity Gross", tick.LiquidityGross)
 	}

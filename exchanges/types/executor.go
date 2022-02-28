@@ -29,7 +29,7 @@ type Executor interface {
 	OnOrderBulkReplaceRequest(context actor.Context) error
 	OnOrderCancelRequest(context actor.Context) error
 	OnOrderMassCancelRequest(context actor.Context) error
-	OnHistoricalUnipoolV3EventRequest(context actor.Context) error
+	OnHistoricalUnipoolV3DataRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
@@ -160,7 +160,7 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		}
 
 	case *messages.HistoricalUnipoolV3DataRequest:
-		if err := state.OnHistoricalUnipoolV3EventRequest(context); err != nil {
+		if err := state.OnHistoricalUnipoolV3DataRequest(context); err != nil {
 			state.GetLogger().Error("error processing UnipoolV3DataRequest", log.Error(err))
 			panic(err)
 		}
@@ -354,7 +354,7 @@ func (state *BaseExecutor) OnOrderMassCancelRequest(context actor.Context) error
 	return nil
 }
 
-func (state *BaseExecutor) OnHistoricalUnipoolV3EventRequest(context actor.Context) error {
+func (state *BaseExecutor) OnHistoricalUnipoolV3DataRequest(context actor.Context) error {
 	req := context.Message().(*messages.HistoricalUnipoolV3DataRequest)
 	context.Respond(&messages.HistoricalUnipoolV3DataResponse{
 		RequestID:       req.RequestID,
