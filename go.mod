@@ -10,6 +10,7 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220224132020-0d4d06a0d257
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83
@@ -54,7 +55,6 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007 // indirect
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
