@@ -17,7 +17,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220224114144-655d4401d88f
-	gitlab.com/alphaticks/xchanger v0.0.0-20220223204928-17a9397669d6
+	gitlab.com/alphaticks/xchanger v0.0.0-20220228084524-f438e5512013
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/grpc v1.40.0
 )
@@ -54,7 +54,7 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220216133217-2f50f8161eac // indirect
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007 // indirect
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
