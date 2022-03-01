@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/tickobjects"
-	"gitlab.com/alphaticks/tickstore-go-client/query"
+	types "gitlab.com/alphaticks/tickstore-types"
+	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -19,18 +19,23 @@ func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *acto
 		&constants.COINBASEPRO,
 	}
 	as := actor.NewActorSystem()
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	cfg := exchanges.ExecutorConfig{
+		Exchanges:  exch,
+		Strict:     false,
+		DialerPool: xchangerUtils.DefaultDialerPool,
+	}
+	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(&cfg)), "executor")
 	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
 }
 
 func TestLiveQuery(t *testing.T) {
-	as, _, clean := StartExecutor(&constants.BINANCE)
+	as, executor, clean := StartExecutor(&constants.BINANCE)
 	defer clean()
-	lt, err := NewLiveStore(as)
+	lt, err := NewLiveStore(as, executor)
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := query.NewQuerySettings(query.WithSelector(`SELECT OBPrice(AggregateOB(orderbook), "0.2") WHERE exchange="^binance|coinbasepro$" base="^BTC$" quote="^USDT$" GROUPBY base`))
+	qs := types.NewQuerySettings(types.WithSelector(`SELECT OBPrice(AggregateOB(orderbook), "0.2") WHERE exchange="^binance|coinbasepro$" base="^BTC$" quote="^USDT$" GROUPBY base`))
 	q, err := lt.NewQuery(qs)
 	if err != nil {
 		t.Fatal(err)
