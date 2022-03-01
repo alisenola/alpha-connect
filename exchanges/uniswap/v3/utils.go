@@ -7,7 +7,14 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 )
 
+const (
+	ETH_CLIENT_WS = "wss://eth-mainnet.alchemyapi.io/v2/hdodrT8DMC-Ow9rd6qIOcjpZgr5_Ixdg"
+)
+
 func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error {
+	if update.Removed {
+		return nil
+	}
 	if i := update.Initialize; i != nil {
 		sqrt := big.NewInt(1).SetBytes(i.SqrtPriceX96)
 		pool.Initialize(
@@ -50,6 +57,7 @@ func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error 
 		amount1 := big.NewInt(1).SetBytes(s.Amount1)
 		sqrt := big.NewInt(1).SetBytes(s.SqrtPriceX96)
 		sqrtPrev := pool.GetSqrtPrice()
+		liquidity := big.NewInt(1).SetBytes(s.Liquidity)
 		if sqrt.Cmp(sqrtPrev) > 0 {
 			sqrt.Add(sqrt, big.NewInt(1))
 			amount0.Neg(amount0)
@@ -60,6 +68,7 @@ func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error 
 		pool.Swap(
 			amount0,
 			amount1,
+			liquidity,
 			sqrt,
 			s.Tick,
 		)

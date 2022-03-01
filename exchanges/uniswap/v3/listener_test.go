@@ -63,19 +63,17 @@ func TestMarketData(t *testing.T) {
 	pool := gorderbook.NewUnipoolV3(feeTier)
 	pool.Initialize(query.Pool.SqrtPrice, feeTier)
 	snap := gorderbook.PoolSnapShot{
-		Tick:                 query.Pool.Tick,
-		FeeTier:              query.Pool.FeeTier,
-		Liquidity:            query.Pool.Liquidity,
-		SqrtPriceX96:         query.Pool.SqrtPrice,
-		ProtocolFees0:        big.NewInt(0),
-		ProtocolFees1:        big.NewInt(0),
-		FeeGrowthGlobal0X128: query.Pool.FeeGrowthGlobal0X128,
-		FeeGrowthGlobal1X128: query.Pool.FeeGrowthGlobal1X128,
-		Tvl0:                 big.NewInt(0),
-		Tvl1:                 big.NewInt(0),
-		FeeProtocol:          0,
-		Ticks:                make(map[int32]*gorderbook.UnipoolV3Tick),
-		Positions:            make(map[[32]byte]*gorderbook.UnipoolV3Position),
+		Tick:          query.Pool.Tick,
+		FeeTier:       query.Pool.FeeTier,
+		Liquidity:     query.Pool.Liquidity,
+		SqrtPriceX96:  query.Pool.SqrtPrice,
+		ProtocolFees0: big.NewInt(0),
+		ProtocolFees1: big.NewInt(0),
+		Tvl0:          big.NewInt(0),
+		Tvl1:          big.NewInt(0),
+		FeeProtocol:   0,
+		Ticks:         make(map[int32]*gorderbook.TickSnapshot),
+		Positions:     make(map[[32]byte]*gorderbook.PositionSnapshot),
 	}
 	ticks := make(map[int32]*gorderbook.UnipoolV3Tick, 0)
 	for len(query.Pool.Ticks) == 1000 {
@@ -129,8 +127,6 @@ func TestMarketData(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := resp.(*tests.GetPool).Pool.GetSnapshot()
-	fmt.Println("Pool Fee0", p.FeeGrowthGlobal0X128.String())
-	fmt.Println("Pool Fee1", p.FeeGrowthGlobal1X128.String())
 	fmt.Println("Pool Liquidity", p.Liquidity.String())
 	fmt.Println("Pool SqrtPrice", p.SqrtPriceX96.String())
 

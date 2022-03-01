@@ -25,6 +25,7 @@ import (
 type checkSockets struct{}
 
 type InstrumentData struct {
+	events          []*models.UPV3Update
 	seqNum          uint64
 	lastBlockUpdate uint64
 	lastHB          time.Time
@@ -114,6 +115,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.instrumentData = &InstrumentData{
+		events:          []*models.UPV3Update{},
 		seqNum:          uint64(time.Now().UnixNano()),
 		lastBlockUpdate: 0,
 	}
@@ -150,6 +152,7 @@ func (state *Listener) OnUnipoolV3DataRequest(context actor.Context) error {
 	resp := &messages.UnipoolV3DataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
+		Update:     state.instrumentData.events,
 		Success:    true,
 		SeqNum:     state.instrumentData.seqNum,
 	}
@@ -169,6 +172,8 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
+	it := eth.NewLogIterator(uabi)
+
 	query := [][]interface{}{{
 		uabi.Events["Initialize"].ID,
 		uabi.Events["Mint"].ID,
@@ -187,15 +192,19 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		Addresses: []common.Address{common.HexToAddress(symbol)},
 		Topics:    topics,
 	}
-	it := eth.NewLogIterator(uabi)
-	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
-	it.WatchLogs(state.client, ctx, fQuery)
 
-	go func(it *eth.LogIterator, pid *actor.PID) {
-		for it.Next() {
-			context.Send(pid, it.Log)
+	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	err = it.WatchLogs(state.client, ctx, fQuery)
+	if err != nil {
+		return fmt.Errorf("error watching logs: %v", err)
+	}
+	state.iterator = it
+
+	go func(pid *actor.PID) {
+		for state.iterator.Next() {
+			context.Send(pid, state.iterator.Log)
 		}
-	}(it, context.Self())
+	}(context.Self())
 
 	return nil
 }
@@ -230,6 +239,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Mint"].ID:
 		event := new(uniswap.UniswapMint)
 		if err := eth.UnpackLog(uabi, event, "Mint", *msg); err != nil {
@@ -247,6 +257,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Burn"].ID:
 		event := new(uniswap.UniswapBurn)
 		if err := eth.UnpackLog(uabi, event, "Burn", *msg); err != nil {
@@ -264,6 +275,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Swap"].ID:
 		event := new(uniswap.UniswapSwap)
 		if err := eth.UnpackLog(uabi, event, "Swap", *msg); err != nil {
@@ -279,6 +291,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Collect"].ID:
 		event := new(uniswap.UniswapCollect)
 		if err := eth.UnpackLog(uabi, event, "Collect", *msg); err != nil {
@@ -295,6 +308,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["Flash"].ID:
 		event := new(uniswap.UniswapFlash)
 		if err := eth.UnpackLog(uabi, event, "Flash", *msg); err != nil {
@@ -308,6 +322,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["SetFeeProtocol"].ID:
 		event := new(uniswap.UniswapSetFeeProtocol)
 		if err := eth.UnpackLog(uabi, event, "SetFeeProtocol", *msg); err != nil {
@@ -320,6 +335,7 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	case uabi.Events["CollectProtocol"].ID:
 		event := new(uniswap.UniswapCollectProtocol)
 		if err := eth.UnpackLog(uabi, event, "CollectProtocol", *msg); err != nil {
@@ -333,13 +349,14 @@ func (state *Listener) onLog(context actor.Context) error {
 			Removed: msg.Removed,
 			Block:   msg.BlockNumber,
 		}
+		state.instrumentData.events = append(state.instrumentData.events, updt)
 	}
 
-	state.instrumentData.lastBlockUpdate = msg.BlockNumber
 	context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
 		SeqNum: state.instrumentData.seqNum + 1,
 		Update: updt,
 	})
+	state.instrumentData.lastBlockUpdate = updt.Block
 	state.instrumentData.seqNum += 1
 
 	return nil
