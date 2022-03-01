@@ -12,7 +12,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220224132020-0d4d06a0d257
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220301075536-4f9ca72aa56c
 	gitlab.com/alphaticks/tickobjects v0.0.0-20220216204541-55d7fb3e3c83
 	gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
@@ -76,6 +76,7 @@ require (
 )
 
 replace gitlab.com/alphaticks/xchanger => ../xchanger
+
 replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
 // replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
