@@ -121,6 +121,7 @@ func (state *MDChecker) Initialize(context actor.Context) error {
 			Symbol:     &types.StringValue{Value: state.security.Symbol},
 		},
 		Aggregation: models.L2,
+		Stats:       []models.StatType{models.OpenInterest, models.FundingRate},
 	}, 80*time.Second).Result()
 	if err != nil {
 		return err

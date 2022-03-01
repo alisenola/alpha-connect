@@ -327,7 +327,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 	if msg.Subscribe {
 		for _, stat := range msg.Stats {
-			if stat == models.OpenInterest && state.openInterestTicker != nil {
+			if stat == models.OpenInterest && state.openInterestTicker == nil {
 				openInterestTicker := time.NewTicker(10 * time.Second)
 				state.openInterestTicker = openInterestTicker
 				go func(pid *actor.PID) {
@@ -435,7 +435,7 @@ func (state *Listener) onDepthData(context actor.Context, depthData fbinance.WSD
 	// Check depth continuity
 	if instr.lastUpdateID+1 != depthData.PreviousUpdateID {
 		return fmt.Errorf("got wrong sequence ID for %s: %d, %d",
-			symbol, instr, depthData.PreviousUpdateID)
+			symbol, instr.lastUpdateID, depthData.PreviousUpdateID)
 	}
 
 	bids, asks, err := depthData.ToBidAsk()

@@ -304,7 +304,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 	if msg.Subscribe {
 		for _, stat := range msg.Stats {
-			if stat == models.OpenInterest && state.openInterestTicker != nil {
+			if stat == models.OpenInterest && state.openInterestTicker == nil {
 				if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP || state.security.SecurityType == enum.SecurityType_CRYPTO_FUT {
 					openInterestTicker := time.NewTicker(10 * time.Second)
 					state.openInterestTicker = openInterestTicker

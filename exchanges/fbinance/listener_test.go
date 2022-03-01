@@ -16,7 +16,7 @@ func TestMarketData(t *testing.T) {
 		Exchange:          constants.FBINANCE,
 		BaseCurrency:      constants.BITCOIN,
 		QuoteCurrency:     constants.TETHER,
-		MinPriceIncrement: 0.01,
+		MinPriceIncrement: 0.1,
 		RoundLot:          0.001,
 		HasMaturityDate:   false,
 		IsInverse:         false,
