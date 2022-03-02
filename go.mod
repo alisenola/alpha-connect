@@ -10,7 +10,6 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220207134548-2116f383c8e4
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220223144659-9bc54cc86b92
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20220223131428-59a9fbe38a67
@@ -55,6 +54,7 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228175426-9e21781ad5ae // indirect
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
@@ -76,8 +76,11 @@ require (
 )
 
 replace gitlab.com/alphaticks/xchanger => ../xchanger
-// replace gitlab.com/alphaticks/gorderbook => ../gorderbook
+
+replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
 // replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
 
 //replace gitlab.com/alphaticks/tickstore => ../tickstore
+
+replace gitlab.com/alphaticks/alpha-public-registry-grpc => ../alpha-public-registry-grpc

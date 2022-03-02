@@ -14,7 +14,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"go.mongodb.org/mongo-driver/bson"

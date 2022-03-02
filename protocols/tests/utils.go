@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"os"
 	"reflect"
 	"testing"
@@ -13,13 +14,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/grpc"
 )
 
-func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem, *actor.PID, func()) {
-	registryAddress := "registry.alphaticks.io:7001"
+func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem, *actor.PID, *actor.PID, func()) {
+	registryAddress := "127.0.0.1:7001"
 	if os.Getenv("REGISTRY_ADDRESS") != "" {
 		registryAddress = os.Getenv("REGISTRY_ADDRESS")
 	}
@@ -40,8 +41,9 @@ func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem
 	if err != nil {
 		t.Fatal(err)
 	}
+	loader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(reg)))
 
-	return as, ex, func() { as.Root.PoisonFuture(ex).Wait() }
+	return as, ex, loader, func() { as.Root.PoisonFuture(ex).Wait() }
 }
 
 type ERC721Checker struct {

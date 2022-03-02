@@ -14,7 +14,7 @@ import (
 
 func TestListener(t *testing.T) {
 	protocol := models2.Protocol{Name: "ERC-721", ID: 0x01}
-	as, ex, clean := tests.StartExecutor(t, &protocol)
+	as, ex, _, clean := tests.StartExecutor(t, &protocol)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{

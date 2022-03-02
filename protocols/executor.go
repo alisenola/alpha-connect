@@ -14,7 +14,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -212,10 +212,13 @@ func (state *Executor) OnProtocolAssetListRequest(context actor.Context) error {
 
 func (state *Executor) OnProtocolAssetList(context actor.Context) error {
 	msg := context.Message().(*messages.ProtocolAssetList)
-	proto := msg.ProtocolAssets[0].Protocol.ID
+	var protoId uint32
+	if len(msg.ProtocolAssets) > 0 {
+		protoId = msg.ProtocolAssets[0].Protocol.ID
+	}
 
 	for k, v := range state.protocolAssets {
-		if v.Protocol.ID == proto {
+		if v.Protocol.ID == protoId {
 			delete(state.protocolAssets, k)
 		}
 	}

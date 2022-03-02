@@ -2,19 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/remote"
-	"gitlab.com/alphaticks/alpha-connect/data"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/rpc"
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
-	tickstore_grpc "gitlab.com/alphaticks/tickstore-grpc"
-	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/models"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
-	"google.golang.org/grpc"
-	_ "google.golang.org/grpc/credentials"
 	"math"
 	"net"
 	"os"
@@ -23,6 +10,20 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/AsynkronIT/protoactor-go/remote"
+	"gitlab.com/alphaticks/alpha-connect/data"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/rpc"
+	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	tickstore_grpc "gitlab.com/alphaticks/tickstore-grpc"
+	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/models"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/credentials"
 )
 
 var done = make(chan os.Signal, 1)

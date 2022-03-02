@@ -8,7 +8,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
 )
@@ -114,9 +114,7 @@ func (state *AssetLoader) onReady(context actor.Context) error {
 
 func (state *AssetLoader) checkAsset(context actor.Context) error {
 	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{
-		Filter: &registry.AssetFilter{
-			Fungible: true,
-		},
+		Filter: &registry.AssetFilter{},
 	})
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
@@ -129,7 +127,6 @@ func (state *AssetLoader) checkAsset(context actor.Context) error {
 			ID:     a.AssetId,
 		}
 	}
-
 	if err := constants.LoadAssets(assets); err != nil {
 		return err
 	}

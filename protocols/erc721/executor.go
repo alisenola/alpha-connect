@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -78,37 +78,40 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
-	filter := registry.AssetFilter{
-		Protocol: []string{"ERC-721"},
-		Fungible: false,
-	}
-	in := registry.AssetsRequest{
+	filter := registry.ProtocolAssetFilter{}
+	in := registry.ProtocolAssetsRequest{
 		Filter: &filter,
 	}
-	res, err := reg.Assets(ctx, &in)
+	res, err := reg.ProtocolAssets(ctx, &in)
 	if err != nil {
-		return fmt.Errorf("error updating asset list: %v", err)
+		return fmt.Errorf("error updating protocol asset list: %v", err)
 	}
-	response := res.Assets
-	for _, asset := range response {
-		add, ok := big.NewInt(1).SetString(asset.Meta["address"][2:], 16)
+	response := res.ProtocolAssets
+	for _, protocolAsset := range response {
+		address, ok := big.NewInt(1).SetString(protocolAsset.Meta["address"][2:], 16)
 		if !ok {
+			state.logger.Warn("incorrect address parsing for asset")
+			continue
+		}
+		as, ok := constants.GetAssetByID(protocolAsset.AssetId)
+		if !ok {
+			state.logger.Warn("error getting asset with id", log.String("asset-id", fmt.Sprint(protocolAsset.AssetId)))
 			continue
 		}
 		assets = append(
 			assets,
 			&models.ProtocolAsset{
-				Address: add.Bytes(),
+				Address: address.Bytes(),
 				Protocol: &models2.Protocol{
 					ID:   constants.ERC721.ID,
 					Name: "ERC-721",
 				},
 				Asset: &models2.Asset{
-					Name:   asset.Name,
-					Symbol: asset.Symbol,
-					ID:     asset.AssetId,
+					Name:   as.Name,
+					Symbol: as.Symbol,
+					ID:     as.ID,
 				},
-				Meta: asset.Meta,
+				Meta: protocolAsset.Meta,
 			})
 	}
 	state.protocolAssets = assets

@@ -703,6 +703,8 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228150408-d6af48d4bec3 h1:hGB636bQks7tTeVL+uUeHUKLBg7ofY8ZcXU0ilzJYWc=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228150408-d6af48d4bec3/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220207134548-2116f383c8e4 h1:SPtIyvntcRAsJ9FZJbt9hj7Ncz8cG3rTckl7OPPvgXc=
 gitlab.com/alphaticks/alpha-registry-grpc v0.0.0-20220207134548-2116f383c8e4/go.mod h1:RIB4tZceB34elzNCDGd+AZJKztVsIC2yeebJkhdYxjU=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=

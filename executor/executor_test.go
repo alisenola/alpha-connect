@@ -13,7 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols"
-	registry "gitlab.com/alphaticks/alpha-registry-grpc"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/grpc"
 )
@@ -111,7 +111,7 @@ func TestMainExecutor(t *testing.T) {
 	}
 	var a *models.ProtocolAsset
 	for _, asset := range msg.ProtocolAssets {
-		if asset.Symbol == "BAYC" {
+		if asset.Asset.Symbol == "BAYC" {
 			a = asset
 		}
 	}

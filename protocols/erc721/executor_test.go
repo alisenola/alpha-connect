@@ -3,6 +3,7 @@ package erc721_test
 import (
 	"context"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"math/big"
 	"testing"
 	"time"
@@ -42,8 +43,12 @@ type ERC721Contract struct {
 }
 
 func TestExecutor(t *testing.T) {
-	as, executor, cancel := tests.StartExecutor(t, &models2.Protocol{Name: "ERC-721", ID: 0x01})
+	as, executor, loader, cancel := tests.StartExecutor(t, &models2.Protocol{Name: "ERC-721", ID: 0x01})
 	defer cancel()
+	_, err := as.Root.RequestFuture(loader, &utils.Ready{}, 15*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testAsset := []models.ProtocolAsset{{
 		Asset: &models2.Asset{
@@ -60,6 +65,7 @@ func TestExecutor(t *testing.T) {
 	}
 	var coll *models.ProtocolAsset
 	for _, asset := range assets.ProtocolAssets {
+		fmt.Printf("asset %+v \n", asset)
 		for _, c := range testAsset {
 			if asset.Asset.Symbol == c.Asset.Symbol {
 				coll = asset
@@ -125,7 +131,7 @@ func TestExecutor(t *testing.T) {
 		}
 	}
 	//Run the transfers using the nft tracker
-	tracker := gorderbook.NewNftTracker()
+	tracker := gorderbook.NewERC721Tracker()
 	for _, t := range response.Update {
 		var from [20]byte
 		var to [20]byte
