@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -81,7 +82,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 
-	request, weight, err := okex.GetPerpetualsInstruments()
+	request, weight, err := okex.GetInstruments(okex.SWAP)
 	if err != nil {
 		return err
 	}
@@ -120,20 +121,24 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	var perpResponse []okex.PerpetualInstrument
+	var perpResponse okex.PerpetualInstrumentsResponse
 	err = json.Unmarshal(response, &perpResponse)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
 		return err
 	}
+	if perpResponse.Code != "0" {
+		return fmt.Errorf("error decoding query response: %s", perpResponse.Msg)
+	}
 
-	for _, pair := range perpResponse {
-		baseCurrency, ok := constants.GetAssetBySymbol(pair.BaseCurrency)
+	for _, pair := range perpResponse.Data {
+		splits := strings.Split(pair.Underlying, "-")
+		baseCurrency, ok := constants.GetAssetBySymbol(splits[0])
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
 			continue
 		}
-		quoteCurrency, ok := constants.GetAssetBySymbol(pair.QuoteCurrency)
+		quoteCurrency, ok := constants.GetAssetBySymbol(splits[1])
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.QuoteCurrency + " for instrument " + pair.InstrumentID)
 			continue
@@ -145,11 +150,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.QuoteCurrency = quoteCurrency
 		security.Status = models.Trading
 		security.Exchange = &constants.OKEXP
-		security.IsInverse = pair.IsInverse
+		security.IsInverse = pair.ContractType == okex.INVERSE
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: pair.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: pair.SizeIncrement}
+		security.RoundLot = &types.DoubleValue{Value: pair.LotSize}
 		security.Multiplier = &types.DoubleValue{Value: pair.ContractValue}
 		securities = append(securities, &security)
 	}

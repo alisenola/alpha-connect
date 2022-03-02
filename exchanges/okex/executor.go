@@ -78,7 +78,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	if state.rateLimit.IsRateLimited() {
 		return fmt.Errorf("rate limited")
 	}
-	request, weight, err := okex.GetSpotInstruments()
+	request, weight, err := okex.GetInstruments(okex.SPOT)
 	if err != nil {
 		return err
 	}
@@ -117,15 +117,18 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	var kResponse []okex.SpotInstrument
+	var kResponse okex.SpotInstrumentsResponse
 	err = json.Unmarshal(response, &kResponse)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
 		return err
 	}
 
+	if kResponse.Code != "0" {
+		return fmt.Errorf("error decoding query response: %s", kResponse.Msg)
+	}
 	var securities []*models.Security
-	for _, pair := range kResponse {
+	for _, pair := range kResponse.Data {
 		baseCurrency, ok := constants.GetAssetBySymbol(pair.BaseCurrency)
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)
@@ -146,7 +149,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: pair.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: pair.SizeIncrement}
+		security.RoundLot = &types.DoubleValue{Value: pair.LotSize}
 		securities = append(securities, &security)
 	}
 	state.securities = securities
