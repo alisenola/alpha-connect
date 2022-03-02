@@ -182,7 +182,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if os.Getenv("DERIBIT_KEY") != "" {
 		fmt.Println("SUBSCRIBE RAW")
 		interval = deribit.Interval0ms
-		if err, _ := ws.Auth(&xchangerModels.APICredentials{
+		if _, err := ws.Auth(&xchangerModels.APICredentials{
 			APIKey:    os.Getenv("DERIBIT_KEY"),
 			APISecret: os.Getenv("DERIBIT_SECRET"),
 		}); err != nil {
@@ -199,7 +199,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		interval = deribit.Interval100ms
 	}
 
-	if err, _ := ws.SubscribeOrderBook(state.security.Symbol, interval); err != nil {
+	if _, err := ws.SubscribeOrderBook(state.security.Symbol, interval); err != nil {
 		return err
 	}
 
@@ -266,11 +266,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.lastUpdateID = update.ChangeID
 
-	if err, _ := ws.SubscribeTrade(state.security.Symbol, interval); err != nil {
+	if _, err := ws.SubscribeTrade(state.security.Symbol, interval); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
 
-	if err, _ := ws.SubscribeTicker(state.security.Symbol, interval); err != nil {
+	if _, err := ws.SubscribeTicker(state.security.Symbol, interval); err != nil {
 		return fmt.Errorf("error subscribing to ticker stream: %v", err)
 	}
 
