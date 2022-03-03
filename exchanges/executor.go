@@ -42,7 +42,6 @@ type Executor struct {
 	slSubscribers     map[uint64]*actor.PID // A map from request ID to security list subscribers
 	execSubscribers   map[uint64]*actor.PID // A map from request ID to execution report subscribers
 	logger            *log.Logger
-	dialerPool        *xchangerUtils.DialerPool
 	strict            bool
 }
 
@@ -229,8 +228,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.slSubscribers = make(map[uint64]*actor.PID)
 	state.accountManagers = make(map[string]*actor.PID)
 
-	if state.dialerPool == nil {
-		state.dialerPool = xchangerUtils.DefaultDialerPool
+	if state.DialerPool == nil {
+		state.DialerPool = xchangerUtils.DefaultDialerPool
 	}
 
 	if state.Db != nil {
@@ -253,7 +252,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.Exchanges {
-		producer := NewExchangeExecutorProducer(exch, state.dialerPool)
+		producer := NewExchangeExecutorProducer(exch, state.DialerPool)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
@@ -406,7 +405,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
@@ -430,7 +429,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool)).WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool)).WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
