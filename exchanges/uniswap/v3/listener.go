@@ -225,6 +225,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
 	updt := &models.UPV3Update{}
+	//TODO add the timestamp for the UPV3Update
 	switch msg.Topics[0] {
 	case uabi.Events["Initialize"].ID:
 		event := new(uniswap.UniswapInitialize)
