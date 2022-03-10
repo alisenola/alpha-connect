@@ -3,6 +3,7 @@ package erc721
 import (
 	goContext "context"
 	"fmt"
+	"math/big"
 	"reflect"
 	"time"
 
@@ -16,8 +17,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbook_models "gitlab.com/alphaticks/gorderbook/gorderbook.models"
-	utils "gitlab.com/alphaticks/xchanger/eth"
+	xutils "gitlab.com/alphaticks/xchanger/eth"
 	"gitlab.com/alphaticks/xchanger/protocols"
 	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
 )
@@ -37,7 +39,7 @@ type Listener struct {
 	types.Listener
 	client       *ethclient.Client
 	instrument   *InstrumentData
-	iterator     *utils.LogIterator
+	iterator     *xutils.LogIterator
 	collection   *models.ProtocolAsset
 	logger       *log.Logger
 	socketTicker *time.Ticker
@@ -161,7 +163,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
-	it := utils.NewLogIterator(eabi)
+	it := xutils.NewLogIterator(eabi)
 
 	query := [][]interface{}{{
 		eabi.Events["Transfer"].ID,
@@ -201,8 +203,12 @@ func (state *Listener) onLog(context actor.Context) error {
 	switch req.Topics[0] {
 	case eabi.Events["Transfer"].ID:
 		event := nft.ERC721Transfer{}
-		if err := utils.UnpackLog(eabi, &event, "Transfer", *req); err != nil {
+		if err := xutils.UnpackLog(eabi, &event, "Transfer", *req); err != nil {
 			return fmt.Errorf("error unpacking log: %v", err)
+		}
+		block, err := state.client.BlockByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
+		if err != nil {
+			return fmt.Errorf("error getting block number: %v", err)
 		}
 		updt = &models.ProtocolAssetUpdate{
 			Transfer: &gorderbook_models.AssetTransfer{
@@ -210,8 +216,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				To:      event.To[:],
 				TokenId: event.TokenId.Bytes(),
 			},
-			Block:   event.Raw.BlockNumber,
-			Removed: event.Raw.Removed,
+			Removed:   event.Raw.Removed,
+			Block:     event.Raw.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(block.Time()),
 		}
 	}
 	context.Send(

@@ -113,6 +113,7 @@ func TestExecutor(t *testing.T) {
 	if !response.Success {
 		t.Fatal("error in the transfers request", response.RejectionReason)
 	}
+	fmt.Println("response", response.Update[0])
 	//Execute the graphql query for the same period querying transfers for the BAYC contract
 	client := graphql.NewClient("https://api.thegraph.com/subgraphs/name/ryry79261/mainnet-erc721-erc1155", nil)
 	query := ERC721Contract{}

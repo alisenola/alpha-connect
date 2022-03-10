@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -19,7 +20,7 @@ import (
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
-	utils "gitlab.com/alphaticks/xchanger/protocols"
+	xutils "gitlab.com/alphaticks/xchanger/protocols"
 
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
@@ -59,7 +60,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(utils.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -188,7 +189,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		}
 
 		events := make([]*models.ProtocolAssetUpdate, 0)
-		for _, l := range resp.Logs {
+		for i, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
 				event := nft.ERC721Transfer{}
@@ -204,8 +205,9 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 						To:      event.To[:],
 						TokenId: event.TokenId.Bytes(),
 					},
-					Removed: l.Removed,
-					Block:   l.BlockNumber,
+					Removed:   l.Removed,
+					Block:     l.BlockNumber,
+					Timestamp: utils.SecondToTimestamp(resp.Times[i]),
 				}
 				events = append(events, t)
 			}

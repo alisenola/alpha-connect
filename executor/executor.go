@@ -82,16 +82,17 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnExchangesMessage", log.Error(err))
 			panic(err)
 		}
-		state.logger.Info("message forwarded to exchange executor")
+		//state.logger.Info("message forwarded to exchange executor")
 	case *messages.ProtocolAssetListRequest,
 		*messages.ProtocolAssetList,
 		*messages.HistoricalProtocolAssetTransferRequest,
-		*messages.ProtocolAssetTransferRequest:
+		*messages.ProtocolAssetTransferRequest,
+		*messages.ProtocolAssetDefinitionRequest:
 		if err := state.OnProtocolsMessage(context); err != nil {
 			state.logger.Error("error processing OnProtocolsMessage", log.Error(err))
 			panic(err)
 		}
-		state.logger.Info("message forwarded to to protocols executor")
+		//state.logger.Info("message forwarded to to protocols executor")
 	}
 }
 
