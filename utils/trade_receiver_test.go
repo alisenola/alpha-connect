@@ -9,9 +9,11 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/grpc"
 	"testing"
 	"time"
 )
@@ -34,7 +36,14 @@ func TestTradeReceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 	as := actor.NewActorSystem()
-	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("../assets.json")))
+	registryAddress := "registry.alphaticks.io:7001"
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		err := fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
+		panic(err)
+	}
+	rgstr := registry.NewPublicRegistryClient(conn)
+	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(rgstr)))
 	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

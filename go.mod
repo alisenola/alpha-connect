@@ -3,34 +3,33 @@ module gitlab.com/alphaticks/alpha-connect
 go 1.17
 
 require (
-	cloud.google.com/go/storage v1.12.0
 	github.com/AsynkronIT/protoactor-go v0.0.0-20210901041048-df2fc305778c
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/gogo/protobuf v1.3.2
-	github.com/melaurent/gotickfile/v2 v2.0.0-20210406111104-845d7c5ec5dc
+	github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220128185923-d2e3fe0a6ff4
-	gitlab.com/alphaticks/tickobjects v0.0.0-20220122082452-1a618304261b
-	gitlab.com/alphaticks/tickstore v0.0.0-20211207113051-444d7194ff7a
-	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20210921083244-4fd9ecfc241a
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220301075536-4f9ca72aa56c
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220225091635-8893e9031196
+	gitlab.com/alphaticks/tickstore v0.0.0-20220221145246-aae0500ce5ae
+	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
-	gitlab.com/alphaticks/xchanger v0.0.0-20220210090849-cf044fe3ddfc
+	gitlab.com/alphaticks/tickstore-types v0.0.0-20220224114144-655d4401d88f
+	gitlab.com/alphaticks/xchanger v0.0.0-20220228103521-4df08586db82
 	go.mongodb.org/mongo-driver v1.7.2
-	google.golang.org/api v0.36.0
 	google.golang.org/grpc v1.40.0
 )
 
 require (
 	cloud.google.com/go v0.72.0 // indirect
+	cloud.google.com/go/storage v1.12.0 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
-	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/Workiva/go-datastructures v1.0.53 // indirect
 	github.com/alecthomas/participle v0.4.4 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
-	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
@@ -43,19 +42,12 @@ require (
 	github.com/google/uuid v1.1.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
-	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/klauspost/compress v1.10.3 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
-	github.com/melaurent/gotickfile v0.0.0-20210921084211-01142566a54d // indirect
-	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/melaurent/gotickfile v0.0.0-20220126102058-08e9bfcfc230 // indirect
 	github.com/orcaman/concurrent-map v0.0.0-20190107190726-7ed82d9cb717 // indirect
-	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
-	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2 // indirect
@@ -75,6 +67,7 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/tools v0.1.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/api v0.36.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
@@ -82,8 +75,9 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-replace gitlab.com/alphaticks/xchanger => ../xchanger
-replace gitlab.com/alphaticks/gorderbook => ../gorderbook
+//replace gitlab.com/alphaticks/xchanger => ../xchanger
+
+//replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
 // replace gitlab.com/alphaticks/go-graphql-client => ../go-graphql-client
 

@@ -37,14 +37,13 @@ type InstrumentData struct {
 // No ID for the deltas..
 
 type Listener struct {
-	ws              *bitmex.Websocket
-	security        *models.Security
-	dialerPool      *xchangerUtils.DialerPool
-	instrumentData  *InstrumentData
-	executorManager *actor.PID
-	logger          *log.Logger
-	lastPingTime    time.Time
-	socketTicker    *time.Ticker
+	ws             *bitmex.Websocket
+	security       *models.Security
+	dialerPool     *xchangerUtils.DialerPool
+	instrumentData *InstrumentData
+	logger         *log.Logger
+	lastPingTime   time.Time
+	socketTicker   *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -55,13 +54,12 @@ func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.Di
 
 func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		ws:              nil,
-		security:        security,
-		dialerPool:      dialerPool,
-		instrumentData:  nil,
-		executorManager: nil,
-		logger:          nil,
-		socketTicker:    nil,
+		ws:             nil,
+		security:       security,
+		dialerPool:     dialerPool,
+		instrumentData: nil,
+		logger:         nil,
+		socketTicker:   nil,
 	}
 }
 
@@ -123,7 +121,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.executorManager = actor.NewPID(context.ActorSystem().Address(), "exchange_executor_manager")
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,
@@ -292,6 +289,9 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 
 func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
+	if state.ws == nil || msg.WSID != state.ws.ID {
+		return nil
+	}
 	switch msg.Message.(type) {
 
 	case error:

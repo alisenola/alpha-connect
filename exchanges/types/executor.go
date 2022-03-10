@@ -161,7 +161,7 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 
 	case *messages.HistoricalUnipoolV3DataRequest:
 		if err := state.OnHistoricalUnipoolV3DataRequest(context); err != nil {
-			state.GetLogger().Error("error processing UnipoolV3DataRequest", log.Error(err))
+			state.GetLogger().Error("error processing HistoricalUnipoolV3DataRequest", log.Error(err))
 			panic(err)
 		}
 

@@ -9,11 +9,12 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/tickobjects"
-	"gitlab.com/alphaticks/tickobjects/market"
+	"gitlab.com/alphaticks/tickfunctors/market"
+	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -50,6 +51,7 @@ func ConstructFunctor(f parsing.Functor) (tickobjects.TickFunctor, reflect.Type,
 }
 
 type LiveQuery struct {
+	sync.RWMutex
 	pid           *actor.PID
 	ch            chan interface{}
 	subscriptions map[uint64]*Feed
@@ -68,7 +70,7 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 	// Spawn listener
 	// Let them push events in the chan
 	lq := &LiveQuery{
-		ch:            make(chan interface{}, 1000),
+		ch:            make(chan interface{}, 10000),
 		subscriptions: make(map[uint64]*Feed),
 		objects:       make(map[uint64]tickobjects.TickFunctor),
 		tick:          0,
@@ -96,10 +98,14 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 }
 
 func (lq *LiveQuery) SetNextDeadline(time time.Time) {
+	lq.Lock()
+	defer lq.Unlock()
 	lq.nextDeadline = &time
 }
 
 func (lq *LiveQuery) Next() bool {
+	lq.Lock()
+	defer lq.Unlock()
 	res := lq.next()
 	lq.nextDeadline = nil
 	return res
@@ -257,12 +263,16 @@ func (lq *LiveQuery) next() bool {
 					rawPrice := uint64(math.Round(float64(feed.security.tickPrecision) * trade.Price))
 					rawQuantity := uint64(math.Round(float64(feed.security.lotPrecision) * trade.Quantity))
 					// Create delta
-					tradeDeltas = append(tradeDeltas, market.NewRawTradeDelta(
+					dlt, err := market.NewRawTradeDelta(
 						rawPrice,
 						rawQuantity,
 						trade.ID,
 						aggTrade.AggregateID,
-						aggTrade.Bid))
+						aggTrade.Bid)
+					if err != nil {
+						lq.err = fmt.Errorf("error creating raw trade delta: %v", err)
+					}
+					tradeDeltas = append(tradeDeltas, dlt)
 				}
 			}
 
@@ -315,6 +325,8 @@ func (lq *LiveQuery) next() bool {
 }
 
 func (lq *LiveQuery) Progress(end uint64) bool {
+	lq.Lock()
+	defer lq.Unlock()
 	for end < lq.tick {
 		lq.next()
 	}
@@ -322,15 +334,21 @@ func (lq *LiveQuery) Progress(end uint64) bool {
 }
 
 func (lq *LiveQuery) Read() (uint64, tickobjects.TickObject, uint64) {
+	lq.RLock()
+	defer lq.RUnlock()
 	return lq.tick, lq.objects[lq.groupID], lq.groupID
 }
 
 func (lq *LiveQuery) Tags() map[string]string {
 	// TODO
+	lq.RLock()
+	defer lq.RUnlock()
 	return make(map[string]string)
 }
 
 func (lq *LiveQuery) Close() error {
+	lq.Lock()
+	defer lq.Unlock()
 	for _, f := range lq.subscriptions {
 		if f.receiver != nil {
 			f.receiver.Close()
@@ -343,5 +361,7 @@ func (lq *LiveQuery) Close() error {
 }
 
 func (lq *LiveQuery) Err() error {
+	lq.RLock()
+	defer lq.RUnlock()
 	return lq.err
 }

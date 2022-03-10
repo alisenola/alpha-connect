@@ -2,6 +2,7 @@ package jobs
 
 import (
 	goContext "context"
+	"math/big"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum"
@@ -25,17 +26,18 @@ type PerformLogsQueryRequest struct {
 type PerformLogsQueryResponse struct {
 	Error error
 	Logs  []types.Log
+	Times []uint64
 }
 
-type ABIQuery struct {
+type ETHQuery struct {
 	client *ethclient.Client
 }
 
-func NewABIQuery(client *ethclient.Client) actor.Actor {
-	return &ABIQuery{client}
+func NewETHQuery(client *ethclient.Client) actor.Actor {
+	return &ETHQuery{client}
 }
 
-func (q *ABIQuery) Receive(context actor.Context) {
+func (q *ETHQuery) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		err := q.Initialize(context)
@@ -62,23 +64,46 @@ func (q *ABIQuery) Receive(context actor.Context) {
 	}
 }
 
-func (q *ABIQuery) Initialize(context actor.Context) error {
+func (q *ETHQuery) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (q *ABIQuery) Clean(context actor.Context) error {
+func (q *ETHQuery) Clean(context actor.Context) error {
 	return nil
 }
 
-func (q *ABIQuery) PerformLogsQueryRequest(context actor.Context) error {
+func (q *ETHQuery) PerformLogsQueryRequest(context actor.Context) error {
 	msg := context.Message().(*PerformLogsQueryRequest)
 	go func(sender *actor.PID) {
 		queryResponse := PerformLogsQueryResponse{}
 		logs, err := q.client.FilterLogs(goContext.Background(), msg.Query)
 		if err != nil {
 			queryResponse.Error = err
+			context.Send(sender, &queryResponse)
+			return
 		} else {
 			queryResponse.Logs = logs
+		}
+		var lastBlock uint64 = 0
+		var lastTime uint64 = 0
+		for _, l := range logs {
+			if lastBlock != l.BlockNumber {
+				block, err := q.client.BlockByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
+				if err != nil {
+					queryResponse.Error = err
+					context.Send(sender, &queryResponse)
+					return
+				}
+				block.Number()
+				block.Size()
+				block.BaseFee()
+				block.Difficulty()
+				block.GasLimit()
+				block.GasUsed()
+				lastTime = block.Time()
+				lastBlock = l.BlockNumber
+			}
+			queryResponse.Times = append(queryResponse.Times, lastTime)
 		}
 		context.Send(sender, &queryResponse)
 	}(context.Sender())

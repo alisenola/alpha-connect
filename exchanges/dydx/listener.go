@@ -175,7 +175,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	ws := dydx.NewWebsocket()
 	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to bitmex websocket: %v", err)
+		return fmt.Errorf("error connecting to websocket: %v", err)
 	}
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading message: %v", ws.Err)

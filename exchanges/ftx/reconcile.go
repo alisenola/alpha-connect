@@ -139,7 +139,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 
 	for k, b := range balances {
 		a, _ := constants.GetAssetByID(k)
-		fmt.Println(a.Symbol, b)
+		if a != nil {
+			fmt.Println(a.Symbol, b)
+		}
 	}
 
 	for k, pos := range state.positions {

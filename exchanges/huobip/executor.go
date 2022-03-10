@@ -64,7 +64,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 	state.rateLimit = exchanges.NewRateLimit(10, time.Second)
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewAPIQuery(state.client)
+		return jobs.NewHTTPQuery(state.client)
 	})
 	state.queryRunner = context.Spawn(props)
 

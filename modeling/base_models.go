@@ -1,7 +1,7 @@
 package modeling
 
 import (
-	"gitlab.com/alphaticks/tickobjects"
+	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"math"
 	"math/rand"
 	"sync"
@@ -14,22 +14,19 @@ type Market interface {
 
 type LongShortModel interface {
 	GetPenalty(fee float64) float64
-	GetLongScore(ID uint64) (float64, bool)
-	GetShortScore(ID uint64) (float64, bool)
+	GetScore(ID uint64) (float64, bool)
 	GetSelectors() []string
 }
 
 type ConstantLongShortModel struct {
-	penalty     float64
-	longScores  map[uint64]float64
-	shortScores map[uint64]float64
+	penalty float64
+	scores  map[uint64]float64
 }
 
 func NewConstantLongShortModel(penalty float64) *ConstantLongShortModel {
 	return &ConstantLongShortModel{
-		penalty:     penalty,
-		longScores:  make(map[uint64]float64),
-		shortScores: make(map[uint64]float64),
+		penalty: penalty,
+		scores:  make(map[uint64]float64),
 	}
 }
 
@@ -37,21 +34,12 @@ func (m *ConstantLongShortModel) GetPenalty(_ float64) float64 {
 	return m.penalty
 }
 
-func (m *ConstantLongShortModel) SetLongScore(ID uint64, score float64) {
-	m.longScores[ID] = score
+func (m *ConstantLongShortModel) SetScore(ID uint64, score float64) {
+	m.scores[ID] = score
 }
 
-func (m *ConstantLongShortModel) GetLongScore(ID uint64) (float64, bool) {
-	s, ok := m.longScores[ID]
-	return s, ok
-}
-
-func (m *ConstantLongShortModel) SetShortScore(ID uint64, score float64) {
-	m.shortScores[ID] = score
-}
-
-func (m *ConstantLongShortModel) GetShortScore(ID uint64) (float64, bool) {
-	s, ok := m.longScores[ID]
+func (m *ConstantLongShortModel) GetScore(ID uint64) (float64, bool) {
+	s, ok := m.scores[ID]
 	return s, ok
 }
 
@@ -185,12 +173,8 @@ func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
 	return m.model.GetPenalty(fee)
 }
 
-func (m *MarketLongShortModel) GetLongScore(ID uint64) (float64, bool) {
-	return m.model.GetLongScore(ID)
-}
-
-func (m *MarketLongShortModel) GetShortScore(ID uint64) (float64, bool) {
-	return m.model.GetShortScore(ID)
+func (m *MarketLongShortModel) GetScore(ID uint64) (float64, bool) {
+	return m.model.GetScore(ID)
 }
 
 /*

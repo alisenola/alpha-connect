@@ -100,7 +100,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewABIQuery(client)
+		return jobs.NewETHQuery(client)
 	})
 	state.queryRunnerETH = &QueryRunner{
 		pid: context.Spawn(props),
@@ -273,7 +273,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 			return
 		}
 		logs := queryResponse.Logs
-		for _, l := range logs {
+		for i, l := range logs {
 			switch l.Topics[0] {
 			case uabi.Events["Initialize"].ID:
 				event := uniswap.UniswapInitialize{}
