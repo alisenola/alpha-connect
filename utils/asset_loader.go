@@ -62,7 +62,6 @@ func (state *AssetLoader) Receive(context actor.Context) {
 	case *checkAsset:
 		if err := state.checkAsset(context); err != nil {
 			state.logger.Error("error checkAsset", log.Error(err))
-			panic(err)
 		}
 
 	case *Ready:
