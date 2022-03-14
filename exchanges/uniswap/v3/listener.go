@@ -3,6 +3,8 @@ package v3
 import (
 	goContext "context"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/utils"
+	"math/big"
 	"reflect"
 	"time"
 
@@ -222,7 +224,10 @@ func (state *Listener) onLog(context actor.Context) error {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
 	updt := &models.UPV3Update{}
-	//TODO add the timestamp for the UPV3Update
+	timestamp, err := state.client.BlockByNumber(goContext.Background(), big.NewInt(int64(msg.BlockNumber)))
+	if err != nil {
+		return fmt.Errorf("error getting block number: %v", err)
+	}
 	switch msg.Topics[0] {
 	case uabi.Events["Initialize"].ID:
 		event := new(uniswap.UniswapInitialize)
@@ -234,8 +239,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["Mint"].ID:
 		event := new(uniswap.UniswapMint)
@@ -251,8 +257,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["Burn"].ID:
 		event := new(uniswap.UniswapBurn)
@@ -268,8 +275,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["Swap"].ID:
 		event := new(uniswap.UniswapSwap)
@@ -283,8 +291,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:      event.Amount0.Bytes(),
 				Amount1:      event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["Collect"].ID:
 		event := new(uniswap.UniswapCollect)
@@ -299,8 +308,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["Flash"].ID:
 		event := new(uniswap.UniswapFlash)
@@ -312,8 +322,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["SetFeeProtocol"].ID:
 		event := new(uniswap.UniswapSetFeeProtocol)
@@ -324,8 +335,9 @@ func (state *Listener) onLog(context actor.Context) error {
 			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	case uabi.Events["CollectProtocol"].ID:
 		event := new(uniswap.UniswapCollectProtocol)
@@ -337,8 +349,9 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Removed: msg.Removed,
-			Block:   msg.BlockNumber,
+			Removed:   msg.Removed,
+			Block:     msg.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
 		}
 	}
 
