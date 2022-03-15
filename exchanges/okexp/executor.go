@@ -349,11 +349,10 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 		var liquidations []*models.Liquidation
 		for _, l := range resx.Data {
-			fmt.Println("LEN", len(l.Details))
 			for _, d := range l.Details {
 				// Inverse will be in USD, Linear in BTC
 				liquidations = append(liquidations, &models.Liquidation{
-					Bid:       d.Side == "sell",
+					Bid:       d.Side == "buy",
 					Timestamp: utils.MilliToTimestamp(d.Ts),
 					OrderID:   rand.Uint64(),
 					Price:     d.BankruptcyPrice,
