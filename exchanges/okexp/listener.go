@@ -7,6 +7,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -247,6 +248,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	if err := ws.Subscribe(state.security.Symbol, okex.WSSwapTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream")
 	}
+	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
+		if err := ws.Subscribe(state.security.Symbol, okex.WSSwapFundingRateChannel); err != nil {
+			return fmt.Errorf("error subscribing to funding rate stream")
+		}
+	}
 
 	state.tradeWs = ws
 
@@ -327,6 +333,20 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			UpdateL2: obDelta,
 			SeqNum:   state.instrumentData.seqNum + 1,
 		})
+		state.instrumentData.seqNum += 1
+
+	case okex.WSSwapFundingRateUpdate:
+		fundData := msg.Message.(okex.WSSwapFundingRateUpdate)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		refresh.Stats = append(refresh.Stats, &models.Stat{
+			Timestamp: utils.MilliToTimestamp(uint64(fundData.FundingTime.UnixNano() / 1000000)),
+			StatType:  models.FundingRate,
+			Value:     fundData.FundingRate,
+		})
+		context.Send(context.Parent(), refresh)
+
 		state.instrumentData.seqNum += 1
 
 	case []okex.WSSwapTrade:

@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.BITFINEX,
 			Symbol:   &types.StringValue{Value: "btcusd"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: false,
-		MarketStatisticsRequest:       false,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

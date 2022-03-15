@@ -14,9 +14,8 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.FTX,
 			Symbol:   &types.StringValue{Value: "BTC-PERP"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		MarketStatisticsRequest:       true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
+		OpenInterestRequest: true,
 	})
 }

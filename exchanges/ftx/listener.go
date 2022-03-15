@@ -207,7 +207,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	_, ok := ws.Msg.Message.(ftx.WSSubscribeResponse)
 	if !ok {
 		if err, ok := ws.Msg.Message.(ftx.WSError); ok {
-			return fmt.Errorf("got WSError trying to subscribe to ob: %d: %s", err.Msg, err.Code)
+			return fmt.Errorf("got WSError trying to subscribe to ob: %s: %d", err.Msg, err.Code)
 		} else {
 			return fmt.Errorf("was expecting WSSubscribeResponse, got %s", reflect.TypeOf(ws.Msg.Message).String())
 		}

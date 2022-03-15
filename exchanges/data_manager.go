@@ -179,7 +179,6 @@ func (state *DataManager) OnMarketDataIncrementalRefresh(context actor.Context) 
 			UpdateL2:    refresh.UpdateL2,
 			UpdateL3:    refresh.UpdateL3,
 			Trades:      refresh.Trades,
-			Funding:     refresh.Funding,
 			Liquidation: refresh.Liquidation,
 			Stats:       refresh.Stats,
 			SeqNum:      refresh.SeqNum,

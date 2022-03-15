@@ -457,10 +457,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			SeqNum: state.instrumentData.seqNum + 1,
 		}
 		if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
-			refresh.Funding = &models.Funding{
+			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(uint64(info.NextFundingTime.UnixNano() / 1000000)),
-				Rate:      float64(info.FundingRateE6) / 1000000,
-			}
+				StatType:  models.FundingRate,
+				Value:     float64(info.FundingRateE6) / 1000000,
+			})
 		}
 		context.Send(context.Parent(), refresh)
 		state.instrumentData.seqNum += 1
@@ -480,10 +481,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				})
 			}
 			if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP && info.FundingRateE6 != nil && info.NextFundingTime != nil {
-				refresh.Funding = &models.Funding{
+				refresh.Stats = append(refresh.Stats, &models.Stat{
 					Timestamp: utils.MilliToTimestamp(uint64(info.NextFundingTime.UnixNano() / 1000000)),
-					Rate:      float64(*info.FundingRateE6) / 1000000,
-				}
+					StatType:  models.FundingRate,
+					Value:     float64(*info.FundingRateE6) / 1000000,
+				})
 			}
 		}
 		context.Send(context.Parent(), refresh)

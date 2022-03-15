@@ -17,6 +17,6 @@ func TestExecutorPublic(t *testing.T) {
 		SecurityListRequest:           true,
 		MarketDataRequest:             true,
 		HistoricalLiquidationsRequest: true,
-		MarketStatisticsRequest:       true,
+		OpenInterestRequest:           true,
 	})
 }

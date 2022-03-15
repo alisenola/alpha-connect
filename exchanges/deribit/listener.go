@@ -509,10 +509,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.openInterest = tickerData.OpenInterest
 		}
 		if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP && state.instrumentData.funding8h != tickerData.Funding8h {
-			refresh.Funding = &models.Funding{
+			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(ts),
-				Rate:      tickerData.Funding8h,
-			}
+				StatType:  models.FundingRate,
+				Value:     tickerData.Funding8h,
+			})
 			state.instrumentData.funding8h = tickerData.Funding8h
 		}
 		if update {

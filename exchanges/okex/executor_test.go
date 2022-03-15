@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.OKEX,
 			Symbol:   &types.StringValue{Value: "BTC-USDT"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: false,
-		MarketStatisticsRequest:       false,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

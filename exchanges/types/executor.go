@@ -15,6 +15,7 @@ type Executor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
 	OnHistoricalOpenInterestsRequest(context actor.Context) error
+	OnHistoricalFundingRatesRequest(context actor.Context) error
 	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
@@ -78,6 +79,18 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 	case *messages.HistoricalLiquidationsRequest:
 		if err := state.OnHistoricalLiquidationsRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnHistoricalLiquidationRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalOpenInterestsRequest:
+		if err := state.OnHistoricalOpenInterestsRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnHistoricalOpenInterestsRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalFundingRatesRequest:
+		if err := state.OnHistoricalFundingRatesRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnHistoricalFundingRateRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -192,6 +205,17 @@ func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {
 func (state *BaseExecutor) OnHistoricalOpenInterestsRequest(context actor.Context) error {
 	req := context.Message().(*messages.HistoricalOpenInterestsRequest)
 	context.Respond(&messages.HistoricalOpenInterestsResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnHistoricalFundingRatesRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalFundingRatesRequest)
+	context.Respond(&messages.HistoricalFundingRatesResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"reflect"
@@ -12,7 +13,7 @@ type ExPubTest struct {
 	Instrument                    *models.Instrument
 	SecurityListRequest           bool
 	HistoricalLiquidationsRequest bool
-	MarketStatisticsRequest       bool
+	OpenInterestRequest           bool
 	MarketDataRequest             bool
 }
 
@@ -58,8 +59,8 @@ func ExPub(t *testing.T, tc ExPubTest) {
 		})
 	}
 
-	if tc.MarketStatisticsRequest {
-		t.Run("MarketStatisticsRequest", func(t *testing.T) {
+	if tc.OpenInterestRequest {
+		t.Run("OpenInterestRequest", func(t *testing.T) {
 			res, err := as.Root.RequestFuture(executor, &messages.MarketStatisticsRequest{
 				RequestID:  0,
 				Instrument: tc.Instrument,
@@ -71,6 +72,37 @@ func ExPub(t *testing.T, tc ExPubTest) {
 			v, ok := res.(*messages.MarketStatisticsResponse)
 			if !ok {
 				t.Fatalf("was expecting *messages.MarketStatisticsResponse, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+			hasStat := false
+			for _, stat := range v.Statistics {
+				if stat.StatType == models.OpenInterest {
+					fmt.Println(stat.Value)
+					hasStat = true
+				}
+			}
+			if !hasStat {
+				t.Fatal("open interest not found")
+			}
+		})
+	}
+
+	if tc.HistoricalLiquidationsRequest {
+		t.Run("HistoricalLiquidationsRequest", func(t *testing.T) {
+			res, err := as.Root.RequestFuture(executor, &messages.HistoricalLiquidationsRequest{
+				RequestID:  0,
+				Instrument: tc.Instrument,
+				From:       nil,
+				To:         nil,
+			}, 10*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := res.(*messages.HistoricalLiquidationsResponse)
+			if !ok {
+				t.Fatalf("was expecting *messages.HistoricalLiquidationsResponse, got %s", reflect.TypeOf(res).String())
 			}
 			if !v.Success {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())

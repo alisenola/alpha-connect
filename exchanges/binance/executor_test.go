@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.BINANCE,
 			Symbol:   &types.StringValue{Value: "BTCUSDT"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: false,
-		MarketStatisticsRequest:       false,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

@@ -436,13 +436,15 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case bitmex.WSFundingData:
 		fundData := msg.Message.(bitmex.WSFundingData)
 		for _, f := range fundData.Data {
-			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-				Funding: &models.Funding{
-					Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
-					Rate:      f.FundingRate,
-				},
+			refresh := &messages.MarketDataIncrementalRefresh{
 				SeqNum: state.instrumentData.seqNum + 1,
+			}
+			refresh.Stats = append(refresh.Stats, &models.Stat{
+				Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
+				StatType:  models.FundingRate,
+				Value:     f.FundingRate,
 			})
+			context.Send(context.Parent(), refresh)
 			state.instrumentData.seqNum += 1
 		}
 

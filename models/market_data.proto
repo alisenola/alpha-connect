@@ -117,11 +117,6 @@ message Liquidation {
     double quantity = 5;
 }
 
-message Funding {
-    google.protobuf.Timestamp timestamp = 1;
-    double rate = 2;
-}
-
 message Stat {
     google.protobuf.Timestamp timestamp = 1;
     StatType stat_type = 2;

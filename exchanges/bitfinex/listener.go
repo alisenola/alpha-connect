@@ -526,10 +526,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			SeqNum: state.instrumentData.seqNum + 1,
 		}
 		if state.instrumentData.lastFundingTime < status.FundingEventMs {
-			refresh.Funding = &models.Funding{
+			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(status.FundingEventMs),
-				Rate:      status.CurrentFunding,
-			}
+				StatType:  models.FundingRate,
+				Value:     status.CurrentFunding,
+			})
 			state.instrumentData.lastFundingTime = status.FundingEventMs
 		}
 		context.Send(context.Parent(), refresh)

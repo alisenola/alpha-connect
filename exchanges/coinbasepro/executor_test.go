@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.COINBASEPRO,
 			Symbol:   &types.StringValue{Value: "BTC-USD"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		MarketStatisticsRequest:       false,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

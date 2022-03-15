@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.BITMEX,
 			Symbol:   &types.StringValue{Value: "XBTUSD"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		MarketStatisticsRequest:       true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

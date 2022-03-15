@@ -201,7 +201,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.DYDX.ID:
 		return func() actor.Actor { return dydx.NewExecutor(dialerPool) }
 	case constants.OKEXP.ID:
-		return func() actor.Actor { return okexp.NewExecutor() }
+		return func() actor.Actor { return okexp.NewExecutor(dialerPool) }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewExecutor(dialerPool) }
 	case constants.UNISWAPV3.ID:

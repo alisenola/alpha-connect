@@ -409,12 +409,13 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case fbinance.WSMarkPriceData:
 		mpData := msg.Message.(fbinance.WSMarkPriceData)
 		refresh := &messages.MarketDataIncrementalRefresh{
-			Funding: &models.Funding{
-				Timestamp: utils.MilliToTimestamp(mpData.NextFundingTime),
-				Rate:      mpData.FundingRate,
-			},
 			SeqNum: state.instrumentData.seqNum + 1,
 		}
+		refresh.Stats = append(refresh.Stats, &models.Stat{
+			Timestamp: utils.MilliToTimestamp(mpData.NextFundingTime),
+			StatType:  models.FundingRate,
+			Value:     mpData.FundingRate,
+		})
 		context.Send(context.Parent(), refresh)
 		state.instrumentData.seqNum += 1
 	}

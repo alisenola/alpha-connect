@@ -119,6 +119,18 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.HistoricalOpenInterestsRequest:
+		if err := state.OnHistoricalOpenInterestsRequest(context); err != nil {
+			state.logger.Error("error processing OnHistoricalOpenInterestsRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.HistoricalFundingRatesRequest:
+		if err := state.OnHistoricalFundingRatesRequest(context); err != nil {
+			state.logger.Error("error processing OnHistoricalFundingRateRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.SecurityDefinitionRequest:
 		if err := state.OnSecurityDefinitionRequest(context); err != nil {
 			state.logger.Error("error processing OnSecurityDefinitionRequest", log.Error(err))
@@ -504,6 +516,56 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	exchange, ok := state.executors[sec.Exchange.ID]
 	if !ok {
 		context.Respond(&messages.HistoricalLiquidationsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownExchange,
+		})
+		return nil
+	}
+	context.Forward(exchange)
+
+	return nil
+}
+
+func (state *Executor) OnHistoricalOpenInterestsRequest(context actor.Context) error {
+	request := context.Message().(*messages.HistoricalOpenInterestsRequest)
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.HistoricalOpenInterestsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	exchange, ok := state.executors[sec.Exchange.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalOpenInterestsResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownExchange,
+		})
+		return nil
+	}
+	context.Forward(exchange)
+
+	return nil
+}
+
+func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) error {
+	request := context.Message().(*messages.HistoricalFundingRatesRequest)
+	sec, rej := state.getSecurity(request.Instrument)
+	if rej != nil {
+		context.Respond(&messages.HistoricalFundingRatesResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	exchange, ok := state.executors[sec.Exchange.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalFundingRatesResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
 			RejectionReason: messages.UnknownExchange,

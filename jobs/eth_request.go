@@ -94,12 +94,6 @@ func (q *ETHQuery) PerformLogsQueryRequest(context actor.Context) error {
 					context.Send(sender, &queryResponse)
 					return
 				}
-				block.Number()
-				block.Size()
-				block.BaseFee()
-				block.Difficulty()
-				block.GasLimit()
-				block.GasUsed()
 				lastTime = block.Time()
 				lastBlock = l.BlockNumber
 			}
