@@ -230,10 +230,6 @@ func (state *MDChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 		state.OBUpdates += 1
 	}
 
-	if refresh.Funding != nil {
-		fmt.Println(refresh.Funding.Rate, refresh.Funding.Timestamp)
-	}
-
 	for _, aggT := range refresh.Trades {
 		if _, ok := state.aggTradeIDs[aggT.AggregateID]; ok {
 			return fmt.Errorf("duplicate aggregate ID")

@@ -187,7 +187,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
 	}
 
-	if err := ws.Subscribe(state.security.Symbol, okex.WSSwapDepthChannel); err != nil {
+	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2TBTChannel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
 	}
 
@@ -202,7 +202,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading message: %v", ws.Err)
 	}
-	depthData, ok := ws.Msg.Message.(okex.WSSwapDepthSnapshot)
+	depthData, ok := ws.Msg.Message.(okex.WSDepthSnapshot)
 	if !ok {
 		return fmt.Errorf("was expecting depth data, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
@@ -245,11 +245,11 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 		return fmt.Errorf("error connecting to okex websocket: %v", err)
 	}
 
-	if err := ws.Subscribe(state.security.Symbol, okex.WSSwapTradesChannel); err != nil {
+	if err := ws.Subscribe(state.security.Symbol, okex.WSTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream")
 	}
 	if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP {
-		if err := ws.Subscribe(state.security.Symbol, okex.WSSwapFundingRateChannel); err != nil {
+		if err := ws.Subscribe(state.security.Symbol, okex.WSFundingRateChannel); err != nil {
 			return fmt.Errorf("error subscribing to funding rate stream")
 		}
 	}
@@ -297,12 +297,12 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
-	case okex.WSSwapDepthUpdate:
+	case okex.WSDepthUpdate:
 		if state.obWs == nil || msg.WSID != state.obWs.ID {
 			return nil
 		}
 
-		obData := msg.Message.(okex.WSSwapDepthUpdate)
+		obData := msg.Message.(okex.WSDepthUpdate)
 
 		instr := state.instrumentData
 
@@ -335,13 +335,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		})
 		state.instrumentData.seqNum += 1
 
-	case okex.WSSwapFundingRateUpdate:
-		fundData := msg.Message.(okex.WSSwapFundingRateUpdate)
+	case okex.WSFundingRateUpdate:
+		fmt.Println("FUNDING RATE UPDATE")
+		fundData := msg.Message.(okex.WSFundingRateUpdate)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,
 		}
 		refresh.Stats = append(refresh.Stats, &models.Stat{
-			Timestamp: utils.MilliToTimestamp(uint64(fundData.FundingTime.UnixNano() / 1000000)),
+			Timestamp: utils.MilliToTimestamp(fundData.FundingTime),
 			StatType:  models.FundingRate,
 			Value:     fundData.FundingRate,
 		})
@@ -349,8 +350,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		state.instrumentData.seqNum += 1
 
-	case []okex.WSSwapTrade:
-		trades := msg.Message.([]okex.WSSwapTrade)
+	case []okex.WSTrade:
+		trades := msg.Message.([]okex.WSTrade)
 		// order trade by timestamps
 		// if trades are on same side, aggregate. We aggregate because otherwise
 		// we will have two trades on the same side with the same timestamp as
@@ -364,7 +365,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		for _, t := range trades {
-			aggID := uint64(t.Timestamp.UnixNano()/1000) * 10
+			aggID := t.Ts * 10
 			// do that so new agg trade if side changes
 			if t.Side == "sell" {
 				aggID += 1
@@ -408,9 +409,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 func (state *Listener) checkSockets(context actor.Context) error {
 	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
 		// "Ping" by resubscribing to the topic
-		symbol := state.security.Symbol
-		_ = state.obWs.Subscribe(symbol, okex.WSSpotDepthChannel)
-		_ = state.tradeWs.Subscribe(symbol, okex.WSSpotTradesChannel)
+		_ = state.obWs.Ping()
+		_ = state.tradeWs.Ping()
 		state.lastPingTime = time.Now()
 	}
 
