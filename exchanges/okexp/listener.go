@@ -361,7 +361,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		refresh.Stats = append(refresh.Stats, &models.Stat{
 			Timestamp: utils.MilliToTimestamp(fundData.Ts),
 			StatType:  models.OpenInterest,
-			Value:     fundData.OpenInterest,
+			Value:     fundData.OpenInterest * state.security.Multiplier.Value,
 		})
 		context.Send(context.Parent(), refresh)
 
