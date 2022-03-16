@@ -18,7 +18,7 @@ const (
 	DATA_CLIENT_1S   int64 = 1000
 	DATA_CLIENT_1M   int64 = DATA_CLIENT_1S * 60
 	DATA_CLIENT_1H   int64 = DATA_CLIENT_1M * 60
-	DATA_CLIENT_1D   int64 = DATA_CLIENT_1H * 24
+	//DATA_CLIENT_1D   int64 = DATA_CLIENT_1H * 24
 )
 
 type DataClient interface {
@@ -31,7 +31,7 @@ var ports = map[int64]string{
 	DATA_CLIENT_1S:   "4551",
 	DATA_CLIENT_1M:   "4552",
 	DATA_CLIENT_1H:   "4553",
-	DATA_CLIENT_1D:   "4554",
+	//DATA_CLIENT_1D:   "4554",
 }
 
 var names = map[int64]string{
@@ -39,7 +39,7 @@ var names = map[int64]string{
 	DATA_CLIENT_1S:   "1s",
 	DATA_CLIENT_1M:   "1m",
 	DATA_CLIENT_1H:   "1h",
-	DATA_CLIENT_1D:   "1d",
+	//DATA_CLIENT_1D:   "1d",
 }
 
 var shardDurations = map[int64]uint64{
@@ -47,7 +47,7 @@ var shardDurations = map[int64]uint64{
 	DATA_CLIENT_1S:   10000000,
 	DATA_CLIENT_1M:   1000000000,
 	DATA_CLIENT_1H:   10000000000,
-	DATA_CLIENT_1D:   100000000000,
+	//DATA_CLIENT_1D:   100000000000,
 }
 
 /*
@@ -91,7 +91,7 @@ func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) 
 	s.stores[DATA_CLIENT_1S] = nil
 	s.stores[DATA_CLIENT_1M] = nil
 	s.stores[DATA_CLIENT_1H] = nil
-	s.stores[DATA_CLIENT_1D] = nil
+	//s.stores[DATA_CLIENT_1D] = nil
 
 	return s, nil
 }
@@ -183,7 +183,7 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 	s.stores[DATA_CLIENT_1S] = nil
 	s.stores[DATA_CLIENT_1M] = nil
 	s.stores[DATA_CLIENT_1H] = nil
-	s.stores[DATA_CLIENT_1D] = nil
+	//s.stores[DATA_CLIENT_1D] = nil
 
 	return s, nil
 }
