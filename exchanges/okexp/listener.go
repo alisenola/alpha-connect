@@ -252,6 +252,9 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 		if err := ws.Subscribe(state.security.Symbol, okex.WSFundingRateChannel); err != nil {
 			return fmt.Errorf("error subscribing to funding rate stream")
 		}
+		if err := ws.Subscribe(state.security.Symbol, okex.WSOpenInterestChannel); err != nil {
+			return fmt.Errorf("error subscribing to open interest stream")
+		}
 	}
 
 	state.tradeWs = ws
@@ -345,6 +348,20 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			Timestamp: utils.MilliToTimestamp(fundData.FundingTime),
 			StatType:  models.FundingRate,
 			Value:     fundData.FundingRate,
+		})
+		context.Send(context.Parent(), refresh)
+
+		state.instrumentData.seqNum += 1
+
+	case okex.WSOpenInterestUpdate:
+		fundData := msg.Message.(okex.WSOpenInterestUpdate)
+		refresh := &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		}
+		refresh.Stats = append(refresh.Stats, &models.Stat{
+			Timestamp: utils.MilliToTimestamp(fundData.Ts),
+			StatType:  models.OpenInterest,
+			Value:     fundData.OpenInterest,
 		})
 		context.Send(context.Parent(), refresh)
 
