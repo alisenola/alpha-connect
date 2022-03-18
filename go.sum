@@ -728,6 +728,12 @@ gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d h1:ADKl
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
 gitlab.com/alphaticks/xchanger v0.0.0-20220316070256-dc4e877cdfd4 h1:Nw5AAI1T5Bg1FSxfjsyvneE7ynBzxrS+zsukyoRdV44=
 gitlab.com/alphaticks/xchanger v0.0.0-20220316070256-dc4e877cdfd4/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318130526-2785b4a73c61 h1:OCJcfvOmg1I1JPlusenWYbKJZwMQXTNoOzVcFm2V3j8=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318130526-2785b4a73c61/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318133225-e4afc49c04cd h1:c1OuBELx6H3MoAbVjloQYL53u+MxUVz/Np0yACdO0jE=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318133225-e4afc49c04cd/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318134111-fc09adf769e5 h1:O/k1cJ5jUt1hEOaQrmNmKMMX6A5DYQooV+FMGqvZUq0=
+gitlab.com/alphaticks/xchanger v0.0.0-20220318134111-fc09adf769e5/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=
