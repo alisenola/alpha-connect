@@ -41,7 +41,7 @@ protoclean:
 
 PROJECT_NAME := alpha-connect
 PKG := gitlab.com/alphaticks/$(PROJECT_NAME)
-PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/ | grep -v /models)
+PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/ | grep -v /models | grep -v /legacy)
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
 

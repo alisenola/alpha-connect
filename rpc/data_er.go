@@ -144,9 +144,8 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 				// TODO BUG HERERE !!
 				typ := q.DeltaType()
 				buff := make([]byte, int(typ.Size())*deltas.Len)
-				ptr := uintptr(deltas.Pointer)
 				for i := 0; i < len(buff); i++ {
-					buff[i] = *(*byte)(unsafe.Pointer(ptr + uintptr(i)))
+					buff[i] = *(*byte)(unsafe.Pointer(uintptr(deltas.Pointer) + uintptr(i)))
 				}
 				event = &tickstore_grpc.StoreQueryTick{
 					Tick:    tick,

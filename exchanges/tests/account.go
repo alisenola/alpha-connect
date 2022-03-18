@@ -2,85 +2,17 @@ package tests
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/binance"
-	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"testing"
 	"time"
 )
 
 type AccntTest struct {
-	account    *models.Account
-	instrument *models.Instrument
-}
-
-var spotTests = []AccntTest{
-	/*
-		{
-			account: &models.Account{
-				Name:     "binance",
-				Exchange: &constants.BINANCE,
-				ApiCredentials: &xchangerModels.APICredentials{
-					APIKey:    "DNySYXVSG7xrM7S8dGSTvLRmRGJIzoU80Uj78IpFOYxiI9veS54VCu8bxQNLloz2",
-					APISecret: "OrIJH6qYynrVFgEi62cknUpf02MoA82l45ySfP3ZTKRPainFJzG377BoJJmTuwXv",
-				},
-			},
-			instrument: &models.Instrument{
-				Exchange: &constants.BINANCE,
-				Symbol:   &types.StringValue{Value: "BTCUSDT"},
-			},
-		},
-	*/
-}
-
-var derivTests = []AccntTest{
-	{
-		account: &models.Account{
-			Name:     "dydx",
-			Exchange: &constants.DYDX,
-			ApiCredentials: &xchangerModels.APICredentials{
-				AccountID: "adc3dffd-9999-57ae-bd1a-34279aa9fa4b",
-				APIKey:    "d678eb7d-e3c0-879d-f02d-9ea26ab26152",
-				APISecret: "nazLBU9Xth156mVaktY7fZSXcLJ7Dv3wF5TpihMU:TIVcVRWBnZAc-AwDO8UC",
-			},
-			StarkCredentials: &xchangerModels.STARKCredentials{
-				PositionId: 98309,
-				PrivateKey: hexutil.MustDecode("0x0657d2ac46d36c1f06715ffb2ff6b8988403c9aad18e548e7a702b17109eeb76"),
-			},
-		},
-		instrument: &models.Instrument{
-			Exchange: &constants.DYDX,
-			Symbol:   &types.StringValue{Value: "BTC-USD"},
-		},
-	},
-}
-
-func TestAllAccount(t *testing.T) {
-	binance.EnableTestNet()
-	fbinance.EnableTestNet()
-	t.Parallel()
-	for _, tc := range spotTests {
-		tc := tc
-		t.Run(tc.instrument.Exchange.Name, func(t *testing.T) {
-			t.Parallel()
-			SpotAccount(t, tc)
-		})
-	}
-	for _, tc := range derivTests {
-		tc := tc
-		t.Run(tc.instrument.Exchange.Name, func(t *testing.T) {
-			t.Parallel()
-			//OpenCancel(t, tc)
-			MarketFill(t, tc)
-			//CheckBalance(t, tc)
-		})
-	}
+	Account    *models.Account
+	Instrument *models.Instrument
 }
 
 func TestCompute(t *testing.T) {
@@ -99,12 +31,12 @@ func TestCompute(t *testing.T) {
 }
 
 func SpotAccount(t *testing.T, tc AccntTest) {
-	as, executor, cleaner := StartExecutor(t, tc.instrument.Exchange, tc.account)
+	as, executor, cleaner := StartExecutor(t, tc.Instrument.Exchange, tc.Account)
 	defer cleaner()
 
 	// Get security def
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityDefinitionRequest{
-		Instrument: tc.instrument,
+		Instrument: tc.Instrument,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +55,7 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 	// Get balances
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
-		Account: tc.account,
+		Account: tc.Account,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +82,7 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 	// Get market data
 	res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
 		RequestID:   0,
-		Instrument:  tc.instrument,
+		Instrument:  tc.Instrument,
 		Aggregation: models.L2,
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -168,10 +100,10 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -196,8 +128,8 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderCancelRequest{
 		RequestID:  0,
-		Account:    tc.account,
-		Instrument: tc.instrument,
+		Account:    tc.Account,
+		Instrument: tc.Instrument,
 		OrderID:    &types.StringValue{Value: orderID},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -215,7 +147,7 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
 			OrderStatus: &messages.OrderStatusValue{Value: models.New},
 		},
@@ -236,12 +168,12 @@ func SpotAccount(t *testing.T, tc AccntTest) {
 }
 
 func OpenCancel(t *testing.T, tc AccntTest) {
-	as, executor, cleaner := StartExecutor(t, tc.instrument.Exchange, tc.account)
+	as, executor, cleaner := StartExecutor(t, tc.Instrument.Exchange, tc.Account)
 	defer cleaner()
 
 	// Get security def
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityDefinitionRequest{
-		Instrument: tc.instrument,
+		Instrument: tc.Instrument,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -260,7 +192,7 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 	// Get balances
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
-		Account: tc.account,
+		Account: tc.Account,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -287,7 +219,7 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 	// Get market data
 	res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
 		RequestID:   0,
-		Instrument:  tc.instrument,
+		Instrument:  tc.Instrument,
 		Aggregation: models.L2,
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -305,10 +237,10 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: clientOrderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -332,7 +264,7 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
 			OrderStatus: &messages.OrderStatusValue{Value: models.New},
 		},
@@ -355,8 +287,8 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderCancelRequest{
 		RequestID:     0,
-		Account:       tc.account,
-		Instrument:    tc.instrument,
+		Account:       tc.Account,
+		Instrument:    tc.Instrument,
 		ClientOrderID: &types.StringValue{Value: clientOrderID},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -374,7 +306,7 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
 			OrderStatus: &messages.OrderStatusValue{Value: models.New},
 		},
@@ -395,12 +327,12 @@ func OpenCancel(t *testing.T, tc AccntTest) {
 }
 
 func MarketFill(t *testing.T, tc AccntTest) {
-	as, executor, cleaner := StartExecutor(t, tc.instrument.Exchange, tc.account)
+	as, executor, cleaner := StartExecutor(t, tc.Instrument.Exchange, tc.Account)
 	defer cleaner()
 
 	// Get security def
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityDefinitionRequest{
-		Instrument: tc.instrument,
+		Instrument: tc.Instrument,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -419,7 +351,7 @@ func MarketFill(t *testing.T, tc AccntTest) {
 	// Get balances
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
-		Account: tc.account,
+		Account: tc.Account,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -447,10 +379,10 @@ func MarketFill(t *testing.T, tc AccntTest) {
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: clientOrderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -471,17 +403,17 @@ func MarketFill(t *testing.T, tc AccntTest) {
 	}
 
 	time.Sleep(5 * time.Second)
-	checkPositions(t, as, executor, tc.account, tc.instrument)
-	checkBalances(t, as, executor, tc.account)
+	checkPositions(t, as, executor, tc.Account, tc.Instrument)
+	checkBalances(t, as, executor, tc.Account)
 
 	clientOrderID = fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: clientOrderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -502,17 +434,17 @@ func MarketFill(t *testing.T, tc AccntTest) {
 	}
 
 	time.Sleep(5 * time.Second)
-	checkPositions(t, as, executor, tc.account, tc.instrument)
-	checkBalances(t, as, executor, tc.account)
+	checkPositions(t, as, executor, tc.Account, tc.Instrument)
+	checkBalances(t, as, executor, tc.Account)
 
 	clientOrderID = fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: clientOrderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.GoodTillCancel,
@@ -532,17 +464,17 @@ func MarketFill(t *testing.T, tc AccntTest) {
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 	time.Sleep(5 * time.Second)
-	checkPositions(t, as, executor, tc.account, tc.instrument)
-	checkBalances(t, as, executor, tc.account)
+	checkPositions(t, as, executor, tc.Account, tc.Instrument)
+	checkBalances(t, as, executor, tc.Account)
 
 	clientOrderID = fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
 	res, err = as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
-		Account:   tc.account,
+		Account:   tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: clientOrderID,
-			Instrument:    tc.instrument,
+			Instrument:    tc.Instrument,
 			OrderType:     models.Market,
 			OrderSide:     models.Sell,
 			TimeInForce:   models.GoodTillCancel,
@@ -563,22 +495,22 @@ func MarketFill(t *testing.T, tc AccntTest) {
 	}
 	time.Sleep(5 * time.Second)
 
-	checkPositions(t, as, executor, tc.account, tc.instrument)
-	checkBalances(t, as, executor, tc.account)
-	checkOrders(t, as, executor, tc.account)
+	checkPositions(t, as, executor, tc.Account, tc.Instrument)
+	checkBalances(t, as, executor, tc.Account)
+	checkOrders(t, as, executor, tc.Account)
 }
 
 func CheckBalance(t *testing.T, tc AccntTest) {
-	as, executor, cleaner := StartExecutor(t, tc.instrument.Exchange, tc.account)
+	as, executor, cleaner := StartExecutor(t, tc.Instrument.Exchange, tc.Account)
 	defer cleaner()
 
-	checkBalances(t, as, executor, tc.account)
+	checkBalances(t, as, executor, tc.Account)
 	time.Sleep(10 * time.Second)
-	checkBalances(t, as, executor, tc.account)
+	checkBalances(t, as, executor, tc.Account)
 	time.Sleep(10 * time.Second)
-	checkBalances(t, as, executor, tc.account)
+	checkBalances(t, as, executor, tc.Account)
 	time.Sleep(10 * time.Second)
-	checkBalances(t, as, executor, tc.account)
+	checkBalances(t, as, executor, tc.Account)
 	time.Sleep(10 * time.Second)
-	checkBalances(t, as, executor, tc.account)
+	checkBalances(t, as, executor, tc.Account)
 }
