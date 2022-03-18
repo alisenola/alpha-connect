@@ -13,35 +13,44 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
 	"gitlab.com/alphaticks/xchanger"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 )
 
+var liqd = 1 * time.Minute
+var liqdLock = sync.RWMutex{}
+
 type checkSockets struct{}
 type postAggTrade struct{}
+type updateLiquidations struct{}
 
 type InstrumentData struct {
-	orderBook      *gorderbook.OrderBookL2
-	seqNum         uint64
-	lastUpdateTime uint64
-	lastHBTime     time.Time
-	aggTrade       *models.AggregatedTrade
-	lastAggTradeTs uint64
+	orderBook         *gorderbook.OrderBookL2
+	seqNum            uint64
+	lastUpdateTime    uint64
+	lastHBTime        time.Time
+	aggTrade          *models.AggregatedTrade
+	lastAggTradeTs    uint64
+	lastLiquidationTs uint64
 }
 
 type Listener struct {
-	obWs           *okex.Websocket
-	tradeWs        *okex.Websocket
-	security       *models.Security
-	dialerPool     *xchangerUtils.DialerPool
-	instrumentData *InstrumentData
-	logger         *log.Logger
-	lastPingTime   time.Time
-	stashedTrades  *list.List
-	socketTicker   *time.Ticker
+	obWs               *okex.Websocket
+	tradeWs            *okex.Websocket
+	security           *models.Security
+	dialerPool         *xchangerUtils.DialerPool
+	instrumentData     *InstrumentData
+	executor           *actor.PID
+	logger             *log.Logger
+	lastPingTime       time.Time
+	stashedTrades      *list.List
+	socketTicker       *time.Ticker
+	liquidationsTicker *time.Ticker
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -106,6 +115,12 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *updateLiquidations:
+		if err := state.updateLiquidations(context); err != nil {
+			state.logger.Error("error updating liquidations", log.Error(err))
+			panic(err)
+		}
+
 	case *postAggTrade:
 		state.postAggTrade(context)
 	}
@@ -123,6 +138,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.OKEXP.Name+"_executor")
+
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
 	state.instrumentData = &InstrumentData{
@@ -151,6 +168,21 @@ func (state *Listener) Initialize(context actor.Context) error {
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
 				return
+			}
+		}
+	}(context.Self())
+
+	liquidationsTicker := time.NewTicker(10 * time.Second)
+	state.liquidationsTicker = liquidationsTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case _ = <-liquidationsTicker.C:
+				context.Send(pid, &updateLiquidations{})
+			case <-time.After(11 * time.Second):
+				if state.liquidationsTicker != liquidationsTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
@@ -483,4 +515,63 @@ func (state *Listener) postAggTrade(context actor.Context) {
 			break
 		}
 	}
+}
+
+func (state *Listener) updateLiquidations(context actor.Context) error {
+	fut := context.RequestFuture(
+		state.executor,
+		&messages.HistoricalLiquidationsRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Instrument: &models.Instrument{
+				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				Exchange:   state.security.Exchange,
+				Symbol:     &types.StringValue{Value: state.security.Symbol},
+			},
+			From: utils.MilliToTimestamp(state.instrumentData.lastLiquidationTs + 1),
+		}, 2*time.Second)
+
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			if err == actor.ErrTimeout {
+				liqdLock.Lock()
+				liqd = time.Duration(float64(liqd) * 1.01)
+				state.liquidationsTicker.Reset(liqd)
+				liqdLock.Unlock()
+			}
+			state.logger.Info("error fetching liquidations", log.Error(err))
+			return
+		}
+		msg := res.(*messages.HistoricalLiquidationsResponse)
+		if !msg.Success {
+			// We want to converge towards the right value,
+			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
+				liqdLock.Lock()
+				liqd = time.Duration(float64(liqd) * 1.01)
+				state.liquidationsTicker.Reset(liqd)
+				liqdLock.Unlock()
+			}
+			state.logger.Info("error fetching liquidations", log.Error(errors.New(msg.RejectionReason.String())))
+			return
+		}
+
+		for _, liq := range msg.Liquidations {
+			context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+				Liquidation: liq,
+				SeqNum:      state.instrumentData.seqNum + 1,
+			})
+			state.instrumentData.seqNum += 1
+			state.instrumentData.lastLiquidationTs = utils.TimestampToMilli(liq.Timestamp)
+		}
+
+		// Reduce delay
+		liqdLock.Lock()
+		liqd = time.Duration(float64(liqd) * 0.99)
+		if liqd < 15*time.Second {
+			liqd = 15 * time.Second
+		}
+		state.liquidationsTicker.Reset(liqd)
+		liqdLock.Unlock()
+	})
+
+	return nil
 }
