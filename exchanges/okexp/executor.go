@@ -230,7 +230,6 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	fmt.Println("HISTORICAL LIQUIDATIONS")
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
 	response := &messages.HistoricalLiquidationsResponse{
 		RequestID: msg.RequestID,
@@ -264,16 +263,13 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	if msg.From != nil {
 		frm := uint64(msg.From.Seconds*1000) + uint64(msg.From.Nanos/1000000)
 		req.SetBefore(frm)
-		fmt.Println("FROM", frm)
 	}
 	if msg.To != nil {
-		fmt.Println("TO", uint64(msg.To.Seconds*1000)+uint64(msg.From.Nanos/1000000))
 		req.SetAfter(uint64(msg.To.Seconds*1000) + uint64(msg.From.Nanos/1000000))
 	}
 	if err := req.SetState("filled"); err != nil {
 		return fmt.Errorf("error setting liquidation state: %v", err)
 	}
-	fmt.Println("underlying", strings.Replace(security.Symbol, "-SWAP", "", -1))
 	if err := req.SetUnderlying(strings.Replace(security.Symbol, "-SWAP", "", -1)); err != nil {
 		return fmt.Errorf("error setting underlying: %v", err)
 	}
@@ -373,7 +369,6 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 }
 
 func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) error {
-	fmt.Println("HISTORICAL FUNDING RATES")
 	msg := context.Message().(*messages.HistoricalFundingRatesRequest)
 	response := &messages.HistoricalFundingRatesResponse{
 		RequestID: msg.RequestID,
@@ -407,10 +402,8 @@ func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) er
 	if msg.From != nil {
 		frm := uint64(msg.From.Seconds*1000) + uint64(msg.From.Nanos/1000000)
 		req.SetBefore(frm)
-		fmt.Println("FROM", frm)
 	}
 	if msg.To != nil {
-		fmt.Println("TO", uint64(msg.To.Seconds*1000)+uint64(msg.From.Nanos/1000000))
 		req.SetAfter(uint64(msg.To.Seconds*1000) + uint64(msg.From.Nanos/1000000))
 	}
 	request, weight, err := okex.GetFundingRateHistory(req)
