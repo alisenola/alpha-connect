@@ -139,6 +139,9 @@ func main() {
 		}
 
 		str, err := data.NewStorageClient("", serverAddress)
+		if err != nil {
+			panic(err)
+		}
 		dataER := rpc.NewDataER(ctx, str)
 
 		go func() {

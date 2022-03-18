@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
 	"testing"
@@ -32,9 +33,10 @@ func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.
 	}
 
 	cfg := &exchanges.ExecutorConfig{
-		Exchanges: exch,
-		Strict:    true,
-		Accounts:  accnts,
+		Exchanges:  exch,
+		Strict:     true,
+		Accounts:   accnts,
+		DialerPool: xchangerUtils.DefaultDialerPool,
 	}
 	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(cfg)), "executor")
 	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }

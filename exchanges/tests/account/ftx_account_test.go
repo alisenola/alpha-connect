@@ -38,7 +38,7 @@ var FBinanceAccount = &models.Account{
 }
 */
 
-func TestftxAccountListener_OnOrderCancelRequest(t *testing.T) {
+func TestFtxAccountListener_OnOrderCancelRequest(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -93,7 +93,7 @@ func TestftxAccountListener_OnOrderCancelRequest(t *testing.T) {
 	time.Sleep(2 * time.Second)
 }
 
-func TestftxAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestFtxAccountListener_OnOrderStatusRequest(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	// Test with no account
@@ -322,7 +322,7 @@ func TestftxAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestftxAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestFtxAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	// Test Invalid account
@@ -414,7 +414,7 @@ func TestftxAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestftxAccountListener_OnBalancesRequest(t *testing.T) {
+func TestFtxAccountListener_OnBalancesRequest(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
@@ -438,7 +438,7 @@ func TestftxAccountListener_OnBalancesRequest(t *testing.T) {
 	fmt.Println(balanceResponse.Balances)
 }
 
-func TestftxAccountListener_OnGetPositionsLimit(t *testing.T) {
+func TestFtxAccountListener_OnGetPositionsLimit(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	// Market buy 2 contract
@@ -517,7 +517,7 @@ func TestftxAccountListener_OnGetPositionsLimit(t *testing.T) {
 	checkBalances(t, as, executor, ftxAccount)
 }
 
-func TestftxAccountListener_OnOrderReplaceRequest(t *testing.T) {
+func TestFtxAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	orderID := uuid.NewV1().String()
@@ -623,7 +623,7 @@ func TestftxAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestftxAccountListener_OnGetPositionsMarket(t *testing.T) {
+func TestFtxAccountListener_OnGetPositionsMarket(t *testing.T) {
 	as, executor := start(t, ftxAccount)
 
 	// Market buy 1 contract

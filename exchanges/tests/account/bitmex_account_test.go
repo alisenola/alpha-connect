@@ -32,7 +32,7 @@ var bitmexAccount = &models.Account{
 	},
 }
 
-func TestbitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	// Test with no account
@@ -242,7 +242,7 @@ func TestbitmexAccountListener_OnOrderStatusRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
+func TestBitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	// Test Invalid account
@@ -334,7 +334,7 @@ func TestbitmexAccountListener_OnNewOrderSingleRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
+func TestBitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	// Test Invalid account
@@ -561,7 +561,7 @@ func TestbitmexAccountListener_OnNewOrderBulkRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	orderID := uuid.NewV1().String()
@@ -647,7 +647,7 @@ func TestbitmexAccountListener_OnOrderReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
+func TestBitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	order1ClID := uuid.NewV1().String()
@@ -776,7 +776,7 @@ func TestbitmexAccountListener_OnOrderBulkReplaceRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnBalancesRequest(t *testing.T) {
+func TestBitmexAccountListener_OnBalancesRequest(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
@@ -799,7 +799,7 @@ func TestbitmexAccountListener_OnBalancesRequest(t *testing.T) {
 	}
 }
 
-func TestbitmexAccountListener_OnGetPositions(t *testing.T) {
+func TestBitmexAccountListener_OnGetPositions(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 	// Market buy 1 contract
 	res, err := as.Root.RequestFuture(executor, &messages.NewOrderSingleRequest{
@@ -870,7 +870,7 @@ func TestbitmexAccountListener_OnGetPositions(t *testing.T) {
 	checkBalances(t, as, executor, bitmexAccount)
 }
 
-func TestbitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
+func TestBitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	// Market buy 2 contracts
@@ -944,7 +944,7 @@ func TestbitmexAccountListener_OnGetPositions_Inverse(t *testing.T) {
 	checkBalances(t, as, executor, bitmexAccount)
 }
 
-func TestbitmexAccountListener_ConfirmFillReplace(t *testing.T) {
+func TestBitmexAccountListener_ConfirmFillReplace(t *testing.T) {
 	as, executor := start(t, bitmexAccount)
 
 	order1ClID := uuid.NewV1().String()

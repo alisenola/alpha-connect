@@ -65,8 +65,8 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 	}
 	defer context.Respond(res)
 	filter := bson.D{
-		{"account", msg.Account.Name},
-		{"type", "TRADE"},
+		{Key: "account", Value: msg.Account.Name},
+		{Key: "type", Value: "TRADE"},
 	}
 	if msg.Filter.From != nil {
 		from, err := types.TimestampFromProto(msg.Filter.From)
@@ -75,7 +75,7 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 			res.RejectionReason = messages.InvalidRequest
 			return nil
 		}
-		filter = append(filter, bson.E{"time", bson.D{{"$gt", from}}})
+		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$gt", Value: from}}})
 	}
 	if msg.Filter.To != nil {
 		to, err := types.TimestampFromProto(msg.Filter.To)
@@ -84,7 +84,7 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 			res.RejectionReason = messages.InvalidRequest
 			return nil
 		}
-		filter = append(filter, bson.E{"time", bson.D{{"$lt", to}}})
+		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$lt", Value: to}}})
 	}
 	cur, err := state.GetTransactions().Find(goContext.Background(), filter)
 	if err != nil {

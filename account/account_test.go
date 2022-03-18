@@ -10,18 +10,18 @@ import (
 )
 
 var bitstampAccount = &models.Account{
-	AccountID: "1",
-	Exchange:  &constants.BITSTAMP,
+	Name:     "1",
+	Exchange: &constants.BITSTAMP,
 }
 
 var bitmexAccount = &models.Account{
-	AccountID: "1",
-	Exchange:  &constants.BITMEX,
+	Name:     "1",
+	Exchange: &constants.BITMEX,
 }
 
 var fbinanceAccount = &models.Account{
-	AccountID: "1",
-	Exchange:  &constants.FBINANCE,
+	Name:     "1",
+	Exchange: &constants.FBINANCE,
 }
 
 var BTCUSD_PERP_SEC = &models.Security{

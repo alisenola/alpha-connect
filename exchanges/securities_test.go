@@ -5,9 +5,11 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -33,8 +35,13 @@ func TestSecurities(t *testing.T) {
 		&constants.FTX,
 		&constants.UPBIT,
 	}
-	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer("gs://patrick-configs/assets.json")))
-	_, err := as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	conn, err := grpc.Dial("gs://patrick-configs/assets.json", grpc.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
+	reg := registry.NewPublicRegistryClient(conn)
+	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(reg)))
+	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}

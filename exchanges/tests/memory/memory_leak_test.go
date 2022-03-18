@@ -1,14 +1,13 @@
 package memory
 
 import (
+	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"log"
 	"os"
 	"reflect"
@@ -20,10 +19,9 @@ import (
 
 func TestMemoryLeak(t *testing.T) {
 
-	exch := []*xchangerModels.Exchange{
-		&constants.COINBASEPRO,
-	}
-	executor, _ := actor.EmptyRootContext.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(exch, nil, false, xchangerUtils.DefaultDialerPool)), "executor")
+	exch := &constants.COINBASEPRO
+	as, ex, cancel := tests.StartExecutor(t, exch, nil)
+	defer cancel()
 
 	f, err := os.Create("profiles/mem.prof")
 	if err != nil {
@@ -36,7 +34,7 @@ func TestMemoryLeak(t *testing.T) {
 	}
 	testedSecurities := make(map[uint64]*models.Security)
 
-	res, err := actor.EmptyRootContext.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := as.Root.RequestFuture(ex, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,17 +64,33 @@ func TestMemoryLeak(t *testing.T) {
 	if !ok {
 		t.Fatalf("BTCUSD not found")
 	}
+	fmt.Println(sec)
 
+	test := tests.MDTest{
+		IgnoreSizeResidue: true,
+		SecurityID:        11630614572540763252,
+		Symbol:            "BTC_USDT",
+		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
+		Exchange:          constants.GATE,
+		BaseCurrency:      constants.BITCOIN,
+		QuoteCurrency:     constants.TETHER,
+		MinPriceIncrement: 0.01,
+		RoundLot:          1e-04,
+		HasMaturityDate:   false,
+		IsInverse:         false,
+		Status:            models.Trading,
+	}
+	//TODO Check if MDChecker replaced OBChecker
 	for i := 0; i < 10; i++ {
-		obChecker := actor.EmptyRootContext.Spawn(actor.PropsFromProducer(tests.NewOBCheckerProducer(sec)))
+		obChecker := as.Root.Spawn(actor.PropsFromProducer(tests.NewMDCheckerProducer(sec, test)))
 		time.Sleep(5 * time.Second)
-		err = actor.EmptyRootContext.PoisonFuture(obChecker).Wait()
+		err = as.Root.PoisonFuture(obChecker).Wait()
 		if err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	err = actor.EmptyRootContext.PoisonFuture(executor).Wait()
+	err = as.Root.PoisonFuture(ex).Wait()
 	if err != nil {
 		t.Fatal(err)
 	}

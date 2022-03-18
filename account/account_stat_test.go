@@ -222,14 +222,14 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		t.Fatal(err)
 	}
 	dollarBalance := &models.Balance{
-		AccountID: "1",
-		Asset:     &constants.DOLLAR,
-		Quantity:  100,
+		Account:  "1",
+		Asset:    &constants.DOLLAR,
+		Quantity: 100,
 	}
 	ethereumBalance := &models.Balance{
-		AccountID: "1",
-		Asset:     &constants.ETHEREUM,
-		Quantity:  10,
+		Account:  "1",
+		Asset:    &constants.ETHEREUM,
+		Quantity: 10,
 	}
 	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, nil, nil); err != nil {
 		t.Fatal(err)

@@ -190,14 +190,16 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		Topics:    topics,
 	}
 
-	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	err = it.WatchLogs(state.client, ctx, fQuery)
 	if err != nil {
+		cancel()
 		return fmt.Errorf("error watching logs: %v", err)
 	}
 	state.iterator = it
 
 	go func(pid *actor.PID) {
+		defer cancel()
 		for state.iterator.Next() {
 			context.Send(pid, state.iterator.Log)
 		}

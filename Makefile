@@ -1,3 +1,10 @@
+.PHONY: all test
+
+all: build
+
+build: protogen
+	go build ./...
+
 # {{{ Protobuf
 
 # Protobuf definitions
@@ -13,20 +20,6 @@ Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,$\
 Mgoogle/protobuf/wrappers.proto=github.com/gogo/protobuf/types,$\
 plugins=grpc:.
 
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-BINARY_UNIX=$(BINARY_NAME)_unix
-
-PLUGIN_GEN_FILES = $(patsubst plugins/%.go, obj/%.so, $(wildcard plugins/*.go))
-
-.PHONY: all build plugins test clean run trader manager
-
-all: build
-
-build: protogen
 
 protogen: $(PROTO_GEN_FILES)
 
@@ -35,6 +28,7 @@ protogen: $(PROTO_GEN_FILES)
 	sed -i '' -En -e '/^package [[:alpha:]]+/,$$p' $@
 
 # }}} Protobuf end
+
 
 # {{{ Cleanup
 clean: protoclean
@@ -45,12 +39,33 @@ protoclean:
 
 # {{{ test
 
-PACKAGES := $(shell go list ./... | grep -v "/examples/")
+PROJECT_NAME := alpha-connect
+PKG := gitlab.com/alphaticks/$(PROJECT_NAME)
+PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/ | grep -v /models)
+GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
+
 
 test:
-	go test $(PACKAGES)
+	go test $(PKG_LIST)
+
+race:
+	go test -race -short $(PKG_LIST)
+
+coverage:
+	coverage
+	go tool cover -html=coverage.cov -o coverage.html
+
+coverhtml:
+	coverage
+	go tool cover -html=coverage.cov -o coverage.html
+
+lint: ## Lint the files
+	echo ${PKG_LIST}
+	go fmt ${PKG_LIST}
+	go vet ${PKG_LIST}
+#	staticcheck ${PKG_LIST}
 
 test-short:
-	go test -short $(PACKAGES)
+	go test -short $(PKG_LIST)
 
 # }}} test

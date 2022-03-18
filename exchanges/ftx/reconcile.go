@@ -106,8 +106,8 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 	// First, calculate current positions from historical
 	cur, err := state.txs.Find(goContext.Background(), bson.D{
-		{"account", state.account.Name},
-	}, options.Find().SetSort(bson.D{{"_id", 1}}))
+		{Key: "account", Value: state.account.Name},
+	}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
 	if err != nil {
 		return fmt.Errorf("error reconcile trades: %v", err)
 	}
@@ -152,9 +152,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	sres := state.txs.FindOne(goContext.Background(), bson.D{
-		{"account", state.account.Name},
-		{"type", "FUNDING"},
-	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
+		{Key: "account", Value: state.account.Name},
+		{Key: "type", Value: "FUNDING"},
+	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
 	if sres.Err() != nil {
 		if sres.Err() != mongo.ErrNoDocuments {
 			return fmt.Errorf("error getting last funding: %v", err)
@@ -168,9 +168,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{"account", state.account.Name},
-		{"type", "DEPOSIT"},
-	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
+		{Key: "account", Value: state.account.Name},
+		{Key: "type", Value: "DEPOSIT"},
+	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
 	if sres.Err() != nil {
 		if sres.Err() != mongo.ErrNoDocuments {
 			return fmt.Errorf("error getting last deposit: %v", err)
@@ -184,9 +184,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{"account", state.account.Name},
-		{"type", "WITHDRAWAL"},
-	}, options.FindOne().SetSort(bson.D{{"_id", -1}}))
+		{Key: "account", Value: state.account.Name},
+		{Key: "type", Value: "WITHDRAWAL"},
+	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
 	if sres.Err() != nil {
 		if sres.Err() != mongo.ErrNoDocuments {
 			return fmt.Errorf("error getting last withdrawal: %v", err)
@@ -219,7 +219,7 @@ func (state *AccountReconcile) Clean(context actor.Context) error {
 func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) error {
 	msg := context.Message().(*messages.AccountMovementRequest)
 	state.txs.Find(goContext.Background(), bson.D{
-		{"type", msg.Type.String()},
+		{Key: "type", Value: msg.Type.String()},
 	})
 	return nil
 }
@@ -255,7 +255,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		progress := false
 		for _, trd := range trds.Trades {
 			// Check if not already inserted
-			if state.txs.FindOne(goContext.Background(), bson.D{{"id", trd.TradeID}}).Err() != mongo.ErrNoDocuments {
+			if state.txs.FindOne(goContext.Background(), bson.D{{Key: "id", Value: trd.TradeID}}).Err() != mongo.ErrNoDocuments {
 				fmt.Println("skip trd", trd)
 				continue
 			}
