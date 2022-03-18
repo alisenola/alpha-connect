@@ -1,4 +1,4 @@
-package binance
+package binance_test
 
 import (
 	"gitlab.com/alphaticks/alpha-connect/enum"
