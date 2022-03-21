@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-var bitmex = constants.BITMEX
 var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
@@ -365,7 +364,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 
 	expectedMarginChange := ((1./90 - 1./100) * 9) - (0.00075 * (1. / 90) * 9)
 	expectedElr := math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-	elr, o := p.GetELROnMarketBuy("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 90, 9, 0.1)
+	elr, _ := p.GetELROnMarketBuy("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 90, 9, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -373,7 +372,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	expectedMarginChange = ((1./90 - 1./100) * 9) + (0.00025 * (1. / 90) * 9)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
 
-	elr, o = p.GetELROnLimitBid("1", BTCUSD_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 0.1)
+	elr, o := p.GetELROnLimitBid("1", BTCUSD_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -439,7 +438,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 
 	expectedMarginChange = ((10 - 9) * 0.000001 * 19) + (-0.00075 * 9. * 19 * 0.000001)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-	elr, o = p.GetELROnMarketBuy("1", ETHUSD_PERP_SEC.SecurityID, model, 10, 9, 19, 0.1)
+	elr, _ = p.GetELROnMarketBuy("1", ETHUSD_PERP_SEC.SecurityID, model, 10, 9, 19, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -512,7 +511,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 
 	expectedMarginChange = ((1./100 - 1./110) * 1. * 11.) + (-0.00075 * (1. / 110) * 11.)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-	elr, o = p.GetELROnMarketSell("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 110, 11, 0.1)
+	elr, _ = p.GetELROnMarketSell("1", BTCUSD_PERP_SEC.SecurityID, model, 10, 110, 11, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -586,7 +585,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	// ETHUSD Short
 	expectedMarginChange = ((11 - 10) * 0.000001 * 19) + (-0.00075 * 11. * 19 * 0.000001)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
-	elr, o = p.GetELROnMarketSell("1", ETHUSD_PERP_SEC.SecurityID, model, 11, 11, 19, 0.1)
+	elr, _ = p.GetELROnMarketSell("1", ETHUSD_PERP_SEC.SecurityID, model, 11, 11, 19, 0.1)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -692,7 +691,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 
 	expectedMarginChange := ((100 - 90) * 0.1) - (0.0004 * 90 * 0.1)
 	expectedElr := math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
-	elr, o := p.GetELROnMarketBuy("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, 90, 0.1, 1000)
+	elr, _ := p.GetELROnMarketBuy("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, 90, 0.1, 1000)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -701,7 +700,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	expectedMarginChange = ((100 - 90) * 1) - (0.0002 * 90 * 1)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
 
-	elr, o = p.GetELROnLimitBid("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 1000)
+	elr, o := p.GetELROnLimitBid("1", BTCUSDT_PERP_SEC.SecurityID, model, 10, []float64{90}, []float64{1}, 1000)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
@@ -769,7 +768,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	// ETHUSD Short
 	expectedMarginChange = ((110 - 100) * 1) - (0.0004 * 110 * 1)
 	expectedElr = math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
-	elr, o = p.GetELROnMarketSell("1", BTCUSDT_PERP_SEC.SecurityID, model, 11, 110, 1, 1000)
+	elr, _ = p.GetELROnMarketSell("1", BTCUSDT_PERP_SEC.SecurityID, model, 11, 110, 1, 1000)
 	if math.Abs(elr-expectedElr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}

@@ -26,7 +26,6 @@ type AccountReconcile struct {
 	extypes.BaseReconcile
 	account          *models.Account
 	ftxExecutor      *actor.PID
-	executorManager  *actor.PID
 	logger           *log.Logger
 	securities       map[uint64]*models.Security
 	txs              *mongo.Collection

@@ -63,7 +63,7 @@ lint: ## Lint the files
 	echo ${PKG_LIST}
 	go fmt ${PKG_LIST}
 	go vet ${PKG_LIST}
-#	staticcheck ${PKG_LIST}
+	staticcheck ${PKG_LIST}
 
 test-short:
 	go test -short $(PKG_LIST)

@@ -11,11 +11,10 @@ import (
 // Wrap actor and sends messages to a channel
 
 type MDReceiver struct {
-	ch       chan interface{}
-	as       *actor.ActorSystem
-	executor *actor.PID
-	pid      *actor.PID
-	seq      uint64
+	ch  chan interface{}
+	as  *actor.ActorSystem
+	pid *actor.PID
+	seq uint64
 }
 
 func NewMDReceiver(as *actor.ActorSystem, executor *actor.PID, instrument *models.Instrument, aggregation models.OrderBookAggregation, requestID uint64, ch chan interface{}) *MDReceiver {

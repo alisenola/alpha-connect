@@ -84,7 +84,7 @@ func (state *AssetLoader) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-ticker.C:
+			case <-ticker.C:
 				context.Send(pid, &checkAsset{})
 			case <-time.After(2 * time.Minute):
 				// timer stopped, we leave

@@ -52,7 +52,6 @@ func ConstructFunctor(f parsing.Functor) (tickobjects.TickFunctor, reflect.Type,
 
 type LiveQuery struct {
 	sync.RWMutex
-	pid           *actor.PID
 	ch            chan interface{}
 	subscriptions map[uint64]*Feed
 	measurement   string
@@ -117,7 +116,7 @@ func (lq *LiveQuery) next() bool {
 		select {
 		case el = <-lq.ch:
 			break
-		case <-time.After(lq.nextDeadline.Sub(time.Now())):
+		case <-time.After(time.Until(*lq.nextDeadline)):
 			return false
 		}
 	} else {

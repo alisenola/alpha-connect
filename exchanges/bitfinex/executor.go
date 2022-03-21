@@ -69,17 +69,18 @@ func (state *Executor) getQueryRunner(method string) *QueryRunner {
 	})
 
 	var qr *QueryRunner
+out:
 	for _, q := range state.queryRunners {
 		switch method {
 		case "OB":
 			if !q.obRateLimit.IsRateLimited() {
 				qr = q
-				break
+				break out
 			}
 		case "SYMBOL":
 			if !q.symbolsRateLimit.IsRateLimited() {
 				qr = q
-				break
+				break out
 			}
 		}
 	}

@@ -18,7 +18,7 @@ func NewRingSet(n int) *RingSet {
 	rs.head = -1
 	rs.tail = 0
 	rs.len = n
-	rs.buffer = make([]element, n, n)
+	rs.buffer = make([]element, n)
 	return &rs
 }
 
@@ -42,11 +42,7 @@ func (rs *RingSet) Contains(key interface{}) bool {
 		}
 	}
 	// Check tail
-	if rs.buffer[i].key == key {
-		return true
-	}
-
-	return false
+	return rs.buffer[i].key == key
 }
 
 func (rs *RingSet) Get(key interface{}) interface{} {

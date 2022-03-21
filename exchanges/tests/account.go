@@ -764,7 +764,7 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 	fmt.Println("CLOSING")
 	// Close position
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1024,7 +1024,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	fmt.Println("CHECK 1 GOOD")
 
 	// Market sell 1 contract
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1045,7 +1045,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 	fmt.Println("CLOSING")
 	// Close position
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1064,7 +1064,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
 
 	// Close position
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1083,7 +1083,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
 
 	// Close position
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
@@ -1102,7 +1102,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
 
 	// Close position
-	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
