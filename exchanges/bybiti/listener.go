@@ -98,12 +98,6 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.HistoricalLiquidationsResponse:
-		if err := state.OnHistoricalLiquidationsResponse(context); err != nil {
-			state.logger.Error("error processing OnHistoricalLiquidationsResponse", log.Error(err))
-			panic(err)
-		}
-
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))

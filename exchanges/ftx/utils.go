@@ -8,7 +8,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 )
 
-func wsOrderToModel(o ftx.WSOrder) *models.Order {
+func WSOrderToModel(o ftx.WSOrder) *models.Order {
 	ord := &models.Order{
 		OrderID: fmt.Sprintf("%d", o.ID),
 		Instrument: &models.Instrument{
@@ -76,7 +76,7 @@ func wsOrderToModel(o ftx.WSOrder) *models.Order {
 	return ord
 }
 
-func orderToModel(o ftx.Order) *models.Order {
+func OrderToModel(o ftx.Order) *models.Order {
 	ord := &models.Order{
 		OrderID: fmt.Sprintf("%d", o.ID),
 		Instrument: &models.Instrument{

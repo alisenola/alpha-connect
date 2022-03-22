@@ -925,7 +925,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			// If we don't have the order, it was created by someone else, add it.
 			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
 				fmt.Println("INSERTING NEW !!!")
-				_, rej := state.account.NewOrder(wsOrderToModel(res.Order))
+				_, rej := state.account.NewOrder(WSOrderToModel(res.Order))
 				if rej != nil {
 					return fmt.Errorf("error creating new order: %s", rej.String())
 				}
