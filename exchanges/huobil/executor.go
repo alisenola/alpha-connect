@@ -1,4 +1,4 @@
-package huobip
+package huobil
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/huobip"
+	"gitlab.com/alphaticks/xchanger/exchanges/huobil"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math/rand"
 	"net/http"
@@ -98,10 +98,11 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	request, weight, err := huobip.GetSwapInfo()
+	request, weight, err := huobil.GetSwapInfo()
 	if err != nil {
 		return err
 	}
+
 	qr := state.getQueryRunner()
 	if qr == nil {
 		return fmt.Errorf("rate limited")
@@ -138,7 +139,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	var data huobip.SwapInfoResponse
+	var data huobil.SwapInfoResponse
 	err = json.Unmarshal(resp.Response, &data)
 	if err != nil {
 		err = fmt.Errorf(
@@ -187,12 +188,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		default:
 			security.Status = models.Disabled
 		}
-		security.Exchange = &constants.HUOBIP
+		security.Exchange = &constants.HUOBIL
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceTick}
 		security.RoundLot = &types.DoubleValue{Value: 1}
-		security.IsInverse = true
 		security.Multiplier = &types.DoubleValue{Value: symbol.ContractSize}
 		securities = append(securities, &security)
 		state.Securities[security.SecurityID] = &security
@@ -231,11 +231,11 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	}
 	for _, stat := range msg.Statistics {
 		switch stat {
-		case models.OpenInterest:
+		case models.OpenInterest, models.FundingRate:
 			if has(stat) {
 				continue
 			}
-			req, weight, err := huobip.GetSwapOpenInterest(sec.Symbol)
+			req, weight, err := huobil.GetSwapOpenInterest(sec.Symbol)
 			if err != nil {
 				return err
 			}
@@ -281,7 +281,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				return nil
 			}
 
-			var ores huobip.SwapOpenInterestResponse
+			var ores huobil.SwapOpenInterestResponse
 			err = json.Unmarshal(queryResponse.Response, &ores)
 			if err != nil {
 				state.logger.Info("http error", log.Error(err))

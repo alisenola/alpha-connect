@@ -41,9 +41,7 @@ type Executor struct {
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 	return &Executor{
-		queryRunners: nil,
-		logger:       nil,
-		dialerPool:   dialerPool,
+		dialerPool: dialerPool,
 	}
 }
 
@@ -121,8 +119,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return fmt.Errorf("http client error: %v", err)
 	}
 	resp := res.(*jobs.PerformQueryResponse)
-
-	qr.rateLimit.Request(weight)
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {

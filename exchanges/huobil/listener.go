@@ -1,4 +1,4 @@
-package huobip
+package huobil
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/huobip"
+	"gitlab.com/alphaticks/xchanger/exchanges/huobil"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
@@ -39,8 +39,8 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	mdws               *huobip.MDWebsocket
-	opws               *huobip.OPWebsocket
+	mdws               *huobil.MDWebsocket
+	opws               *huobil.OPWebsocket
 	security           *models.Security
 	dialerPool         *xchangerUtils.DialerPool
 	instrumentData     *InstrumentData
@@ -128,7 +128,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.HUOBIP.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.HUOBIL.Name+"_executor")
 	state.lastPingTime = time.Now()
 
 	state.instrumentData = &InstrumentData{
@@ -193,12 +193,12 @@ func (state *Listener) subscribeMarketData(context actor.Context) error {
 		_ = state.mdws.Disconnect()
 	}
 
-	mdws := huobip.NewMDWebsocket()
+	mdws := huobil.NewMDWebsocket()
 	if err := mdws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to huobi websocket: %v", err)
 	}
 
-	if err := mdws.SubscribeMarketDepth(state.security.Symbol, huobip.WSOBLevel150, true); err != nil {
+	if err := mdws.SubscribeMarketDepth(state.security.Symbol, huobil.WSOBLevel150, true); err != nil {
 		return fmt.Errorf("error subscribing to orderbook for %s", state.security.Symbol)
 	}
 
@@ -210,8 +210,8 @@ func (state *Listener) subscribeMarketData(context actor.Context) error {
 		}
 
 		switch mdws.Msg.Message.(type) {
-		case huobip.WSMarketDepthTick:
-			res := mdws.Msg.Message.(huobip.WSMarketDepthTick)
+		case huobil.WSMarketDepthTick:
+			res := mdws.Msg.Message.(huobil.WSMarketDepthTick)
 			if res.Event != "snapshot" {
 				return fmt.Errorf("was expecting snapshot as first event, got %s", res.Event)
 			}
@@ -233,8 +233,8 @@ func (state *Listener) subscribeMarketData(context actor.Context) error {
 			state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 			nTries = 100
 
-		case huobip.WSError:
-			err := fmt.Errorf("error getting orderbook: %s", mdws.Msg.Message.(huobip.WSError).ErrMsg)
+		case huobil.WSError:
+			err := fmt.Errorf("error getting orderbook: %s", mdws.Msg.Message.(huobil.WSError).ErrMsg)
 			return err
 		}
 		nTries += 1
@@ -250,7 +250,7 @@ func (state *Listener) subscribeMarketData(context actor.Context) error {
 
 	state.mdws = mdws
 
-	go func(ws *huobip.MDWebsocket, pid *actor.PID) {
+	go func(ws *huobil.MDWebsocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -264,7 +264,7 @@ func (state *Listener) subscribeOrderPush(context actor.Context) error {
 		_ = state.opws.Disconnect()
 	}
 
-	opws := huobip.NewOPWebsocket()
+	opws := huobil.NewOPWebsocket()
 	if err := opws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to huobi websocket: %v", err)
 	}
@@ -279,7 +279,7 @@ func (state *Listener) subscribeOrderPush(context actor.Context) error {
 
 	state.opws = opws
 
-	go func(ws *huobip.OPWebsocket, pid *actor.PID) {
+	go func(ws *huobil.OPWebsocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -341,7 +341,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("OB socket error: %v", msg)
 
-	case huobip.WSMarketDepthTick:
+	case huobil.WSMarketDepthTick:
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		instr := state.instrumentData
@@ -396,7 +396,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		instr.lastUpdateID = res.Version
 		//state.postSnapshot(context)
 
-	case huobip.WSMarketTradeDetailTick:
+	case huobil.WSMarketTradeDetailTick:
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		if len(res.Data) == 0 {
 			break
@@ -456,7 +456,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
-	case []huobip.WSFundingRate:
+	case []huobil.WSFundingRate:
 		for _, r := range res {
 			fmt.Println("FUNDING", r.FundingRate, r.SettlementTime, r.FundingTime)
 			refresh := &messages.MarketDataIncrementalRefresh{
@@ -471,7 +471,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.seqNum += 1
 		}
 
-	case []huobip.WSLiquidationOrder:
+	case []huobil.WSLiquidationOrder:
 		for _, r := range res {
 			refresh := &messages.MarketDataIncrementalRefresh{
 				// If the position was a short, the direction == 'sell', therefore
@@ -489,23 +489,23 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.seqNum += 1
 		}
 
-	case huobip.MDWSSubscribeResponse, huobip.OPWSSubscribeResponse:
+	case huobil.MDWSSubscribeResponse, huobil.OPWSSubscribeResponse:
 		// pass
 
-	case huobip.MDWSPing:
-		ping := msg.Message.(huobip.MDWSPing)
+	case huobil.MDWSPing:
+		ping := msg.Message.(huobil.MDWSPing)
 		if err := state.mdws.Pong(ping.Ping); err != nil {
 			return fmt.Errorf("error sending pong to websocket")
 		}
 
-	case huobip.OPWSPing:
-		ping := msg.Message.(huobip.OPWSPing)
+	case huobil.OPWSPing:
+		ping := msg.Message.(huobil.OPWSPing)
 		if err := state.opws.Pong(ping.Ts); err != nil {
 			return fmt.Errorf("error sending pong to websocket")
 		}
 
-	case huobip.WSError:
-		msg := msg.Message.(huobip.WSError)
+	case huobil.WSError:
+		msg := msg.Message.(huobil.WSError)
 		state.logger.Info("got WSError message",
 			log.String("message", msg.ErrMsg),
 			log.String("code", msg.ErrCode))

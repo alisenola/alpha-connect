@@ -24,6 +24,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/hitbtc"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobi"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobif"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/huobil"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobip"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/kraken"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okcoin"
@@ -121,6 +122,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return huobip.NewListener(security, dialerPool) }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewListener(security, dialerPool) }
+	case constants.HUOBIL.ID:
+		return func() actor.Actor { return huobil.NewListener(security, dialerPool) }
 	case constants.BYBITI.ID:
 		return func() actor.Actor { return bybiti.NewListener(security, dialerPool) }
 	case constants.BYBITL.ID:
@@ -185,9 +188,11 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 	case constants.HUOBI.ID:
 		return func() actor.Actor { return huobi.NewExecutor() }
 	case constants.HUOBIP.ID:
-		return func() actor.Actor { return huobip.NewExecutor() }
+		return func() actor.Actor { return huobip.NewExecutor(dialerPool) }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewExecutor() }
+	case constants.HUOBIL.ID:
+		return func() actor.Actor { return huobil.NewExecutor(dialerPool) }
 	case constants.BYBITI.ID:
 		return func() actor.Actor { return bybiti.NewExecutor(dialerPool) }
 	case constants.BYBITL.ID:

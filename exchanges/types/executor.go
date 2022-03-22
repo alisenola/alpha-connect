@@ -1,6 +1,7 @@
 package types
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"math/rand"
 	"time"
 
@@ -38,6 +39,25 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
+	Securities  map[uint64]*models.Security
+	SymbolToSec map[string]*models.Security
+}
+
+func (state *BaseExecutor) GetSecurity(instr *models.Instrument) *models.Security {
+	if instr == nil {
+		return nil
+	}
+	if instr.SecurityID != nil {
+		if sec, ok := state.Securities[instr.SecurityID.Value]; ok {
+			return sec
+		}
+	}
+	if instr.Symbol != nil {
+		if sec, ok := state.SymbolToSec[instr.Symbol.Value]; ok {
+			return sec
+		}
+	}
+	return nil
 }
 
 func ReceiveExecutor(state Executor, context actor.Context) {
@@ -192,13 +212,20 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 }
 
 func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {
-	req := context.Message().(*messages.SecurityListRequest)
+	// Get http request and the expected response
+	msg := context.Message().(*messages.SecurityListRequest)
+	securities := make([]*models.Security, len(state.Securities))
+	i := 0
+	for _, v := range state.Securities {
+		securities[i] = v
+		i += 1
+	}
 	context.Respond(&messages.SecurityList{
-		RequestID:       req.RequestID,
-		ResponseID:      rand.Uint64(),
-		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
-	})
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Securities: securities})
+
 	return nil
 }
 

@@ -99,13 +99,17 @@ func MarketData(t *testing.T, test MDTest) {
 	}
 	var sec *models.Security
 	for _, s := range securityList.Securities {
-		if test.SecurityID == s.SecurityID {
+		if s.Symbol == test.Symbol {
 			sec = s
 		}
 	}
 
 	if sec == nil {
 		t.Fatalf("security not found")
+	}
+
+	if sec.SecurityID != test.SecurityID {
+		t.Fatalf("different security ID %d: %d", sec.SecurityID, test.SecurityID)
 	}
 
 	CheckSecurityDefinition(t, sec, test)
