@@ -187,8 +187,6 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			context.Send(pid, &updateSecurityList{})
 		}(context.Self())
 	}
-
-	return
 }
 
 func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {

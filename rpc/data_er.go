@@ -93,9 +93,9 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 
 	sampler := qr.GetSampler()
 	if sampler != nil {
-		switch sampler.(type) {
+		switch sampler := sampler.(type) {
 		case *tickstore_grpc.StoreQueryRequest_TickSampler:
-			qs.WithSampler(readers.NewTickSampler(sampler.(*tickstore_grpc.StoreQueryRequest_TickSampler).TickSampler.Interval))
+			qs.WithSampler(readers.NewTickSampler(sampler.TickSampler.Interval))
 		}
 	}
 	if err := qs.WithSelectorString(qr.Selector); err != nil {

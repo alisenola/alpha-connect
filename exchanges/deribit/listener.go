@@ -142,7 +142,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -221,7 +221,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	var bids, asks []gmodels.OrderBookLevel
-	bids = make([]gmodels.OrderBookLevel, len(update.Bids), len(update.Bids))
+	bids = make([]gmodels.OrderBookLevel, len(update.Bids))
 	for i, bid := range update.Bids {
 		bids[i] = gmodels.OrderBookLevel{
 			Price:    bid.Price,
@@ -229,7 +229,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			Bid:      true,
 		}
 	}
-	asks = make([]gmodels.OrderBookLevel, len(update.Asks), len(update.Asks))
+	asks = make([]gmodels.OrderBookLevel, len(update.Asks))
 	for i, ask := range update.Asks {
 		asks[i] = gmodels.OrderBookLevel{
 			Price:    ask.Price,
@@ -334,7 +334,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
-			Levels:    make([]gmodels.OrderBookLevel, nLevels, nLevels),
+			Levels:    make([]gmodels.OrderBookLevel, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
@@ -527,7 +527,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 func (state *Listener) checkSockets(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+	if time.Since(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
 		_ = state.ws.Ping()
 		state.lastPingTime = time.Now()
@@ -543,7 +543,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,

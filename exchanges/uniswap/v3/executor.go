@@ -228,7 +228,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 		context.Respond(response)
 		return nil
 	}
-	query := append([][]interface{}{{
+	query := [][]interface{}{{
 		uabi.Events["Initialize"].ID,
 		uabi.Events["Mint"].ID,
 		uabi.Events["Swap"].ID,
@@ -237,7 +237,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 		uabi.Events["Flash"].ID,
 		uabi.Events["SetFeeProtocol"].ID,
 		uabi.Events["CollectProtocol"].ID,
-	}})
+	}}
 	topics, err := abi.MakeTopics(query...)
 	if err != nil {
 		state.logger.Warn("error getting topics", log.Error(err))

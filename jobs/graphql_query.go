@@ -47,9 +47,7 @@ func (q *GraphQuery) Receive(context actor.Context) {
 		}
 
 	case *actor.Restarting:
-		if err := q.Clean(context); err != nil {
-			// Attention, no panic in restarting or infinite loop
-		}
+		q.Clean(context)
 
 	case *PerformGraphQueryRequest:
 		//Set API credentials

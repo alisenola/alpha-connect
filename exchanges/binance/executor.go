@@ -114,6 +114,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 
 	request, weight, err := binance.GetExchangeInfo()
+	if err != nil {
+		return err
+	}
 	// Launch an APIQuery actor with the given request and target
 
 	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
@@ -210,10 +213,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, symbol := range exchangeInfo.Symbols {
-		base := symbol.BaseAsset
-		if sym, ok := binance.BINANCE_TO_GLOBAL[base]; ok {
-			base = sym
-		}
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
 			/*
@@ -548,7 +547,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			ord := orderToModel(&o)
+			ord := OrderToModel(&o)
 			ord.Instrument.SecurityID = &types.UInt64Value{Value: sec.SecurityID}
 			morders = append(morders, ord)
 		}

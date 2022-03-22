@@ -129,9 +129,8 @@ func (m *MapMarketModel) GetSelectors() []string {
 
 type MarketLongShortModel struct {
 	sync.RWMutex
-	model     LongShortModel
-	selectors []string
-	prices    map[uint64]float64
+	model  LongShortModel
+	prices map[uint64]float64
 }
 
 func NewMarketLongShortModel(model LongShortModel) *MarketLongShortModel {
@@ -275,7 +274,7 @@ func (m *ConstantPriceModel) Frequency() uint64 {
 
 func (m *ConstantPriceModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
 	if m.samplePrices == nil || len(m.samplePrices) != sampleSize {
-		m.samplePrices = make([]float64, sampleSize, sampleSize)
+		m.samplePrices = make([]float64, sampleSize)
 		for i := 0; i < sampleSize; i++ {
 			m.samplePrices[i] = m.price
 		}
@@ -326,7 +325,7 @@ func (m *GBMPriceModel) Frequency() uint64 {
 func (m *GBMPriceModel) GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64 {
 	if m.samplePrices == nil || len(m.samplePrices) != sampleSize || m.sampleTime != time {
 		intervalLength := int((time - m.time) / m.freq)
-		m.samplePrices = make([]float64, sampleSize, sampleSize)
+		m.samplePrices = make([]float64, sampleSize)
 		for i := 0; i < sampleSize; i++ {
 			m.samplePrices[i] = m.price
 			for j := 0; j < intervalLength; j++ {
@@ -384,7 +383,7 @@ func (m *ConstantTradeModel) Ready() bool {
 
 func (m *ConstantTradeModel) GetSampleMatchAsk(ID, time uint64, sampleSize int) []float64 {
 	if m.sampleMatch == nil || len(m.sampleMatch) != sampleSize {
-		m.sampleMatch = make([]float64, sampleSize, sampleSize)
+		m.sampleMatch = make([]float64, sampleSize)
 		for i := 0; i < sampleSize; i++ {
 			m.sampleMatch[i] = m.match
 		}
@@ -394,7 +393,7 @@ func (m *ConstantTradeModel) GetSampleMatchAsk(ID, time uint64, sampleSize int) 
 
 func (m *ConstantTradeModel) GetSampleMatchBid(ID, time uint64, sampleSize int) []float64 {
 	if m.sampleMatch == nil || len(m.sampleMatch) != sampleSize {
-		m.sampleMatch = make([]float64, sampleSize, sampleSize)
+		m.sampleMatch = make([]float64, sampleSize)
 		for i := 0; i < sampleSize; i++ {
 			m.sampleMatch[i] = m.match
 		}

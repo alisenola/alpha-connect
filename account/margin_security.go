@@ -369,10 +369,10 @@ func (sec *MarginSecurity) GetLotPrecision() float64 {
 }
 
 func (sec *MarginSecurity) Clear() {
-	for k, _ := range sec.openBidOrders {
+	for k := range sec.openBidOrders {
 		sec.RemoveBidOrder(k)
 	}
-	for k, _ := range sec.openAskOrders {
+	for k := range sec.openAskOrders {
 		sec.RemoveAskOrder(k)
 	}
 	sec.size = 0.
@@ -392,7 +392,7 @@ func (sec *MarginSecurity) GetInstrument() *models.Instrument {
 func (sec *MarginSecurity) updateSampleValueChange(model modeling.MarketModel, time uint64, sampleSize int) {
 	N := sampleSize
 	// TODO handle change in sample size, need to recompute too
-	sampleValueChange := make([]float64, sampleSize, sampleSize)
+	sampleValueChange := make([]float64, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
 	sampleMarginPrice := model.GetSamplePairPrices(sec.marginCurrency.ID, sec.modelCurrency.ID, time, N)

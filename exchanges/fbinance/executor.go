@@ -125,6 +125,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 
 	request, weight, err := fbinance.GetExchangeInfo()
+	if err != nil {
+		return err
+	}
 
 	future := context.RequestFuture(state.queryRunners[0].pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()

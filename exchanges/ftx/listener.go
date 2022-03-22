@@ -152,7 +152,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -311,7 +311,7 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 					go func(pid *actor.PID) {
 						for {
 							select {
-							case _ = <-openInterestTicker.C:
+							case <-openInterestTicker.C:
 								context.Send(pid, &updateOpenInterest{})
 							case <-time.After(11 * time.Second):
 								if state.openInterestTicker != openInterestTicker {
@@ -343,7 +343,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
-			Levels:    make([]gmodels.OrderBookLevel, nLevels, nLevels),
+			Levels:    make([]gmodels.OrderBookLevel, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
@@ -464,7 +464,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		}
 	}
 
-	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+	if time.Since(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
 		if err := state.ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 			return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
@@ -476,7 +476,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,

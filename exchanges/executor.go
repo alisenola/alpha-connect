@@ -33,16 +33,14 @@ type ExecutorConfig struct {
 
 type Executor struct {
 	*ExecutorConfig
-	accountPortfolios map[string]*actor.PID
-	accountManagers   map[string]*actor.PID
-	executors         map[uint32]*actor.PID       // A map from exchange ID to executor
-	securities        map[uint64]*models.Security // A map from security ID to security
-	symbToSecs        map[uint32]map[string]*models.Security
-	instruments       map[uint64]*actor.PID // A map from security ID to market manager
-	slSubscribers     map[uint64]*actor.PID // A map from request ID to security list subscribers
-	execSubscribers   map[uint64]*actor.PID // A map from request ID to execution report subscribers
-	logger            *log.Logger
-	strict            bool
+	accountManagers map[string]*actor.PID
+	executors       map[uint32]*actor.PID       // A map from exchange ID to executor
+	securities      map[uint64]*models.Security // A map from security ID to security
+	symbToSecs      map[uint32]map[string]*models.Security
+	instruments     map[uint64]*actor.PID // A map from security ID to market manager
+	slSubscribers   map[uint64]*actor.PID // A map from request ID to security list subscribers
+	logger          *log.Logger
+	strict          bool
 }
 
 func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {

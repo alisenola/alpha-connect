@@ -73,7 +73,7 @@ func TestTradeReceiver(t *testing.T) {
 			receivers = append(receivers, receiver)
 		}
 	}
-
+	fmt.Println(receivers)
 	for {
 		msg := <-ch
 		fmt.Println(msg)

@@ -264,18 +264,16 @@ type GetPool struct {
 }
 
 type PoolV3Checker struct {
-	test          MDTest
-	security      *models.Security
-	pool          *gorderbook.UnipoolV3
-	tickPrecision uint64
-	lotPrecision  uint64
-	seqNum        uint64
-	synced        bool
-	trades        int
-	aggTrades     int
-	aggTradeIDs   map[uint64]bool
-	OBUpdates     int
-	err           error
+	test        MDTest
+	security    *models.Security
+	pool        *gorderbook.UnipoolV3
+	seqNum      uint64
+	synced      bool
+	trades      int
+	aggTrades   int
+	aggTradeIDs map[uint64]bool
+	OBUpdates   int
+	err         error
 }
 
 func NewPoolV3CheckerProducer(security *models.Security, test MDTest) actor.Producer {

@@ -313,7 +313,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkAccountTicker.C:
+			case <-checkAccountTicker.C:
 				context.Send(pid, &checkAccount{})
 			case <-time.After(6 * time.Minute):
 				// timer stopped, we leave
@@ -327,7 +327,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkSocketTicker.C:
+			case <-checkSocketTicker.C:
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -341,7 +341,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkExpirationTicker.C:
+			case <-checkExpirationTicker.C:
 				context.Send(pid, &checkExpiration{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -925,7 +925,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			// If we don't have the order, it was created by someone else, add it.
 			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
 				fmt.Println("INSERTING NEW !!!")
-				_, rej := state.account.NewOrder(wsOrderToModel(res.Order))
+				_, rej := state.account.NewOrder(WSOrderToModel(res.Order))
 				if rej != nil {
 					return fmt.Errorf("error creating new order: %s", rej.String())
 				}
@@ -1009,7 +1009,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
+	if time.Since(state.lastPingTime) > 5*time.Second {
 		_ = state.ws.Ping()
 		state.lastPingTime = time.Now()
 	}
@@ -1106,6 +1106,9 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	}
 
 	orderList, ok := res.(*messages.OrderList)
+	if !ok {
+		return fmt.Errorf("incorrect type assertion: expected OrderList, got %s", reflect.TypeOf(res).String())
+	}
 
 	orders1 := make(map[string]*models.Order)
 	orders2 := make(map[string]*models.Order)

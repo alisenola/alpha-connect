@@ -76,6 +76,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	req, weight, err := deribit.GetCurrencies()
+	if err != nil {
+		return err
+	}
 	state.rateLimit.Request(weight)
 
 	resp, err := state.client.Do(req)

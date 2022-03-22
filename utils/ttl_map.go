@@ -30,7 +30,7 @@ func NewTTLMap(TTL int) (m *TTLMap) {
 func (m *TTLMap) Start() {
 	m.stopped = false
 	go func() {
-		for now := range time.Tick(time.Second) {
+		for now := range time.NewTicker(time.Second).C {
 			m.l.Lock()
 			if m.stopped {
 				return

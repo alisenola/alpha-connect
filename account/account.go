@@ -380,9 +380,9 @@ func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		res := messages.UnknownOrder
@@ -416,9 +416,9 @@ func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.Execution
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -469,9 +469,9 @@ func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionRea
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -500,9 +500,9 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		res := messages.UnknownOrder
@@ -539,9 +539,9 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -578,9 +578,9 @@ func (accnt *Account) ConfirmExpiredOrder(ID string) (*messages.ExecutionReport,
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -617,9 +617,9 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -654,9 +654,9 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -712,19 +712,17 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		FillQuantity:    &types.DoubleValue{Value: quantity},
 	}
 
-	switch sec.(type) {
+	switch sec := sec.(type) {
 	case *SpotSecurity:
-		spotSec := sec.(*SpotSecurity)
 		if order.Side == models.Buy {
-			accnt.balances[spotSec.Underlying.ID] += quantity
-			accnt.balances[spotSec.QuoteCurrency.ID] -= quantity * price
+			accnt.balances[sec.Underlying.ID] += quantity
+			accnt.balances[sec.QuoteCurrency.ID] -= quantity * price
 		} else {
-			accnt.balances[spotSec.Underlying.ID] -= quantity
-			accnt.balances[spotSec.QuoteCurrency.ID] += quantity * price
+			accnt.balances[sec.Underlying.ID] -= quantity
+			accnt.balances[sec.QuoteCurrency.ID] += quantity * price
 		}
 	case *MarginSecurity:
-		marginSec := sec.(*MarginSecurity)
-		pos := accnt.positions[marginSec.SecurityID]
+		pos := accnt.positions[sec.SecurityID]
 		// Margin
 		//fmt.Println("MARGIN POS", float64(pos.cost) / accnt.MarginPrecision, float64(pos.rawSize) / accnt.MarginPrecision)
 		var fee, cost int64
@@ -742,7 +740,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		er.FeeBasis = messages.Percentage
 		er.FeeType = messages.ExchangeFees
 		// TODO mutex on position ?
-		marginSec.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
+		sec.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
 
 	return er, nil
@@ -791,9 +789,9 @@ func (accnt *Account) HasOrder(ID string) bool {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	return order != nil
 }
@@ -802,9 +800,9 @@ func (accnt *Account) GetOrder(ID string) (*models.Order, error) {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	var order *Order
-	order, _ = accnt.ordersClID[ID]
+	order = accnt.ordersClID[ID]
 	if order == nil {
-		order, _ = accnt.ordersID[ID]
+		order = accnt.ordersID[ID]
 	}
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
@@ -958,7 +956,7 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 
 func (accnt *Account) CheckExpiration() error {
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.PendingNew || o.OrderStatus == models.PendingCancel || o.OrderStatus == models.PendingReplace) && (time.Now().Sub(o.lastEventTime) > accnt.expirationLimit) {
+		if (o.OrderStatus == models.PendingNew || o.OrderStatus == models.PendingCancel || o.OrderStatus == models.PendingReplace) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
 			return fmt.Errorf("order %s in unknown state", k)
 		}
 	}
@@ -969,11 +967,9 @@ func (accnt *Account) CleanOrders() {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Now().Sub(o.lastEventTime) > time.Minute) {
+		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Since(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
-			if _, ok := accnt.ordersID[o.OrderID]; ok {
-				delete(accnt.ordersID, o.OrderID)
-			}
+			delete(accnt.ordersID, o.OrderID)
 		}
 	}
 }

@@ -31,24 +31,18 @@ type checkSockets struct{}
 type postAggTrade struct{}
 type updateBook struct{}
 
-type OBL2Request struct {
-	requester *actor.PID
-	requestID int64
-}
-
 type InstrumentData struct {
-	minPriceIncrement float64
-	tickPrecision     uint64
-	lotPrecision      uint64
-	orderBook         *gorderbook.OrderBookL2
-	fullBook          *gorderbook.OrderBookL2
-	seqNum            uint64
-	lastUpdateTime    uint64
-	lastFundingTime   uint64
-	lastHBTime        time.Time
-	lastSequence      uint64
-	aggTrade          *models.AggregatedTrade
-	lastAggTradeTs    uint64
+	tickPrecision   uint64
+	lotPrecision    uint64
+	orderBook       *gorderbook.OrderBookL2
+	fullBook        *gorderbook.OrderBookL2
+	seqNum          uint64
+	lastUpdateTime  uint64
+	lastFundingTime uint64
+	lastHBTime      time.Time
+	lastSequence    uint64
+	aggTrade        *models.AggregatedTrade
+	lastAggTradeTs  uint64
 }
 
 // OBType: OBL3
@@ -182,7 +176,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -281,9 +275,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		n += 1.
 	}
 	avgPrice /= n
-	if avgPrice < 0. {
-		// Use log
-	}
 
 	lg := math.Log10(avgPrice)
 	digits := int(math.Ceil(lg))
@@ -657,7 +648,7 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,
