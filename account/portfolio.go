@@ -67,7 +67,7 @@ func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) f
 	N := p.sampleSize
 
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -132,7 +132,7 @@ func (p *Portfolio) ExpectedLogReturnOnCancel(time uint64, exchange uint64, inst
 func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) float64 {
 	N := p.sampleSize
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -152,7 +152,7 @@ func (p *Portfolio) GetELROnCancelBid(accountID string, securityID uint64, order
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -170,7 +170,7 @@ func (p *Portfolio) GetELROnCancelAsk(accountID string, securityID uint64, order
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -188,7 +188,7 @@ func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model 
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -207,7 +207,7 @@ func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model 
 	N := p.sampleSize
 
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -230,7 +230,7 @@ func (p *Portfolio) GetELROnLimitBidChange(accountID string, securityID uint64, 
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -249,7 +249,7 @@ func (p *Portfolio) GetELROnLimitAskChange(accountID string, securityID uint64, 
 	N := p.sampleSize
 
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -269,7 +269,7 @@ func (p *Portfolio) GetELROnMarketBuy(accountID string, securityID uint64, model
 	N := p.sampleSize
 
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}
@@ -289,7 +289,7 @@ func (p *Portfolio) GetELROnMarketSell(accountID string, securityID uint64, mode
 	N := p.sampleSize
 
 	var value float64 = 0
-	values := make([]float64, N, N)
+	values := make([]float64, N)
 	for i := 0; i < N; i++ {
 		values[i] = 0.
 	}

@@ -282,7 +282,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkAccountTicker.C:
+			case <-checkAccountTicker.C:
 				context.Send(pid, &checkAccount{})
 			case <-time.After(6 * time.Minute):
 				// timer stopped, we leave
@@ -296,7 +296,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-checkSocketTicker.C:
+			case <-checkSocketTicker.C:
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -946,7 +946,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
+	if time.Since(state.lastPingTime) > 5*time.Second {
 		_ = state.ws.Ping()
 		state.lastPingTime = time.Now()
 	}

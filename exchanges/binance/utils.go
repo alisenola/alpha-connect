@@ -9,7 +9,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/binance"
 )
 
-func wsOrderToModel(o *binance.WSExecutionReport) *models.Order {
+func WSOrderToModel(o *binance.WSExecutionReport) *models.Order {
 	ord := &models.Order{
 		OrderID:       fmt.Sprintf("%d", o.OrderID),
 		ClientOrderID: o.ClientOrderID,
@@ -86,7 +86,7 @@ func wsOrderToModel(o *binance.WSExecutionReport) *models.Order {
 	return ord
 }
 
-func orderToModel(o *binance.OrderData) *models.Order {
+func OrderToModel(o *binance.OrderData) *models.Order {
 	ord := &models.Order{
 		OrderID:       fmt.Sprintf("%d", o.OrderID),
 		ClientOrderID: o.ClientOrderID,

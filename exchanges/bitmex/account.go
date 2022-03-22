@@ -202,7 +202,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				fmt.Println("SENDING CHECK SOCKET")
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
@@ -218,7 +218,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-accountTicker.C:
+			case <-accountTicker.C:
 				fmt.Println("SENDING CHECK ACCOUUNT")
 				context.Send(pid, &checkAccount{})
 			case <-time.After(11 * time.Minute):
@@ -1001,7 +1001,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			report, err := state.account.ConfirmReplaceOrder(*data.ClOrdID, "")
 			if err != nil {
 				if err == account.ErrNotPendingReplace {
-
+					return fmt.Errorf("error not pending replace: %v", err)
 				}
 				return fmt.Errorf("error confirming replace order: %v", err)
 			}
@@ -1143,7 +1143,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 5*time.Second {
+	if time.Since(state.lastPingTime) > 5*time.Second {
 		_ = state.ws.Ping()
 	}
 

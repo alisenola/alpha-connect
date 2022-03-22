@@ -330,10 +330,10 @@ func (sec *SpotSecurity) GetLotPrecision() float64 {
 }
 
 func (sec *SpotSecurity) Clear() {
-	for k, _ := range sec.openBidOrders {
+	for k := range sec.openBidOrders {
 		sec.RemoveBidOrder(k)
 	}
-	for k, _ := range sec.openAskOrders {
+	for k := range sec.openAskOrders {
 		sec.RemoveAskOrder(k)
 	}
 }
@@ -349,7 +349,7 @@ func (sec *SpotSecurity) GetInstrument() *models.Instrument {
 func (sec *SpotSecurity) updateSampleValueChange(model modeling.MarketModel, time uint64, sampleSize int) {
 	// TODO refresh when sample size changes
 	N := sampleSize
-	sampleValueChange := make([]float64, sampleSize, sampleSize)
+	sampleValueChange := make([]float64, sampleSize)
 	sampleMatchBid := model.GetSampleMatchBid(sec.SecurityID, time, N)
 	sampleMatchAsk := model.GetSampleMatchAsk(sec.SecurityID, time, N)
 	sampleBasePrice := model.GetSamplePairPrices(sec.Underlying.ID, sec.modelCurrency.ID, time, N)

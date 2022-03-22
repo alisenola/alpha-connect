@@ -22,8 +22,6 @@ import (
 	"time"
 )
 
-var pairs = []string{"BTC_KRW"}
-
 type Executor struct {
 	extypes.BaseExecutor
 	client      *http.Client

@@ -98,12 +98,6 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.HistoricalLiquidationsResponse:
-		if err := state.OnHistoricalLiquidationsResponse(context); err != nil {
-			state.logger.Error("error processing OnHistoricalLiquidationsResponse", log.Error(err))
-			panic(err)
-		}
-
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing websocket message", log.Error(err))
@@ -153,7 +147,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -372,7 +366,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		sort.Slice(trades, func(i, j int) bool {
-			return trades[i].TradeTime < trades[i].TradeTime
+			return trades[i].TradeTime < trades[j].TradeTime
 		})
 
 		var aggTrade *models.AggregatedTrade
@@ -504,7 +498,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 func (state *Listener) checkSockets(context actor.Context) error {
 	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,

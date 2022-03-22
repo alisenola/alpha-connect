@@ -151,7 +151,7 @@ func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, er
 		groupBy := sel.TickSelector.GroupBy
 
 		if groupBy == nil {
-			for k, _ := range tags {
+			for k := range tags {
 				groupTags[k] = tags[k]
 			}
 		} else {
@@ -175,6 +175,9 @@ func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, er
 	}
 
 	q, err := NewLiveQuery(lt.as, lt.executor, sel, feeds)
+	if err != nil {
+		return nil, fmt.Errorf("error constructing new live query: %v", err)
+	}
 	lt.queries = append(lt.queries, q)
 	return q, nil
 }

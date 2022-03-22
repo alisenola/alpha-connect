@@ -154,7 +154,7 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 	go func(pid *actor.PID) {
 		for {
 			select {
-			case _ = <-socketTicker.C:
+			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				// timer stopped, we leave
@@ -476,7 +476,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 func (state *ListenerL3) checkSockets(context actor.Context) error {
 
-	if time.Now().Sub(state.lastPingTime) > 10*time.Second {
+	if time.Since(state.lastPingTime) > 10*time.Second {
 		// "Ping" by resubscribing to the topic
 		_ = state.ws.Subscribe(state.security.Symbol, bitstamp.WSLiveOrdersChannel)
 		state.lastPingTime = time.Now()
@@ -492,7 +492,7 @@ func (state *ListenerL3) checkSockets(context actor.Context) error {
 	}
 
 	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Now().Sub(state.instrumentData.lastHBTime) > 2*time.Second {
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
 		// Send an empty refresh
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,

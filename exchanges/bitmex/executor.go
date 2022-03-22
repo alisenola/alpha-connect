@@ -623,7 +623,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	requestStart := time.Now()
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
-		requestDur := time.Now().Sub(requestStart)
+		requestDur := time.Since(requestStart)
 		state.logger.Info(fmt.Sprintf("post order request done in %v", requestDur))
 		if err != nil {
 			response.RejectionReason = messages.HTTPError
@@ -718,7 +718,7 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 	requestStart := time.Now()
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
-		requestDur := time.Now().Sub(requestStart)
+		requestDur := time.Since(requestStart)
 		state.logger.Info(fmt.Sprintf("post bulk order request done in %v", requestDur))
 		if err != nil {
 			response.RejectionReason = messages.ExchangeAPIError

@@ -117,6 +117,9 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	req, weight, err := dydx.GetMarkets()
+	if err != nil {
+		return fmt.Errorf("error getting markets: %v", err)
+	}
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -605,7 +608,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		for _, p := range account.Account.OpenPositions {
 			cost := math.Round(1e6*(p.SumOpen*p.EntryPrice-p.SumClose*p.ExitPrice)) / 1e6
 			qb += cost
-			fmt.Println(fmt.Sprintf("FC: %f Unrealized %f QB: %f", account.Account.FreeCollateral, p.UnrealizedPnl, account.Account.QuoteBalance))
+			fmt.Printf("FC: %f Unrealized %f QB: %f \n", account.Account.FreeCollateral, p.UnrealizedPnl, account.Account.QuoteBalance)
 		}
 		fmt.Println("MARGIN BALANCE", qb)
 		response.Balances = append(response.Balances, &models.Balance{

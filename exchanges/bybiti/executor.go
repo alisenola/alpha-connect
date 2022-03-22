@@ -197,7 +197,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			date := time.Date(year, time.Month(monthInt), int(dayInt), 0, 0, 0, 0, time.UTC)
 			ts, err := types.TimestampProto(date)
 			if err != nil {
-				state.logger.Info(fmt.Sprintf("error converting date"))
+				state.logger.Info("error converting date")
 				continue
 			}
 			security.MaturityDate = ts
