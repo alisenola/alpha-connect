@@ -14,9 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: &constants.CRYPTOFACILITIES,
 			Symbol:   &types.StringValue{Value: "pi_xbtusd"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		OpenInterestRequest:           true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

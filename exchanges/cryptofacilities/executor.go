@@ -133,7 +133,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if !instrument.Tradeable {
 			continue
 		}
-		underlying := strings.ToUpper(strings.Split(instrument.Underlying, "_")[1])
+		underlying := strings.ToUpper(strings.Split(instrument.Symbol, "_")[1])
 		baseSymbol := underlying[:3]
 		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
 			baseSymbol = sym
@@ -171,6 +171,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			// Perpetual inverse
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.IsInverse = true
+		case "pf":
+			// Perpetual flexible
+			security.SecurityType = enum.SecurityType_CRYPTO_PERP
+			security.IsInverse = false
 		case "fv":
 			// Future vanilla
 			security.SecurityType = enum.SecurityType_CRYPTO_FUT
