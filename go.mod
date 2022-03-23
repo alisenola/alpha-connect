@@ -10,7 +10,7 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323153113-b540d878780b
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323164811-817b284d343b
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220314112354-40d564234f20
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20220315100643-daa5e4a18f2e
