@@ -99,7 +99,6 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	fmt.Println("UPDATING")
 	request, weight, err := gate.GetPairs()
 	if err != nil {
 		return err
@@ -141,7 +140,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	// TODO
 	var kResponse []gate.Pair
 	err = json.Unmarshal(resp.Response, &kResponse)
 	if err != nil {

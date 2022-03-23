@@ -2,6 +2,15 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"net"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/remote"
 	"gitlab.com/alphaticks/alpha-connect/data"
@@ -15,14 +24,6 @@ import (
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
-	"math"
-	"net"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
 )
 
 var done = make(chan os.Signal, 1)
