@@ -707,6 +707,8 @@ gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220314111548-9eba7c48a4a0 h1:1KCBWw49GKv1gv2WHGzk+TQq/vtVQnRHCQKBdQAQ25k=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220314111548-9eba7c48a4a0/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323153113-b540d878780b h1:zl6TFu+rzurCki9+gPYJh6KDu5zG0tT4kVLkSU7FyvY=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323153113-b540d878780b/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=

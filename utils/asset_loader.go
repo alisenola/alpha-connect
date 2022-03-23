@@ -3,6 +3,7 @@ package utils
 import (
 	goContext "context"
 	"fmt"
+	"github.com/gogo/protobuf/types"
 	"reflect"
 	"time"
 
@@ -113,7 +114,9 @@ func (state *AssetLoader) onReady(context actor.Context) error {
 
 func (state *AssetLoader) checkAsset(context actor.Context) error {
 	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{
-		Filter: &registry.AssetFilter{Fungible: true},
+		Filter: &registry.AssetFilter{
+			Fungible: &types.BoolValue{Value: true},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
