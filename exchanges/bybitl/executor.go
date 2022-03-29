@@ -2,7 +2,6 @@ package bybitl
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -15,12 +14,10 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"net/http"
 	"reflect"
-	"sort"
 	"strconv"
 	"time"
 	"unicode"
@@ -245,6 +242,7 @@ func (state *Executor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
+/*
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
 	response := &messages.HistoricalLiquidationsResponse{
@@ -338,7 +336,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 			ExitInfo      string               `json:"ext_info"`
 			Result        []bybiti.Liquidation `json:"result"`
 		}
-		var bres Res
+		var bres json.RawMessage
 		err = json.Unmarshal(queryResponse.Response, &bres)
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
@@ -346,7 +344,9 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 			context.Respond(response)
 			return
 		}
+		fmt.Println(string(bres))
 
+		/*
 		if bres.ReturnCode != 0 {
 			state.logger.Info("http error", log.Error(errors.New(bres.ReturnMessage)))
 			response.RejectionReason = messages.ExchangeAPIError
@@ -370,10 +370,12 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		response.Liquidations = liquidations
 		response.Success = true
 		context.Respond(response)
+
 	})
 
 	return nil
 }
+*/
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsRequest)
