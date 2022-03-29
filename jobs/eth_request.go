@@ -86,13 +86,13 @@ func (q *ETHQuery) PerformLogsQueryRequest(context actor.Context) error {
 		var lastTime uint64 = 0
 		for _, l := range logs {
 			if lastBlock != l.BlockNumber {
-				block, err := q.client.BlockByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
+				block, err := q.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
 				if err != nil {
 					queryResponse.Error = err
 					context.Send(sender, &queryResponse)
 					return
 				}
-				lastTime = block.Time()
+				lastTime = block.Time
 				lastBlock = l.BlockNumber
 			}
 			queryResponse.Times = append(queryResponse.Times, lastTime)
