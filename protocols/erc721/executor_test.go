@@ -133,14 +133,16 @@ func TestExecutor(t *testing.T) {
 	}
 	//Run the transfers using the nft tracker
 	tracker := gorderbook.NewERC721Tracker()
-	for _, t := range response.Update {
+	for _, updt := range response.Update {
 		var from [20]byte
 		var to [20]byte
 		tokenID := big.NewInt(1)
-		copy(from[:], t.Transfer.From)
-		copy(to[:], t.Transfer.To)
-		tokenID.SetBytes(t.Transfer.TokenId)
-		tracker.TransferFrom(from, to, tokenID, "")
+		copy(from[:], updt.Transfer.From)
+		copy(to[:], updt.Transfer.To)
+		tokenID.SetBytes(updt.Transfer.TokenId)
+		if err := tracker.TransferFrom(from, to, tokenID); err != nil {
+			t.Fatal(err)
+		}
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
 	snap := tracker.GetSnapshot()

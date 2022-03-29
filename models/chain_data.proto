@@ -1,0 +1,7 @@
+syntax = "proto3";
+package models;
+
+message Chain {
+    uint64 chainID = 1;
+    string chainType = 2;
+}
