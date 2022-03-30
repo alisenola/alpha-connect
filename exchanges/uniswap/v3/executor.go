@@ -2,6 +2,7 @@ package v3
 
 import (
 	"fmt"
+	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -134,27 +135,53 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	done := false
 	for !done {
 		for _, pool := range query.Pools {
-			baseCurrency, ok := constants.GetAssetBySymbol(pool.Token1.Symbol)
+			token0, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
 			if !ok {
 				// state.logger.Info("unknown symbol " + pool.Token0.Symbol)
 				continue
 			}
-			quoteCurrency, ok := constants.GetAssetBySymbol(pool.Token0.Symbol)
+			token1, ok := constants.GetAssetBySymbol(pool.Token1.Symbol)
 			if !ok {
 				// state.logger.Info("unknown symbol " + pool.Token1.Symbol)
 				continue
 			}
+
 			tickSpacing, err := pool.GetTickSpacing()
 			if err != nil {
 				continue
 			}
+
+			var baseCurrency, quoteCurrency *xmodels.Asset
+			var inverse bool
+			if token1.Symbol == "USDC" || token1.Symbol == "USDT" || token1.Symbol == "DAI" || token1.Symbol == "BUSD" {
+				baseCurrency = token0
+				quoteCurrency = token1
+				inverse = false
+			} else if token0.Symbol == "USDC" || token0.Symbol == "USDT" || token0.Symbol == "DAI" || token0.Symbol == "BUSD" {
+				baseCurrency = token1
+				quoteCurrency = token0
+				inverse = true
+			} else if token1.Symbol == "WBTC" || token1.Symbol == "WETH" {
+				baseCurrency = token0
+				quoteCurrency = token1
+				inverse = false
+			} else if token0.Symbol == "WBTC" || token0.Symbol == "WETH" {
+				baseCurrency = token1
+				quoteCurrency = token0
+				inverse = true
+			} else {
+				baseCurrency = token0
+				quoteCurrency = token1
+				inverse = false
+			}
+
 			security := models.Security{}
 			security.Symbol = pool.Id
 			security.Underlying = baseCurrency
 			security.QuoteCurrency = quoteCurrency
+			security.IsInverse = inverse
 			security.Status = models.Trading
 			security.Exchange = &constants.UNISWAPV3
-			security.IsInverse = false
 			security.SecurityType = enum.SecurityType_CRYPTO_AMM
 			security.SecuritySubType = &types.StringValue{Value: enum.SecuritySubType_UNIPOOLV3}
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
