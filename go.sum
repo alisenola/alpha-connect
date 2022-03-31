@@ -703,6 +703,8 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
+gitlab.com/alphaticks/alpha-private-registry-grpc v0.0.0-20220331124612-5a77edd215d7 h1:e2aI/F/ok+eo6tB0W8x0kt8nA78e+TsvL1XLhCaRR48=
+gitlab.com/alphaticks/alpha-private-registry-grpc v0.0.0-20220331124612-5a77edd215d7/go.mod h1:WYzrZl+nOBfo1VudospOv3LemVLaCAERmRtjyHb4afc=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007 h1:af02MA6vOnrAIj6U01csQvlgdJ7LavxOcJA7CzY/fFw=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220228082856-580817338007/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220314111548-9eba7c48a4a0 h1:1KCBWw49GKv1gv2WHGzk+TQq/vtVQnRHCQKBdQAQ25k=
@@ -719,6 +721,8 @@ gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092013-9dc7d3d66
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092013-9dc7d3d66628/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092410-8a01979ded1d h1:tjtbKx0QtMkaMJbxqCMK12Iaze1ir98NmTu6q3NPWv0=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092410-8a01979ded1d/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331130236-121f8795ed36 h1:HWSuW9/mtBvZG9zbHLJRd6zzdOnheA0B8zc43BL9hPU=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331130236-121f8795ed36/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=

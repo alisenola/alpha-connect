@@ -188,6 +188,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.MinPriceIncrement = &types.DoubleValue{Value: float64(tickSpacing)}
 			security.TakerFee = &types.DoubleValue{Value: float64(pool.FeeTier)}
 			security.CreationBlock = &types.UInt64Value{Value: pool.CreatedAtBlockNumber.Uint64()}
+			security.Protocol = &constants.ERC20
+			security.Chain = &constants.EthereumMainnet
 			securities = append(securities, &security)
 		}
 		if len(query.Pools) != 1000 {
