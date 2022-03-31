@@ -40,6 +40,7 @@ type Listener struct {
 	client       *ethclient.Client
 	instrument   *InstrumentData
 	iterator     *xutils.LogIterator
+	address      [20]byte
 	collection   *models.ProtocolAsset
 	logger       *log.Logger
 	socketTicker *time.Ticker
@@ -102,14 +103,23 @@ func (state *Listener) Receive(context actor.Context) {
 }
 
 func (state *Listener) Initialize(context actor.Context) error {
-	address := common.Bytes2Hex(state.collection.Address)
+	addr, ok := state.collection.Meta["address"]
+	if !ok || len(addr) < 2 {
+		return fmt.Errorf("invalid collection address: %s", state.collection.Meta["address"])
+	}
+	addressBig, ok := big.NewInt(1).SetString(state.collection.Meta["address"][2:], 16)
+	if !ok {
+		return fmt.Errorf("invalid collection address: %s", state.collection.Meta["address"])
+	}
+	copy(state.address[:], addressBig.Bytes())
+
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("protocol", "ERC-721"),
-		log.String("contract", address),
+		log.String("contract", addr),
 	)
 
 	state.instrument = &InstrumentData{
@@ -158,7 +168,6 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		state.iterator.Close()
 	}
 
-	address := common.BytesToAddress(state.collection.Address)
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting abi: %v", err)
@@ -173,7 +182,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		return fmt.Errorf("error making topics: %v", err)
 	}
 	fQuery := ethereum.FilterQuery{
-		Addresses: []common.Address{address},
+		Addresses: []common.Address{state.address},
 		Topics:    topics,
 	}
 

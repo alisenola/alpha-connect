@@ -35,7 +35,7 @@ type QueryRunner struct {
 type Executor struct {
 	extype.BaseExecutor
 	queryRunnerETH *QueryRunner
-	protocolAssets []*models.ProtocolAsset
+	protocolAssets map[uint64]*models.ProtocolAsset
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
@@ -89,20 +89,24 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	}
 	response := res.ProtocolAssets
 	for _, protocolAsset := range response {
-		address, ok := big.NewInt(1).SetString(protocolAsset.Meta["address"][2:], 16)
-		if !ok {
+		if addr, ok := protocolAsset.Meta["address"]; !ok || len(addr) < 2 {
 			state.logger.Warn("incorrect address parsing for asset")
 			continue
 		}
 		as, ok := constants.GetAssetByID(protocolAsset.AssetId)
 		if !ok {
-			state.logger.Warn("error getting asset with id", log.String("asset-id", fmt.Sprint(protocolAsset.AssetId)))
+			state.logger.Warn(fmt.Sprintf("error getting asset with id %d", protocolAsset.AssetId))
+			continue
+		}
+		ch, ok := constants.GetChainByID(protocolAsset.ChainId)
+		if !ok {
+			state.logger.Warn(fmt.Sprintf("error getting chain with id %d", protocolAsset.ChainId))
 			continue
 		}
 		assets = append(
 			assets,
 			&models.ProtocolAsset{
-				Address: address.Bytes(),
+				ProtocolAssetID: protocolAsset.ProtocolAssetId,
 				Protocol: &models2.Protocol{
 					ID:   constants.ERC721.ID,
 					Name: "ERC-721",
@@ -112,10 +116,18 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 					Symbol: as.Symbol,
 					ID:     as.ID,
 				},
+				Chain: &models2.Chain{
+					ID:   ch.ID,
+					Name: ch.Name,
+					Type: ch.Type,
+				},
 				Meta: protocolAsset.Meta,
 			})
 	}
-	state.protocolAssets = assets
+	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
+	for _, a := range assets {
+		state.protocolAssets[a.ProtocolAssetID] = a
+	}
 
 	context.Send(context.Parent(), &messages.ProtocolAssetList{
 		ResponseID:     uint64(time.Now().UnixNano()),
@@ -128,11 +140,17 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 
 func (state *Executor) OnProtocolAssetListRequest(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetListRequest)
-	context.Respond(&messages.ProtocolAssetListResponse{
+	passets := make([]*models.ProtocolAsset, len(state.protocolAssets))
+	i := 0
+	for _, v := range state.protocolAssets {
+		passets[i] = v
+		i += 1
+	}
+	context.Respond(&messages.ProtocolAssetList{
 		RequestID:      req.RequestID,
 		ResponseID:     uint64(time.Now().UnixNano()),
 		Success:        true,
-		ProtocolAssets: state.protocolAssets,
+		ProtocolAssets: passets,
 	})
 	return nil
 }
@@ -145,8 +163,9 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		Success:    false,
 	}
 
-	if req.ProtocolAsset == nil || req.ProtocolAsset.Address == nil {
-		msg.RejectionReason = messages.MissingProtocolAsset
+	pa, ok := state.protocolAssets[req.ProtocolAssetID]
+	if !ok {
+		msg.RejectionReason = messages.UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
@@ -163,7 +182,15 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		eabi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
-	copy(address[:], req.ProtocolAsset.Address)
+	addressBig, ok := big.NewInt(1).SetString(pa.Meta["address"][2:], 16)
+	if !ok {
+		state.logger.Warn("invalid protocol asset address", log.Error(err))
+		msg.RejectionReason = messages.UnknownProtocolAsset
+		context.Respond(msg)
+		return nil
+	}
+
+	copy(address[:], addressBig.Bytes())
 	fQuery := ethereum.FilterQuery{
 		Addresses: []common.Address{address},
 		FromBlock: big.NewInt(1).SetUint64(req.Start),

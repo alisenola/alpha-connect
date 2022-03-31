@@ -81,7 +81,7 @@ func (state *BaseExecutor) UpdateProtocolAssetList(context actor.Context) error 
 
 func (state *BaseExecutor) OnProtocolAssetListRequest(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetListRequest)
-	context.Respond(&messages.ProtocolAssetListResponse{
+	context.Respond(&messages.ProtocolAssetList{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,

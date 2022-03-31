@@ -2,13 +2,11 @@ syntax = "proto3";
 package models;
 
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
-import "google/protobuf/wrappers.proto";
 
 message ProtocolAsset {
-    bytes address = 1;
-    google.protobuf.BytesValue max_supply = 2;
-    models.Protocol protocol = 3;
-    models.Asset asset = 4;
-    models.Chain chain = 5;
-    map<string, string> meta = 6;
+    uint64 protocol_assetID = 1;
+    models.Protocol protocol = 2;
+    models.Asset asset = 3;
+    models.Chain chain = 4;
+    map<string, string> meta = 5;
 }

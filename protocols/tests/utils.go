@@ -41,7 +41,7 @@ func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem
 	if err != nil {
 		t.Fatal(err)
 	}
-	loader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(reg)))
+	loader := as.Root.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(reg)))
 
 	return as, ex, loader, func() { as.Root.PoisonFuture(ex).Wait() }
 }
@@ -92,10 +92,10 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	)
 	executor := context.ActorSystem().NewLocalPID("executor")
 	res, err := context.RequestFuture(executor, &messages.ProtocolAssetTransferRequest{
-		RequestID:     0,
-		ProtocolAsset: state.asset,
-		Subscriber:    context.Self(),
-		Subscribe:     true,
+		RequestID:       0,
+		ProtocolAssetID: state.asset.ProtocolAssetID,
+		Subscriber:      context.Self(),
+		Subscribe:       true,
 	}, 30*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching the asset transfer %v", err)

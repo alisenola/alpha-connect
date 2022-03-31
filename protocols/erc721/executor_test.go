@@ -6,6 +6,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -50,27 +51,23 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	testAsset := []models.ProtocolAsset{{
-		Asset: &models2.Asset{
-			Symbol: "BAYC",
-		},
-	}}
+	testAsset := models2.Asset{
+		ID:     275.,
+		Symbol: "BAYC",
+	}
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assets, ok := res.(*messages.ProtocolAssetListResponse)
+	assets, ok := res.(*messages.ProtocolAssetList)
 	if !ok {
 		t.Fatal("incorrect for type assertion")
 	}
 	var coll *models.ProtocolAsset
 	for _, asset := range assets.ProtocolAssets {
 		fmt.Printf("asset %+v \n", asset)
-		for _, c := range testAsset {
-			if asset.Asset.Symbol == c.Asset.Symbol {
-				coll = asset
-			}
+		if asset.Asset.Symbol == testAsset.Symbol {
+			coll = asset
 		}
 	}
 	if coll == nil {
@@ -78,14 +75,14 @@ func TestExecutor(t *testing.T) {
 	}
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: uint64(275)<<32 + 1,
+		ProtocolAssetID: utils.GetProtocolAssetID(testAsset, constants.ERC721, constants.EthereumMainnet),
 	}, 15*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
 	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
 	if !ok {
-		t.Fatal("error type asserting")
+		t.Fatalf("was expecting ProtocolAssetDefinitionResponse got %s", reflect.TypeOf(r).String())
 	}
 	if !def.Success {
 		t.Fatal(def.RejectionReason)
@@ -95,15 +92,10 @@ func TestExecutor(t *testing.T) {
 	resp, err := as.Root.RequestFuture(
 		executor,
 		&messages.HistoricalProtocolAssetTransferRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			ProtocolAsset: &models.ProtocolAsset{
-				Address:  coll.Address,
-				Asset:    &models2.Asset{ID: coll.Asset.ID},
-				Protocol: &models2.Protocol{ID: coll.Protocol.ID},
-				Meta:     coll.Meta,
-			},
-			Start: 12200000,
-			Stop:  12300000,
+			RequestID:       uint64(time.Now().UnixNano()),
+			ProtocolAssetID: coll.ProtocolAssetID,
+			Start:           12200000,
+			Stop:            12300000,
 		},
 		30*time.Second,
 	).Result()

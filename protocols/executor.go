@@ -25,13 +25,12 @@ type ExecutorConfig struct {
 
 type Executor struct {
 	*ExecutorConfig
-	executors          map[uint32]*actor.PID // A map from exchange ID to executor
-	protocolAssets     map[uint64]*models.ProtocolAsset
-	symToProtocolAsset map[uint32]map[string]*models.ProtocolAsset
-	alSubscribers      map[uint64]*actor.PID // A map from request ID to asset list subscriber
-	dataManagers       map[uint32]*actor.PID // A map from asset ID to data manager
-	logger             *log.Logger
-	strict             bool
+	executors      map[uint32]*actor.PID // A map from exchange ID to executor
+	protocolAssets map[uint64]*models.ProtocolAsset
+	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
+	dataManagers   map[uint32]*actor.PID // A map from asset ID to data manager
+	logger         *log.Logger
+	strict         bool
 }
 
 func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
@@ -108,7 +107,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	state.symToProtocolAsset = make(map[uint32]map[string]*models.ProtocolAsset)
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	state.executors = make(map[uint32]*actor.PID)
 	state.dataManagers = make(map[uint32]*actor.PID)
@@ -144,26 +142,20 @@ func (state *Executor) Initialize(context actor.Context) error {
 				state.logger.Error("error fetching assets for one venue: %v", log.Error(err))
 			}
 		}
-		result, ok := res.(*messages.ProtocolAssetListResponse)
+		result, ok := res.(*messages.ProtocolAssetList)
 		if !ok {
-			return fmt.Errorf("was expecting ProtocolAssetListResponse, got %s", reflect.TypeOf(res).String())
+			return fmt.Errorf("was expecting ProtocolAssetList, got %s", reflect.TypeOf(res).String())
 		}
 		if !result.Success {
 			return errors.New(result.RejectionReason.String())
 		}
 
-		symToProtocolAsset := make(map[string]*models.ProtocolAsset)
-		var protoID uint32
 		for _, asset := range result.ProtocolAssets {
-			id := uint64(asset.Asset.ID)<<32 + uint64(asset.Protocol.ID)
-			if asset2, ok := state.protocolAssets[id]; ok {
-				return fmt.Errorf("got two assets with the same ID: %s and %s", asset2.Asset.Symbol, asset.Asset.Symbol)
+			if asset2, ok := state.protocolAssets[asset.ProtocolAssetID]; ok {
+				return fmt.Errorf("got two protocol assets with the same ID: %s and %s", asset2.Asset.Symbol, asset.Asset.Symbol)
 			}
-			state.protocolAssets[id] = asset
-			symToProtocolAsset[asset.Asset.Symbol] = asset
-			protoID = asset.Protocol.ID
+			state.protocolAssets[asset.ProtocolAssetID] = asset
 		}
-		state.symToProtocolAsset[protoID] = symToProtocolAsset
 	}
 	return nil
 }
@@ -174,7 +166,7 @@ func (state *Executor) OnProtocolAssetListRequest(context actor.Context) error {
 	for _, asset := range state.protocolAssets {
 		assets = append(assets, asset)
 	}
-	response := &messages.ProtocolAssetListResponse{
+	response := &messages.ProtocolAssetList{
 		RequestID:      req.RequestID,
 		ResponseID:     uint64(time.Now().UnixNano()),
 		Success:        true,
@@ -201,8 +193,7 @@ func (state *Executor) OnProtocolAssetList(context actor.Context) error {
 		}
 	}
 	for _, asset := range msg.ProtocolAssets {
-		id := uint64(asset.Asset.ID)<<32 + uint64(asset.Protocol.ID)
-		state.protocolAssets[id] = asset
+		state.protocolAssets[asset.ProtocolAssetID] = asset
 	}
 	var assets []*models.ProtocolAsset
 	for _, v := range state.protocolAssets {
@@ -222,11 +213,11 @@ func (state *Executor) OnProtocolAssetList(context actor.Context) error {
 
 func (state *Executor) OnProtocolAssetTransferRequest(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetTransferRequest)
-	a, rej := state.getProtocolAsset(req.ProtocolAsset)
-	if rej != nil {
-		context.Respond(&messages.ProtocolAssetListResponse{
+	a, ok := state.protocolAssets[req.ProtocolAssetID]
+	if !ok {
+		context.Respond(&messages.ProtocolAssetList{
 			RequestID:       req.RequestID,
-			RejectionReason: *rej,
+			RejectionReason: messages.UnknownProtocolAsset,
 			Success:         false,
 		})
 		return nil
@@ -245,11 +236,11 @@ func (state *Executor) OnProtocolAssetTransferRequest(context actor.Context) err
 
 func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Context) error {
 	req := context.Message().(*messages.HistoricalProtocolAssetTransferRequest)
-	a, rej := state.getProtocolAsset(req.ProtocolAsset)
-	if rej != nil {
-		context.Respond(&messages.HistoricalProtocolAssetTransferResponse{
+	a, ok := state.protocolAssets[req.ProtocolAssetID]
+	if !ok {
+		context.Respond(&messages.ProtocolAssetList{
 			RequestID:       req.RequestID,
-			RejectionReason: *rej,
+			RejectionReason: messages.UnknownProtocolAsset,
 			Success:         false,
 		})
 		return nil
@@ -268,24 +259,13 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 
 func (state *Executor) OnProtocolAssetDefinition(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetDefinitionRequest)
-	id := req.ProtocolAssetID
-	assetID := id >> 32
-	protocolID := id - assetID<<32
-	asset := &models.ProtocolAsset{
-		Protocol: &models2.Protocol{
-			ID: uint32(protocolID),
-		},
-		Asset: &models2.Asset{
-			ID: uint32(assetID),
-		},
-	}
-	a, rej := state.getProtocolAsset(asset)
-	if rej != nil {
+	fmt.Println(req.ProtocolAssetID, state.protocolAssets)
+	a, ok := state.protocolAssets[req.ProtocolAssetID]
+	if !ok {
 		context.Respond(&messages.ProtocolAssetDefinitionResponse{
 			RequestID:       req.RequestID,
-			ResponseID:      uint64(time.Now().UnixNano()),
+			RejectionReason: messages.UnknownProtocolAsset,
 			Success:         false,
-			RejectionReason: *rej,
 		})
 		return nil
 	}
@@ -303,26 +283,14 @@ func (state *Executor) getProtocolAsset(asset *models.ProtocolAsset) (*models.Pr
 		rej := messages.MissingProtocolAsset
 		return nil, &rej
 	}
-	if asset.Protocol != nil && asset.Asset != nil {
-		id := uint64(asset.Asset.ID)<<32 + uint64(asset.Protocol.ID)
-		if a, ok := state.protocolAssets[id]; !ok {
+	if asset.Protocol != nil && asset.Asset != nil && asset.Chain != nil {
+		ID := utils.GetProtocolAssetID(*asset.Asset, *asset.Protocol, *asset.Chain)
+		if a, ok := state.protocolAssets[ID]; !ok {
 			rej := messages.UnknownProtocolAsset
 			return nil, &rej
 		} else {
 			return a, nil
 		}
-	} else if asset.Protocol != nil {
-		p, ok := state.symToProtocolAsset[asset.Protocol.ID]
-		if !ok {
-			rej := messages.UnknowProtocol
-			return nil, &rej
-		}
-		a, ok := p[asset.Asset.Symbol]
-		if !ok {
-			rej := messages.UnknownSymbol
-			return nil, &rej
-		}
-		return a, nil
 	} else {
 		rej := messages.MissingProtocolAsset
 		return nil, &rej

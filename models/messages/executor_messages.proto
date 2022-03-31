@@ -152,22 +152,6 @@ message HistoricalUnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
-message HistoricalProtocolAssetTransferRequest {
-    uint64 requestID = 1;
-    models.ProtocolAsset protocol_asset = 2;
-    uint64 start = 3;
-    uint64 stop = 4;
-}
-
-message HistoricalProtocolAssetTransferResponse {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    repeated models.ProtocolAssetUpdate update = 3;
-    uint64 seq_num = 4;
-    bool success = 5;
-    RejectionReason rejection_reason = 6;
-}
-
 message MarketStatisticsRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
@@ -231,34 +215,11 @@ message UnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
-message ProtocolAssetTransferRequest{
-    uint64 requestID = 1;
-    bool subscribe = 2;
-    actor.PID subscriber = 3;
-    models.ProtocolAsset protocol_asset = 4;
-}
-
-message ProtocolAssetTransferResponse {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    repeated models.ProtocolAssetUpdate update = 3;
-    uint64 seq_num = 4;
-    bool success = 5;
-    RejectionReason rejection_reason = 6;
-}
-
 message UnipoolV3DataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
     uint64 seq_num = 3;
     models.UPV3Update update = 4;
-}
-
-message ProtocolAssetDataIncrementalRefresh {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    uint64 seq_num = 3;
-    models.ProtocolAssetUpdate update = 4;
 }
 
 message AccountDataRequest {
@@ -578,9 +539,48 @@ message TransferDataResponse {
     RejectionReason rejection_reason = 5;
 }
 
+message HistoricalProtocolAssetTransferRequest {
+    uint64 requestID = 1;
+    uint64 protocol_assetID = 2;
+    uint64 start = 3;
+    uint64 stop = 4;
+}
+
+message HistoricalProtocolAssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAssetUpdate update = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message ProtocolAssetTransferRequest{
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+    uint64 protocol_assetID = 4;
+}
+
+message ProtocolAssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAssetUpdate update = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
+message ProtocolAssetDataIncrementalRefresh {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    uint64 seq_num = 3;
+    models.ProtocolAssetUpdate update = 4;
+}
+
 message ProtocolAssetDefinitionRequest {
     uint64 requestID = 1;
-    uint64 protocol_asset_iD = 2;
+    uint64 protocol_assetID = 2;
 }
 
 message ProtocolAssetDefinitionResponse {
@@ -595,14 +595,6 @@ message ProtocolAssetListRequest {
     uint64 requestID = 1;
     bool subscribe = 2;
     actor.PID subscriber = 3;
-}
-
-message ProtocolAssetListResponse {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    repeated models.ProtocolAsset protocol_assets = 3;
-    bool success = 4;
-    RejectionReason rejection_reason = 5;
 }
 
 message ProtocolAssetList {

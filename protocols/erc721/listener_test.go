@@ -24,7 +24,7 @@ func TestListener(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
-	response, ok := res.(*messages.ProtocolAssetListResponse)
+	response, ok := res.(*messages.ProtocolAssetList)
 	if !ok {
 		t.Fatal("incorrect type assertion")
 	}
