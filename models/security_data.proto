@@ -48,8 +48,8 @@ message Security {
     google.protobuf.Timestamp creation_date = 20;
     google.protobuf.UInt64Value creation_block = 21;
     uint32 protocolID = 22;
+    uint32 chainID = 23;
 }
-
 
 message Order {
     string orderID = 1;
