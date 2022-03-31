@@ -633,10 +633,15 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 			delete(state.securities, k)
 		}
 	}
+	delete(state.symbToSecs, exchangeID)
+
 	// re-add them
+	secs := make(map[string]*models.Security)
 	for _, s := range securityList.Securities {
 		state.securities[s.SecurityID] = s
+		secs[s.Symbol] = s
 	}
+	state.symbToSecs[exchangeID] = secs
 
 	// build the updated list
 	var securities []*models.Security
