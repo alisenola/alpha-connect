@@ -14,28 +14,28 @@ import (
 	"gitlab.com/alphaticks/xchanger/models"
 )
 
-type checkAsset struct{}
+type checkStatic struct{}
 type Ready struct{}
 
-type AssetLoader struct {
+type StaticLoader struct {
 	registry registry.PublicRegistryClient
 	logger   *log.Logger
 	ticker   *time.Ticker
 }
 
-func NewAssetLoaderProducer(rgstry registry.PublicRegistryClient) actor.Producer {
+func NewStaticLoaderProducer(rgstry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewAssetLoader(rgstry)
+		return NewStaticLoader(rgstry)
 	}
 }
 
-func NewAssetLoader(rgstry registry.PublicRegistryClient) actor.Actor {
-	return &AssetLoader{
+func NewStaticLoader(rgstry registry.PublicRegistryClient) actor.Actor {
+	return &StaticLoader{
 		registry: rgstry,
 	}
 }
 
-func (state *AssetLoader) Receive(context actor.Context) {
+func (state *StaticLoader) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -61,9 +61,9 @@ func (state *AssetLoader) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *checkAsset:
-		if err := state.checkAsset(context); err != nil {
-			state.logger.Error("error checkAsset", log.Error(err))
+	case *checkStatic:
+		if err := state.checkStatic(context); err != nil {
+			state.logger.Error("error checkStatic", log.Error(err))
 		}
 
 	case *Ready:
@@ -74,7 +74,7 @@ func (state *AssetLoader) Receive(context actor.Context) {
 	}
 }
 
-func (state *AssetLoader) Initialize(context actor.Context) error {
+func (state *StaticLoader) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -87,7 +87,7 @@ func (state *AssetLoader) Initialize(context actor.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				context.Send(pid, &checkAsset{})
+				context.Send(pid, &checkStatic{})
 			case <-time.After(2 * time.Minute):
 				// timer stopped, we leave
 				return
@@ -95,10 +95,10 @@ func (state *AssetLoader) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	return state.checkAsset(context)
+	return state.checkStatic(context)
 }
 
-func (state *AssetLoader) Clean(context actor.Context) error {
+func (state *StaticLoader) Clean(context actor.Context) error {
 	if state.ticker != nil {
 		state.ticker.Stop()
 		state.ticker = nil
@@ -107,12 +107,12 @@ func (state *AssetLoader) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *AssetLoader) onReady(context actor.Context) error {
+func (state *StaticLoader) onReady(context actor.Context) error {
 	context.Respond(&Ready{})
 	return nil
 }
 
-func (state *AssetLoader) checkAsset(context actor.Context) error {
+func (state *StaticLoader) checkStatic(context actor.Context) error {
 	res, err := state.registry.Assets(goContext.Background(), &registry.AssetsRequest{
 		Filter: &registry.AssetFilter{
 			Fungible: &types.BoolValue{Value: true},
@@ -130,6 +130,37 @@ func (state *AssetLoader) checkAsset(context actor.Context) error {
 		}
 	}
 	if err := constants.LoadAssets(assets); err != nil {
+		return err
+	}
+
+	resp, err := state.registry.Protocols(goContext.Background(), &registry.ProtocolsRequest{})
+	if err != nil {
+		return fmt.Errorf("error fetching assets: %v", err)
+	}
+	protocols := make(map[uint32]models.Protocol)
+	for _, p := range resp.Protocols {
+		protocols[p.ProtocolId] = models.Protocol{
+			ID:   p.ProtocolId,
+			Name: p.Name,
+		}
+	}
+	if err := constants.LoadProtocols(protocols); err != nil {
+		return err
+	}
+
+	resc, err := state.registry.Chains(goContext.Background(), &registry.ChainsRequest{})
+	if err != nil {
+		return fmt.Errorf("error fetching assets: %v", err)
+	}
+	chains := make(map[uint32]models.Chain)
+	for _, c := range resc.Chains {
+		chains[c.ChainId] = models.Chain{
+			ID:   c.ChainId,
+			Type: c.Type,
+			Name: c.Name,
+		}
+	}
+	if err := constants.LoadChains(chains); err != nil {
 		return err
 	}
 

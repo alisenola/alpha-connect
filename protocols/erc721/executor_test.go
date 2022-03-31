@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"math/big"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ type ERC721Contract struct {
 }
 
 func TestExecutor(t *testing.T) {
-	as, executor, loader, cancel := tests.StartExecutor(t, &models2.Protocol{Name: "ERC-721", ID: 0x01})
+	as, executor, loader, cancel := tests.StartExecutor(t, &constants.ERC721)
 	defer cancel()
 	_, err := as.Root.RequestFuture(loader, &utils.Ready{}, 15*time.Second).Result()
 	if err != nil {

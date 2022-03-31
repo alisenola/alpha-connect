@@ -711,6 +711,14 @@ gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323153113-b540d8787
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323153113-b540d878780b/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323164811-817b284d343b h1:XvioE4eJndFwpyOJ18pvwL9eF76IEBtiv8oxrO7kLSY=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323164811-817b284d343b/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331084018-f6815f7b5993 h1:9I2DWSDmUgGQ8wr21Mwhwxum9+3OAdJcPmoW6ZrO8W8=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331084018-f6815f7b5993/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331085809-cd76766f845e h1:7G1Y7hFLvQqYqxv9B8LudGuXzI3sGzJy7CdZIXNUibI=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331085809-cd76766f845e/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092013-9dc7d3d66628 h1:WDNrGnwmTjW9ktjrNKFyYuaYGlr78MReV5bxDJN3QQM=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092013-9dc7d3d66628/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092410-8a01979ded1d h1:tjtbKx0QtMkaMJbxqCMK12Iaze1ir98NmTu6q3NPWv0=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092410-8a01979ded1d/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
@@ -736,6 +744,12 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220322125833-c5e1c2c100af h1:a6/06x4TTPb
 gitlab.com/alphaticks/xchanger v0.0.0-20220322125833-c5e1c2c100af/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
 gitlab.com/alphaticks/xchanger v0.0.0-20220322152424-70a418842535 h1:IQMWsQAtitFC0uZyyjiLVzeIlX2vokngI0dD5jcz+lA=
 gitlab.com/alphaticks/xchanger v0.0.0-20220322152424-70a418842535/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331083403-103b41b40831 h1:OxOaFcSe7jnMdUEJV1SH462Oi1PkLwAtdipbLHT5X90=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331083403-103b41b40831/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331092035-4b9057271273 h1:0QrKQkyKXfEHDBgepxsnDtFY0zKsFQ70EiqmhcIeYLE=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331092035-4b9057271273/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331092319-dbebdb3017de h1:osRTfdVoIpJMgtS58U4yvCiue7oy1GH4mmTzqcOozDQ=
+gitlab.com/alphaticks/xchanger v0.0.0-20220331092319-dbebdb3017de/go.mod h1:Iz8BEfrkd6nXBMJYm31oFEjwMsMtc4oOpVCpKSMx+MU=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

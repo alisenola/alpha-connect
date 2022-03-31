@@ -10,7 +10,7 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20210921082217-5279763aa403
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220323164811-817b284d343b
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331092410-8a01979ded1d
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220314112354-40d564234f20
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20220315100643-daa5e4a18f2e
@@ -18,7 +18,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220217065618-3c1fd871286a
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220322152424-70a418842535
+	gitlab.com/alphaticks/xchanger v0.0.0-20220331092319-dbebdb3017de
 	go.mongodb.org/mongo-driver v1.7.2
 	google.golang.org/grpc v1.40.0
 )

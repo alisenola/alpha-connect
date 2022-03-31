@@ -1,7 +1,6 @@
 package protocols
 
 import (
-	goContext "context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -15,17 +14,12 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
 type ExecutorConfig struct {
-	Db        *mongo.Database
 	Registry  registry.PublicRegistryClient
-	Strict    bool
 	Protocols []*models2.Protocol
 }
 
@@ -114,22 +108,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	if state.Db != nil {
-		unique := true
-		mod := mongo.IndexModel{
-			Keys: bson.M{
-				"id": 1, // index in ascending order
-			}, Options: &options.IndexOptions{Unique: &unique},
-		}
-		txs := state.Db.Collection("transactions")
-		execs := state.Db.Collection("executions")
-		if _, err := txs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
-			return fmt.Errorf("error creating index on transactions: %v", err)
-		}
-		if _, err := execs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
-			return fmt.Errorf("error creating index on executions: %v", err)
-		}
-	}
 	state.symToProtocolAsset = make(map[uint32]map[string]*models.ProtocolAsset)
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	state.executors = make(map[uint32]*actor.PID)
@@ -179,7 +157,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		for _, asset := range result.ProtocolAssets {
 			id := uint64(asset.Asset.ID)<<32 + uint64(asset.Protocol.ID)
 			if asset2, ok := state.protocolAssets[id]; ok {
-				return fmt.Errorf("got two assets with the same contract address: %s and %s", asset2.Asset.Symbol, asset.Asset.Symbol)
+				return fmt.Errorf("got two assets with the same ID: %s and %s", asset2.Asset.Symbol, asset.Asset.Symbol)
 			}
 			state.protocolAssets[id] = asset
 			symToProtocolAsset[asset.Asset.Symbol] = asset

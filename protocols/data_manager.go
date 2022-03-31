@@ -94,7 +94,7 @@ func (state *DataManager) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	state.subscribers = make(map[uint64]*actor.PID)
-	producer := NewAssetListenerProfucer(state.asset)
+	producer := NewAssetListenerProducer(state.asset)
 	if producer == nil {
 		return fmt.Errorf("error getting asset listener")
 	}

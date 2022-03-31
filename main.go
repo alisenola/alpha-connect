@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/executor"
+	"gitlab.com/alphaticks/alpha-connect/protocols"
 	"math"
 	"net"
 	"os"
@@ -104,18 +106,22 @@ func main() {
 		panic(err)
 	}
 	rgstr := registry.NewPublicRegistryClient(conn)
-	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(rgstr)))
+	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
 	_, err = ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)
 	}
 	// TODO mongo env
-	config := &exchanges.ExecutorConfig{
+	cfgExch := &exchanges.ExecutorConfig{
 		Exchanges:  exch,
 		DialerPool: xchangerUtils.DefaultDialerPool,
 		Strict:     true,
 	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(config)), "executor")
+	cfgPrt := &protocols.ExecutorConfig{
+		Registry:  nil,
+		Protocols: nil,
+	}
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgExch, cfgPrt)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(

@@ -47,6 +47,7 @@ message Security {
     google.protobuf.DoubleValue max_market_quantity = 19;
     google.protobuf.Timestamp creation_date = 20;
     google.protobuf.UInt64Value creation_block = 21;
+    uint32 protocolID = 22;
 }
 
 
