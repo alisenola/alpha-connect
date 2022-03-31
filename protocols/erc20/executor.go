@@ -1,4 +1,4 @@
-package erc721
+package erc20
 
 import (
 	goContext "context"
@@ -7,25 +7,18 @@ import (
 	"reflect"
 	"time"
 
-	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
-	models2 "gitlab.com/alphaticks/xchanger/models"
 	xutils "gitlab.com/alphaticks/xchanger/protocols"
 
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
-	"gitlab.com/alphaticks/xchanger/eth"
-	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
 )
 
 type QueryRunner struct {
@@ -80,7 +73,7 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
 	filter := registry.ProtocolAssetFilter{
-		ProtocolId: []uint32{constants.ERC721.ID},
+		ProtocolId: []uint32{constants.ERC20.ID},
 	}
 	in := registry.ProtocolAssetsRequest{
 		Filter: &filter,
@@ -100,6 +93,10 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
 		}
+		if _, ok := protocolAsset.Meta["decimals"]; !ok {
+			state.logger.Warn("invalid protocol asset decimals")
+			continue
+		}
 		as, ok := constants.GetAssetByID(protocolAsset.AssetId)
 		if !ok {
 			state.logger.Warn(fmt.Sprintf("error getting asset with id %d", protocolAsset.AssetId))
@@ -114,21 +111,10 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			assets,
 			&models.ProtocolAsset{
 				ProtocolAssetID: protocolAsset.ProtocolAssetId,
-				Protocol: &models2.Protocol{
-					ID:   constants.ERC721.ID,
-					Name: "ERC-721",
-				},
-				Asset: &models2.Asset{
-					Name:   as.Name,
-					Symbol: as.Symbol,
-					ID:     as.ID,
-				},
-				Chain: &models2.Chain{
-					ID:   ch.ID,
-					Name: ch.Name,
-					Type: ch.Type,
-				},
-				Meta: protocolAsset.Meta,
+				Protocol:        &constants.ERC20,
+				Asset:           as,
+				Chain:           ch,
+				Meta:            protocolAsset.Meta,
 			})
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
@@ -159,100 +145,6 @@ func (state *Executor) OnProtocolAssetListRequest(context actor.Context) error {
 		Success:        true,
 		ProtocolAssets: passets,
 	})
-	return nil
-}
-
-func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalProtocolAssetTransferRequest)
-	msg := &messages.HistoricalProtocolAssetTransferResponse{
-		RequestID:  req.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    false,
-	}
-
-	pa, ok := state.protocolAssets[req.ProtocolAssetID]
-	if !ok {
-		msg.RejectionReason = messages.UnknownProtocolAsset
-		context.Respond(msg)
-		return nil
-	}
-
-	eabi, err := nft.ERC721MetaData.GetAbi()
-	if err != nil {
-		state.logger.Warn("error getting erc721 ABI", log.Error(err))
-		msg.RejectionReason = messages.ABIError
-		context.Respond(msg)
-		return nil
-	}
-
-	topics := [][]common.Hash{{
-		eabi.Events["Transfer"].ID,
-	}}
-	var address [20]byte
-	addressBig, ok := big.NewInt(1).SetString(pa.Meta["address"][2:], 16)
-	if !ok {
-		state.logger.Warn("invalid protocol asset address", log.Error(err))
-		msg.RejectionReason = messages.UnknownProtocolAsset
-		context.Respond(msg)
-		return nil
-	}
-
-	copy(address[:], addressBig.Bytes())
-	fQuery := ethereum.FilterQuery{
-		Addresses: []common.Address{address},
-		FromBlock: big.NewInt(1).SetUint64(req.Start),
-		ToBlock:   big.NewInt(1).SetUint64(req.Stop),
-		Topics:    topics,
-	}
-	qr := state.queryRunnerETH
-	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 15*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
-		if err != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
-			msg.RejectionReason = messages.EthRPCError
-			context.Respond(msg)
-			return
-		}
-
-		resp := res.(*jobs.PerformLogsQueryResponse)
-		if resp.Error != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
-			msg.RejectionReason = messages.EthRPCError
-			context.Respond(msg)
-			return
-		}
-
-		events := make([]*models.ProtocolAssetUpdate, 0)
-		for i, l := range resp.Logs {
-			switch l.Topics[0] {
-			case eabi.Events["Transfer"].ID:
-				event := nft.ERC721Transfer{}
-				if err := eth.UnpackLog(eabi, &event, "Transfer", l); err != nil {
-					state.logger.Warn("error unpacking log", log.Error(err))
-					msg.RejectionReason = messages.EthRPCError
-					context.Respond(msg)
-					return
-				}
-				t := &models.ProtocolAssetUpdate{
-					Transfer: &gorderbook.AssetTransfer{
-						From:    event.From[:],
-						To:      event.To[:],
-						TokenId: event.TokenId.Bytes(),
-					},
-					Removed:   l.Removed,
-					Block:     l.BlockNumber,
-					Timestamp: utils.SecondToTimestamp(resp.Times[i]),
-				}
-				events = append(events, t)
-			}
-		}
-		msg.Update = events
-		msg.Success = true
-		msg.SeqNum = uint64(time.Now().UnixNano())
-		context.Respond(msg)
-
-	})
-
 	return nil
 }
 
