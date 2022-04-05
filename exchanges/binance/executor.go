@@ -766,7 +766,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 		response.Success = true
-		response.OrderID = fmt.Sprintf("%d", order.OrderID)
+		response.OrderID = fmt.Sprintf("%d", order.OrderId)
 		context.Respond(response)
 	})
 	return nil

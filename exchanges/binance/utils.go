@@ -88,8 +88,8 @@ func WSOrderToModel(o *binance.WSExecutionReport) *models.Order {
 
 func OrderToModel(o *binance.OrderData) *models.Order {
 	ord := &models.Order{
-		OrderID:       fmt.Sprintf("%d", o.OrderID),
-		ClientOrderID: o.ClientOrderID,
+		OrderID:       fmt.Sprintf("%d", o.OrderId),
+		ClientOrderID: o.ClientOrderId,
 		Instrument: &models.Instrument{
 			Exchange: &constants.BINANCE,
 			Symbol:   &types.StringValue{Value: o.Symbol},

@@ -957,7 +957,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
 	if time.Since(state.lastPingTime) > 5*time.Second {
-		_ = state.ws.Ping()
+		// TODO
 		state.lastPingTime = time.Now()
 	}
 

@@ -367,9 +367,13 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if err := ws.SubscribeStatus(symbol); err != nil {
 			return err
 		}
-		if err := ws.SubscribeLiquidation(symbol); err != nil {
-			return err
-		}
+		/*
+			// TODO
+			if err := ws.SubscribeLiquidation(); err != nil {
+				return err
+			}
+
+		*/
 	}
 
 	state.ws = ws

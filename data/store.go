@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	DATA_CLIENT_LIVE int64 = 0
+	DATA_CLIENT_LIVE int64 = -1
+	DATA_CLIENT_WEB3 int64 = -2
 	DATA_CLIENT_1S   int64 = 1000
 	DATA_CLIENT_1M   int64 = DATA_CLIENT_1S * 60
 	DATA_CLIENT_1H   int64 = DATA_CLIENT_1M * 60
-	//DATA_CLIENT_1D   int64 = DATA_CLIENT_1H * 24
+	DATA_CLIENT_1D   int64 = DATA_CLIENT_1H * 24
 )
 
 type DataClient interface {
@@ -28,47 +29,28 @@ type DataClient interface {
 
 var ports = map[int64]string{
 	DATA_CLIENT_LIVE: "4550",
+	DATA_CLIENT_WEB3: "4554",
 	DATA_CLIENT_1S:   "4551",
 	DATA_CLIENT_1M:   "4552",
 	DATA_CLIENT_1H:   "4553",
-	//DATA_CLIENT_1D:   "4554",
 }
 
 var names = map[int64]string{
 	DATA_CLIENT_LIVE: "live",
+	DATA_CLIENT_WEB3: "web3",
 	DATA_CLIENT_1S:   "1s",
 	DATA_CLIENT_1M:   "1m",
 	DATA_CLIENT_1H:   "1h",
-	//DATA_CLIENT_1D:   "1d",
 }
 
 var shardDurations = map[int64]uint64{
 	DATA_CLIENT_LIVE: 10000000,
+	DATA_CLIENT_WEB3: 1000000000,
 	DATA_CLIENT_1S:   10000000,
 	DATA_CLIENT_1M:   1000000000,
 	DATA_CLIENT_1H:   10000000000,
 	//DATA_CLIENT_1D:   100000000000,
 }
-
-/*
-var shardDurations = map[int64]uint64{
-	DATA_CLIENT_LIVE: 10000000,
-	DATA_CLIENT_1S:   10000000,
-	DATA_CLIENT_1M:   1000000000,
-	DATA_CLIENT_1H:   10000000000,
-	DATA_CLIENT_1D:   100000000000,
-}
-*/
-
-/*
-var durations = map[int64]uint64{
-	DATA_CLIENT_LIVE: 100000,
-	DATA_CLIENT_1S:   100000,
-	DATA_CLIENT_1M:   100000,
-	DATA_CLIENT_1H:   100000,
-	DATA_CLIENT_1D:   100000,
-}
-*/
 
 type StorageClient struct {
 	stores       map[int64]*store.Store
@@ -88,10 +70,10 @@ func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) 
 		cacheDir:     cacheDir,
 	}
 	s.stores[DATA_CLIENT_LIVE] = nil
+	s.stores[DATA_CLIENT_WEB3] = nil
 	s.stores[DATA_CLIENT_1S] = nil
 	s.stores[DATA_CLIENT_1M] = nil
 	s.stores[DATA_CLIENT_1H] = nil
-	//s.stores[DATA_CLIENT_1D] = nil
 
 	return s, nil
 }
@@ -99,15 +81,20 @@ func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) 
 func (s *StorageClient) GetStore(freq int64) (*store.Store, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
-	for f := range s.stores {
-		if f <= freq {
-			score := freq - f
-			if score < minScore {
-				minScore = score
-				cfreq = f
+	if freq == DATA_CLIENT_LIVE || freq == DATA_CLIENT_WEB3 {
+		cfreq = freq
+	} else {
+		for f := range s.stores {
+			if f <= freq {
+				score := freq - f
+				if score < minScore {
+					minScore = score
+					cfreq = f
+				}
 			}
 		}
 	}
+
 	if s.stores[cfreq] == nil {
 		// Construct store
 		// Construct cache storage
