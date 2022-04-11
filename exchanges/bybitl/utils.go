@@ -204,6 +204,8 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	fmt.Println("SET QTY", order.Quantity, lotPrecision, strconv.FormatFloat(order.Quantity, 'f', int(lotPrecision), 64))
 	request.SetQuantity(order.Quantity, lotPrecision)
 	request.SetOrderLinkId(order.ClientOrderID)
+	// For now, only one way is supported
+	request.SetPositionIdx(0)
 
 	if order.Price != nil {
 		request.SetPrice(order.Price.Value, tickPrecision)

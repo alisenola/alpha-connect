@@ -30,6 +30,7 @@ func TestNewAccountListener(t *testing.T) {
 		Account:            bybitlAccount,
 		Instrument:         instrument,
 		OrderStatusRequest: true,
-		OrderCancelRequest: true,
+		GetPositionsLimit:  true,
+		GetPositionsMarket: true,
 	})
 }

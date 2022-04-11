@@ -482,7 +482,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		value := reflect.ValueOf(balances.Balance)
 		for i := 0; i < value.NumField(); i++ {
 			coin := value.Field(i).Interface().(bybitl.Coin)
-			if coin.AvailableBalance == 0 {
+			if coin.WalletBalance == 0 {
 				continue
 			}
 			asset, ok := constants.GetAssetBySymbol(value.Type().Field(i).Name)
@@ -493,7 +493,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			response.Balances = append(response.Balances, &models.Balance{
 				Account:  msg.Account.Name,
 				Asset:    asset,
-				Quantity: coin.AvailableBalance,
+				Quantity: coin.WalletBalance,
 			})
 		}
 		response.Success = true

@@ -522,7 +522,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	}
 	switch s := msg.Message.(type) {
 	case bybitl.WSOrders:
-		fmt.Println("WSORDERS", s)
 		for _, order := range s {
 			switch order.OrderStatus {
 			case bybitl.OrderNew:
@@ -555,15 +554,13 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					context.Send(context.Parent(), report)
 				}
 			case bybitl.OrderFilled:
-				ord, ok := state.confirmFillBuf[order.OrderLinkId]
-				if !ok {
-					state.confirmFillBuf[order.OrderLinkId] = &confirmFillBuf{
-						orderId:  order.OrderId,
-						price:    order.LastExecPrice,
-						quantity: order.Qty,
-					}
-				} else {
-					report, err := state.account.ConfirmFill(order.OrderId, ord.tradeId, order.LastExecPrice, order.Qty, !ord.maker)
+				ord, err := state.account.GetOrder(order.OrderLinkId)
+				if err != nil {
+					return fmt.Errorf("error getting order: %v", err)
+				}
+				// If instantly filled, won't get a new order update in between
+				if ord.OrderStatus == models.PendingNew {
+					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
 					if err != nil {
 						return fmt.Errorf("error confirming filled order: %v", err)
 					}
@@ -576,28 +573,18 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 	case bybitl.WSExecutions:
-		fmt.Println("WSEXECUTIONS", s)
 		for _, exec := range s {
 			switch exec.ExecType {
-			case "trade":
-				ord, ok := state.confirmFillBuf[exec.OrderLinkId]
-				if !ok {
-					state.confirmFillBuf[exec.OrderLinkId] = &confirmFillBuf{
-						tradeId: exec.ExecId,
-						maker:   exec.IsMaker,
-					}
-				} else {
-					report, err := state.account.ConfirmFill(exec.OrderId, exec.ExecId, ord.price, ord.quantity, !exec.IsMaker)
-					if err != nil {
-						return fmt.Errorf("error confirming filled order: %v", err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
+			case "Trade":
+				report, err := state.account.ConfirmFill(exec.OrderId, exec.ExecId, exec.Price, exec.ExecQty, !exec.IsMaker)
+				if err != nil {
+					return fmt.Errorf("error confirming filled order: %v", err)
 				}
-
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
 			}
 		}
 	}
