@@ -16,8 +16,10 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"math/rand"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 	"unicode"
@@ -31,6 +33,7 @@ type QueryRunner struct {
 type Executor struct {
 	extypes.BaseExecutor
 	securities   map[uint64]*models.Security
+	symbolToSec  map[string]*models.Security
 	queryRunners []*QueryRunner
 	dialerPool   *xutils.DialerPool
 	logger       *log.Logger
@@ -46,6 +49,22 @@ func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
 
 func (state *Executor) Receive(context actor.Context) {
 	extypes.ReceiveExecutor(state, context)
+}
+
+func (state *Executor) getQueryRunner() *QueryRunner {
+	sort.Slice(state.queryRunners, func(i, j int) bool {
+		return rand.Uint64()%2 == 0
+	})
+
+	var qr *QueryRunner
+	for _, q := range state.queryRunners {
+		if !q.rateLimit.IsRateLimited() {
+			qr = q
+			break
+		}
+	}
+
+	return qr
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -213,8 +232,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	state.securities = make(map[uint64]*models.Security)
+	state.symbolToSec = make(map[string]*models.Security)
 	for _, s := range securities {
 		state.securities[s.SecurityID] = s
+		state.symbolToSec[s.Symbol] = s
 	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
@@ -384,5 +405,340 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		Success:         false,
 		RejectionReason: messages.UnsupportedRequest,
 	})
+	return nil
+}
+
+//TODO following functions need to be added:
+// - Account mouvements (withdrawal, funding,...)
+// - Trade records
+// - Orders Status
+// - Positions Status: done
+// - Balances request: done
+// - NewSingleOrder request
+// - CancelOrder request
+// - MassCancel request
+
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+	response := &messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+		Balances:   nil,
+	}
+	if msg.Subscribe {
+		response.RejectionReason = messages.UnsupportedSubscription
+		context.Respond(response)
+		return nil
+	}
+	req, rate, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.rateLimit.Request(rate)
+	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
+	context.AwaitFuture(f, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		qResponse := res.(*jobs.PerformQueryResponse)
+		if qResponse.StatusCode != 200 {
+			if qResponse.StatusCode >= 400 && qResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if qResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var balances bybitl.BalanceResponse
+		err = json.Unmarshal(qResponse.Response, &balances)
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		value := reflect.ValueOf(balances.Balance)
+		for i := 0; i < value.NumField(); i++ {
+			coin := value.Field(i).Interface().(bybitl.Coin)
+			if coin.AvailableBalance == 0 {
+				continue
+			}
+			asset, ok := constants.GetAssetBySymbol(value.Type().Field(i).Name)
+			if !ok {
+				state.logger.Error("got balance for unknown asset", log.String("asset", value.Type().Field(i).Name))
+				continue
+			}
+			response.Balances = append(response.Balances, &models.Balance{
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: coin.AvailableBalance,
+			})
+		}
+		response.Success = true
+		context.Respond(response)
+
+	})
+	return nil
+}
+
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+	response := &messages.PositionList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+		Positions:  nil,
+	}
+	if msg.Subscribe {
+		response.RejectionReason = messages.UnsupportedSubscription
+		context.Respond(response)
+		return nil
+	}
+
+	symbol := ""
+	if msg.Instrument != nil {
+		if msg.Instrument.Symbol != nil {
+			symbol = msg.Instrument.Symbol.Value
+		} else if msg.Instrument.SecurityID != nil {
+			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			symbol = sec.Symbol
+		}
+	}
+
+	req, rate, err := bybitl.GetPositions("", msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.rateLimit.Request(rate)
+	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
+	context.AwaitFuture(f, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		qResponse := res.(*jobs.PerformQueryResponse)
+		if qResponse.StatusCode != 200 {
+			if qResponse.StatusCode >= 400 && qResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if qResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var positions bybitl.GetPositionsResponse
+		err = json.Unmarshal(qResponse.Response, &positions)
+		if err != nil {
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		for _, pos := range positions.Positions {
+			if pos.Position.Size == 0 {
+				continue
+			}
+			if !pos.IsValid {
+				state.logger.Warn("got invalid position", log.String("position", fmt.Sprintf("%+v", pos.Position)))
+				continue
+			}
+			if symbol != "" && symbol != pos.Position.Symbol {
+				continue
+			}
+			sec, ok := state.symbolToSec[pos.Position.Symbol]
+			if !ok {
+				response.RejectionReason = messages.ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+			cost := pos.Position.Size * pos.Position.EntryPrice
+
+			response.Positions = append(response.Positions, &models.Position{
+				Account: msg.Account.Name,
+				Instrument: &models.Instrument{
+					Exchange:   &constants.BYBITL,
+					Symbol:     &types.StringValue{Value: pos.Position.Symbol},
+					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+				},
+				Quantity: pos.Position.Size,
+				Cost:     cost,
+				Cross:    false,
+			})
+		}
+		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderStatusRequest)
+	response := &messages.OrderList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+		Orders:     nil,
+	}
+	if msg.Subscribe {
+		response.RejectionReason = messages.UnsupportedSubscription
+		context.Respond(response)
+		return nil
+	}
+	symbol := ""
+	orderId := ""
+	clOrderId := ""
+	orderStatus := ""
+	if msg.Filter != nil {
+		if msg.Filter.Side != nil {
+			response.RejectionReason = messages.UnsupportedFilter
+			context.Respond(response)
+			return nil
+		}
+		if msg.Filter.Instrument != nil {
+			if msg.Filter.Instrument.Symbol != nil {
+				symbol = msg.Filter.Instrument.Symbol.Value
+			} else if msg.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					response.RejectionReason = messages.UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				symbol = sec.Symbol
+			}
+		}
+		if msg.Filter.OrderStatus != nil {
+			stat, ok := models.OrderStatus_name[int32(msg.Filter.OrderStatus.Value)]
+			if !ok {
+				response.RejectionReason = messages.UnsupportedFilter
+				context.Respond(response)
+				return nil
+			}
+			orderStatus = stat
+		}
+		if msg.Filter.OrderID != nil {
+			orderId = msg.Filter.OrderID.Value
+		}
+		if msg.Filter.ClientOrderID != nil {
+			clOrderId = msg.Filter.ClientOrderID.Value
+		}
+	}
+
+	params := bybitl.NewGetActiveOrderParams(symbol)
+	if clOrderId != "" {
+		params.SetOrderLinkID(clOrderId)
+	}
+	if orderId != "" {
+		params.SetOrderID(orderId)
+	}
+	if orderStatus != "" {
+		params.SetOrderStatus(bybitl.OrderStatus(orderStatus))
+	}
+	req, rate, err := bybitl.GetActiveOrders(params, msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.rateLimit.Request(rate)
+	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
+	context.AwaitFuture(f, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		qResponse := res.(*jobs.PerformQueryResponse)
+		if qResponse.StatusCode != 200 {
+			if qResponse.StatusCode >= 400 && qResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if qResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					qResponse.StatusCode,
+					string(qResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var orders bybitl.GetActiveOrdersResponse
+		err = json.Unmarshal(qResponse.Response, &orders)
+		if err != nil {
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		for _, ord := range orders.ActiveOrders.Orders {
+			sec, ok := state.symbolToSec[ord.Symbol]
+			if !ok {
+				response.RejectionReason = messages.UnknownSymbol
+				context.Respond(response)
+				return
+			}
+			o := orderToModel(&ord)
+			o.Instrument.SecurityID = &types.UInt64Value{Value: sec.SecurityID}
+			response.Orders = append(response.Orders, o)
+		}
+		response.Success = true
+		context.Respond(response)
+	})
+
 	return nil
 }

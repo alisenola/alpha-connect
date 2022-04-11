@@ -19,6 +19,7 @@ enum InstrumentStatus {
 enum ExecutionInstruction {
     ParticipateDoNotInitiate = 0;
     ReduceOnly = 1;
+    CloseOnTrigger = 2;
 }
 
 message Instrument {
@@ -123,6 +124,7 @@ enum OrderStatus {
     Calculated = 11;
     Expired = 12;
     PendingReplace = 13;
+    Created = 14;
 }
 
 enum OrderType {
@@ -141,4 +143,5 @@ enum TimeInForce {
     AtTheOpening = 2;
     ImmediateOrCancel = 3;
     FillOrKill = 4;
+    PostOnly = 5;
 }
