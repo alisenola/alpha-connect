@@ -1064,7 +1064,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		var positions []fbinance.AccountPositionRisk
 		err = json.Unmarshal(queryResponse.Response, &positions)
 		if err != nil {
-			state.logger.Info("unmarshaling error", log.Error(err))
+			state.logger.Info("unmarshalling error", log.Error(err))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return

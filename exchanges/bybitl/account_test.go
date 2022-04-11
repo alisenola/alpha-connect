@@ -25,16 +25,11 @@ var bybitlAccount = &models.Account{
 
 func TestNewAccountListener(t *testing.T) {
 	bybitl.EnableTestNet()
+	bybitl.EnableWebSocketTestNet()
 	tests.AccntTest(t, tests.AccountTest{
-		Account:                 bybitlAccount,
-		Instrument:              instrument,
-		OrderCancelRequest:      false,
-		OrderStatusRequest:      false,
-		NewOrderSingleRequest:   false,
-		NewOrderBulkRequest:     false,
-		GetPositionsLimit:       false,
-		OrderReplaceRequest:     false,
-		OrderBulkReplaceRequest: false,
-		GetPositionsMarket:      false,
+		Account:            bybitlAccount,
+		Instrument:         instrument,
+		OrderStatusRequest: true,
+		OrderCancelRequest: true,
 	})
 }

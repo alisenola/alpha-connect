@@ -180,7 +180,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 
 	ws := bybitl.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	if err := ws.ConnectPublic(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to bybit websocket: %v", err)
 	}
 

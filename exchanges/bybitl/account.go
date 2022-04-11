@@ -33,13 +33,13 @@ type AccountListener struct {
 	account            *account.Account
 	seqNum             uint64
 	bybitlExecutor     *actor.PID
-	ws                 *bybitl.AuthWebsocket
+	ws                 *bybitl.Websocket
 	logger             *log.Logger
 	checkAccountTicker *time.Ticker
 	checkSocketTicker  *time.Ticker
-	refreshKeyTicker   *time.Ticker
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
+	symbolToSec        map[string]*models.Security
 	confirmFillBuf     map[string]*confirmFillBuf
 	client             *http.Client
 	txs                *mongo.Collection
@@ -106,6 +106,16 @@ func (state *AccountListener) Receive(context actor.Context) {
 			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
 			panic(err)
 		}
+	case *messages.NewOrderSingleRequest:
+		if err := state.OnNewOrderSingleRequest(context); err != nil {
+			state.logger.Error("error processing OnNewOrderSingleRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.OrderCancelRequest:
+		if err := state.OnOrderCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
+		}
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
@@ -130,10 +140,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
-	if err := state.subscribeAccount(context); err != nil {
-		return fmt.Errorf("error subscribing to account: %v", err)
-	}
-
 	//Fetch the securities
 	fmt.Println("Fetching the securities")
 	ex := actor.NewPID(context.ActorSystem().Address(), "executor")
@@ -153,6 +159,14 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		if s.Exchange.ID == state.account.Exchange.ID {
 			filteredSecurities = append(filteredSecurities, s)
 		}
+	}
+	state.symbolToSec = make(map[string]*models.Security)
+	for _, sec := range filteredSecurities {
+		state.symbolToSec[sec.Symbol] = sec
+	}
+
+	if err := state.subscribeAccount(context); err != nil {
+		return fmt.Errorf("error subscribing to account: %v", err)
 	}
 
 	//Fetch the current balance
@@ -254,20 +268,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
-	refreshKeyTicker := time.NewTicker(30 * time.Minute)
-	state.refreshKeyTicker = refreshKeyTicker
-	go func(pid *actor.PID) {
-		for {
-			select {
-			case <-refreshKeyTicker.C:
-				context.Send(pid, &refreshKey{})
-			case <-time.After(31 * time.Minute):
-				// timer stopped, we leave
-				return
-			}
-		}
-	}(context.Self())
-
 	return nil
 }
 
@@ -333,13 +333,153 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 	return nil
 }
 
+func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) error {
+	req := context.Message().(*messages.NewOrderSingleRequest)
+	req.Account = state.account.Account
+	// Check order quantity
+	order := &models.Order{
+		OrderID:               "",
+		ClientOrderID:         req.Order.ClientOrderID,
+		Instrument:            req.Order.Instrument,
+		OrderStatus:           models.PendingNew,
+		OrderType:             req.Order.OrderType,
+		Side:                  req.Order.OrderSide,
+		TimeInForce:           req.Order.TimeInForce,
+		LeavesQuantity:        req.Order.Quantity,
+		Price:                 req.Order.Price,
+		CumQuantity:           0,
+		ExecutionInstructions: req.Order.ExecutionInstructions,
+		Tag:                   req.Order.Tag,
+	}
+	report, res := state.account.NewOrder(order)
+	if res != nil {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *res,
+		})
+	} else {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
+			if report.ExecutionType == messages.PendingNew {
+				fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
+				context.AwaitFuture(fut, func(res interface{}, err error) {
+					if err != nil {
+						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
+						if err != nil {
+							panic(err)
+						}
+						context.Respond(&messages.NewOrderSingleResponse{
+							RequestID:       req.RequestID,
+							Success:         false,
+							RejectionReason: messages.Other,
+						})
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+						return
+					}
+					response := res.(*messages.NewOrderSingleResponse)
+					context.Respond(response)
+
+					if response.Success {
+						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+						if nReport != nil {
+							nReport.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), nReport)
+						}
+					} else {
+						nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
+						if nReport != nil {
+							nReport.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), nReport)
+						}
+					}
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderCancelRequest)
+	var ID string
+	if req.ClientOrderID != nil {
+		ID = req.ClientOrderID.Value
+	} else if req.OrderID != nil {
+		ID = req.OrderID.Value
+	}
+	report, res := state.account.CancelOrder(ID)
+	if res != nil {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *res,
+			Success:         false,
+		})
+	} else {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
+			if report.ExecutionType == messages.PendingCancel {
+				fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
+				context.AwaitFuture(fut, func(res interface{}, err error) {
+					if err != nil {
+						report, err := state.account.RejectCancelOrder(ID, messages.Other)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+						return
+					}
+					response := res.(*messages.OrderCancelResponse)
+
+					if !response.Success {
+						report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					}
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
 func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if state.ws != nil {
 		_ = state.ws.Disconnect()
 	}
 
-	ws := bybitl.NewAuthWebsocket()
-	if err := ws.Connect(&net.Dialer{}); err != nil {
+	ws := bybitl.NewWebsocket()
+	if err := ws.ConnectPrivate(&net.Dialer{}); err != nil {
 		return fmt.Errorf("error connection to bybitl websocket: %v", err)
 	}
 	if err := ws.Authenticate(state.account.ApiCredentials); err != nil {
@@ -361,7 +501,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if err := ws.SubscribeExecutions(); err != nil {
 		return fmt.Errorf("error subscribing to executions: %v", err)
 	}
-	go func(pid *actor.PID, ws *bybitl.AuthWebsocket) {
+	go func(pid *actor.PID, ws *bybitl.Websocket) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -382,6 +522,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	}
 	switch s := msg.Message.(type) {
 	case bybitl.WSOrders:
+		fmt.Println("WSORDERS", s)
 		for _, order := range s {
 			switch order.OrderStatus {
 			case bybitl.OrderNew:
@@ -435,9 +576,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 	case bybitl.WSExecutions:
+		fmt.Println("WSEXECUTIONS", s)
 		for _, exec := range s {
 			switch exec.ExecType {
-			case bybitl.ExecTypeTrade:
+			case "trade":
 				ord, ok := state.confirmFillBuf[exec.OrderLinkId]
 				if !ok {
 					state.confirmFillBuf[exec.OrderLinkId] = &confirmFillBuf{
@@ -477,11 +619,6 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.checkSocketTicker != nil {
 		state.checkSocketTicker.Stop()
 		state.checkSocketTicker = nil
-	}
-
-	if state.refreshKeyTicker != nil {
-		state.refreshKeyTicker.Stop()
-		state.refreshKeyTicker = nil
 	}
 
 	return nil

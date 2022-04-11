@@ -2,6 +2,7 @@ package bybitl
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -16,6 +17,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"math"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -148,14 +150,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	type Res struct {
-		ReturnCode    int             `json:"ret_code"`
-		ReturnMessage string          `json:"ret_msg"`
-		ExitCode      string          `json:"ext_code"`
-		ExitInfo      string          `json:"ext_info"`
-		Result        []bybitl.Symbol `json:"result"`
-	}
-	var data Res
+	var data bybitl.SymbolsResponse
 	err = json.Unmarshal(queryResponse.Response, &data)
 	if err != nil {
 		err = fmt.Errorf(
@@ -163,10 +158,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			err)
 		return err
 	}
-	if data.ReturnCode != 0 {
+	if data.RetCode != 0 {
 		err = fmt.Errorf(
-			"got wrong retrun code: %s",
-			data.ReturnMessage)
+			"got wrong return code: %s",
+			data.RetMsg)
 		return err
 	}
 
@@ -227,7 +222,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.IsInverse = false
 		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}
-
+		security.Multiplier = &types.DoubleValue{Value: 1}
 		securities = append(securities, &security)
 	}
 
@@ -478,6 +473,12 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		if balances.RetCode != 0 {
+			state.logger.Info("error getting orders", log.Error(errors.New(balances.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		value := reflect.ValueOf(balances.Balance)
 		for i := 0; i < value.NumField(); i++ {
 			coin := value.Field(i).Interface().(bybitl.Coin)
@@ -574,6 +575,12 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		var positions bybitl.GetPositionsResponse
 		err = json.Unmarshal(qResponse.Response, &positions)
 		if err != nil {
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if positions.RetCode != 0 {
+			state.logger.Info("error getting orders", log.Error(errors.New(positions.RetMsg)))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
@@ -725,6 +732,12 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		if orders.RetCode != 0 {
+			state.logger.Info("error getting orders", log.Error(errors.New(orders.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		for _, ord := range orders.ActiveOrders.Orders {
 			sec, ok := state.symbolToSec[ord.Symbol]
 			if !ok {
@@ -740,5 +753,210 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		context.Respond(response)
 	})
 
+	return nil
+}
+
+func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
+	req := context.Message().(*messages.NewOrderSingleRequest)
+	response := &messages.NewOrderSingleResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	symbol := ""
+	var tickPrecision, lotPrecision int
+	if req.Order.Instrument != nil {
+		if req.Order.Instrument.Symbol != nil {
+			symbol = req.Order.Instrument.Symbol.Value
+			sec, ok := state.symbolToSec[symbol]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
+		} else if req.Order.Instrument.SecurityID != nil {
+			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			symbol = sec.Symbol
+			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
+		}
+	} else {
+		response.RejectionReason = messages.UnknownSecurityID
+		context.Respond(response)
+		return nil
+	}
+
+	params, rej := buildPostOrderRequest(symbol, req.Order, tickPrecision, lotPrecision)
+	if rej != nil {
+		response.RejectionReason = *rej
+		context.Respond(response)
+		return nil
+	}
+
+	request, weight, err := bybitl.PostActiveOrder(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr.rateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var order bybitl.PostOrderResponse
+		err = json.Unmarshal(queryResponse.Response, &order)
+		if err != nil {
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if order.RetCode != 0 {
+			state.logger.Info("error posting order", log.Error(errors.New(order.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.Success = true
+		response.OrderID = order.Order.OrderId
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderCancelRequest)
+	response := &messages.OrderCancelResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	symbol := ""
+	if req.Instrument != nil {
+		if req.Instrument.Symbol != nil {
+			symbol = req.Instrument.Symbol.Value
+		} else if req.Instrument.SecurityID != nil {
+			sec, ok := state.securities[req.Instrument.SecurityID.Value]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			symbol = sec.Symbol
+		}
+	} else {
+		response.RejectionReason = messages.UnknownSecurityID
+		context.Respond(response)
+		return nil
+	}
+	params := bybitl.NewCancelActiveOrderParams(symbol)
+	if req.OrderID != nil {
+		params.SetOrderId(req.OrderID.Value)
+	} else if req.ClientOrderID != nil {
+		params.SetOrderLinkId(req.ClientOrderID.Value)
+	} else {
+		response.RejectionReason = messages.UnknownOrder
+		context.Respond(response)
+		return nil
+	}
+
+	request, weight, err := bybitl.CancelActiveOrder(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(request.URL)
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.rateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var order bybitl.CancelOrderResponse
+		fmt.Println(string(queryResponse.Response))
+		err = json.Unmarshal(queryResponse.Response, &order)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if order.RetCode != 0 {
+			state.logger.Info("error cancelling order", log.Error(errors.New(order.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.Success = true
+		context.Respond(response)
+	})
 	return nil
 }

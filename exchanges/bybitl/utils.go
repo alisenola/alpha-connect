@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
+	"strconv"
 )
 
 func orderToModel(order *bybitl.ActiveOrder) *models.Order {
@@ -49,18 +51,18 @@ func orderToModel(order *bybitl.ActiveOrder) *models.Order {
 	}
 
 	switch order.OrderType {
-	case bybitl.Limit:
+	case bybitl.LimitOrder:
 		o.OrderType = models.Limit
-	case bybitl.Market:
+	case bybitl.MarketOrder:
 		o.OrderType = models.Market
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", order.OrderType)
 	}
 
 	switch order.Side {
-	case bybitl.Buy:
+	case bybitl.BuyOrder:
 		o.Side = models.Buy
-	case bybitl.Sell:
+	case bybitl.SellOrder:
 		o.Side = models.Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
@@ -122,18 +124,18 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 	}
 
 	switch order.OrderType {
-	case bybitl.Limit:
+	case bybitl.LimitOrder:
 		ord.OrderType = models.Limit
-	case bybitl.Market:
+	case bybitl.MarketOrder:
 		ord.OrderType = models.Market
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", order.OrderType)
 	}
 
 	switch order.Side {
-	case bybitl.Buy:
+	case bybitl.BuyOrder:
 		ord.Side = models.Buy
-	case bybitl.Sell:
+	case bybitl.SellOrder:
 		ord.Side = models.Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
@@ -153,4 +155,59 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 	}
 
 	return ord
+}
+
+func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (bybitl.PostActiveOrderParams, *messages.RejectionReason) {
+	var side bybitl.OrderSide
+	var typ bybitl.OrderType
+	var tif bybitl.TimeInForce
+	var redo bool
+
+	if order.OrderSide == models.Buy {
+		side = bybitl.BuyOrder
+	} else {
+		side = bybitl.SellOrder
+	}
+	switch order.OrderType {
+	case models.Limit:
+		typ = bybitl.LimitOrder
+	case models.Market:
+		typ = bybitl.MarketOrder
+	default:
+		rej := messages.UnsupportedOrderType
+		return nil, &rej
+	}
+
+	switch order.TimeInForce {
+	case models.Session:
+		tif = bybitl.GoodTillCancel
+	case models.GoodTillCancel:
+		tif = bybitl.GoodTillCancel
+	case models.ImmediateOrCancel:
+		tif = bybitl.ImmediateOrCancel
+	case models.FillOrKill:
+		tif = bybitl.FillOrKill
+	}
+
+	for _, exec := range order.ExecutionInstructions {
+		rej := messages.UnsupportedOrderCharacteristic
+		switch exec {
+		case models.ReduceOnly:
+			redo = true
+		default:
+			return nil, &rej
+		}
+	}
+
+	request := bybitl.NewPostActiveOrderParams(symbol, side, typ, tif, redo, false)
+
+	fmt.Println("SET QTY", order.Quantity, lotPrecision, strconv.FormatFloat(order.Quantity, 'f', int(lotPrecision), 64))
+	request.SetQuantity(order.Quantity, lotPrecision)
+	request.SetOrderLinkId(order.ClientOrderID)
+
+	if order.Price != nil {
+		request.SetPrice(order.Price.Value, tickPrecision)
+	}
+
+	return request, nil
 }
