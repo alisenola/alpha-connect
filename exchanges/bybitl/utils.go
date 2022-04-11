@@ -81,3 +81,76 @@ func orderToModel(order *bybitl.ActiveOrder) *models.Order {
 
 	return o
 }
+
+func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
+	ord := &models.Order{
+		OrderID:       order.OrderId,
+		ClientOrderID: order.OrderLinkId,
+		Instrument: &models.Instrument{
+			Exchange: &constants.BYBITL,
+			Symbol:   &types.StringValue{Value: order.Symbol},
+		},
+		LeavesQuantity: order.LeavesQty,
+		CumQuantity:    order.CumExecQty,
+		Price:          &types.DoubleValue{Value: order.Price},
+	}
+
+	if order.ReduceOnly {
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+	}
+	if order.CloseOnTrigger {
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.CloseOnTrigger)
+	}
+
+	switch order.OrderStatus {
+	case bybitl.OrderCreated:
+		ord.OrderStatus = models.Created
+	case bybitl.OrderRejected:
+		ord.OrderStatus = models.Rejected
+	case bybitl.OrderNew:
+		ord.OrderStatus = models.New
+	case bybitl.OrderPartiallyFilled:
+		ord.OrderStatus = models.PartiallyFilled
+	case bybitl.OrderFilled:
+		ord.OrderStatus = models.Filled
+	case bybitl.OrderCancelled:
+		ord.OrderStatus = models.Canceled
+	case bybitl.OrderPendingCancel:
+		ord.OrderStatus = models.PendingCancel
+	default:
+		fmt.Println("UNKNOWN ORDER STATUS", order.OrderStatus)
+	}
+
+	switch order.OrderType {
+	case bybitl.Limit:
+		ord.OrderType = models.Limit
+	case bybitl.Market:
+		ord.OrderType = models.Market
+	default:
+		fmt.Println("UNKNOWN ORDER TYPE", order.OrderType)
+	}
+
+	switch order.Side {
+	case bybitl.Buy:
+		ord.Side = models.Buy
+	case bybitl.Sell:
+		ord.Side = models.Sell
+	default:
+		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
+	}
+
+	switch order.TimeInForce {
+	case bybitl.GoodTillCancel:
+		ord.TimeInForce = models.GoodTillCancel
+	case bybitl.ImmediateOrCancel:
+		ord.TimeInForce = models.ImmediateOrCancel
+	case bybitl.FillOrKill:
+		ord.TimeInForce = models.FillOrKill
+	case bybitl.PostOnly:
+		ord.TimeInForce = models.PostOnly
+	default:
+		fmt.Println("UNKNOWN ORDER TIME IN FORCE", order.TimeInForce)
+	}
+
+	return ord
+}

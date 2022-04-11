@@ -8,9 +8,11 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	"go.mongodb.org/mongo-driver/mongo"
+	"net"
 	"net/http"
 	"reflect"
 	"time"
@@ -19,18 +21,26 @@ import (
 type checkSocket struct{}
 type checkAccount struct{}
 type refreshKey struct{}
+type confirmFillBuf struct {
+	orderId  string
+	tradeId  string
+	price    float64
+	quantity float64
+	maker    bool
+}
 
 type AccountListener struct {
 	account            *account.Account
 	seqNum             uint64
 	bybitlExecutor     *actor.PID
-	ws                 *bybitl.Websocket
+	ws                 *bybitl.AuthWebsocket
 	logger             *log.Logger
 	checkAccountTicker *time.Ticker
 	checkSocketTicker  *time.Ticker
 	refreshKeyTicker   *time.Ticker
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
+	confirmFillBuf     map[string]*confirmFillBuf
 	client             *http.Client
 	txs                *mongo.Collection
 	execs              *mongo.Collection
@@ -76,9 +86,29 @@ func (state *AccountListener) Receive(context actor.Context) {
 			state.logger.Error("error restarting", log.Error(err))
 		}
 		state.logger.Info("actor restarting")
+	case *messages.AccountDataRequest:
+		if err := state.OnAccountDataRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountDataRequest", log.Error(err))
+			panic(err)
+		}
 	case *messages.BalancesRequest:
 		if err := state.OnBalancesRequest(context); err != nil {
 			state.logger.Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.PositionsRequest:
+		if err := state.OnPositionsRequest(context); err != nil {
+			state.logger.Error("error processing OnPositionListRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.OrderStatusRequest:
+		if err := state.OnOrderStatusRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
+			panic(err)
+		}
+	case *xchanger.WebsocketMessage:
+		if err := state.onWebsocketMessage(context); err != nil {
+			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
 			panic(err)
 		}
 	}
@@ -241,11 +271,195 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	return nil
 }
 
+func (state *AccountListener) OnAccountDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountDataRequest)
+	resp := &messages.AccountDataResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Securities: state.account.GetSecurities(),
+		Orders:     state.account.GetOrders(nil),
+		Positions:  state.account.GetPositions(),
+		Balances:   state.account.GetBalances(),
+		Success:    true,
+		SeqNum:     state.seqNum,
+	}
+	makerFee := state.account.GetMakerFee()
+	takerFee := state.account.GetTakerFee()
+
+	if makerFee != nil {
+		resp.MakerFee = &types.DoubleValue{Value: *makerFee}
+	}
+	if takerFee != nil {
+		resp.TakerFee = &types.DoubleValue{Value: *takerFee}
+	}
+	context.Respond(resp)
+	return nil
+}
+
+func (state *AccountListener) OnPositionsRequest(context actor.Context) error {
+	req := context.Message().(*messages.PositionsRequest)
+	// TODO FILTER
+	context.Respond(&messages.PositionList{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Positions:  state.account.GetPositions(),
+	})
+	return nil
+}
+
+func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
+	req := context.Message().(*messages.BalancesRequest)
+	// TODO FILTER
+	balances := state.account.GetBalances()
+	context.Respond(&messages.BalanceList{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+		Balances:   balances,
+	})
+	return nil
+}
+
+func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderStatusRequest)
+	orders := state.account.GetOrders(req.Filter)
+	context.Respond(&messages.OrderList{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Orders:     orders,
+		Success:    true,
+	})
+	return nil
+}
+
 func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if state.ws != nil {
 		_ = state.ws.Disconnect()
 	}
-	
+
+	ws := bybitl.NewAuthWebsocket()
+	if err := ws.Connect(&net.Dialer{}); err != nil {
+		return fmt.Errorf("error connection to bybitl websocket: %v", err)
+	}
+	if err := ws.Authenticate(state.account.ApiCredentials); err != nil {
+		return fmt.Errorf("error authenticating for bybitl websocket: %v", err)
+	}
+	// Subscribe to balances
+	if err := ws.SubscribeBalance(); err != nil {
+		return fmt.Errorf("error subscribing to balances: %v", err)
+	}
+	// Subscribe to positions
+	if err := ws.SubscribePositions(); err != nil {
+		return fmt.Errorf("error subscribing to positions: %v", err)
+	}
+	// Subscribe to orders
+	if err := ws.SubscribeOrders(); err != nil {
+		return fmt.Errorf("error subscribing to orders: %v", err)
+	}
+	// Subscribe to executions
+	if err := ws.SubscribeExecutions(); err != nil {
+		return fmt.Errorf("error subscribing to executions: %v", err)
+	}
+	go func(pid *actor.PID, ws *bybitl.AuthWebsocket) {
+		for ws.ReadMessage() {
+			context.Send(pid, ws.Msg)
+		}
+	}(context.Self(), ws)
+
+	state.ws = ws
+	return nil
+}
+
+func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
+	msg := context.Message().(*xchanger.WebsocketMessage)
+	if state.ws == nil || msg.WSID != state.ws.ID {
+		return nil
+	}
+
+	if msg.Message == nil {
+		return fmt.Errorf("reveived nil message")
+	}
+	switch s := msg.Message.(type) {
+	case bybitl.WSOrders:
+		for _, order := range s {
+			switch order.OrderStatus {
+			case bybitl.OrderNew:
+				// New Order
+				if !state.account.HasOrder(order.OrderId) {
+					o := wsOrderToModel(&order)
+					o.OrderStatus = models.PendingNew
+					_, rej := state.account.NewOrder(o)
+					if rej != nil {
+						return fmt.Errorf("error creating new order: %s", rej.String())
+					}
+				}
+				report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
+				if err != nil {
+					return fmt.Errorf("error confirming new order: %v", err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			case bybitl.OrderCancelled:
+				report, err := state.account.ConfirmCancelOrder(order.OrderLinkId)
+				if err != nil {
+					return fmt.Errorf("error confirming cancel order: %v", err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			case bybitl.OrderFilled:
+				ord, ok := state.confirmFillBuf[order.OrderLinkId]
+				if !ok {
+					state.confirmFillBuf[order.OrderLinkId] = &confirmFillBuf{
+						orderId:  order.OrderId,
+						price:    order.LastExecPrice,
+						quantity: order.Qty,
+					}
+				} else {
+					report, err := state.account.ConfirmFill(order.OrderId, ord.tradeId, order.LastExecPrice, order.Qty, !ord.maker)
+					if err != nil {
+						return fmt.Errorf("error confirming filled order: %v", err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+				}
+			}
+		}
+	case bybitl.WSExecutions:
+		for _, exec := range s {
+			switch exec.ExecType {
+			case bybitl.ExecTypeTrade:
+				ord, ok := state.confirmFillBuf[exec.OrderLinkId]
+				if !ok {
+					state.confirmFillBuf[exec.OrderLinkId] = &confirmFillBuf{
+						tradeId: exec.ExecId,
+						maker:   exec.IsMaker,
+					}
+				} else {
+					report, err := state.account.ConfirmFill(exec.OrderId, exec.ExecId, ord.price, ord.quantity, !exec.IsMaker)
+					if err != nil {
+						return fmt.Errorf("error confirming filled order: %v", err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+				}
+
+			}
+		}
+	}
+	return nil
 }
 
 func (state *AccountListener) Clean(context actor.Context) error {
@@ -268,6 +482,24 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.refreshKeyTicker != nil {
 		state.refreshKeyTicker.Stop()
 		state.refreshKeyTicker = nil
+	}
+
+	return nil
+}
+
+func (state *AccountListener) checkSocket(context actor.Context) error {
+	if time.Since(state.lastPingTime) > 5*time.Second {
+		_ = state.ws.Ping()
+		state.lastPingTime = time.Now()
+	}
+
+	if state.ws.Err != nil || !state.ws.Connected {
+		if state.ws.Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws.Err))
+		}
+		if err := state.subscribeAccount(context); err != nil {
+			return fmt.Errorf("error subscribing to account: %v", err)
+		}
 	}
 
 	return nil
