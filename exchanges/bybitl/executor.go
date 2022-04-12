@@ -404,14 +404,8 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 }
 
 //TODO following functions need to be added:
-// - Account mouvements (withdrawal, funding,...)
-// - Trade records
-// - Orders Status
-// - Positions Status: done
-// - Balances request: done
-// - NewSingleOrder request
-// - CancelOrder request
 // - MassCancel request
+// - AmendOrder request
 
 func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
@@ -951,6 +945,98 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		}
 		if order.RetCode != 0 {
 			state.logger.Info("error cancelling order", log.Error(errors.New(order.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	response := &messages.OrderMassCancelResponse{
+		ResponseID: uint64(time.Now().UnixNano()),
+		RequestID:  req.RequestID,
+		Success:    false,
+	}
+	symbol := ""
+	if req.Filter != nil {
+		if req.Filter.Instrument != nil {
+			if req.Filter.Instrument.Symbol != nil {
+				symbol = req.Filter.Instrument.Symbol.Value
+			} else if req.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					response.RejectionReason = messages.UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				symbol = sec.Symbol
+			}
+		} else {
+			response.RejectionReason = messages.UnknownSecurityID
+			context.Respond(response)
+			return nil
+		}
+	} else {
+		response.RejectionReason = messages.UnsupportedFilter
+		context.Respond(response)
+		return nil
+	}
+
+	params := bybitl.NewCancelAllActiveParams(symbol)
+	request, weight, err := bybitl.CancelAllActiveOrders(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.rateLimit.Request(weight)
+
+	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(f, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf("%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf("%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var cancelResponse bybitl.CancelOrdersResponse
+		err = json.Unmarshal(queryResponse.Response, &cancelResponse)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if cancelResponse.RetCode != 0 {
+			state.logger.Info("error mass cancelling orders", log.Error(err))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return

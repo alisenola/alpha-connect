@@ -27,10 +27,11 @@ func TestNewAccountListener(t *testing.T) {
 	bybitl.EnableTestNet()
 	bybitl.EnableWebSocketTestNet()
 	tests.AccntTest(t, tests.AccountTest{
-		Account:            bybitlAccount,
-		Instrument:         instrument,
-		OrderStatusRequest: true,
-		GetPositionsLimit:  true,
-		GetPositionsMarket: true,
+		Account:                bybitlAccount,
+		Instrument:             instrument,
+		OrderStatusRequest:     false,
+		GetPositionsLimit:      false,
+		GetPositionsMarket:     false,
+		OrderMassCancelRequest: true,
 	})
 }

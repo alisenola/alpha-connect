@@ -12,15 +12,16 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	"go.mongodb.org/mongo-driver/mongo"
+	"math"
 	"net"
 	"net/http"
 	"reflect"
+	"sort"
 	"time"
 )
 
 type checkSocket struct{}
 type checkAccount struct{}
-type refreshKey struct{}
 type confirmFillBuf struct {
 	orderId  string
 	tradeId  string
@@ -116,10 +117,23 @@ func (state *AccountListener) Receive(context actor.Context) {
 			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
 			panic(err)
 		}
+	case *messages.OrderMassCancelRequest:
+		if err := state.OnOrderMassCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderMassCancelRequest", log.Error(err))
+			panic(err)
+		}
 	case *xchanger.WebsocketMessage:
 		if err := state.onWebsocketMessage(context); err != nil {
 			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
 			panic(err)
+		}
+	case *checkSocket:
+		if err := state.checkSocket(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
+		}
+	case *checkAccount:
+		if err := state.checkAccount(context); err != nil {
+			state.logger.Error("error checking socket", log.Error(err))
 		}
 	}
 }
@@ -469,7 +483,92 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			}
 		}
 	}
+	return nil
+}
 
+func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	orders := state.account.GetOrders(req.Filter)
+	if len(orders) == 0 {
+		context.Respond(&messages.OrderMassCancelResponse{
+			RequestID:  req.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Success:    true,
+		})
+		return nil
+	}
+	var reports []*messages.ExecutionReport
+	for _, o := range orders {
+		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
+			continue
+		}
+		report, res := state.account.CancelOrder(o.OrderID)
+		if res != nil {
+			for _, r := range reports {
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					return err
+				}
+			}
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+			return nil
+		} else if report != nil {
+			reports = append(reports, report)
+		}
+	}
+
+	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    true,
+	})
+
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+	fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
+	context.AwaitFuture(fut, func(res interface{}, err error) {
+		if err != nil {
+			for _, r := range reports {
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: messages.Other,
+			})
+			return
+		}
+		response := res.(*messages.OrderMassCancelResponse)
+		context.Respond(response)
+		if !response.Success {
+			for _, r := range reports {
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, response.RejectionReason)
+				if err != nil {
+					panic(err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
+			}
+		}
+	})
 	return nil
 }
 
@@ -490,9 +589,10 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error subscribing to balances: %v", err)
 	}
 	// Subscribe to positions
-	if err := ws.SubscribePositions(); err != nil {
-		return fmt.Errorf("error subscribing to positions: %v", err)
-	}
+	// TODO NEED POSITIONS?
+	//if err := ws.SubscribePositions(); err != nil {
+	//	return fmt.Errorf("error subscribing to positions: %v", err)
+	//}
 	// Subscribe to orders
 	if err := ws.SubscribeOrders(); err != nil {
 		return fmt.Errorf("error subscribing to orders: %v", err)
@@ -558,6 +658,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				if err != nil {
 					return fmt.Errorf("error getting order: %v", err)
 				}
+				// TODO EXPLANATION
 				// If instantly filled, won't get a new order update in between
 				if ord.OrderStatus == models.PendingNew {
 					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
@@ -569,6 +670,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 						state.seqNum += 1
 						context.Send(context.Parent(), report)
 					}
+					delete(state.confirmFillBuf, order.OrderLinkId)
 				}
 			}
 		}
@@ -587,6 +689,19 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				}
 			}
 		}
+	case bybitl.WSBalances:
+		for _, b := range s {
+			if _, err := state.account.UpdateBalance(&constants.TETHER, b.WalletBalance, messages.Unknown); err != nil {
+				return fmt.Errorf("error updating account balance: %v", err)
+			}
+		}
+	case bybitl.WSResponse:
+		if !s.Success {
+			return fmt.Errorf("error in WSResponse: %s", s.ReturnMessage)
+		}
+		return nil
+	default:
+		return fmt.Errorf("received unknown event type: %s", reflect.TypeOf(s).String())
 	}
 	return nil
 }
@@ -623,6 +738,86 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 		}
 		if err := state.subscribeAccount(context); err != nil {
 			return fmt.Errorf("error subscribing to account: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (state *AccountListener) checkAccount(context actor.Context) error {
+	fmt.Println("CHECKING ACCOUNT")
+
+	// Fetch balances
+	resp, err := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting balances from executor: %v", err)
+	}
+
+	balanceList, ok := resp.(*messages.BalanceList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !balanceList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	}
+	if len(balanceList.Balances) != 1 {
+		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+	}
+
+	// Fetch positions
+	resp, err = context.RequestFuture(state.bybitlExecutor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account.Account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting balances from executor: %v", err)
+	}
+
+	positionList, ok := resp.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !positionList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	}
+
+	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
+	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
+	if rawMargin1 != rawMargin2 {
+		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+	}
+
+	pos1 := state.account.GetPositions()
+
+	var pos2 []*models.Position
+	for _, p := range positionList.Positions {
+		if p.Quantity != 0 {
+			pos2 = append(pos2, p)
+		}
+	}
+
+	if len(pos1) != len(pos2) {
+		return fmt.Errorf("different number of positions: %d vs %d", len(pos1), len(pos2))
+	}
+
+	sort.Slice(pos1, func(i, j int) bool {
+		return pos1[i].Instrument.SecurityID.Value < pos1[j].Instrument.SecurityID.Value
+	})
+	sort.Slice(pos2, func(i, j int) bool {
+		return pos2[i].Instrument.SecurityID.Value < pos2[j].Instrument.SecurityID.Value
+	})
+
+	for i := range pos1 {
+		lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
+		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
+			return fmt.Errorf("positions have different quantities: %f vs %f", pos1[i].Quantity, pos2[i].Quantity)
+		}
+		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
+		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
+		if rawCost1 != rawCost2 {
+			return fmt.Errorf("positions have different costs: %f vs %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
 

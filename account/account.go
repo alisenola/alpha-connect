@@ -896,7 +896,6 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 }
 
 func (accnt *Account) GetBalances() []*models.Balance {
-	fmt.Println("Getting the balance in account/account.go")
 	accnt.RLock()
 	defer accnt.RUnlock()
 	accnt.settle()
