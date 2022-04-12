@@ -99,6 +99,9 @@ func NewAccount(account *models.Account) (*Account, error) {
 	case constants.DYDX.ID:
 		accnt.MarginCurrency = &constants.USDC
 		accnt.MarginPrecision = 1e6
+	case constants.BYBITL.ID:
+		accnt.MarginCurrency = &constants.TETHER
+		accnt.MarginPrecision = 1e8
 	}
 	if accnt.MarginCurrency != nil {
 		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
@@ -893,6 +896,7 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 }
 
 func (accnt *Account) GetBalances() []*models.Balance {
+	fmt.Println("Getting the balance in account/account.go")
 	accnt.RLock()
 	defer accnt.RUnlock()
 	accnt.settle()

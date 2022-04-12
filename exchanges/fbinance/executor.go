@@ -613,7 +613,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -622,7 +622,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			}
 			return
@@ -786,7 +786,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -795,7 +795,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			}
 			return
@@ -949,7 +949,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -958,7 +958,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			}
 			return
@@ -976,8 +976,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		for _, o := range orders {
 			sec, ok := state.symbolToSec[o.Symbol]
 			if !ok {
-				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.UnknownSymbol
 				context.Respond(response)
 				return
 			}
@@ -1035,7 +1034,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
-			response.RejectionReason = messages.Other
+			response.RejectionReason = messages.HTTPError
 			context.Respond(response)
 			return
 		}
@@ -1047,7 +1046,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -1057,7 +1056,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
 				response.Success = false
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.HTTPError
 				context.Respond(response)
 			}
 			return
@@ -1065,7 +1064,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		var positions []fbinance.AccountPositionRisk
 		err = json.Unmarshal(queryResponse.Response, &positions)
 		if err != nil {
-			state.logger.Info("unmarshaling error", log.Error(err))
+			state.logger.Info("unmarshalling error", log.Error(err))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
@@ -1080,7 +1079,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			sec, ok := state.symbolToSec[p.Symbol]
 			if !ok {
 				err := fmt.Errorf("unknown symbol %s", p.Symbol)
-				state.logger.Info("unmarshaling error", log.Error(err))
+				state.logger.Info("unknown symbol error", log.Error(err))
 				response.RejectionReason = messages.ExchangeAPIError
 				context.Respond(response)
 				return
@@ -1166,7 +1165,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		var balances []fbinance.AccountBalance
 		err = json.Unmarshal(queryResponse.Response, &balances)
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
 		}
@@ -1296,7 +1295,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		var order fbinance.OrderData
 		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
 		}
