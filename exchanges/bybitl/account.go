@@ -22,13 +22,6 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
-type confirmFillBuf struct {
-	orderId  string
-	tradeId  string
-	price    float64
-	quantity float64
-	maker    bool
-}
 
 type AccountListener struct {
 	account            *account.Account
@@ -41,7 +34,6 @@ type AccountListener struct {
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
 	symbolToSec        map[string]*models.Security
-	confirmFillBuf     map[string]*confirmFillBuf
 	client             *http.Client
 	txs                *mongo.Collection
 	execs              *mongo.Collection
@@ -662,11 +654,6 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if err := ws.SubscribeBalance(); err != nil {
 		return fmt.Errorf("error subscribing to balances: %v", err)
 	}
-	// Subscribe to positions
-	// TODO NEED POSITIONS?
-	//if err := ws.SubscribePositions(); err != nil {
-	//	return fmt.Errorf("error subscribing to positions: %v", err)
-	//}
 	// Subscribe to orders
 	if err := ws.SubscribeOrders(); err != nil {
 		return fmt.Errorf("error subscribing to orders: %v", err)
@@ -732,8 +719,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				if err != nil {
 					return fmt.Errorf("error getting order: %v", err)
 				}
-				// TODO EXPLANATION
-				// If instantly filled, won't get a new order update in between
+				// If instantly filled, we will not receive an update with a bybitl.OrderNew status
+				// therefore we won't go through the branch above that confirms the new order.
+				// Therefore, we check if it's pendingNew, and we confirm it here. We let
+				// the confirmFill to the bybitl.WSExecutions
 				if ord.OrderStatus == models.PendingNew {
 					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
 					if err != nil {
@@ -744,7 +733,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 						state.seqNum += 1
 						context.Send(context.Parent(), report)
 					}
-					delete(state.confirmFillBuf, order.OrderLinkId)
 				}
 			}
 		}
