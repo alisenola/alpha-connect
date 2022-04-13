@@ -1132,6 +1132,9 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		}
 		if amendResponse.RetCode != 0 {
 			state.logger.Info("error amending order", log.Error(errors.New(amendResponse.RetMsg)))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
 		}
 		response.Success = true
 		response.OrderID = amendResponse.AmendedOrder.OrderId
