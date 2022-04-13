@@ -147,13 +147,11 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	// TODO Finish testing
 	clean(t, ctx, tc)
 	defer clean(t, ctx, tc)
-	time.Sleep(5 * time.Second)
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   nil,
 	}, 30*time.Second).Result()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +232,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Price:         &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +243,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(3 * time.Second)
 	filter := &messages.OrderFilter{
 		OrderStatus: &messages.OrderStatusValue{Value: models.New},
 		Instrument:  tc.Instrument,
@@ -258,12 +255,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		RequestID: 0,
 		Subscribe: false,
 		Account:   tc.Account,
-		Filter: &messages.OrderFilter{
-			OrderID:       nil,
-			ClientOrderID: nil,
-			Instrument:    tc.Instrument,
-			OrderStatus:   &messages.OrderStatusValue{Value: models.New},
-		},
+		Filter:    filter,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -318,7 +310,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Query order and check if got canceled
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
@@ -355,6 +347,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if int(order.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
 	}
+
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 }
 
 func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {

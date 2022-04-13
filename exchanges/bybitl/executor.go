@@ -95,7 +95,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			pid:       context.Spawn(props),
-			rateLimit: exchanges.NewRateLimit(10, time.Second),
+			rateLimit: exchanges.NewRateLimit(50, time.Second),
 		})
 	}
 
@@ -628,7 +628,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	symbol := ""
 	orderId := ""
 	clOrderId := ""
-	orderStatus := ""
+	var orderStatus bybitl.OrderStatus
 	if msg.Filter != nil {
 		if msg.Filter.Side != nil {
 			response.RejectionReason = messages.UnsupportedFilter
@@ -653,13 +653,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			return nil
 		}
 		if msg.Filter.OrderStatus != nil {
-			stat, ok := models.OrderStatus_name[int32(msg.Filter.OrderStatus.Value)]
-			if !ok {
-				response.RejectionReason = messages.UnsupportedFilter
-				context.Respond(response)
-				return nil
-			}
-			orderStatus = stat
+			orderStatus = statusToBybitl(msg.Filter.OrderStatus.Value)
 		}
 		if msg.Filter.OrderID != nil {
 			orderId = msg.Filter.OrderID.Value
@@ -669,20 +663,14 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		}
 	}
 
-	params := bybitl.NewGetActiveOrderParams(symbol)
+	params := bybitl.NewQueryActiveOrderParams(symbol)
 	if clOrderId != "" {
 		params.SetOrderLinkID(clOrderId)
 	}
 	if orderId != "" {
 		params.SetOrderID(orderId)
 	}
-	if orderStatus != "" {
-		params.SetOrderStatus(bybitl.OrderStatus(orderStatus))
-	}
-	if clOrderId == "" && orderId == "" && orderStatus == "" {
-		params.SetOrderStatus("New,Created,PartiallyFilled")
-	}
-	req, rate, err := bybitl.GetActiveOrders(params, msg.Account.ApiCredentials)
+	req, rate, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -722,7 +710,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			}
 			return
 		}
-		var orders bybitl.GetActiveOrdersResponse
+		var orders bybitl.QueryActiveOrdersResponse
 		err = json.Unmarshal(qResponse.Response, &orders)
 		if err != nil {
 			response.RejectionReason = messages.ExchangeAPIError
@@ -735,7 +723,10 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
-		for _, ord := range orders.ActiveOrders.Orders {
+		for _, ord := range orders.Orders {
+			if orderStatus != "" && ord.OrderStatus != orderStatus {
+				continue
+			}
 			sec, ok := state.symbolToSec[ord.Symbol]
 			if !ok {
 				response.RejectionReason = messages.UnknownSymbol

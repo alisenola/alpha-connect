@@ -173,7 +173,6 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 	}
 	orders2 := response.Orders
 	fmt.Printf("got %d orders from exchange executor i.e. api \n", len(orders2))
-
 	if len(orders1) != len(orders2) {
 		t.Fatalf("differents lengths, got %d vs %d", len(orders1), len(orders2))
 	}
