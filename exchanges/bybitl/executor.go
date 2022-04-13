@@ -403,10 +403,6 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	return nil
 }
 
-//TODO following functions need to be added:
-// - MassCancel request
-// - AmendOrder request
-
 func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.BalancesRequest)
 	response := &messages.BalanceList{
@@ -651,6 +647,10 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				}
 				symbol = sec.Symbol
 			}
+		} else {
+			response.RejectionReason = messages.MissingInstrument
+			context.Respond(response)
+			return nil
 		}
 		if msg.Filter.OrderStatus != nil {
 			stat, ok := models.OrderStatus_name[int32(msg.Filter.OrderStatus.Value)]
@@ -678,6 +678,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 	if orderStatus != "" {
 		params.SetOrderStatus(bybitl.OrderStatus(orderStatus))
+	}
+	if clOrderId == "" && orderId == "" && orderStatus == "" {
+		params.SetOrderStatus("New,Created,PartiallyFilled")
 	}
 	req, rate, err := bybitl.GetActiveOrders(params, msg.Account.ApiCredentials)
 	if err != nil {
@@ -739,7 +742,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			o := orderToModel(&ord)
+			o := orderToModel(ord)
 			o.Instrument.SecurityID = &types.UInt64Value{Value: sec.SecurityID}
 			response.Orders = append(response.Orders, o)
 		}
@@ -977,7 +980,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 				symbol = sec.Symbol
 			}
 		} else {
-			response.RejectionReason = messages.UnknownSecurityID
+			response.RejectionReason = messages.MissingInstrument
 			context.Respond(response)
 			return nil
 		}
@@ -1036,12 +1039,102 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			return
 		}
 		if cancelResponse.RetCode != 0 {
-			state.logger.Info("error mass cancelling orders", log.Error(err))
+			state.logger.Info("error mass cancelling orders", log.Error(errors.New(cancelResponse.RetMsg)))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
 		}
 		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderReplaceRequest)
+	response := &messages.OrderReplaceResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	symbol := ""
+	if req.Instrument != nil {
+		if req.Instrument.Symbol != nil {
+			symbol = req.Instrument.Symbol.Value
+		} else if req.Instrument.SecurityID != nil {
+			sec, ok := state.securities[req.Instrument.SecurityID.Value]
+			if !ok {
+				response.RejectionReason = messages.UnknownSecurityID
+				context.Respond(response)
+				return nil
+			}
+			symbol = sec.Symbol
+		}
+	} else {
+		response.RejectionReason = messages.MissingInstrument
+		context.Respond(response)
+		return nil
+	}
+	params := bybitl.NewAmendOrderParams(symbol)
+	if req.Update.OrderID != nil {
+		params.SetOrderId(req.Update.OrderID.Value)
+	} else if req.Update.OrigClientOrderID != nil {
+		params.SetOrderLinkId(req.Update.OrigClientOrderID.Value)
+	} else {
+		response.RejectionReason = messages.UnknownOrder
+		context.Respond(response)
+		return nil
+	}
+	request, weight, err := bybitl.AmendOrder(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.rateLimit.Request(weight)
+
+	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+	context.AwaitFuture(f, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf("%d %s", queryResponse.StatusCode, string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf("%d %s", queryResponse.StatusCode, string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.HTTPError
+				context.Respond(response)
+				return
+			}
+		}
+		var amendResponse bybitl.AmendOrderResponse
+		err = json.Unmarshal(queryResponse.Response, &amendResponse)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if amendResponse.RetCode != 0 {
+			state.logger.Info("error amending order", log.Error(errors.New(amendResponse.RetMsg)))
+		}
+		response.Success = true
+		response.OrderID = amendResponse.AmendedOrder.OrderId
 		context.Respond(response)
 	})
 	return nil

@@ -131,16 +131,14 @@ func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, ac
 }
 */
 
-func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, inst *models.Instrument) {
+func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, filter *messages.OrderFilter) {
 	// Request the same from binance directly
 	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/%s_executor", account.Exchange.Name))
 
 	res, err := as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Account:   account,
-		Filter: &messages.OrderFilter{
-			Instrument: inst,
-		},
+		Filter:    filter,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -155,13 +153,12 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 	}
 
 	orders1 := response.Orders
+	fmt.Printf("got %d orders from main executor i.e. account \n", len(orders1))
 
 	res, err = as.Root.RequestFuture(exchangeExecutor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Account:   account,
-		Filter: &messages.OrderFilter{
-			Instrument: inst,
-		},
+		Filter:    filter,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -175,6 +172,7 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 	orders2 := response.Orders
+	fmt.Printf("got %d orders from exchange executor i.e. api \n", len(orders2))
 
 	if len(orders1) != len(orders2) {
 		t.Fatalf("differents lengths, got %d vs %d", len(orders1), len(orders2))

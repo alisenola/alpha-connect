@@ -29,9 +29,10 @@ func TestNewAccountListener(t *testing.T) {
 	tests.AccntTest(t, tests.AccountTest{
 		Account:                bybitlAccount,
 		Instrument:             instrument,
-		OrderStatusRequest:     false,
+		OrderStatusRequest:     true,
 		GetPositionsLimit:      false,
 		GetPositionsMarket:     false,
-		OrderMassCancelRequest: true,
+		OrderReplaceRequest:    false,
+		OrderMassCancelRequest: false,
 	})
 }
