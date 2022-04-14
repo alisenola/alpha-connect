@@ -21,11 +21,32 @@ type AccountTest struct {
 	OrderReplaceRequest     bool
 	OrderBulkReplaceRequest bool
 	GetPositionsMarket      bool
+	OrderMassCancelRequest  bool
 }
 
 type AccountTestCtx struct {
 	as       *actor.ActorSystem
 	executor *actor.PID
+}
+
+func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
+	filter := &messages.OrderFilter{
+		Instrument: tc.Instrument,
+	}
+	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderMassCancelRequest{
+		Account: tc.Account,
+		Filter:  filter,
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok := res.(*messages.OrderMassCancelResponse)
+	if !ok {
+		t.Fatalf("expecting *messages.OrderMassCancelResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("unsuccessfull OrderMassCancelResponse: %s", response.RejectionReason.String())
+	}
 }
 
 func AccntTest(t *testing.T, tc AccountTest) {
@@ -92,7 +113,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 	v, ok := res.(*messages.MarketDataResponse)
 	if !ok {
-		t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+		t.Fatalf("was expecting *messages.MarketDataResponse, got %s", reflect.TypeOf(res).String())
 	}
 	if !v.Success {
 		t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
@@ -116,16 +137,21 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderBulkReplaceRequest {
 		OrderBulkReplaceRequest(t, ctx, tc)
 	}
+	if tc.OrderMassCancelRequest {
+		OrderMassCancelRequest(t, ctx, tc)
+	}
 }
 
 func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	// Test with no account
+	// TODO Finish testing
+	clean(t, ctx, tc)
+	defer clean(t, ctx, tc)
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   nil,
 	}, 30*time.Second).Result()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +232,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Price:         &types.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,19 +243,19 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
+	filter := &messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+		Instrument:  tc.Instrument,
+	}
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 
 	// Test with instrument and order status
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
 		Account:   tc.Account,
-		Filter: &messages.OrderFilter{
-			OrderID:       nil,
-			ClientOrderID: nil,
-			Instrument:    tc.Instrument,
-			OrderStatus:   &messages.OrderStatusValue{Value: models.New},
-		},
+		Filter:    filter,
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -252,7 +277,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("order status not new")
 	}
 	if int(order.LeavesQuantity*1000) != 1 {
-		t.Fatalf("was expecting leaves quantity of 0.0004, got %f", order.LeavesQuantity)
+		t.Fatalf("was expecting leaves quantity of 0.0001, got %f", order.LeavesQuantity)
 	}
 	if int(order.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
@@ -285,7 +310,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Query order and check if got canceled
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
@@ -322,6 +347,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if int(order.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
 	}
+
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 }
 
 func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
@@ -610,7 +637,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.Limit,
 			OrderSide:     models.Buy,
 			TimeInForce:   models.Session,
-			Quantity:      1.,
+			Quantity:      0.001,
 			Price:         &types.DoubleValue{Value: 35000.},
 		},
 	}, 10*time.Second).Result()
@@ -626,7 +653,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Test replace quantity
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderReplaceRequest{
@@ -636,7 +663,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
 			OrigClientOrderID: &types.StringValue{Value: orderID},
-			Quantity:          &types.DoubleValue{Value: 2},
+			Quantity:          &types.DoubleValue{Value: 0.002},
 			Price:             nil,
 		},
 	}, 10*time.Second).Result()
@@ -677,8 +704,8 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if len(orderList.Orders) != 1 {
 		t.Fatalf("was expecting one order, got %d", len(orderList.Orders))
 	}
-	if orderList.Orders[0].LeavesQuantity != 2 {
-		t.Fatalf("was expecting quantity of 2")
+	if orderList.Orders[0].LeavesQuantity != 0.002 {
+		t.Fatalf("was expecting quantity of 0.002")
 	}
 }
 
@@ -933,4 +960,91 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 	time.Sleep(2 * time.Second)
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
+}
+
+func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
+	//Place Orders
+	var id []string
+	for i := 0; i < 3; i++ {
+		id = append(id, uuid.NewV1().String())
+		resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+			Account: tc.Account,
+			Order: &messages.NewOrder{
+				ClientOrderID: id[i],
+				Instrument:    tc.Instrument,
+				OrderType:     models.Limit,
+				OrderSide:     models.Buy,
+				TimeInForce:   models.GoodTillCancel,
+				Quantity:      0.001 * float64(1+i),
+				Price:         &types.DoubleValue{Value: 30000.},
+			},
+		}, 10*time.Second).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		singleOrder, ok := resp.(*messages.NewOrderSingleResponse)
+		if !ok {
+			t.Fatalf("expecting *messasges.NewOrderSingleRequest, got %s", reflect.TypeOf(resp).String())
+		}
+		if !singleOrder.Success {
+			t.Fatal(singleOrder.RejectionReason.String())
+		}
+	}
+	time.Sleep(30 * time.Second)
+	filter := &messages.OrderFilter{
+		Instrument:  tc.Instrument,
+		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+	}
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	//Cancel all the orders
+	resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderMassCancelRequest{
+		Account: tc.Account,
+		Filter: &messages.OrderFilter{
+			Instrument: tc.Instrument,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cancel, ok := resp.(*messages.OrderMassCancelResponse)
+	if !ok {
+		t.Fatalf("expecting *messasges.OrderMassCancelResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if !cancel.Success {
+		t.Fatal(cancel.RejectionReason.String())
+	}
+	time.Sleep(20 * time.Second)
+	filter = &messages.OrderFilter{
+		Instrument:  tc.Instrument,
+		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+	}
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	// Fetch all orders
+	for i := 0; i < 3; i++ {
+		resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
+			Account: tc.Account,
+			Filter: &messages.OrderFilter{
+				ClientOrderID: &types.StringValue{Value: id[i]},
+			},
+		}, 10*time.Second).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+		order, ok := resp.(*messages.OrderList)
+		if !ok {
+			t.Fatalf("expecting *messasges.OrderList, got %s", reflect.TypeOf(resp).String())
+		}
+		if !order.Success {
+			t.Fatal(cancel.RejectionReason.String())
+		}
+		fmt.Println(order)
+		if len(order.Orders) != 1 {
+			t.Fatalf("was expecting 1 order got %d", len(order.Orders))
+		}
+		if order.Orders[0].OrderStatus.String() != "Canceled" {
+			t.Fatalf("expecting Canceled, got %s", order.Orders[0].OrderStatus.String())
+		}
+	}
 }

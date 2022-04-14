@@ -799,7 +799,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		context.Respond(response)
 		if !response.Success {
 			for _, r := range reports {
-				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, response.RejectionReason)
 				if err != nil {
 					panic(err)
 				}
