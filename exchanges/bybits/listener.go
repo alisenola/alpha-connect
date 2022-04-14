@@ -355,7 +355,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		mergedBook.Sync(bids, asks)
 
 		levels := state.instrumentData.mergedBook.Diff(mergedBook)
-		fmt.Println(levels)
 		state.instrumentData.mergedBook = mergedBook
 
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
