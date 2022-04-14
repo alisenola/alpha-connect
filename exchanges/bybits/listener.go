@@ -369,6 +369,11 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case bybits.WSResponse:
+		if msg.Code != "0" {
+			return fmt.Errorf("received a non-sucess response: %s", msg.Msg)
+		}
+
+	case bybits.WSPing:
 
 	default:
 		state.logger.Info("received unknown message",
@@ -380,14 +385,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-	// If haven't sent anything for 2 seconds, send heartbeat
-	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
-		// Send an empty refresh
-		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
-			SeqNum: state.instrumentData.seqNum + 1,
-		})
-		state.instrumentData.seqNum += 1
-		state.instrumentData.lastHBTime = time.Now()
+	if time.Since(state.lastPingTime) > 10*time.Second {
+		_ = state.ws.Ping()
+		fmt.Println("Ping")
+		state.lastPingTime = time.Now()
 	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
@@ -397,6 +398,15 @@ func (state *Listener) checkSockets(context actor.Context) error {
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
+	}
+	// If haven't sent anything for 2 seconds, send heartbeat
+	if time.Since(state.instrumentData.lastHBTime) > 2*time.Second {
+		// Send an empty refresh
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastHBTime = time.Now()
 	}
 
 	return nil
