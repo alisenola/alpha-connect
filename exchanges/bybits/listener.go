@@ -24,6 +24,7 @@ type checkSockets struct{}
 
 type InstrumentData struct {
 	orderBook           *gorderbook.OrderBookL2
+	mergedBook          *gorderbook.OrderBookL2
 	seqNum              uint64
 	lastUpdateTime      uint64
 	lastHBTime          time.Time
@@ -205,6 +206,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			}
 			ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
 			state.instrumentData.orderBook = ob
+			state.instrumentData.mergedBook = gorderbook.NewOrderBookL2(
+				tickPrecision,
+				lotPrecision,
+				10000)
+			state.instrumentData.mergedBook.Sync(nil, nil)
 			state.instrumentData.lastUpdateTime = ts
 			state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 			nTries = 100
@@ -226,6 +232,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
 	}
 
+	if err := ws.SubscribeMergedDepth(state.security.Symbol, -3); err != nil {
+		return fmt.Errorf("error subscribing to merged orderbook for %s", state.security.Symbol)
+	}
+
 	state.ws = ws
 
 	go func(ws *bybits.Websocket, pid *actor.PID) {
@@ -239,24 +249,24 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataRequest)
-	response := &messages.MarketDataResponse{
+	bids := state.instrumentData.mergedBook.GetBids(0)
+	asks := state.instrumentData.mergedBook.GetAsks(0)
+	bids = append(bids, state.instrumentData.orderBook.GetBids(0)...)
+	asks = append(asks, state.instrumentData.orderBook.GetAsks(0)...)
+	snapshot := &models.OBL2Snapshot{
+		Bids:          bids,
+		Asks:          asks,
+		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
+		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+	}
+	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
+		SnapshotL2: snapshot,
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
-	}
-	if msg.Aggregation == models.L2 {
-		snapshot := &models.OBL2Snapshot{
-			Bids:          state.instrumentData.orderBook.GetBids(0),
-			Asks:          state.instrumentData.orderBook.GetAsks(0),
-			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
-		}
-		response.SnapshotL2 = snapshot
-	}
-
-	context.Respond(response)
+	})
 	return nil
 }
 
@@ -311,6 +321,53 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		})
 		state.instrumentData.seqNum += 1
 		instr.lastUpdateTime = ts
+
+	case bybits.WSMergedDepths:
+		ts := uint64(wsmsg.ClientTime.UnixNano() / 1000000)
+
+		bids := state.instrumentData.orderBook.GetBids(-1)
+		worstBid := bids[len(bids)-1].Price
+		asks := state.instrumentData.orderBook.GetAsks(-1)
+		worstAsk := asks[len(asks)-1].Price
+
+		bids = nil
+		asks = nil
+
+		bbids, basks := msg[0].ToBidAsk()
+		for _, b := range bbids {
+			if b.Price < worstBid {
+				// Add to book
+				bids = append(bids, b)
+			}
+		}
+		for _, a := range basks {
+			if a.Price > worstAsk {
+				// Add to book
+				asks = append(asks, a)
+			}
+		}
+
+		mergedBook := gorderbook.NewOrderBookL2(
+			state.instrumentData.mergedBook.TickPrecision,
+			state.instrumentData.mergedBook.LotPrecision,
+			state.instrumentData.mergedBook.Depth)
+
+		mergedBook.Sync(bids, asks)
+
+		levels := state.instrumentData.mergedBook.Diff(mergedBook)
+		fmt.Println(levels)
+		state.instrumentData.mergedBook = mergedBook
+
+		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
+			UpdateL2: &models.OBL2Update{
+				Levels:    levels,
+				Timestamp: utils.MilliToTimestamp(ts),
+				Trade:     false,
+			},
+			SeqNum: state.instrumentData.seqNum + 1,
+		})
+		state.instrumentData.seqNum += 1
+		state.instrumentData.lastUpdateTime = ts
 
 	case bybits.WSTrades:
 		ts := uint64(wsmsg.ClientTime.UnixNano() / 1000000)
