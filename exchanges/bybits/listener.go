@@ -373,7 +373,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			return fmt.Errorf("received a non-sucess response: %s", msg.Msg)
 		}
 
-	case bybits.WSPing:
+	case bybits.WSPong:
 
 	default:
 		state.logger.Info("received unknown message",
