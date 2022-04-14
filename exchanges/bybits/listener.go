@@ -180,6 +180,23 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("error connecting to bybit websocket: %v", err)
 	}
 
+	dumpScale := -int(math.Round(math.Log10(state.security.MinPriceIncrement.Value))) - 5
+	for dumpScale < 0 {
+		if err := ws.SubscribeMergedDepth(state.security.Symbol, dumpScale); err != nil {
+			return fmt.Errorf("error subscribing to merged orderbook for %s", state.security.Symbol)
+		}
+		if !ws.ReadMessage() {
+			return fmt.Errorf("error reading message: %v", ws.Err)
+		}
+		res, ok := ws.Msg.Message.(bybits.WSResponse)
+		// !ok means we are good
+		if !ok || res.Code == "0" {
+			break
+		} else {
+			dumpScale += 1
+		}
+	}
+
 	if err := ws.Subscribe(state.security.Symbol, bybits.WSDiffDepthTopic); err != nil {
 		return fmt.Errorf("error subscribing to orderbook for %s", state.security.Symbol)
 	}
@@ -230,10 +247,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 
 	if err := ws.Subscribe(state.security.Symbol, bybits.WSTradeTopic); err != nil {
 		return fmt.Errorf("error subscribing to trades for %s", state.security.Symbol)
-	}
-
-	if err := ws.SubscribeMergedDepth(state.security.Symbol, -3); err != nil {
-		return fmt.Errorf("error subscribing to merged orderbook for %s", state.security.Symbol)
 	}
 
 	state.ws = ws
@@ -426,7 +439,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bybits.WSResponse:
 		if msg.Code != "0" {
-			fmt.Printf("received a non-sucess response: %s %s \n", msg.Msg, msg.Desc)
+			return fmt.Errorf("received a non-sucess response: %s %s", msg.Msg, msg.Desc)
 		}
 
 	case bybits.WSPong:
