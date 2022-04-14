@@ -426,7 +426,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case bybits.WSResponse:
 		if msg.Code != "0" {
-			return fmt.Errorf("received a non-sucess response: %s", msg.Msg)
+			fmt.Printf("received a non-sucess response: %s %s \n", msg.Msg, msg.Desc)
 		}
 
 	case bybits.WSPong:
