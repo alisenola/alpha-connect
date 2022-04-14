@@ -305,7 +305,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeInstrument(context)
 		}
-
 		context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 			UpdateL2: obDelta,
 			SeqNum:   state.instrumentData.seqNum + 1,
