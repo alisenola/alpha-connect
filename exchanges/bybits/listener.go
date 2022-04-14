@@ -387,7 +387,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 func (state *Listener) checkSockets(context actor.Context) error {
 	if time.Since(state.lastPingTime) > 10*time.Second {
 		_ = state.ws.Ping()
-		fmt.Println("Ping")
 		state.lastPingTime = time.Now()
 	}
 
