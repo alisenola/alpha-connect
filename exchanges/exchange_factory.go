@@ -12,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bitz"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybiti"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybitl"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/bybits"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/coinbasepro"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/cryptofacilities"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/deribit"
@@ -130,6 +131,8 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 		return func() actor.Actor { return bybiti.NewListener(security, dialerPool) }
 	case constants.BYBITL.ID:
 		return func() actor.Actor { return bybitl.NewListener(security, dialerPool) }
+	case constants.BYBITS.ID:
+		return func() actor.Actor { return bybits.NewListener(security, dialerPool) }
 	case constants.UPBIT.ID:
 		return func() actor.Actor { return upbit.NewListener(security, dialerPool) }
 	case constants.BITHUMB.ID:
@@ -199,6 +202,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *utils.D
 		return func() actor.Actor { return bybiti.NewExecutor(dialerPool) }
 	case constants.BYBITL.ID:
 		return func() actor.Actor { return bybitl.NewExecutor(dialerPool) }
+	case constants.BYBITS.ID:
+		return func() actor.Actor { return bybits.NewExecutor(dialerPool) }
 	case constants.UPBIT.ID:
 		return func() actor.Actor { return upbit.NewExecutor() }
 	case constants.BITHUMB.ID:

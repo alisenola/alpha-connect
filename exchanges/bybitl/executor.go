@@ -733,7 +733,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			o := orderToModel(ord)
+			o := orderToModel(&ord)
 			o.Instrument.SecurityID = &types.UInt64Value{Value: sec.SecurityID}
 			response.Orders = append(response.Orders, o)
 		}
