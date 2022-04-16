@@ -116,10 +116,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			pid:            context.Spawn(props),
-			sPostRateLimit: exchanges.NewRateLimit(20, 2*time.Minute),
-			mPostRateLimit: exchanges.NewRateLimit(50, 5*time.Second),
-			sGetRateLimit:  exchanges.NewRateLimit(50, 2*time.Minute),
-			mGetRateLimit:  exchanges.NewRateLimit(70, 5*time.Second),
+			sGetRateLimit:  exchanges.NewRateLimit(50*120, 2*time.Minute),
+			mGetRateLimit:  exchanges.NewRateLimit(70*5, 5*time.Second),
+			sPostRateLimit: exchanges.NewRateLimit(20*120, 2*time.Minute),
+			mPostRateLimit: exchanges.NewRateLimit(50*5, 5*time.Second),
 		})
 	}
 
@@ -137,17 +137,17 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	request, weight, err := bybitl.GetSymbols()
-	if err != nil {
-		return err
-	}
-
 	qr := state.getQueryRunner(false)
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
-	qr.Get(weight)
+	request, _, err := bybitl.GetSymbols()
+	if err != nil {
+		return err
+	}
+
+	qr.Get(1)
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
@@ -435,7 +435,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	req, weight, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
+	req, _, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	qr.Get(weight)
+	qr.Get(1)
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
 		if err != nil {
@@ -541,7 +541,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		}
 	}
 
-	req, weight, err := bybitl.GetPositions("", msg.Account.ApiCredentials)
+	req, _, err := bybitl.GetPositions("", msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -552,7 +552,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	qr.Get(weight)
+	qr.Get(1)
 	// TODO check account rate limit
 
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
@@ -695,7 +695,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	if orderId != "" {
 		params.SetOrderID(orderId)
 	}
-	req, weight, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
+	req, _, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -706,7 +706,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	qr.Get(weight)
+	qr.Get(1)
 	// TODO check account rate limit
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
@@ -821,12 +821,12 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	request, weight, err := bybitl.PostActiveOrder(params, req.Account.ApiCredentials)
+	request, _, err := bybitl.PostActiveOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
 
-	qr.Post(weight)
+	qr.Post(1)
 	// TODO check account rate limit
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
@@ -1018,11 +1018,11 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}
 
 	params := bybitl.NewCancelAllActiveParams(symbol)
-	request, weight, err := bybitl.CancelAllActiveOrders(params, req.Account.ApiCredentials)
+	request, _, err := bybitl.CancelAllActiveOrders(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
-	qr.Post(weight)
+	qr.Post(1)
 
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
@@ -1113,11 +1113,11 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	request, weight, err := bybitl.AmendOrder(params, req.Account.ApiCredentials)
+	request, _, err := bybitl.AmendOrder(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
-	qr.Post(weight)
+	qr.Post(1)
 	// TODO check account rate limits
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
