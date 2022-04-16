@@ -79,9 +79,9 @@ func orderToModel(order *bybitl.ActiveOrder) *models.Order {
 	}
 
 	switch order.Side {
-	case bybitl.BuyOrder:
+	case bybitl.Buy:
 		o.Side = models.Buy
-	case bybitl.SellOrder:
+	case bybitl.Sell:
 		o.Side = models.Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
@@ -152,9 +152,9 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 	}
 
 	switch order.Side {
-	case bybitl.BuyOrder:
+	case bybitl.Buy:
 		ord.Side = models.Buy
-	case bybitl.SellOrder:
+	case bybitl.Sell:
 		ord.Side = models.Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
@@ -177,15 +177,15 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 }
 
 func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (bybitl.PostActiveOrderParams, *messages.RejectionReason) {
-	var side bybitl.OrderSide
+	var side bybitl.Side
 	var typ bybitl.OrderType
 	var tif bybitl.TimeInForce
-	var redo bool
+	var redo = false
 
 	if order.OrderSide == models.Buy {
-		side = bybitl.BuyOrder
+		side = bybitl.Buy
 	} else {
-		side = bybitl.SellOrder
+		side = bybitl.Sell
 	}
 	switch order.OrderType {
 	case models.Limit:
@@ -213,6 +213,8 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 		switch exec {
 		case models.ReduceOnly:
 			redo = true
+		case models.ParticipateDoNotInitiate:
+			tif = bybitl.PostOnly
 		default:
 			return nil, &rej
 		}
@@ -224,7 +226,23 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	request.SetQuantity(order.Quantity, lotPrecision)
 	request.SetOrderLinkId(order.ClientOrderID)
 	// For now, only one way is supported
-	request.SetPositionIdx(0)
+	if side == bybitl.Buy {
+		if redo {
+			// Buy, reduce only, we are working with a short
+			request.SetPositionIdx(2)
+		} else {
+			// Buy, we are working with a long
+			request.SetPositionIdx(1)
+		}
+	} else {
+		if redo {
+			// Sell, reduce only, we are working with a long
+			request.SetPositionIdx(1)
+		} else {
+			// Sell, we are working with a short
+			request.SetPositionIdx(2)
+		}
+	}
 
 	if order.Price != nil {
 		request.SetPrice(order.Price.Value, tickPrecision)

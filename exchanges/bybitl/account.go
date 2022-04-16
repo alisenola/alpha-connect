@@ -127,10 +127,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *checkSocket:
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
+			panic(err)
 		}
 	case *checkAccount:
 		if err := state.checkAccount(context); err != nil {
-			state.logger.Error("error checking socket", log.Error(err))
+			state.logger.Error("error checking account", log.Error(err))
+			panic(err)
 		}
 	}
 }
@@ -182,9 +184,15 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	//Fetch the current balance
 	fmt.Println("Fetching the balance")
-	res, err = context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
+	bal := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
-	}, 10*time.Second).Result()
+	}, 10*time.Second)
+	pos := context.RequestFuture(state.bybitlExecutor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account.Account,
+	}, 10*time.Second)
+
+	res, err = bal.Result()
 	if err != nil {
 		return fmt.Errorf("error getting balances from executor: %v", err)
 	}
@@ -198,10 +206,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	//Fetch the positions
 	fmt.Println("Fetching the positions")
-	res, err = context.RequestFuture(state.bybitlExecutor, &messages.PositionsRequest{
-		Instrument: nil,
-		Account:    state.account.Account,
-	}, 10*time.Second).Result()
+	res, err = pos.Result()
 	if err != nil {
 		return fmt.Errorf("error getting positions from executor: %v", err)
 	}
@@ -217,8 +222,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	fmt.Println("Fetching the orders")
 	var ords []*models.Order
 	securityMap := make(map[uint64]*models.Security)
+	var futs []*actor.Future
 	for _, fs := range filteredSecurities {
-		res, err = context.RequestFuture(state.bybitlExecutor, &messages.OrderStatusRequest{
+		f := context.RequestFuture(state.bybitlExecutor, &messages.OrderStatusRequest{
 			Account: state.account.Account,
 			Filter: &messages.OrderFilter{
 				Instrument: &models.Instrument{
@@ -227,7 +233,13 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 					Exchange:   fs.Exchange,
 				},
 			},
-		}, 10*time.Second).Result()
+		}, 10*time.Second)
+		futs = append(futs, f)
+		time.Sleep(100 * time.Millisecond)
+		securityMap[fs.SecurityID] = fs
+	}
+	for _, f := range futs {
+		res, err := f.Result()
 		if err != nil {
 			return fmt.Errorf("error getting orders from executor: %v", err)
 		}
@@ -239,7 +251,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			return fmt.Errorf("error getting orders: %s", orders.RejectionReason.String())
 		}
 		ords = append(ords, orders.Orders...)
-		securityMap[fs.SecurityID] = fs
 	}
 	state.securities = securityMap
 	state.seqNum = 0

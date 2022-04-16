@@ -95,7 +95,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			pid:       context.Spawn(props),
-			rateLimit: exchanges.NewRateLimit(50, time.Second),
+			rateLimit: exchanges.NewRateLimit(150, time.Second),
 		})
 	}
 
@@ -592,7 +592,11 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			cost := pos.Position.Size * pos.Position.EntryPrice
+			size := pos.Position.Size
+			if pos.Position.Side == bybitl.Sell {
+				size *= -1
+			}
+			cost := size * pos.Position.EntryPrice
 
 			response.Positions = append(response.Positions, &models.Position{
 				Account: msg.Account.Name,
@@ -601,7 +605,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					Symbol:     &types.StringValue{Value: pos.Position.Symbol},
 					SecurityID: &types.UInt64Value{Value: sec.SecurityID},
 				},
-				Quantity: pos.Position.Size,
+				Quantity: size,
 				Cost:     cost,
 				Cross:    false,
 			})
@@ -837,7 +841,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 		if order.RetCode != 0 {
-			state.logger.Info("error posting order", log.Error(errors.New(order.RetMsg)))
+			state.logger.Info("error posting order", log.Error(errors.New(fmt.Sprintf("%d: ", order.RetCode)+order.RetMsg)))
 			response.RejectionReason = messages.ExchangeAPIError
 			context.Respond(response)
 			return
