@@ -28,17 +28,31 @@ import (
 )
 
 type QueryRunner struct {
-	pid       *actor.PID
-	rateLimit *exchanges.RateLimit
+	pid            *actor.PID
+	sPostRateLimit *exchanges.RateLimit
+	mPostRateLimit *exchanges.RateLimit
+	sGetRateLimit  *exchanges.RateLimit
+	mGetRateLimit  *exchanges.RateLimit
+}
+
+func (qr *QueryRunner) Get(weight int) {
+	qr.sGetRateLimit.Request(weight)
+	qr.mGetRateLimit.Request(weight)
+}
+
+func (qr *QueryRunner) Post(weight int) {
+	qr.sPostRateLimit.Request(weight)
+	qr.mPostRateLimit.Request(weight)
 }
 
 type Executor struct {
 	extypes.BaseExecutor
-	securities   map[uint64]*models.Security
-	symbolToSec  map[string]*models.Security
-	queryRunners []*QueryRunner
-	dialerPool   *xutils.DialerPool
-	logger       *log.Logger
+	securities        map[uint64]*models.Security
+	symbolToSec       map[string]*models.Security
+	queryRunners      []*QueryRunner
+	accountRateLimits map[string]*exchanges.RateLimit
+	dialerPool        *xutils.DialerPool
+	logger            *log.Logger
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
@@ -53,16 +67,23 @@ func (state *Executor) Receive(context actor.Context) {
 	extypes.ReceiveExecutor(state, context)
 }
 
-func (state *Executor) getQueryRunner() *QueryRunner {
+func (state *Executor) getQueryRunner(post bool) *QueryRunner {
 	sort.Slice(state.queryRunners, func(i, j int) bool {
 		return rand.Uint64()%2 == 0
 	})
 
 	var qr *QueryRunner
 	for _, q := range state.queryRunners {
-		if !q.rateLimit.IsRateLimited() {
-			qr = q
-			break
+		if post {
+			if !q.sPostRateLimit.IsRateLimited() && !q.mPostRateLimit.IsRateLimited() {
+				qr = q
+				break
+			}
+		} else {
+			if !q.sGetRateLimit.IsRateLimited() && !q.mGetRateLimit.IsRateLimited() {
+				qr = q
+				break
+			}
 		}
 	}
 
@@ -94,10 +115,15 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return jobs.NewHTTPQuery(client)
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
-			pid:       context.Spawn(props),
-			rateLimit: exchanges.NewRateLimit(150, time.Second),
+			pid:            context.Spawn(props),
+			sPostRateLimit: exchanges.NewRateLimit(20, 2*time.Minute),
+			mPostRateLimit: exchanges.NewRateLimit(50, 5*time.Second),
+			sGetRateLimit:  exchanges.NewRateLimit(50, 2*time.Minute),
+			mGetRateLimit:  exchanges.NewRateLimit(70, 5*time.Second),
 		})
 	}
+
+	state.accountRateLimits = make(map[string]*exchanges.RateLimit)
 
 	if err := state.UpdateSecurityList(context); err != nil {
 		state.logger.Warn("error updating security list: %v", log.Error(err))
@@ -116,19 +142,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	var qr *QueryRunner
-	for _, q := range state.queryRunners {
-		if !q.rateLimit.IsRateLimited() {
-			qr = q
-			break
-		}
-	}
-
+	qr := state.getQueryRunner(false)
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
 
-	qr.rateLimit.Request(weight)
+	qr.Get(weight)
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	res, err := future.Result()
@@ -416,18 +435,18 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
-	req, rate, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
+	req, weight, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
 
-	qr := state.getQueryRunner()
+	qr := state.getQueryRunner(false)
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
-	qr.rateLimit.Request(rate)
+	qr.Get(weight)
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
 		if err != nil {
@@ -522,18 +541,20 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		}
 	}
 
-	req, rate, err := bybitl.GetPositions("", msg.Account.ApiCredentials)
+	req, weight, err := bybitl.GetPositions("", msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
 
-	qr := state.getQueryRunner()
+	qr := state.getQueryRunner(false)
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
-	qr.rateLimit.Request(rate)
+	qr.Get(weight)
+	// TODO check account rate limit
+
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
 		if err != nil {
@@ -674,18 +695,19 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	if orderId != "" {
 		params.SetOrderID(orderId)
 	}
-	req, rate, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
+	req, weight, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
 
-	qr := state.getQueryRunner()
+	qr := state.getQueryRunner(false)
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
-	qr.rateLimit.Request(rate)
+	qr.Get(weight)
+	// TODO check account rate limit
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 15*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
 		if err != nil {
@@ -755,7 +777,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	qr := state.getQueryRunner()
+	qr := state.getQueryRunner(true)
 	if qr == nil {
 		response.RejectionReason = messages.RateLimitExceeded
 		context.Respond(response)
@@ -804,7 +826,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return err
 	}
 
-	qr.rateLimit.Request(weight)
+	qr.Post(weight)
+	// TODO check account rate limit
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -860,6 +883,14 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
+
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
 	symbol := ""
 	if req.Instrument != nil {
 		if req.Instrument.Symbol != nil {
@@ -895,14 +926,8 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	fmt.Println(request.URL)
-	qr := state.getQueryRunner()
-	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
 
-	qr.rateLimit.Request(weight)
+	qr.Post(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(future, func(res interface{}, err error) {
 		if err != nil {
@@ -960,6 +985,13 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		RequestID:  req.RequestID,
 		Success:    false,
 	}
+
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
 	symbol := ""
 	if req.Filter != nil {
 		if req.Filter.Instrument != nil {
@@ -990,14 +1022,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-
-	qr := state.getQueryRunner()
-	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-	qr.rateLimit.Request(weight)
+	qr.Post(weight)
 
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
@@ -1053,6 +1078,13 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		Success:    false,
 	}
 
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
 	symbol := ""
 	if req.Instrument != nil {
 		if req.Instrument.Symbol != nil {
@@ -1085,15 +1117,8 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-
-	qr := state.getQueryRunner()
-	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
-		context.Respond(response)
-		return nil
-	}
-	qr.rateLimit.Request(weight)
-
+	qr.Post(weight)
+	// TODO check account rate limits
 	f := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 	context.AwaitFuture(f, func(res interface{}, err error) {
 		if err != nil {
