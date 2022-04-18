@@ -47,10 +47,18 @@ func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 		t.Fatalf("was expecting %s exchange, got %s", test.Exchange.Name, sec.Exchange.Name)
 	}
 	if sec.Underlying.ID != test.BaseCurrency.ID {
-		t.Fatalf("was expecting %s base, got %s", test.BaseCurrency.Symbol, sec.Underlying.Symbol)
+		t.Fatalf("was expecting %d:%s base, got %d:%s",
+			test.BaseCurrency.ID,
+			test.BaseCurrency.Symbol,
+			sec.Underlying.ID,
+			sec.Underlying.Symbol)
 	}
 	if sec.QuoteCurrency.ID != test.QuoteCurrency.ID {
-		t.Fatalf("was expecting %s quote, got %s", test.QuoteCurrency.Symbol, sec.QuoteCurrency.Symbol)
+		t.Fatalf("was expecting %d:%s quote, got %d:%s",
+			test.QuoteCurrency.ID,
+			test.QuoteCurrency.Symbol,
+			sec.QuoteCurrency.ID,
+			sec.QuoteCurrency.Symbol)
 	}
 	if sec.IsInverse != test.IsInverse {
 		t.Fatalf("was expecting different inverse")

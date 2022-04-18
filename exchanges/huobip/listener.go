@@ -204,7 +204,7 @@ func (state *Listener) subscribeMarketData(context actor.Context) error {
 
 	var ob *gorderbook.OrderBookL2
 	nTries := 0
-	for nTries < 100 {
+	for nTries < 10 {
 		if !mdws.ReadMessage() {
 			return fmt.Errorf("error reading message: %v", mdws.Err)
 		}

@@ -34,6 +34,7 @@ func NewExecutor(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfi
 	}
 }
 
+// TODO this implementation can easily lead to forgetting adding new messages, need to be changed
 func (state *Executor) Receive(context actor.Context) {
 	msg := context.Message()
 	switch msg.(type) {
@@ -60,8 +61,9 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.AccountDataRequest,
 		*messages.MarketDataRequest,
 		*messages.UnipoolV3DataRequest,
-		*messages.HistoricalUnipoolV3DataRequest,
 		*messages.MarketStatisticsRequest,
+		*messages.HistoricalUnipoolV3DataRequest,
+		*messages.HistoricalFundingRatesRequest,
 		*messages.HistoricalLiquidationsRequest,
 		*messages.SecurityDefinitionRequest,
 		*messages.SecurityListRequest,
