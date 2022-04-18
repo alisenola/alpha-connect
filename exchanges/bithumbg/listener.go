@@ -118,7 +118,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITHUMBG.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITHUMBG.Name+"_executor")
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
 

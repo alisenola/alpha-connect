@@ -65,7 +65,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FTX.Name+"_executor")
+	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FTX.Name+"_executor")
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
 	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()

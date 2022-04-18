@@ -195,7 +195,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.fbinanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.FBINANCE.Name+"_executor")
+	state.fbinanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FBINANCE.Name+"_executor")
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,

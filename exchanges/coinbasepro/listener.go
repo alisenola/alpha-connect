@@ -125,7 +125,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.coinbaseproExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.COINBASEPRO.Name+"_executor")
+	state.coinbaseproExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.COINBASEPRO.Name+"_executor")
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,

@@ -14,7 +14,7 @@ import (
 
 func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account) {
 	// Now check balance
-	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/%s_executor", account.Exchange.Name))
+	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
 	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		RequestID: 0,
 		Account:   account,
@@ -73,7 +73,7 @@ func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, acc
 /*
 func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, instrument *models.Instrument) {
 	// Request the same from binance directly
-	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/%s_executor", account.Exchange.Name))
+	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
 
 	res, err := as.Root.RequestFuture(executor, &messages.PositionsRequest{
 		RequestID:  0,
@@ -133,7 +133,7 @@ func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, ac
 
 func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, filter *messages.OrderFilter) {
 	// Request the same from binance directly
-	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/%s_executor", account.Exchange.Name))
+	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
 
 	res, err := as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,

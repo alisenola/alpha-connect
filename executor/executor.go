@@ -34,7 +34,7 @@ func NewExecutor(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfi
 	}
 }
 
-// TODO this implementation can easily lead to forgetting adding new messages, need to be changed
+// TODO this implementation can easily lead to forgetting adding new messages
 func (state *Executor) Receive(context actor.Context) {
 	msg := context.Message()
 	switch msg.(type) {
@@ -110,7 +110,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	exProps := actor.PropsFromProducer(exProducer).WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
 	)
-	exEx, err := context.SpawnNamed(exProps, "exchanges_executor")
+	exEx, err := context.SpawnNamed(exProps, "exchanges")
 	if err != nil {
 		return fmt.Errorf("error spawning exchanges executor: %v", err)
 	}
@@ -120,7 +120,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	prProps := actor.PropsFromProducer(prProducer).WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
 	)
-	prEx, err := context.SpawnNamed(prProps, "protocols_executor")
+	prEx, err := context.SpawnNamed(prProps, "protocols")
 	if err != nil {
 		return fmt.Errorf("error spawning protocols executor: %v", err)
 	}

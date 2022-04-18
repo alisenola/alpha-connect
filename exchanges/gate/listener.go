@@ -131,7 +131,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 	}
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
-	state.gateExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.GATE.Name+"_executor")
+	state.gateExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.GATE.Name+"_executor")
 
 	state.instrumentData = &InstrumentData{
 		orderBook:      nil,

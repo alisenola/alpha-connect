@@ -2,6 +2,8 @@ package tests
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/executor"
+	"gitlab.com/alphaticks/alpha-connect/protocols"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"math"
 	"reflect"
@@ -32,14 +34,18 @@ func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.
 		accnts = append(accnts, accnt)
 	}
 
-	cfg := &exchanges.ExecutorConfig{
+	cfgEx := &exchanges.ExecutorConfig{
 		Exchanges:  exch,
 		Strict:     true,
 		Accounts:   accnts,
 		DialerPool: xchangerUtils.DefaultDialerPool,
 	}
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(cfg)), "executor")
-	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
+	cfgPr := &protocols.ExecutorConfig{
+		Registry:  nil,
+		Protocols: nil,
+	}
+	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgEx, cfgPr)), "executor")
+	return as, exec, func() { _ = as.Root.PoisonFuture(exec).Wait() }
 }
 
 type GetStat struct {

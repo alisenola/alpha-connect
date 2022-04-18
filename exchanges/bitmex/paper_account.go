@@ -126,7 +126,7 @@ func (state *PaperAccountListener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.bitmexExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITMEX.Name+"_executor")
+	state.bitmexExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITMEX.Name+"_executor")
 
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")

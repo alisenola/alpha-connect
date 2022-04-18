@@ -125,7 +125,7 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
-	state.bitstampExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITSTAMP.Name+"_executor")
+	state.bitstampExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITSTAMP.Name+"_executor")
 
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")

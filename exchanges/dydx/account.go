@@ -186,7 +186,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.dydxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.DYDX.Name+"_executor")
+	state.dydxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.DYDX.Name+"_executor")
 	state.client = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: 1024,

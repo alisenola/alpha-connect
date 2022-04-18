@@ -148,7 +148,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/"+constants.BITFINEX.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITFINEX.Name+"_executor")
 	state.stashedTrades = list.New()
 
 	if state.security.RoundLot == nil {
