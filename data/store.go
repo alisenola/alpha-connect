@@ -166,6 +166,7 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 		opts:         opts,
 		measurements: make(map[string]string),
 	}
+	s.stores[DATA_CLIENT_WEB3] = nil
 	s.stores[DATA_CLIENT_LIVE] = nil
 	s.stores[DATA_CLIENT_1S] = nil
 	s.stores[DATA_CLIENT_1M] = nil
@@ -178,12 +179,16 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 func (s *StoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
-	for f := range s.stores {
-		if f <= freq {
-			score := freq - f
-			if score < minScore {
-				minScore = score
-				cfreq = f
+	if freq == DATA_CLIENT_LIVE || freq == DATA_CLIENT_WEB3 {
+		cfreq = freq
+	} else {
+		for f := range s.stores {
+			if f <= freq {
+				score := freq - f
+				if score < minScore {
+					minScore = score
+					cfreq = f
+				}
 			}
 		}
 	}
