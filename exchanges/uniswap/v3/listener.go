@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"container/list"
 	goContext "context"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -25,11 +26,11 @@ import (
 )
 
 type checkSockets struct{}
+type flush struct{}
 
 type InstrumentData struct {
-	seqNum          uint64
-	lastBlockUpdate uint64
-	lastHB          time.Time
+	seqNum uint64
+	lastHB time.Time
 }
 
 type Listener struct {
@@ -40,7 +41,9 @@ type Listener struct {
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	socketTicker   *time.Ticker
+	flushTicker    *time.Ticker
 	lastPingTime   time.Time
+	updates        *list.List
 }
 
 func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
@@ -98,6 +101,12 @@ func (state *Listener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *flush:
+		if err := state.onFlush(context); err != nil {
+			state.logger.Error("error flushing updates", log.Error(err))
+			panic(err)
+		}
+
 	case *checkSockets:
 		if err := state.onCheckSockets(context); err != nil {
 			state.logger.Error("error checking sockets", log.Error(err))
@@ -116,8 +125,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("symbol", state.security.Symbol))
 
 	state.instrumentData = &InstrumentData{
-		seqNum:          uint64(time.Now().UnixNano()),
-		lastBlockUpdate: 0,
+		seqNum: uint64(time.Now().UnixNano()),
 	}
 
 	client, err := ethclient.Dial(eth.ETH_CLIENT_WS)
@@ -143,6 +151,22 @@ func (state *Listener) Initialize(context actor.Context) error {
 			}
 		}
 	}(context.Self())
+
+	flushTicker := time.NewTicker(10 * time.Second)
+	state.flushTicker = flushTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case <-flushTicker.C:
+				context.Send(pid, &flush{})
+			case <-time.After(20 * time.Second):
+				// timer stopped, we leave
+				return
+			}
+		}
+	}(context.Self())
+
+	state.updates = list.New()
 
 	return nil
 }
@@ -221,12 +245,37 @@ func (state *Listener) Clean(context actor.Context) error {
 
 func (state *Listener) onLog(context actor.Context) error {
 	msg := context.Message().(*types.Log)
+	el := state.updates.Front()
+	for ; el != nil; el = el.Next() {
+		update := el.Value.(*models.UPV3Update)
+		if update.Block == msg.BlockNumber {
+			state.updates.Remove(el)
+			break
+		}
+	}
+	if msg.Removed {
+		el := state.updates.Front()
+		removed := false
+		for ; el != nil; el = el.Next() {
+			update := el.Value.(*models.UPV3Update)
+			if update.Block == msg.BlockNumber {
+				state.updates.Remove(el)
+				removed = true
+				break
+			}
+		}
+		if !removed {
+			return fmt.Errorf("removed log not found for block %d", msg.BlockNumber)
+		} else {
+			return nil
+		}
+	}
 	uabi, err := uniswap.UniswapMetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
-	updt := &models.UPV3Update{}
-	timestamp, err := state.client.BlockByNumber(goContext.Background(), big.NewInt(int64(msg.BlockNumber)))
+	var update *models.UPV3Update
+	header, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(msg.BlockNumber)))
 	if err != nil {
 		return fmt.Errorf("error getting block number: %v", err)
 	}
@@ -236,21 +285,21 @@ func (state *Listener) onLog(context actor.Context) error {
 		if err := eth.UnpackLog(uabi, event, "Initialize", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Initialize: &gorderbook.UPV3Initialize{
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["Mint"].ID:
 		event := new(uniswap.UniswapMint)
 		if err := eth.UnpackLog(uabi, event, "Mint", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Mint: &gorderbook.UPV3Mint{
 				Owner:     event.Owner[:],
 				TickLower: int32(event.TickLower.Int64()),
@@ -261,14 +310,14 @@ func (state *Listener) onLog(context actor.Context) error {
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["Burn"].ID:
 		event := new(uniswap.UniswapBurn)
 		if err := eth.UnpackLog(uabi, event, "Burn", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Burn: &gorderbook.UPV3Burn{
 				Owner:     event.Owner[:],
 				TickLower: int32(event.TickLower.Int64()),
@@ -279,14 +328,14 @@ func (state *Listener) onLog(context actor.Context) error {
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["Swap"].ID:
 		event := new(uniswap.UniswapSwap)
 		if err := eth.UnpackLog(uabi, event, "Swap", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Swap: &gorderbook.UPV3Swap{
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
@@ -295,14 +344,14 @@ func (state *Listener) onLog(context actor.Context) error {
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["Collect"].ID:
 		event := new(uniswap.UniswapCollect)
 		if err := eth.UnpackLog(uabi, event, "Collect", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Collect: &gorderbook.UPV3Collect{
 				Owner:            event.Recipient[:],
 				TickLower:        int32(event.TickLower.Int64()),
@@ -312,58 +361,76 @@ func (state *Listener) onLog(context actor.Context) error {
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["Flash"].ID:
 		event := new(uniswap.UniswapFlash)
 		if err := eth.UnpackLog(uabi, event, "Flash", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			Flash: &gorderbook.UPV3Flash{
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["SetFeeProtocol"].ID:
 		event := new(uniswap.UniswapSetFeeProtocol)
 		if err := eth.UnpackLog(uabi, event, "SetFeeProtocol", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
 	case uabi.Events["CollectProtocol"].ID:
 		event := new(uniswap.UniswapCollectProtocol)
 		if err := eth.UnpackLog(uabi, event, "CollectProtocol", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
-		updt = &models.UPV3Update{
+		update = &models.UPV3Update{
 			CollectProtocol: &gorderbook.UPV3CollectProtocol{
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
 			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(timestamp.Time()),
+			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
+	default:
+		return fmt.Errorf("received unknown event: %v", msg.Topics[0])
 	}
 
-	context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
-		SeqNum: state.instrumentData.seqNum + 1,
-		Update: updt,
-	})
-	state.instrumentData.lastBlockUpdate = updt.Block
-	state.instrumentData.seqNum += 1
+	state.updates.PushBack(update)
+	return nil
+}
 
+func (state *Listener) onFlush(context actor.Context) error {
+	current, err := state.client.BlockNumber(goContext.Background())
+	if err != nil {
+		return fmt.Errorf("error fetching current block number")
+	}
+	// Post all the updates with block < current - 4
+	for el := state.updates.Front(); el != nil; el = state.updates.Front() {
+		update := el.Value.(*models.UPV3Update)
+		if update.Block <= current-4 {
+			context.Send(context.Parent(), &messages.UnipoolV3DataIncrementalRefresh{
+				SeqNum: state.instrumentData.seqNum + 1,
+				Update: update,
+			})
+			state.instrumentData.seqNum += 1
+			state.updates.Remove(el)
+		} else {
+			break
+		}
+	}
 	return nil
 }
 
