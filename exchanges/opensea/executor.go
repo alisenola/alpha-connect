@@ -205,42 +205,25 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		context.Respond(msg)
 		return nil
 	}
-	var pAsset []*models.MarketableAsset
+	var pAssets []*models.MarketableAsset
 	for _, v := range state.marketableAssets {
 		if v.ProtocolAsset.Asset.ID == req.AssetID {
-			pAsset = append(pAsset, v)
+			pAssets = append(pAssets, v)
 		}
 	}
-	if pAsset == nil {
+	if pAssets == nil {
 		msg.RejectionReason = messages.UnknownAsset
 		context.Respond(msg)
 		return nil
 	}
 
 	//TODO change code to handle multiple protocolAssets
-	if len(pAsset) > 1 {
+	if len(pAssets) > 1 {
 		msg.RejectionReason = messages.UnsupportedRequest
 		context.Respond(msg)
 		return nil
 	}
-	asset := pAsset[0]
-	params := opensea.NewGetEventsParams()
-	if add, ok := asset.ProtocolAsset.Meta["address"]; ok {
-		params.SetAssetContractAddress(add)
-	}
-	if req.To != nil {
-		params.SetOccurredBefore(uint64(req.To.Seconds))
-	}
-	if req.From != nil {
-		params.SetOccurredAfter(uint64(req.From.Seconds))
-	}
-	params.SetEventType("successful")
-	r, weight, err := opensea.GetEvents(params, state.credentials.APIKey)
-	if err != nil {
-		msg.RejectionReason = messages.UnsupportedOrderCharacteristic
-		context.Respond(msg)
-		return nil
-	}
+	asset := pAssets[0]
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -248,10 +231,33 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		context.Respond(msg)
 		return nil
 	}
+
+	params := opensea.NewGetEventsParams()
+	add := asset.ProtocolAsset.Meta["address"]
+	params.SetAssetContractAddress(add)
+	params.SetEventType("successful")
+	if req.To != nil {
+		params.SetOccurredBefore(uint64(req.To.Seconds))
+	}
+	if req.From != nil {
+		params.SetOccurredAfter(uint64(req.From.Seconds))
+	}
+	r, weight, err := opensea.GetEvents(params, state.credentials.APIKey)
+	if err != nil {
+		msg.RejectionReason = messages.UnsupportedOrderCharacteristic
+		context.Respond(msg)
+		return nil
+	}
 	qr.rateLimit.Request(weight)
 
-	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 15*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	//Global variables
+	cursor := ""
+	done := false
+	var sales []*models.Sale
+	sender := context.Sender() //keep copy of sender
+
+	var processFuture func(res interface{}, err error)
+	processFuture = func(res interface{}, err error) {
 		if err != nil {
 			msg.RejectionReason = messages.HTTPError
 			context.Respond(msg)
@@ -282,7 +288,6 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			context.Respond(msg)
 			return
 		}
-		var sales []*models.Sale
 		for _, e := range events.AssetEvents {
 			var from [20]byte
 			var to [20]byte
@@ -333,14 +338,28 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				Timestamp: &types.Timestamp{Seconds: tim.Unix()},
 			})
 		}
-
-		msg.Success = true
-		msg.Sale = sales
-		msg.SeqNum = uint64(time.Now().UnixNano())
-		msg.Cursor = events.Next
-		context.Respond(msg)
-	})
-
+		cursor = events.Next
+		done = cursor == ""
+		if !done {
+			params.SetCursor(cursor)
+			r, weight, err = opensea.GetEvents(params, state.credentials.APIKey)
+			if err != nil {
+				msg.RejectionReason = messages.UnsupportedOrderCharacteristic
+				context.Respond(msg)
+				return
+			}
+			qr.rateLimit.Request(weight)
+			fut := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 15*time.Second)
+			context.AwaitFuture(fut, processFuture)
+		} else {
+			msg.Success = true
+			msg.Sale = sales
+			msg.SeqNum = uint64(time.Now().UnixNano())
+			context.Send(sender, msg)
+		}
+	}
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 10*time.Minute)
+	context.AwaitFuture(future, processFuture)
 	return nil
 }
 

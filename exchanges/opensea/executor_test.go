@@ -41,7 +41,7 @@ func TestExecutor(t *testing.T) {
 	r, err := as.Root.RequestFuture(executor, &messages.HistoricalSalesRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		AssetID:   coll.ProtocolAsset.Asset.ID,
-		From:      &types.Timestamp{Seconds: 12347099},
+		From:      &types.Timestamp{Seconds: 1650891168},
 	}, 15*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -54,6 +54,4 @@ func TestExecutor(t *testing.T) {
 		t.Fatal(sales.RejectionReason)
 	}
 	fmt.Println("Sales", sales.Sale)
-	fmt.Println("Cursor", sales.Cursor)
-	//Execute the future request for the NFT historical data
 }

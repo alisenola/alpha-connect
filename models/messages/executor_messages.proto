@@ -164,10 +164,9 @@ message HistoricalSalesResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     repeated models.Sale sale = 3;
-    string cursor = 4;
-    uint64 seq_num = 5;
-    bool success = 6;
-    RejectionReason rejection_reason = 7;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
 }
 
 message MarketStatisticsRequest {
