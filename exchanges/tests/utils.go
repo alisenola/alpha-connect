@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/protocols"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/grpc"
 	"math"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -21,6 +24,15 @@ import (
 )
 
 func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
+	registryAddress := "127.0.0.1:7001"
+	if os.Getenv("REGISTRY_ADDRESS") != "" {
+		registryAddress = os.Getenv("REGISTRY_ADDRESS")
+	}
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := registry.NewPublicRegistryClient(conn)
 	exch := []*xchangerModels.Exchange{
 		exchange,
 	}
@@ -34,11 +46,16 @@ func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.
 		accnts = append(accnts, accnt)
 	}
 
+	credentials := xchangerModels.APICredentials{
+		APIKey: "cb85cb07b83e4d43a2938e44e52f96ee",
+	}
 	cfgEx := &exchanges.ExecutorConfig{
-		Exchanges:  exch,
-		Strict:     true,
-		Accounts:   accnts,
-		DialerPool: xchangerUtils.DefaultDialerPool,
+		Exchanges:          exch,
+		Strict:             true,
+		Accounts:           accnts,
+		OpenseaCredentials: &credentials,
+		DialerPool:         xchangerUtils.DefaultDialerPool,
+		Registry:           reg,
 	}
 	cfgPr := &protocols.ExecutorConfig{
 		Registry:  nil,
@@ -118,8 +135,8 @@ func (state *MDChecker) Receive(context actor.Context) {
 }
 
 func (state *MDChecker) Initialize(context actor.Context) error {
-	executor := context.ActorSystem().NewLocalPID("executor")
-	res, err := context.RequestFuture(executor, &messages.MarketDataRequest{
+	ex := context.ActorSystem().NewLocalPID("executor")
+	res, err := context.RequestFuture(ex, &messages.MarketDataRequest{
 		RequestID:  0,
 		Subscribe:  true,
 		Subscriber: context.Self(),
@@ -329,8 +346,8 @@ func (state *PoolV3Checker) Receive(context actor.Context) {
 }
 
 func (state *PoolV3Checker) Initialize(context actor.Context) error {
-	executor := context.ActorSystem().NewLocalPID("executor")
-	res, err := context.RequestFuture(executor, &messages.UnipoolV3DataRequest{
+	ex := context.ActorSystem().NewLocalPID("executor")
+	res, err := context.RequestFuture(ex, &messages.UnipoolV3DataRequest{
 		RequestID:  0,
 		Subscribe:  true,
 		Subscriber: context.Self(),
