@@ -65,6 +65,7 @@ enum RejectionReason {
     UnknowProtocol = 30;
     MissingProtocolAsset = 31;
     UnknownProtocolAsset = 32;
+    UnknownAsset = 33;
 }
 
 enum FeeType {
@@ -150,6 +151,23 @@ message HistoricalUnipoolV3DataResponse {
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;
+}
+
+message HistoricalSalesRequest {
+    uint64 requestID = 1;
+    uint32 assetID = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
+}
+
+message HistoricalSalesResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.Sale sale = 3;
+    string cursor = 4;
+    uint64 seq_num = 5;
+    bool success = 6;
+    RejectionReason rejection_reason = 7;
 }
 
 message MarketStatisticsRequest {
@@ -601,6 +619,20 @@ message ProtocolAssetList {
     uint64 requestID = 1;
     uint64 responseID = 2;
     repeated models.ProtocolAsset protocol_assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message MarketableAssetListRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message MarketableAssetList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.MarketableAsset marketable_assets = 3;
     bool success = 4;
     RejectionReason rejection_reason = 5;
 }

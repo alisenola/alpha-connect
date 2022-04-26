@@ -10,3 +10,8 @@ message ProtocolAsset {
     models.Chain chain = 4;
     map<string, string> meta = 5;
 }
+
+message MarketableAsset {
+    ProtocolAsset protocol_asset = 1;
+    models.Exchange market = 2;
+}
