@@ -31,11 +31,7 @@ func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, acc
 		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
 	}
 
-	bal1 := make(map[string]float64)
-	for _, b := range balanceResponse.Balances {
-		bal1[b.Asset.Name] = b.Quantity
-	}
-	fmt.Println("ACCOUNT BALANCE", bal1)
+	execBalances := balanceResponse.Balances
 
 	res, err = as.Root.RequestFuture(exchangeExecutor, &messages.BalancesRequest{
 		RequestID: 0,
@@ -53,19 +49,22 @@ func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, acc
 		t.Fatalf("was expecting sucessful request: %s", balanceResponse.RejectionReason.String())
 	}
 
-	bal2 := make(map[string]float64)
-	for _, b := range balanceResponse.Balances {
-		bal2[b.Asset.Name] = b.Quantity
-	}
-	fmt.Println("EXECUTOR BALANCE", bal2)
+	accntBalances := balanceResponse.Balances
 
-	for k, b1 := range bal1 {
-		if b2, ok := bal2[k]; ok {
-			if math.Abs(b1-b2) > 0.00001 {
-				t.Fatalf("different balance for %s %f:%f", k, b1, b2)
-			}
-		} else {
-			t.Fatalf("different balance for %s %f:%f", k, b1, 0.)
+	sort.Slice(accntBalances, func(i, j int) bool {
+		return accntBalances[i].Asset.ID < accntBalances[j].Asset.ID
+	})
+	sort.Slice(execBalances, func(i, j int) bool {
+		return execBalances[i].Asset.ID < execBalances[j].Asset.ID
+	})
+	for i, b1 := range execBalances {
+		b2 := accntBalances[i]
+		// TODO use exchange balance precision
+		rawB1 := int(math.Round(b1.Quantity * 1e8))
+		rawB2 := int(math.Round(b2.Quantity * 1e8))
+		fmt.Println(rawB1, rawB2)
+		if rawB1 != rawB2 {
+			t.Fatalf("different balance: %f %f", b1.Quantity, b2.Quantity)
 		}
 	}
 }

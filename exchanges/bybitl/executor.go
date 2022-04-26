@@ -242,6 +242,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}
 		security.Multiplier = &types.DoubleValue{Value: 1}
+		security.MinOrderQuantity = &types.DoubleValue{Value: symbol.LotSizeFilter.MinTradingQuantity}
 		securities = append(securities, &security)
 	}
 
@@ -968,7 +969,12 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		}
 		if order.RetCode != 0 {
 			state.logger.Info("error cancelling order", log.Error(errors.New(order.RetMsg)))
-			response.RejectionReason = messages.ExchangeAPIError
+			switch order.RetCode {
+			case 20001:
+				response.RejectionReason = messages.UnknownOrder
+			default:
+				response.RejectionReason = messages.ExchangeAPIError
+			}
 			context.Respond(response)
 			return
 		}

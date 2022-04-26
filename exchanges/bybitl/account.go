@@ -1,6 +1,7 @@
 package bybitl
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/log"
@@ -661,10 +662,6 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if err := ws.Authenticate(state.account.ApiCredentials); err != nil {
 		return fmt.Errorf("error authenticating for bybitl websocket: %v", err)
 	}
-	// Subscribe to balances
-	if err := ws.SubscribeBalance(); err != nil {
-		return fmt.Errorf("error subscribing to balances: %v", err)
-	}
 	// Subscribe to orders
 	if err := ws.SubscribeOrders(); err != nil {
 		return fmt.Errorf("error subscribing to orders: %v", err)
@@ -692,13 +689,15 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	if msg.Message == nil {
 		return fmt.Errorf("reveived nil message")
 	}
+	b, _ := json.Marshal(msg.Message)
+	fmt.Println(string(b))
 	switch s := msg.Message.(type) {
 	case bybitl.WSOrders:
 		for _, order := range s {
 			switch order.OrderStatus {
 			case bybitl.OrderNew:
 				// New Order
-				if !state.account.HasOrder(order.OrderId) {
+				if !state.account.HasOrder(order.OrderLinkId) {
 					o := wsOrderToModel(&order)
 					o.OrderStatus = models.PendingNew
 					_, rej := state.account.NewOrder(o)
@@ -762,12 +761,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				}
 			}
 		}
-	case bybitl.WSBalances:
-		for _, b := range s {
-			if _, err := state.account.UpdateBalance(&constants.TETHER, b.WalletBalance, messages.Unknown); err != nil {
-				return fmt.Errorf("error updating account balance: %v", err)
-			}
-		}
 	case bybitl.WSResponse:
 		if !s.Success {
 			return fmt.Errorf("error in WSResponse: %s", s.ReturnMessage)
@@ -828,15 +821,16 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting balances from executor: %v", err)
 	}
 
-	balanceList, ok := resp.(*messages.BalanceList)
+	accntBalances := state.account.GetBalances()
+	execBalanceList, ok := resp.(*messages.BalanceList)
 	if !ok {
 		return fmt.Errorf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(resp).String())
 	}
-	if !balanceList.Success {
-		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	if !execBalanceList.Success {
+		return fmt.Errorf("error getting balances: %s", execBalanceList.RejectionReason.String())
 	}
-	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
+	if len(execBalanceList.Balances) != len(accntBalances) {
+		return fmt.Errorf("was expecting %d balance, got %d", len(execBalanceList.Balances), len(accntBalances))
 	}
 
 	// Fetch positions
@@ -853,13 +847,23 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
 	}
 	if !positionList.Success {
-		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+		return fmt.Errorf("error getting balances: %s", execBalanceList.RejectionReason.String())
 	}
-
-	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
-	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
-	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+	execBalances := execBalanceList.Balances
+	sort.Slice(accntBalances, func(i, j int) bool {
+		return accntBalances[i].Asset.ID < accntBalances[j].Asset.ID
+	})
+	sort.Slice(execBalances, func(i, j int) bool {
+		return execBalances[i].Asset.ID < execBalances[j].Asset.ID
+	})
+	for i, b1 := range execBalances {
+		b2 := accntBalances[i]
+		//rawB1 := int(math.Round(b1.Quantity * state.account.MarginPrecision))
+		//rawB2 := int(math.Round(b2.Quantity * state.account.MarginPrecision))
+		diff := math.Abs(1 - b1.Quantity/b2.Quantity)
+		if diff > 0.01 {
+			return fmt.Errorf("different margin amount: %f %f", b1.Quantity, b2.Quantity)
+		}
 	}
 
 	pos1 := state.account.GetPositions()

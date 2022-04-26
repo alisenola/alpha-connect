@@ -140,6 +140,8 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderMassCancelRequest {
 		OrderMassCancelRequest(t, ctx, tc)
 	}
+
+	time.Sleep(1 * time.Minute)
 }
 
 func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
@@ -608,12 +610,13 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
-			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Sell,
-			Price:         &types.DoubleValue{Value: 32000},
-			Quantity:      0.001,
+			ClientOrderID:         uuid.NewV1().String(),
+			Instrument:            tc.Instrument,
+			OrderType:             models.Limit,
+			OrderSide:             models.Sell,
+			Price:                 &types.DoubleValue{Value: 32000},
+			Quantity:              0.001,
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {

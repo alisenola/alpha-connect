@@ -323,8 +323,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
-	case cryptofacilities.WSError:
-		err := msg.Message.(cryptofacilities.WSError)
+	case cryptofacilities.WSAlert:
+		err := msg.Message.(cryptofacilities.WSAlert)
 		return fmt.Errorf("socket error: %v", err)
 
 	case cryptofacilities.WSBookDelta:

@@ -245,14 +245,6 @@ func (state *Listener) Clean(context actor.Context) error {
 
 func (state *Listener) onLog(context actor.Context) error {
 	msg := context.Message().(*types.Log)
-	el := state.updates.Front()
-	for ; el != nil; el = el.Next() {
-		update := el.Value.(*models.UPV3Update)
-		if update.Block == msg.BlockNumber {
-			state.updates.Remove(el)
-			break
-		}
-	}
 	if msg.Removed {
 		el := state.updates.Front()
 		removed := false

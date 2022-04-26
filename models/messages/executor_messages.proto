@@ -152,6 +152,22 @@ message HistoricalUnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
+message HistoricalProtocolAssetTransferRequest {
+    uint64 requestID = 1;
+    uint64 protocol_assetID = 2;
+    uint64 start = 3;
+    uint64 stop = 4;
+}
+
+message HistoricalProtocolAssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAssetUpdate update = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
 message MarketStatisticsRequest {
     uint64 requestID = 1;
     models.Instrument instrument = 2;
@@ -539,21 +555,6 @@ message TransferDataResponse {
     RejectionReason rejection_reason = 5;
 }
 
-message HistoricalProtocolAssetTransferRequest {
-    uint64 requestID = 1;
-    uint64 protocol_assetID = 2;
-    uint64 start = 3;
-    uint64 stop = 4;
-}
-
-message HistoricalProtocolAssetTransferResponse {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    repeated models.ProtocolAssetUpdate update = 3;
-    uint64 seq_num = 4;
-    bool success = 5;
-    RejectionReason rejection_reason = 6;
-}
 
 message ProtocolAssetTransferRequest{
     uint64 requestID = 1;

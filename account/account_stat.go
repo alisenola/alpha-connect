@@ -14,7 +14,7 @@ func (accnt *Account) Value(model modeling.Market) float64 {
 	for k, v := range accnt.balances {
 		pp, ok := model.GetPairPrice(k, accnt.quoteCurrency.ID)
 		if ok {
-			value += v * pp
+			value += (float64(v) / accnt.MarginPrecision) * pp
 		}
 	}
 
@@ -57,7 +57,7 @@ func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, v
 	for k, v := range accnt.balances {
 		samplePrices := model.GetSamplePairPrices(k, accnt.quoteCurrency.ID, time, N)
 		for i := 0; i < N; i++ {
-			values[i] += v * samplePrices[i]
+			values[i] += (float64(v) / accnt.MarginPrecision) * samplePrices[i]
 		}
 	}
 	if accnt.MarginCurrency != nil {
@@ -127,7 +127,14 @@ func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.Marke
 func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	availableMargin := accnt.balances[accnt.MarginCurrency.ID] + float64(accnt.margin)/accnt.MarginPrecision
+	var availableMargin uint64 = 0
+	if accnt.margin < 0 {
+		availableMargin -= uint64(-accnt.margin)
+	} else {
+		availableMargin += uint64(accnt.margin)
+	}
+	availableMargin += accnt.balances[accnt.MarginCurrency.ID]
+
 	usedMargin := 0.
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
@@ -143,24 +150,13 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 			usedMargin += (float64(p.rawSize) / p.lotPrecision) * exitPrice * math.Abs(p.multiplier)
 		}
 	}
-	return usedMargin / availableMargin
+	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
 func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
+	availableMargin := accnt.GetMargin(model)
 	accnt.RLock()
 	defer accnt.RUnlock()
-	availableMargin := 0.
-	for k, b := range accnt.balances {
-		if k == accnt.MarginCurrency.ID {
-			availableMargin += b
-		} else {
-			pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
-			if ok {
-				availableMargin += b * pp
-			}
-		}
-	}
-	availableMargin += float64(accnt.margin) / accnt.MarginPrecision
 	availableMargin *= leverage
 	//fmt.Println("AV MARGIN", availableMargin)
 	for k, p := range accnt.positions {
