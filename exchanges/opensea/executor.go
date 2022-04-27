@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
@@ -37,12 +38,12 @@ type QueryRunner struct {
 
 type Executor struct {
 	extype.BaseExecutor
-	queryRunners     []*QueryRunner
-	marketableAssets map[uint64]*models.MarketableAsset
-	credentials      *models2.APICredentials
-	dialerPool       *xutils.DialerPool
-	logger           *log.Logger
-	registry         registry.PublicRegistryClient
+	queryRunners             []*QueryRunner
+	marketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
+	credentials              *models2.APICredentials
+	dialerPool               *xutils.DialerPool
+	logger                   *log.Logger
+	registry                 registry.PublicRegistryClient
 }
 
 func NewExecutor(registry registry.PublicRegistryClient, dialerPool *xutils.DialerPool, credentials *models2.APICredentials) actor.Actor {
@@ -95,11 +96,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 			rateLimit: exchanges.NewRateLimit(100, time.Minute),
 		})
 	}
-	return state.UpdateMarketableAssetList(context)
+	return state.UpdateMarketableProtocolAssetList(context)
 }
 
-func (state *Executor) UpdateMarketableAssetList(context actor.Context) error {
-	assets := make([]*models.MarketableAsset, 0)
+func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) error {
+	assets := make([]*models.MarketableProtocolAsset, 0)
 	reg := state.registry
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
@@ -138,7 +139,8 @@ func (state *Executor) UpdateMarketableAssetList(context actor.Context) error {
 		}
 		assets = append(
 			assets,
-			&models.MarketableAsset{
+			&models.MarketableProtocolAsset{
+				MarketableProtocolAssetID: utils.MarketableProtocolAssetID(protocolAsset.ProtocolAssetId, constants.OPENSEA.ID),
 				ProtocolAsset: &models.ProtocolAsset{
 					ProtocolAssetID: protocolAsset.ProtocolAssetId,
 					Protocol: &models2.Protocol{
@@ -161,33 +163,33 @@ func (state *Executor) UpdateMarketableAssetList(context actor.Context) error {
 			},
 		)
 	}
-	state.marketableAssets = make(map[uint64]*models.MarketableAsset)
+	state.marketableProtocolAssets = make(map[uint64]*models.MarketableProtocolAsset)
 	for _, a := range assets {
-		state.marketableAssets[a.ProtocolAsset.ProtocolAssetID] = a
+		state.marketableProtocolAssets[a.MarketableProtocolAssetID] = a
 	}
 
-	context.Send(context.Parent(), &messages.MarketableAssetList{
-		ResponseID:       uint64(time.Now().UnixNano()),
-		MarketableAssets: assets,
-		Success:          true,
+	context.Send(context.Parent(), &messages.MarketableProtocolAssetList{
+		ResponseID:               uint64(time.Now().UnixNano()),
+		MarketableProtocolAssets: assets,
+		Success:                  true,
 	})
 
 	return nil
 }
 
-func (state *Executor) OnMarketableAssetListRequest(context actor.Context) error {
-	req := context.Message().(*messages.MarketableAssetListRequest)
-	passets := make([]*models.MarketableAsset, len(state.marketableAssets))
+func (state *Executor) OnMarketableProtocolAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.MarketableProtocolAssetListRequest)
+	passets := make([]*models.MarketableProtocolAsset, len(state.marketableProtocolAssets))
 	i := 0
-	for _, v := range state.marketableAssets {
+	for _, v := range state.marketableProtocolAssets {
 		passets[i] = v
 		i += 1
 	}
-	context.Respond(&messages.MarketableAssetList{
-		RequestID:        req.RequestID,
-		ResponseID:       uint64(time.Now().UnixNano()),
-		Success:          true,
-		MarketableAssets: passets,
+	context.Respond(&messages.MarketableProtocolAssetList{
+		RequestID:                req.RequestID,
+		ResponseID:               uint64(time.Now().UnixNano()),
+		Success:                  true,
+		MarketableProtocolAssets: passets,
 	})
 	return nil
 }
@@ -205,25 +207,12 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		context.Respond(msg)
 		return nil
 	}
-	var pAssets []*models.MarketableAsset
-	for _, v := range state.marketableAssets {
-		if v.ProtocolAsset.Asset.ID == req.AssetID {
-			pAssets = append(pAssets, v)
-		}
-	}
-	if pAssets == nil {
-		msg.RejectionReason = messages.UnknownAsset
+	pAsset := state.marketableProtocolAssets[req.MarketableProtocolAssetID]
+	if pAsset == nil {
+		msg.RejectionReason = messages.UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
-
-	//TODO change code to handle multiple protocolAssets
-	if len(pAssets) > 1 {
-		msg.RejectionReason = messages.UnsupportedRequest
-		context.Respond(msg)
-		return nil
-	}
-	asset := pAssets[0]
 
 	qr := state.getQueryRunner()
 	if qr == nil {
@@ -233,7 +222,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	}
 
 	params := opensea.NewGetEventsParams()
-	add := asset.ProtocolAsset.Meta["address"]
+	add := pAsset.ProtocolAsset.Meta["address"]
 	params.SetAssetContractAddress(add)
 	params.SetEventType("successful")
 	if req.To != nil {
