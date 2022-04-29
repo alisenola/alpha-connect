@@ -11,7 +11,8 @@ message ProtocolAsset {
     map<string, string> meta = 5;
 }
 
-message MarketableAsset {
+message MarketableProtocolAsset {
     ProtocolAsset protocol_asset = 1;
     models.Exchange market = 2;
+    uint64 marketable_protocol_assetID = 3;
 }

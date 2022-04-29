@@ -36,17 +36,16 @@ type ExecutorConfig struct {
 
 type Executor struct {
 	*ExecutorConfig
-	accountManagers    map[string]*actor.PID
-	executors          map[uint32]*actor.PID              // A map from exchange ID to executor
-	securities         map[uint64]*models.Security        // A map from security ID to security
-	marketAssets       map[uint64]*models.MarketableAsset // A map from MarketAsset ID to MarketAsset
-	symbToSecs         map[uint32]map[string]*models.Security
-	symbToMarketAssets map[uint32]map[uint64]*models.MarketableAsset
-	instruments        map[uint64]*actor.PID // A map from security ID to market manager
-	slSubscribers      map[uint64]*actor.PID // A map from request ID to security list subscribers
-	malSubscribers     map[uint64]*actor.PID // A map from request ID to protocolAssets list subscribers
-	logger             *log.Logger
-	strict             bool
+	accountManagers          map[string]*actor.PID
+	executors                map[uint32]*actor.PID                      // A map from exchange ID to executor
+	securities               map[uint64]*models.Security                // A map from security ID to security
+	marketableProtocolAssets map[uint64]*models.MarketableProtocolAsset // A map from MarketAsset ID to MarketAsset
+	symbToSecs               map[uint32]map[string]*models.Security
+	instruments              map[uint64]*actor.PID // A map from security ID to market manager
+	slSubscribers            map[uint64]*actor.PID // A map from request ID to security list subscribers
+	malSubscribers           map[uint64]*actor.PID // A map from request ID to protocolAssets list subscribers
+	logger                   *log.Logger
+	strict                   bool
 }
 
 func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
@@ -159,15 +158,15 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.MarketableAssetListRequest:
-		if err := state.OnMarketableAssetListRequest(context); err != nil {
-			state.logger.Error("error processing OnMarketableAssetListRequest", log.Error(err))
+	case *messages.MarketableProtocolAssetListRequest:
+		if err := state.OnMarketableProtocolAssetListRequest(context); err != nil {
+			state.logger.Error("error processing OnMarketableProtocolAssetListRequest", log.Error(err))
 			panic(err)
 		}
 
-	case *messages.MarketableAssetList:
-		if err := state.OnMarketableAssetList(context); err != nil {
-			state.logger.Error("error processing OnMarketableAssetList", log.Error(err))
+	case *messages.MarketableProtocolAssetList:
+		if err := state.OnMarketableProtocolAssetList(context); err != nil {
+			state.logger.Error("error processing OnMarketableProtocolAssetList", log.Error(err))
 			panic(err)
 		}
 	case *messages.AccountMovementRequest:
@@ -343,7 +342,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	//Request market assets for all of them
 	var futs []*actor.Future
-	req := messages.MarketableAssetListRequest{
+	req := messages.MarketableProtocolAssetListRequest{
 		RequestID: 0,
 		Subscribe: true,
 	}
@@ -352,33 +351,29 @@ func (state *Executor) Initialize(context actor.Context) error {
 		futs = append(futs, f)
 	}
 
-	state.marketAssets = make(map[uint64]*models.MarketableAsset)
-	state.symbToMarketAssets = make(map[uint32]map[uint64]*models.MarketableAsset)
+	state.marketableProtocolAssets = make(map[uint64]*models.MarketableProtocolAsset)
 	for _, f := range futs {
 		resp, err := f.Result()
 		if err != nil {
 			state.logger.Error("error fetching marketable assets for one venue", log.Error(err))
 			continue
 		}
-		list, ok := resp.(*messages.MarketableAssetList)
+		list, ok := resp.(*messages.MarketableProtocolAssetList)
 		if !ok {
 			return fmt.Errorf("was expecting MarketAssetList, got %s", reflect.TypeOf(resp).String())
 		}
 		if !list.Success {
 			return errors.New(list.RejectionReason.String())
 		}
-		if len(list.MarketableAssets) > 0 {
-			idToMarketAssets := make(map[uint64]*models.MarketableAsset)
-			var marketID uint32
-			for _, asset := range list.MarketableAssets {
-				if asset2, ok := state.marketAssets[asset.ProtocolAsset.ProtocolAssetID]; ok {
+		if len(list.MarketableProtocolAssets) > 0 {
+			idToMarketAssets := make(map[uint64]*models.MarketableProtocolAsset)
+			for _, asset := range list.MarketableProtocolAssets {
+				if asset2, ok := state.marketableProtocolAssets[asset.MarketableProtocolAssetID]; ok {
 					return fmt.Errorf("got two protocol assets with the same ID: %v and %v", asset.ProtocolAsset, asset2.ProtocolAsset)
 				}
-				state.marketAssets[asset.ProtocolAsset.ProtocolAssetID] = asset
-				idToMarketAssets[asset.ProtocolAsset.ProtocolAssetID] = asset
-				marketID = asset.Market.ID
+				state.marketableProtocolAssets[asset.MarketableProtocolAssetID] = asset
+				idToMarketAssets[asset.MarketableProtocolAssetID] = asset
 			}
-			state.symbToMarketAssets[marketID] = idToMarketAssets
 		}
 	}
 
@@ -465,20 +460,6 @@ func (state *Executor) getSecurity(instr *models.Instrument) (*models.Security, 
 		rej := messages.MissingInstrument
 		return nil, &rej
 	}
-}
-
-func (state *Executor) getMarketableAssets(assetID uint32) ([]*models.MarketableAsset, *messages.RejectionReason) {
-	var assets []*models.MarketableAsset
-	for _, v := range state.marketAssets {
-		if v.ProtocolAsset.Asset.ID == assetID {
-			assets = append(assets, v)
-		}
-	}
-	if len(assets) == 0 {
-		rej := messages.UnknownAsset
-		return nil, &rej
-	}
-	return assets, nil
 }
 
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
@@ -655,27 +636,25 @@ func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) er
 
 func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	request := context.Message().(*messages.HistoricalSalesRequest)
-	assets, rej := state.getMarketableAssets(request.AssetID)
-	if rej != nil {
+	passet, ok := state.marketableProtocolAssets[request.MarketableProtocolAssetID]
+	if !ok {
 		context.Respond(&messages.HistoricalSalesResponse{
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: *rej,
+			RejectionReason: messages.UnknownProtocolAsset,
 		})
 		return nil
 	}
-	for _, asset := range assets {
-		market, ok := state.executors[asset.Market.ID]
-		if !ok {
-			context.Respond(&messages.HistoricalSalesResponse{
-				ResponseID:      uint64(time.Now().UnixNano()),
-				Success:         false,
-				RejectionReason: messages.UnknownExchange,
-			})
-			return nil
-		}
-		context.Forward(market)
+	market, ok := state.executors[passet.Market.ID]
+	if !ok {
+		context.Respond(&messages.HistoricalSalesResponse{
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.UnknownExchange,
+		})
+		return nil
 	}
+	context.Forward(market)
 	return nil
 }
 
@@ -763,17 +742,36 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnMarketableAssetListRequest(context actor.Context) error {
-	req := context.Message().(*messages.MarketableAssetListRequest)
-	var marketAssets []*models.MarketableAsset
-	for _, a := range state.marketAssets {
+func (state *Executor) OnMarketableProtocolsAssetDefinitionRequest(context actor.Context) error {
+	req := context.Message().(messages.MarketableProtocolAssetDefinitionRequest)
+	ma, ok := state.marketableProtocolAssets[req.MarketableProtocolAssetID]
+	if !ok {
+		context.Respond(messages.MarketableProtocolAssetDefinitionResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.UnknownProtocolAsset,
+		})
+	}
+	context.Respond(messages.MarketableProtocolAssetDefinitionResponse{
+		RequestID:               req.RequestID,
+		ResponseID:              uint64(time.Now().UnixNano()),
+		Success:                 true,
+		MarketableProtocolAsset: ma,
+	})
+	return nil
+}
+
+func (state *Executor) OnMarketableProtocolAssetListRequest(context actor.Context) error {
+	req := context.Message().(*messages.MarketableProtocolAssetListRequest)
+	var marketAssets []*models.MarketableProtocolAsset
+	for _, a := range state.marketableProtocolAssets {
 		marketAssets = append(marketAssets, a)
 	}
-	response := &messages.MarketableAssetList{
-		RequestID:        req.RequestID,
-		ResponseID:       uint64(time.Now().UnixNano()),
-		MarketableAssets: marketAssets,
-		Success:          true,
+	response := &messages.MarketableProtocolAssetList{
+		RequestID:                req.RequestID,
+		ResponseID:               uint64(time.Now().UnixNano()),
+		MarketableProtocolAssets: marketAssets,
+		Success:                  true,
 	}
 	if req.Subscribe {
 		context.Watch(req.Subscriber)
@@ -783,38 +781,34 @@ func (state *Executor) OnMarketableAssetListRequest(context actor.Context) error
 	return nil
 }
 
-func (state *Executor) OnMarketableAssetList(context actor.Context) error {
-	req := context.Message().(*messages.MarketableAssetList)
-	if len(req.MarketableAssets) == 0 {
+func (state *Executor) OnMarketableProtocolAssetList(context actor.Context) error {
+	req := context.Message().(*messages.MarketableProtocolAssetList)
+	if len(req.MarketableProtocolAssets) == 0 {
 		return nil
 	}
-	market := req.MarketableAssets[0].Market
+	market := req.MarketableProtocolAssets[0].Market
 	// delete all assets from executor for this market
-	for k, v := range state.marketAssets {
+	for k, v := range state.marketableProtocolAssets {
 		if v.Market.ID == market.ID {
-			delete(state.marketAssets, k)
+			delete(state.marketableProtocolAssets, k)
 		}
 	}
-	delete(state.symbToMarketAssets, market.ID)
 
 	//replace all the assets
-	m := make(map[uint64]*models.MarketableAsset)
-	for _, a := range req.MarketableAssets {
-		state.marketAssets[a.ProtocolAsset.ProtocolAssetID] = a
-		m[a.ProtocolAsset.ProtocolAssetID] = a
+	for _, a := range req.MarketableProtocolAssets {
+		state.marketableProtocolAssets[a.MarketableProtocolAssetID] = a
 	}
-	state.symbToMarketAssets[market.ID] = m
 
-	var maList []*models.MarketableAsset
-	for _, v := range state.marketAssets {
+	var maList []*models.MarketableProtocolAsset
+	for _, v := range state.marketableProtocolAssets {
 		maList = append(maList, v)
 	}
 	for k, v := range state.malSubscribers {
-		context.Send(v, &messages.MarketableAssetList{
-			RequestID:        k,
-			ResponseID:       uint64(time.Now().UnixNano()),
-			Success:          true,
-			MarketableAssets: maList,
+		context.Send(v, &messages.MarketableProtocolAssetList{
+			RequestID:                k,
+			ResponseID:               uint64(time.Now().UnixNano()),
+			Success:                  true,
+			MarketableProtocolAssets: maList,
 		})
 	}
 	return nil
@@ -823,7 +817,6 @@ func (state *Executor) OnMarketableAssetList(context actor.Context) error {
 func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
 	msg := context.Message().(*messages.TradeCaptureReportRequest)
 	if msg.Account == nil {
-		fmt.Println("NIL")
 		context.Respond(&messages.TradeCaptureReport{
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),

@@ -11,12 +11,12 @@ import (
 )
 
 type updateSecurityList struct{}
-type updateMarketableAssetList struct{}
+type updateMarketableProtocolAssetList struct{}
 
 type Executor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
-	OnMarketableAssetListRequest(context actor.Context) error
+	OnMarketableProtocolAssetListRequest(context actor.Context) error
 	OnHistoricalOpenInterestsRequest(context actor.Context) error
 	OnHistoricalFundingRatesRequest(context actor.Context) error
 	OnHistoricalLiquidationsRequest(context actor.Context) error
@@ -36,16 +36,16 @@ type Executor interface {
 	OnHistoricalUnipoolV3DataRequest(context actor.Context) error
 	OnHistoricalSalesRequest(context actor.Context) error
 	UpdateSecurityList(context actor.Context) error
-	UpdateMarketableAssetList(context actor.Context) error
+	UpdateMarketableProtocolAssetList(context actor.Context) error
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
 }
 
 type BaseExecutor struct {
-	Securities       map[uint64]*models.Security
-	MarketableAssets map[uint64]*models.MarketableAsset
-	SymbolToSec      map[string]*models.Security
+	Securities               map[uint64]*models.Security
+	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
+	SymbolToSec              map[string]*models.Security
 }
 
 func (state *BaseExecutor) GetSecurity(instr *models.Instrument) *models.Security {
@@ -101,8 +101,8 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			panic(err)
 		}
 
-	case *messages.MarketableAssetListRequest:
-		if err := state.OnMarketableAssetListRequest(context); err != nil {
+	case *messages.MarketableProtocolAssetListRequest:
+		if err := state.OnMarketableProtocolAssetListRequest(context); err != nil {
 			state.GetLogger().Error("error processing ProtocolAssetListRequest", log.Error(err))
 			panic(err)
 		}
@@ -224,13 +224,13 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			context.Send(pid, &updateSecurityList{})
 		}(context.Self())
 
-	case *updateMarketableAssetList:
-		if err := state.UpdateMarketableAssetList(context); err != nil {
+	case *updateMarketableProtocolAssetList:
+		if err := state.UpdateMarketableProtocolAssetList(context); err != nil {
 			state.GetLogger().Info("error updating asset list", log.Error(err))
 		}
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
-			context.Send(pid, &updateMarketableAssetList{})
+			context.Send(pid, &updateMarketableProtocolAssetList{})
 		}(context.Self())
 	}
 }
@@ -253,20 +253,20 @@ func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *BaseExecutor) OnMarketableAssetListRequest(context actor.Context) error {
+func (state *BaseExecutor) OnMarketableProtocolAssetListRequest(context actor.Context) error {
 	// Get http request and the expected response
-	msg := context.Message().(*messages.MarketableAssetListRequest)
-	massets := make([]*models.MarketableAsset, len(state.MarketableAssets))
+	msg := context.Message().(*messages.MarketableProtocolAssetListRequest)
+	massets := make([]*models.MarketableProtocolAsset, len(state.MarketableProtocolAssets))
 	i := 0
-	for _, v := range state.MarketableAssets {
+	for _, v := range state.MarketableProtocolAssets {
 		massets[i] = v
 		i += 1
 	}
-	context.Respond(&messages.MarketableAssetList{
-		RequestID:        msg.RequestID,
-		ResponseID:       uint64(time.Now().UnixNano()),
-		Success:          true,
-		MarketableAssets: massets})
+	context.Respond(&messages.MarketableProtocolAssetList{
+		RequestID:                msg.RequestID,
+		ResponseID:               uint64(time.Now().UnixNano()),
+		Success:                  true,
+		MarketableProtocolAssets: massets})
 
 	return nil
 }
@@ -473,7 +473,7 @@ func (state *BaseExecutor) UpdateSecurityList(context actor.Context) error {
 	return nil
 }
 
-func (state *BaseExecutor) UpdateMarketableAssetList(context actor.Context) error {
+func (state *BaseExecutor) UpdateMarketableProtocolAssetList(context actor.Context) error {
 	return nil
 }
 
