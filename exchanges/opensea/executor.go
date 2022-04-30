@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gogo/protobuf/types"
-	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
@@ -102,47 +101,68 @@ func (state *Executor) Initialize(context actor.Context) error {
 func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) error {
 	assets := make([]*models.MarketableProtocolAsset, 0)
 	reg := state.registry
-
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
 	//TODO add matic and solana protocols
-	filter := registry.ProtocolAssetFilter{
-		ProtocolId: []uint32{constants.ERC721.ID},
+	filter := registry.MarketableProtocolAssetFilter{
+		MarketId: []uint32{constants.OPENSEA.ID},
 	}
-	in := registry.ProtocolAssetsRequest{
+	in := registry.MarketableProtocolAssetsRequest{
 		Filter: &filter,
 	}
-	res, err := reg.ProtocolAssets(ctx, &in)
+
+	//Get marketable protocol assets
+	res, err := reg.MarketableProtocolAssets(ctx, &in)
 	if err != nil {
-		return fmt.Errorf("error updating protocol asset list: %v", err)
+		return fmt.Errorf("error querying marketable protocol asset list: %v", err)
 	}
-	response := res.ProtocolAssets
-	for _, protocolAsset := range response {
-		if addr, ok := protocolAsset.Meta["address"]; !ok || len(addr) < 2 {
+	marketables := res.MarketableProtocolAssets
+	var protocolAssetIds []uint64
+	for _, marketable := range marketables {
+		protocolAssetIds = append(protocolAssetIds, marketable.ProtocolAssetId)
+	}
+
+	//Get protocol assets from the corresponding marketable protocol assets
+	r, err := reg.ProtocolAssets(ctx, &registry.ProtocolAssetsRequest{
+		Filter: &registry.ProtocolAssetFilter{
+			ProtocolAssetId: protocolAssetIds,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("error querying protocol asset list: %v", err)
+	}
+	protocolAssets := r.ProtocolAssets
+	idToProtocolAsset := make(map[uint64]*registry.ProtocolAsset)
+	for _, asset := range protocolAssets {
+		idToProtocolAsset[asset.ProtocolAssetId] = asset
+	}
+	//Create the marketable assets from the protocol assets and the marketable protocol assets
+	for _, marketable := range marketables {
+		if addr, ok := idToProtocolAsset[marketable.ProtocolAssetId].Meta["address"]; !ok || len(addr) < 2 {
 			state.logger.Warn("invalid protocol asset address")
 			continue
 		}
-		_, ok := big.NewInt(1).SetString(protocolAsset.Meta["address"][2:], 16)
+		_, ok := big.NewInt(1).SetString(idToProtocolAsset[marketable.ProtocolAssetId].Meta["address"][2:], 16)
 		if !ok {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
 		}
-		as, ok := constants.GetAssetByID(protocolAsset.AssetId)
+		as, ok := constants.GetAssetByID(idToProtocolAsset[marketable.ProtocolAssetId].AssetId)
 		if !ok {
-			state.logger.Warn(fmt.Sprintf("error getting asset with id %d", protocolAsset.AssetId))
+			state.logger.Warn(fmt.Sprintf("error getting asset with id %d", idToProtocolAsset[marketable.ProtocolAssetId].AssetId))
 			continue
 		}
-		ch, ok := constants.GetChainByID(protocolAsset.ChainId)
+		ch, ok := constants.GetChainByID(idToProtocolAsset[marketable.ProtocolAssetId].ChainId)
 		if !ok {
-			state.logger.Warn(fmt.Sprintf("error getting chain with id %d", protocolAsset.ChainId))
+			state.logger.Warn(fmt.Sprintf("error getting chain with id %d", idToProtocolAsset[marketable.ProtocolAssetId].ChainId))
 			continue
 		}
 		assets = append(
 			assets,
 			&models.MarketableProtocolAsset{
-				MarketableProtocolAssetID: utils.MarketableProtocolAssetID(protocolAsset.ProtocolAssetId, constants.OPENSEA.ID),
+				MarketableProtocolAssetID: marketable.MarketableProtocolAssetId,
 				ProtocolAsset: &models.ProtocolAsset{
-					ProtocolAssetID: protocolAsset.ProtocolAssetId,
+					ProtocolAssetID: idToProtocolAsset[marketable.ProtocolAssetId].ProtocolAssetId,
 					Protocol: &models2.Protocol{
 						ID:   constants.ERC721.ID,
 						Name: "ERC-721",
@@ -157,7 +177,7 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 						Name: ch.Name,
 						Type: ch.Type,
 					},
-					Meta: protocolAsset.Meta,
+					Meta: idToProtocolAsset[marketable.ProtocolAssetId].Meta,
 				},
 				Market: &constants.OPENSEA,
 			},
@@ -167,7 +187,6 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 	for _, a := range assets {
 		state.marketableProtocolAssets[a.MarketableProtocolAssetID] = a
 	}
-
 	context.Send(context.Parent(), &messages.MarketableProtocolAssetList{
 		ResponseID:               uint64(time.Now().UnixNano()),
 		MarketableProtocolAssets: assets,

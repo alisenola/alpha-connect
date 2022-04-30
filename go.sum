@@ -706,6 +706,10 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331130236-121f8795ed36 h1:HWSuW9/mtBvZG9zbHLJRd6zzdOnheA0B8zc43BL9hPU=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220331130236-121f8795ed36/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220427155934-bd4700950436 h1:jRjdesjrO91G9Ck7ycb+7cF42/+F4oahgJkk4+18nS8=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220427155934-bd4700950436/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220430165358-5f4e23a457b7 h1:Dr2loFmjQiom8AcGIdyaYHjlWBADQFoanwreK/BdP4U=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220430165358-5f4e23a457b7/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20211222101918-07fc389f88ff/go.mod h1:LSdMpqt+lvNoQMgnOYahcaTizKIg8TP7kGnwtY/zSos=
@@ -731,6 +735,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220416190017-1b3e69266cdf h1:X3ImYevCaMq
 gitlab.com/alphaticks/xchanger v0.0.0-20220416190017-1b3e69266cdf/go.mod h1:Uu7uTeWh9H1bM4rXinOAFemtfSvzpJMag0XnEZV/Rj0=
 gitlab.com/alphaticks/xchanger v0.0.0-20220426084211-76f8a3a70e44 h1:aU0RCCoM8ZAhF4aFxYBdP1EPZQYHb9G3aYwlV328dOc=
 gitlab.com/alphaticks/xchanger v0.0.0-20220426084211-76f8a3a70e44/go.mod h1:Uu7uTeWh9H1bM4rXinOAFemtfSvzpJMag0XnEZV/Rj0=
+gitlab.com/alphaticks/xchanger v0.0.0-20220430165556-415661969a39 h1:gdFWyfm6vvWiEefpty1ihjV4S1tJcCUOIkCs04hhE84=
+gitlab.com/alphaticks/xchanger v0.0.0-20220430165556-415661969a39/go.mod h1:Uu7uTeWh9H1bM4rXinOAFemtfSvzpJMag0XnEZV/Rj0=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.etcd.io/etcd/api/v3 v3.5.0/go.mod h1:cbVKeC6lCfl7j/8jBhAK6aIYO9XOjdptoxU/nLQcPvs=

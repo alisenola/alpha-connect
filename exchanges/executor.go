@@ -340,14 +340,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 	}
 
-	//Request market assets for all of them
+	//Request marketable protocol assets for all of them
 	var futs []*actor.Future
 	req := messages.MarketableProtocolAssetListRequest{
 		RequestID: 0,
 		Subscribe: true,
 	}
 	for _, pid := range state.executors {
-		f := context.RequestFuture(pid, &req, 10*time.Second)
+		f := context.RequestFuture(pid, &req, 15*time.Second)
 		futs = append(futs, f)
 	}
 
@@ -355,7 +355,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, f := range futs {
 		resp, err := f.Result()
 		if err != nil {
-			state.logger.Error("error fetching marketable assets for one venue", log.Error(err))
+			state.logger.Error("error fetching marketable protocol assets for one venue", log.Error(err))
 			continue
 		}
 		list, ok := resp.(*messages.MarketableProtocolAssetList)
