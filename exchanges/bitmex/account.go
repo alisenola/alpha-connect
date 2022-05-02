@@ -206,9 +206,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 				fmt.Println("SENDING CHECK SOCKET")
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
-				fmt.Println("CHECK SOCKET TIMER STOPPED")
-				// timer stopped, we leave
-				return
+				if state.socketTicker != socketTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
@@ -223,8 +223,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 				context.Send(pid, &checkAccount{})
 			case <-time.After(11 * time.Minute):
 				// timer stopped, we leave
-				fmt.Println("CHECK ACCOUNT TIMER STOPPED")
-				return
+				if state.accountTicker != accountTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())

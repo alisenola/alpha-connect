@@ -296,8 +296,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			case <-checkAccountTicker.C:
 				context.Send(pid, &checkAccount{})
 			case <-time.After(6 * time.Minute):
-				// timer stopped, we leave
-				return
+				if state.checkAccountTicker != checkAccountTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
@@ -310,8 +311,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			case <-checkSocketTicker.C:
 				context.Send(pid, &checkSocket{})
 			case <-time.After(10 * time.Second):
-				// timer stopped, we leave
-				return
+				if state.checkSocketTicker != checkSocketTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())

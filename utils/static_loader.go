@@ -88,8 +88,9 @@ func (state *StaticLoader) Initialize(context actor.Context) error {
 			case <-ticker.C:
 				context.Send(pid, &checkStatic{})
 			case <-time.After(2 * time.Minute):
-				// timer stopped, we leave
-				return
+				if state.ticker != ticker {
+					return
+				}
 			}
 		}
 	}(context.Self())
