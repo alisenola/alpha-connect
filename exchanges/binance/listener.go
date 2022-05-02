@@ -500,7 +500,11 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	if time.Since(state.lastPingTime) > 10*time.Second {
-		_ = state.ws.ListSubscriptions()
+		if err := state.ws.ListSubscriptions(); err != nil {
+			if err := state.subscribeInstrument(context); err != nil {
+				return fmt.Errorf("error subscribing to instrument: %v", err)
+			}
+		}
 		state.lastPingTime = time.Now()
 	}
 
