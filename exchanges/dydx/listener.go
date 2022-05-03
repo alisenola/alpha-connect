@@ -351,7 +351,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case dydx.WSTradesSubscribed:
-		// Ignore
 		if res.MessageID != state.lastMessageID+1 {
 			return state.subscribeInstrument(context)
 		}
@@ -413,6 +412,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 	case dydx.WSPong:
+		state.lastMessageID = res.MessageID
 
 	default:
 		return fmt.Errorf("received unknown message: %s", reflect.TypeOf(msg.Message).String())
