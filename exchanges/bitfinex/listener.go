@@ -576,6 +576,9 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 			fbdLock.Lock()
 			fbd = time.Duration(float64(fbd) * 1.01)
 			fbdLock.Unlock()
+			if state.fullBookTicker != nil {
+				state.fullBookTicker.Reset(fbd)
+			}
 			fmt.Println("INCREASE DELAY", fbd)
 		}
 		state.logger.Info("error fetching snapshot", log.Error(errors.New(msg.RejectionReason.String())))
@@ -589,8 +592,10 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	// Reduce delay
 	fbdLock.Lock()
 	fbd = time.Duration(float64(fbd) * 0.999)
-	state.fullBookTicker.Reset(fbd)
 	fbdLock.Unlock()
+	if state.fullBookTicker != nil {
+		state.fullBookTicker.Reset(fbd)
+	}
 	fmt.Println("DECREASE DELAY", fbd)
 
 	// What to do ? ...

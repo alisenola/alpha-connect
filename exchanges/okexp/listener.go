@@ -537,8 +537,10 @@ func (state *Listener) updateLiquidations(context actor.Context) error {
 			if err == actor.ErrTimeout {
 				liqdLock.Lock()
 				liqd = time.Duration(float64(liqd) * 1.01)
-				state.liquidationsTicker.Reset(liqd)
 				liqdLock.Unlock()
+				if state.liquidationsTicker != nil {
+					state.liquidationsTicker.Reset(liqd)
+				}
 			}
 			state.logger.Info("error fetching liquidations", log.Error(err))
 			return
@@ -549,8 +551,10 @@ func (state *Listener) updateLiquidations(context actor.Context) error {
 			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
 				liqdLock.Lock()
 				liqd = time.Duration(float64(liqd) * 1.01)
-				state.liquidationsTicker.Reset(liqd)
 				liqdLock.Unlock()
+				if state.liquidationsTicker != nil {
+					state.liquidationsTicker.Reset(liqd)
+				}
 			}
 			state.logger.Info("error fetching liquidations", log.Error(errors.New(msg.RejectionReason.String())))
 			return
@@ -571,8 +575,10 @@ func (state *Listener) updateLiquidations(context actor.Context) error {
 		if liqd < 15*time.Second {
 			liqd = 15 * time.Second
 		}
-		state.liquidationsTicker.Reset(liqd)
 		liqdLock.Unlock()
+		if state.liquidationsTicker != nil {
+			state.liquidationsTicker.Reset(liqd)
+		}
 	})
 
 	return nil

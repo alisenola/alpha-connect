@@ -571,7 +571,9 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 			if err == actor.ErrTimeout {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
-				state.openInterestTicker.Reset(oid)
+				if state.openInterestTicker != nil {
+					state.openInterestTicker.Reset(oid)
+				}
 				oidLock.Unlock()
 			}
 			state.logger.Info("error fetching market statistics", log.Error(err))
@@ -583,7 +585,9 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
-				state.openInterestTicker.Reset(oid)
+				if state.openInterestTicker != nil {
+					state.openInterestTicker.Reset(oid)
+				}
 				oidLock.Unlock()
 			}
 			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
@@ -603,7 +607,9 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		if oid < 15*time.Second {
 			oid = 15 * time.Second
 		}
-		state.openInterestTicker.Reset(oid)
+		if state.openInterestTicker != nil {
+			state.openInterestTicker.Reset(oid)
+		}
 		oidLock.Unlock()
 	})
 

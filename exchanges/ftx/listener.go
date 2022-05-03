@@ -189,6 +189,7 @@ func (state *Listener) Clean(context actor.Context) error {
 }
 
 func (state *Listener) subscribeInstrument(context actor.Context) error {
+	fmt.Println("SUBSCRIBING INSTRUEMNT")
 	if state.ws != nil {
 		_ = state.ws.Disconnect()
 	}
@@ -196,14 +197,17 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 
 	ws := ftx.NewWebsocket()
+	fmt.Println("NEW WS")
 	err := ws.Connect(state.dialerPool.GetDialer())
 	if err != nil {
 		return err
 	}
+	fmt.Println("CONNECT")
 
 	if err := ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 		return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 	}
+	fmt.Println("SUB GORUPED")
 
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading message: %v", ws.Err)
@@ -266,6 +270,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if ob.Crossed() {
 		return fmt.Errorf("crossed orderbook")
 	}
+	fmt.Println("OB SYNCED")
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateTime = ts
@@ -280,8 +285,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
+		fmt.Println("WS EXITING")
 	}(ws, context.Self())
 
+	fmt.Println("DONE")
 	return nil
 }
 
@@ -511,24 +518,31 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		}, 2*time.Second)
 
 	context.AwaitFuture(fut, func(res interface{}, err error) {
+		fmt.Println("UPDATE OI RESOLVED")
 		if err != nil {
+			fmt.Println("ERR", err)
 			if err == actor.ErrTimeout {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
-				state.openInterestTicker.Reset(oid)
 				oidLock.Unlock()
+				if state.openInterestTicker != nil {
+					state.openInterestTicker.Reset(oid)
+				}
 			}
 			state.logger.Info("error fetching market statistics", log.Error(err))
 			return
 		}
 		msg := res.(*messages.MarketStatisticsResponse)
 		if !msg.Success {
+			fmt.Println("ERR")
 			// We want to converge towards the right value,
 			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
-				state.openInterestTicker.Reset(oid)
 				oidLock.Unlock()
+				if state.openInterestTicker != nil {
+					state.openInterestTicker.Reset(oid)
+				}
 			}
 			state.logger.Info("error fetching market statistics", log.Error(errors.New(msg.RejectionReason.String())))
 			return
@@ -547,9 +561,12 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		if oid < 15*time.Second {
 			oid = 15 * time.Second
 		}
-		state.openInterestTicker.Reset(oid)
 		oidLock.Unlock()
+		if state.openInterestTicker != nil {
+			state.openInterestTicker.Reset(oid)
+		}
 	})
+	fmt.Println("UPDATE OI DONE")
 
 	return nil
 }
