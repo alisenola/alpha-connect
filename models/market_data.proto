@@ -134,5 +134,6 @@ message Sale {
     gorderbook.models.AssetTransfer transfer = 1;
     bytes price = 2;
     uint64 block = 3;
-    google.protobuf.Timestamp timestamp = 4;
+    uint64 id = 4;
+    google.protobuf.Timestamp timestamp = 5;
 }

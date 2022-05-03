@@ -47,8 +47,8 @@ func TestExecutor(t *testing.T) {
 	r, err := as.Root.RequestFuture(executor, &messages.HistoricalSalesRequest{
 		RequestID:                 uint64(time.Now().UnixNano()),
 		MarketableProtocolAssetID: coll.MarketableProtocolAssetID,
-		From:                      &types.Timestamp{Seconds: 1650891168},
-	}, 15*time.Second).Result()
+		From:                      &types.Timestamp{Seconds: 0},
+	}, 5*time.Minute).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,6 +85,7 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Println("TimeStamp", sales.Sale[0].Timestamp)
 }
 
 func TestMarketableProtocolAssetID(t *testing.T) {

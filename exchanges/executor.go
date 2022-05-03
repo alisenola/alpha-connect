@@ -146,6 +146,12 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.MarketableProtocolAssetDefinitionRequest:
+		if err := state.OnMarketableProtocolsAssetDefinitionRequest(context); err != nil {
+			state.logger.Error("error processing OnMarketableProtocolsAssetDefinitionRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.SecurityListRequest:
 		if err := state.OnSecurityListRequest(context); err != nil {
 			state.logger.Error("error processing OnSecurityListRequest", log.Error(err))
@@ -743,16 +749,16 @@ func (state *Executor) OnSecurityList(context actor.Context) error {
 }
 
 func (state *Executor) OnMarketableProtocolsAssetDefinitionRequest(context actor.Context) error {
-	req := context.Message().(messages.MarketableProtocolAssetDefinitionRequest)
+	req := context.Message().(*messages.MarketableProtocolAssetDefinitionRequest)
 	ma, ok := state.marketableProtocolAssets[req.MarketableProtocolAssetID]
 	if !ok {
-		context.Respond(messages.MarketableProtocolAssetDefinitionResponse{
+		context.Respond(&messages.MarketableProtocolAssetDefinitionResponse{
 			RequestID:       req.RequestID,
 			Success:         false,
 			RejectionReason: messages.UnknownProtocolAsset,
 		})
 	}
-	context.Respond(messages.MarketableProtocolAssetDefinitionResponse{
+	context.Respond(&messages.MarketableProtocolAssetDefinitionResponse{
 		RequestID:               req.RequestID,
 		ResponseID:              uint64(time.Now().UnixNano()),
 		Success:                 true,

@@ -35,3 +35,10 @@ func MicroToTimestamp(ts uint64) *types.Timestamp {
 
 	return &types.Timestamp{Seconds: seconds, Nanos: nanos}
 }
+
+func NanoToTimestamp(ts uint64) *types.Timestamp {
+	seconds := int64(ts) / 1000000000
+	nanos := int32(int64(ts) - (seconds * 1000000000))
+
+	return &types.Timestamp{Seconds: seconds, Nanos: nanos}
+}

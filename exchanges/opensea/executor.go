@@ -4,7 +4,7 @@ import (
 	goContext "context"
 	"encoding/json"
 	"fmt"
-	"github.com/gogo/protobuf/types"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
@@ -220,7 +220,6 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-
 	if state.credentials.APIKey == "" {
 		msg.RejectionReason = messages.UnsupportedRequest
 		context.Respond(msg)
@@ -335,6 +334,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			t.FillBytes(to[:])
 			token.FillBytes(tokenID[:])
 			p.FillBytes(price[:])
+			ts := utils.NanoToTimestamp(uint64(tim.UnixNano()))
 			sales = append(sales, &models.Sale{
 				Transfer: &gorderbook.AssetTransfer{
 					From:    from[:],
@@ -343,7 +343,8 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				},
 				Block:     uint64(i),
 				Price:     price[:],
-				Timestamp: &types.Timestamp{Seconds: tim.Unix()},
+				Timestamp: ts,
+				Id:        uint64(e.Transaction.Id),
 			})
 		}
 		cursor = events.Next
@@ -356,9 +357,13 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				context.Respond(msg)
 				return
 			}
-			qr.rateLimit.Request(weight)
-			fut := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 15*time.Second)
-			context.AwaitFuture(fut, processFuture)
+			go func() {
+				qr.rateLimit.WaitRequest(weight)
+				fut := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 15*time.Second)
+				qr.rateLimit.Request(weight)
+				context.AwaitFuture(fut, processFuture)
+				return
+			}()
 		} else {
 			msg.Success = true
 			msg.Sale = sales

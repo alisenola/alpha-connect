@@ -71,6 +71,7 @@ func (state *Executor) Receive(context actor.Context) {
 		*messages.SecurityList,
 		*messages.MarketableProtocolAssetList,
 		*messages.MarketableProtocolAssetListRequest,
+		*messages.MarketableProtocolAssetDefinitionRequest,
 		*messages.AccountMovementRequest,
 		*messages.TradeCaptureReportRequest,
 		*messages.PositionsRequest,
