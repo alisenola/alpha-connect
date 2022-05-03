@@ -153,6 +153,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		for {
 			select {
 			case <-socketTicker.C:
+				fmt.Println("SENDING CHECK SOCKET")
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
 				if state.socketTicker != socketTicker {
@@ -161,6 +162,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 				}
 			}
 		}
+		fmt.Println("EXITING !!!")
 	}(context.Self())
 
 	return nil
@@ -456,7 +458,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-
+	state.logger.Info("checking socket")
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
 			state.logger.Info("error on socket", log.Error(state.ws.Err))
@@ -467,7 +469,11 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	}
 
 	if time.Since(state.lastPingTime) > 10*time.Second {
+		state.logger.Info("pinging")
 		// "Ping" by resubscribing to the topic
+		if err := state.ws.Ping(); err != nil {
+			return fmt.Errorf("error pinging: %v", err)
+		}
 		if err := state.ws.SubscribeGroupedOrderBook(state.security.Symbol, state.security.MinPriceIncrement.Value); err != nil {
 			return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 		}
