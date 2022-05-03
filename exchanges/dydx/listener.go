@@ -412,6 +412,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.lastAggTradeTs = ts
 		}
 
+	case dydx.WSPong:
+
 	default:
 		return fmt.Errorf("received unknown message: %s", reflect.TypeOf(msg.Message).String())
 	}
