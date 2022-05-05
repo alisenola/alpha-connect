@@ -128,7 +128,9 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 					Name: ch.Name,
 					Type: ch.Type,
 				},
-				Meta: protocolAsset.Meta,
+				CreationDate:  protocolAsset.CreationDate,
+				CreationBlock: protocolAsset.CreationBlock,
+				Meta:          protocolAsset.Meta,
 			})
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)

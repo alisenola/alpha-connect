@@ -114,6 +114,8 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 				Protocol:        &constants.ERC20,
 				Asset:           as,
 				Chain:           ch,
+				CreationBlock:   protocolAsset.CreationBlock,
+				CreationDate:    protocolAsset.CreationDate,
 				Meta:            protocolAsset.Meta,
 			})
 	}
