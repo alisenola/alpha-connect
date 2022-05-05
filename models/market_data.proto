@@ -131,7 +131,7 @@ message Stat {
 }
 
 message Sale {
-    gorderbook.models.AssetTransfer transfer = 1;
+    repeated gorderbook.models.AssetTransfer transfer = 1;
     bytes price = 2;
     uint64 block = 3;
     uint64 id = 4;
