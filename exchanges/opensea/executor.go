@@ -57,13 +57,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 	sort.Slice(state.queryRunners, func(i, j int) bool {
 		return rand.Uint64()%2 == 0
 	})
-
-	for _, q := range state.queryRunners {
-		if !q.rateLimit.IsRateLimited() {
-			return q
-		}
-	}
-	return nil
+	return state.queryRunners[0]
 }
 
 func (state *Executor) Receive(context actor.Context) {
@@ -92,7 +86,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			pid:       context.Spawn(props),
-			rateLimit: exchanges.NewRateLimit(100, time.Minute),
+			rateLimit: exchanges.NewRateLimit(4, time.Second),
 		})
 	}
 	return state.UpdateMarketableProtocolAssetList(context)
@@ -177,7 +171,9 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 						Name: ch.Name,
 						Type: ch.Type,
 					},
-					Meta: idToProtocolAsset[marketable.ProtocolAssetId].Meta,
+					CreationDate:  idToProtocolAsset[marketable.ProtocolAssetId].CreationDate,
+					CreationBlock: idToProtocolAsset[marketable.ProtocolAssetId].CreationBlock,
+					Meta:          idToProtocolAsset[marketable.ProtocolAssetId].Meta,
 				},
 				Market: &constants.OPENSEA,
 			},
@@ -232,12 +228,8 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		return nil
 	}
 
+	//TODO add field for strict rate limiting
 	qr := state.getQueryRunner()
-	if qr == nil {
-		msg.RejectionReason = messages.RateLimitExceeded
-		context.Respond(msg)
-		return nil
-	}
 
 	params := opensea.NewGetEventsParams()
 	add := pAsset.ProtocolAsset.Meta["address"]
@@ -267,7 +259,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	processFuture = func(res interface{}, err error) {
 		if err != nil {
 			msg.RejectionReason = messages.HTTPError
-			context.Respond(msg)
+			context.Send(sender, msg)
 			return
 		}
 
@@ -277,13 +269,13 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				err := fmt.Errorf("%d %s", resp.StatusCode, string(resp.Response))
 				state.logger.Warn("http client error", log.Error(err))
 				msg.RejectionReason = messages.HTTPError
-				context.Respond(msg)
+				context.Send(sender, msg)
 				return
 			} else if resp.StatusCode >= 500 {
 				err := fmt.Errorf("%d %s", resp.StatusCode, string(resp.Response))
 				state.logger.Warn("http server error", log.Error(err))
 				msg.RejectionReason = messages.HTTPError
-				context.Respond(msg)
+				context.Send(sender, msg)
 				return
 			}
 			return
@@ -292,13 +284,12 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		var events opensea.EventsResponse
 		if err := json.Unmarshal(resp.Response, &events); err != nil {
 			msg.RejectionReason = messages.ExchangeAPIError
-			context.Respond(msg)
+			context.Send(sender, msg)
 			return
 		}
 		for _, e := range events.AssetEvents {
 			var from [20]byte
 			var to [20]byte
-			var tokenID [32]byte
 			var price [32]byte
 			f, ok := big.NewInt(1).SetString(e.Transaction.FromAccount.Address[2:], 16)
 			if !ok {
@@ -310,10 +301,24 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				state.logger.Warn("incorrect address format", log.String("address", e.Transaction.ToAccount.Address))
 				continue
 			}
-			token, ok := big.NewInt(1).SetString(e.Asset.TokenId, 10)
-			if !ok {
-				state.logger.Warn("incorrect tokenID format", log.String("tokenID", e.Asset.TokenId))
-				continue
+			tokens := make([]*big.Int, 0)
+			if e.Asset != nil {
+				token, ok := big.NewInt(1).SetString(e.Asset.TokenId, 10)
+				if !ok {
+					state.logger.Warn("incorrect tokenID format", log.String("tokenID", e.Asset.TokenId))
+					continue
+				}
+				tokens = append(tokens, token)
+			}
+			if e.AssetBundle != nil {
+				for _, asset := range e.AssetBundle.Assets {
+					token, ok := big.NewInt(1).SetString(asset.TokenId, 10)
+					if !ok {
+						state.logger.Warn("incorrect tokenID format", log.String("tokenID", asset.TokenId))
+						continue
+					}
+					tokens = append(tokens, token)
+				}
 			}
 			i, err := strconv.ParseInt(e.Transaction.BlockNumber, 10, 64)
 			if err != nil {
@@ -325,22 +330,28 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				state.logger.Warn("incorrect price format", log.String("price", e.TotalPrice))
 				continue
 			}
-			tim, err := time.Parse("2006-01-02T15:04:05", e.Transaction.Timestamp)
+			tim, err := time.Parse("2006-01-02T15:04:05", e.EventTimestamp)
 			if err != nil {
 				state.logger.Warn("incorrect timestamp format", log.String("ts", e.Transaction.Timestamp))
 				continue
 			}
 			f.FillBytes(from[:])
 			t.FillBytes(to[:])
-			token.FillBytes(tokenID[:])
 			p.FillBytes(price[:])
 			ts := utils.NanoToTimestamp(uint64(tim.UnixNano()))
+			var transfers []*gorderbook.AssetTransfer
+			for _, tok := range tokens {
+				var tokenID [32]byte
+				tok.FillBytes(tokenID[:])
+				transfers = append(transfers,
+					&gorderbook.AssetTransfer{
+						From:    from[:],
+						To:      to[:],
+						TokenId: tokenID[:],
+					})
+			}
 			sales = append(sales, &models.Sale{
-				Transfer: &gorderbook.AssetTransfer{
-					From:    from[:],
-					To:      to[:],
-					TokenId: tokenID[:],
-				},
+				Transfer:  transfers,
 				Block:     uint64(i),
 				Price:     price[:],
 				Timestamp: ts,
@@ -354,7 +365,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			r, weight, err = opensea.GetEvents(params, state.credentials.APIKey)
 			if err != nil {
 				msg.RejectionReason = messages.UnsupportedOrderCharacteristic
-				context.Respond(msg)
+				context.Send(sender, msg)
 				return
 			}
 			go func() {
@@ -369,6 +380,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			msg.Sale = sales
 			msg.SeqNum = uint64(time.Now().UnixNano())
 			context.Send(sender, msg)
+			return
 		}
 	}
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 10*time.Minute)
