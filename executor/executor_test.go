@@ -102,7 +102,7 @@ func TestMainExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg, ok := pro.(*messages.ProtocolAssetListResponse)
+	msg, ok := pro.(*messages.ProtocolAssetList)
 	if !ok {
 		t.Fatal("incorrect type assertiob")
 	}
@@ -119,10 +119,10 @@ func TestMainExecutor(t *testing.T) {
 		t.Fatal("Missing asset")
 	}
 	r, err := as.Root.RequestFuture(ex, &messages.HistoricalProtocolAssetTransferRequest{
-		RequestID:     uint64(time.Now().UnixNano()),
-		ProtocolAsset: a,
-		Start:         14268513 - 500,
-		Stop:          14268513,
+		RequestID:       uint64(time.Now().UnixNano()),
+		ProtocolAssetID: a.ProtocolAssetID,
+		Start:           14268513 - 500,
+		Stop:            14268513,
 	}, 40*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

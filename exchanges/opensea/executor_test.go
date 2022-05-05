@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -23,10 +24,14 @@ func TestExecutor(t *testing.T) {
 	as, executor, cancel := tests.StartExecutor(t, &models2.Exchange{ID: 0x23, Name: "opensea"}, nil)
 	defer cancel()
 	testAsset := models2.Asset{
-		ID:     275.,
-		Symbol: "BAYC",
+		ID:     276.,
+		Symbol: "MEEBTS",
 	}
-	res, err := as.Root.RequestFuture(executor, &messages.MarketableProtocolAssetListRequest{}, 20*time.Second).Result()
+	//testAsset := models2.Asset{
+	//	ID:     275.,
+	//	Symbol: "BAYC",
+	//}
+	res, err := as.Root.RequestFuture(executor, &messages.MarketableProtocolAssetListRequest{}, 60*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,38 +49,75 @@ func TestExecutor(t *testing.T) {
 	if coll == nil {
 		t.Fatal("missing collection")
 	}
-	r, err := as.Root.RequestFuture(executor, &messages.HistoricalSalesRequest{
-		RequestID:                 uint64(time.Now().UnixNano()),
-		MarketableProtocolAssetID: coll.MarketableProtocolAssetID,
-		From:                      &types.Timestamp{Seconds: 0},
-	}, 5*time.Minute).Result()
-	if err != nil {
-		t.Fatal(err)
+	now := time.Now().Unix()
+	step := int64(86400 / 3)
+	from := int64(1620054232)
+	done := false
+	var sales *messages.HistoricalSalesResponse
+	highestTs := uint64(0)
+	bundleCount := 0
+OUTER:
+	for !done {
+		r, err := as.Root.RequestFuture(executor, &messages.HistoricalSalesRequest{
+			RequestID:                 uint64(time.Now().UnixNano()),
+			MarketableProtocolAssetID: coll.MarketableProtocolAssetID,
+			From:                      &types.Timestamp{Seconds: from},
+			To:                        &types.Timestamp{Seconds: from + step},
+		}, 5*time.Minute).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+		sales, ok = r.(*messages.HistoricalSalesResponse)
+		if !ok {
+			t.Fatalf("was expecting HistoricalSalesResponse got %s", reflect.TypeOf(r).String())
+		}
+		if !sales.Success {
+			t.Fatal(sales.RejectionReason)
+		}
+		sort.Slice(sales.Sale, func(i, j int) bool {
+			return utils.TimestampToMilli(sales.Sale[i].Timestamp) < utils.TimestampToMilli(sales.Sale[j].Timestamp)
+		})
+		done = from >= now
+		from += step + 1
+		for _, sale := range sales.Sale {
+			if len(sale.Transfer) > 1 {
+				fmt.Println("bundle")
+				if bundleCount > 5 {
+					break OUTER
+				}
+				bundleCount++
+			}
+		}
+		sort.Slice(sales.Sale, func(i, j int) bool {
+			return utils.TimestampToMilli(sales.Sale[i].Timestamp) < utils.TimestampToMilli(sales.Sale[j].Timestamp)
+		})
+		for _, s := range sales.Sale {
+			if utils.TimestampToMilli(s.Timestamp) < highestTs {
+				t.Fatal("mismatched timestamp")
+			}
+			highestTs = utils.TimestampToMilli(s.Timestamp)
+		}
 	}
-	sales, ok := r.(*messages.HistoricalSalesResponse)
-	if !ok {
-		t.Fatalf("was expecting HistoricalSalesResponse got %s", reflect.TypeOf(r).String())
-	}
-	if !sales.Success {
-		t.Fatal(sales.RejectionReason)
-	}
-	fmt.Println("Sales", sales.Sale)
 	type SaleFile struct {
 		From        common.Address
 		To          common.Address
 		TokenID     *big.Int
 		Price       *big.Int
+		SaleId      uint64
 		BlockNumber uint64
 	}
 	var s []SaleFile
 	for _, sale := range sales.Sale {
-		s = append(s, SaleFile{
-			From:        common.BytesToAddress(sale.Transfer.From),
-			To:          common.BytesToAddress(sale.Transfer.To),
-			TokenID:     big.NewInt(1).SetBytes(sale.Transfer.TokenId),
-			Price:       big.NewInt(1).SetBytes(sale.Price),
-			BlockNumber: sale.Block,
-		})
+		for _, tr := range sale.Transfer {
+			s = append(s, SaleFile{
+				From:        common.BytesToAddress(tr.From),
+				To:          common.BytesToAddress(tr.To),
+				TokenID:     big.NewInt(1).SetBytes(tr.TokenId),
+				Price:       big.NewInt(1).SetBytes(sale.Price),
+				SaleId:      sale.Id,
+				BlockNumber: sale.Block,
+			})
+		}
 	}
 	b, err := json.Marshal(s)
 	if err != nil {
@@ -85,7 +127,6 @@ func TestExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("TimeStamp", sales.Sale[0].Timestamp)
 }
 
 func TestMarketableProtocolAssetID(t *testing.T) {
