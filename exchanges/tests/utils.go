@@ -36,7 +36,8 @@ func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.
 	exch := []*xchangerModels.Exchange{
 		exchange,
 	}
-	as := actor.NewActorSystem()
+	configAs := actor.NewConfig().WithDeveloperSupervisionLogging(true).WithDeadLetterThrottleCount(1000)
+	as := actor.NewActorSystemWithConfig(configAs)
 	var accnts []*account.Account
 	if acc != nil {
 		accnt, err := exchanges.NewAccount(acc)
