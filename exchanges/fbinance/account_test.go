@@ -27,13 +27,11 @@ var fbinanceAccount = &models.Account{
 func TestAccountListener(t *testing.T) {
 	fbinance.EnableTestNet()
 	tests.AccntTest(t, tests.AccountTest{
-		Account:               fbinanceAccount,
-		Instrument:            instrument,
-		OrderStatusRequest:    true,
-		OrderCancelRequest:    true,
-		GetPositionsLimit:     true,
-		GetPositionsMarket:    true,
-		NewOrderSingleRequest: true,
-		OrderReplaceRequest:   true,
+		Account:             fbinanceAccount,
+		Instrument:          instrument,
+		OrderStatusRequest:  true,
+		GetPositionsLimit:   true,
+		GetPositionsMarket:  true,
+		OrderReplaceRequest: true,
 	})
 }

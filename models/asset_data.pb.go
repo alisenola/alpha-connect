@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+	types "github.com/gogo/protobuf/types"
 	models "gitlab.com/alphaticks/xchanger/models"
 	io "io"
 	math "math"
@@ -27,11 +28,13 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type ProtocolAsset struct {
-	ProtocolAssetID uint64            `protobuf:"varint,1,opt,name=protocol_assetID,json=protocolAssetID,proto3" json:"protocol_assetID,omitempty"`
-	Protocol        *models.Protocol  `protobuf:"bytes,2,opt,name=protocol,proto3" json:"protocol,omitempty"`
-	Asset           *models.Asset     `protobuf:"bytes,3,opt,name=asset,proto3" json:"asset,omitempty"`
-	Chain           *models.Chain     `protobuf:"bytes,4,opt,name=chain,proto3" json:"chain,omitempty"`
-	Meta            map[string]string `protobuf:"bytes,5,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	ProtocolAssetID uint64             `protobuf:"varint,1,opt,name=protocol_assetID,json=protocolAssetID,proto3" json:"protocol_assetID,omitempty"`
+	Protocol        *models.Protocol   `protobuf:"bytes,2,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	Asset           *models.Asset      `protobuf:"bytes,3,opt,name=asset,proto3" json:"asset,omitempty"`
+	Chain           *models.Chain      `protobuf:"bytes,4,opt,name=chain,proto3" json:"chain,omitempty"`
+	CreationBlock   *types.UInt64Value `protobuf:"bytes,5,opt,name=creation_block,json=creationBlock,proto3" json:"creation_block,omitempty"`
+	CreationDate    *types.Timestamp   `protobuf:"bytes,6,opt,name=creation_date,json=creationDate,proto3" json:"creation_date,omitempty"`
+	Meta            map[string]string  `protobuf:"bytes,7,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *ProtocolAsset) Reset()      { *m = ProtocolAsset{} }
@@ -94,6 +97,20 @@ func (m *ProtocolAsset) GetChain() *models.Chain {
 	return nil
 }
 
+func (m *ProtocolAsset) GetCreationBlock() *types.UInt64Value {
+	if m != nil {
+		return m.CreationBlock
+	}
+	return nil
+}
+
+func (m *ProtocolAsset) GetCreationDate() *types.Timestamp {
+	if m != nil {
+		return m.CreationDate
+	}
+	return nil
+}
+
 func (m *ProtocolAsset) GetMeta() map[string]string {
 	if m != nil {
 		return m.Meta
@@ -101,36 +118,106 @@ func (m *ProtocolAsset) GetMeta() map[string]string {
 	return nil
 }
 
+type MarketableProtocolAsset struct {
+	ProtocolAsset             *ProtocolAsset   `protobuf:"bytes,1,opt,name=protocol_asset,json=protocolAsset,proto3" json:"protocol_asset,omitempty"`
+	Market                    *models.Exchange `protobuf:"bytes,2,opt,name=market,proto3" json:"market,omitempty"`
+	MarketableProtocolAssetID uint64           `protobuf:"varint,3,opt,name=marketable_protocol_assetID,json=marketableProtocolAssetID,proto3" json:"marketable_protocol_assetID,omitempty"`
+}
+
+func (m *MarketableProtocolAsset) Reset()      { *m = MarketableProtocolAsset{} }
+func (*MarketableProtocolAsset) ProtoMessage() {}
+func (*MarketableProtocolAsset) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f7bd1bc6b244e966, []int{1}
+}
+func (m *MarketableProtocolAsset) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MarketableProtocolAsset) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MarketableProtocolAsset.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MarketableProtocolAsset) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MarketableProtocolAsset.Merge(m, src)
+}
+func (m *MarketableProtocolAsset) XXX_Size() int {
+	return m.Size()
+}
+func (m *MarketableProtocolAsset) XXX_DiscardUnknown() {
+	xxx_messageInfo_MarketableProtocolAsset.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MarketableProtocolAsset proto.InternalMessageInfo
+
+func (m *MarketableProtocolAsset) GetProtocolAsset() *ProtocolAsset {
+	if m != nil {
+		return m.ProtocolAsset
+	}
+	return nil
+}
+
+func (m *MarketableProtocolAsset) GetMarket() *models.Exchange {
+	if m != nil {
+		return m.Market
+	}
+	return nil
+}
+
+func (m *MarketableProtocolAsset) GetMarketableProtocolAssetID() uint64 {
+	if m != nil {
+		return m.MarketableProtocolAssetID
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*ProtocolAsset)(nil), "models.ProtocolAsset")
 	proto.RegisterMapType((map[string]string)(nil), "models.ProtocolAsset.MetaEntry")
+	proto.RegisterType((*MarketableProtocolAsset)(nil), "models.MarketableProtocolAsset")
 }
 
 func init() { proto.RegisterFile("asset_data.proto", fileDescriptor_f7bd1bc6b244e966) }
 
 var fileDescriptor_f7bd1bc6b244e966 = []byte{
-	// 321 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x5c, 0x8f, 0xbd, 0x4a, 0x3b, 0x41,
-	0x14, 0xc5, 0x67, 0xf2, 0xc5, 0x3f, 0x13, 0xc2, 0x7f, 0x19, 0x2c, 0x96, 0x14, 0xd7, 0xa0, 0x4d,
-	0x04, 0xd9, 0x85, 0x44, 0x50, 0xec, 0xd4, 0x58, 0xa4, 0x10, 0x64, 0x5e, 0x20, 0x4c, 0x36, 0x43,
-	0x12, 0xb2, 0x5f, 0xec, 0x8e, 0x62, 0x3a, 0x1f, 0xc1, 0x47, 0xb0, 0xf4, 0x51, 0x2c, 0xb7, 0x4c,
-	0xe9, 0xce, 0x36, 0x96, 0x79, 0x04, 0xd9, 0x19, 0x37, 0xa8, 0xdd, 0xbd, 0xe7, 0xfe, 0xee, 0x39,
-	0x1c, 0x62, 0xf1, 0x34, 0x15, 0x72, 0x3a, 0xe7, 0x92, 0x3b, 0x71, 0x12, 0xc9, 0x88, 0xb6, 0x82,
-	0x68, 0x2e, 0xfc, 0xb4, 0x37, 0x5c, 0xac, 0xa4, 0xcf, 0x67, 0x8e, 0x17, 0x05, 0x2e, 0xf7, 0xe3,
-	0x25, 0x97, 0x2b, 0x6f, 0x9d, 0xba, 0x4f, 0xde, 0x92, 0x87, 0x0b, 0x91, 0xb8, 0x06, 0x73, 0xf5,
-	0x53, 0x6a, 0x7e, 0x8f, 0x5e, 0x6b, 0xa4, 0x7b, 0x5f, 0x4e, 0x5e, 0xe4, 0x5f, 0x95, 0xc6, 0xf4,
-	0x84, 0x58, 0xf1, 0xb7, 0x30, 0xd5, 0x51, 0x93, 0xb1, 0x8d, 0xfb, 0x78, 0xd0, 0x60, 0xff, 0xe3,
-	0x9f, 0xe0, 0x64, 0x4c, 0x4f, 0xc9, 0xbf, 0x4a, 0xb2, 0x6b, 0x7d, 0x3c, 0xe8, 0x0c, 0x2d, 0xc7,
-	0x84, 0x38, 0x95, 0x27, 0xdb, 0x13, 0xf4, 0x98, 0x34, 0xb5, 0x9f, 0x5d, 0xd7, 0x68, 0xb7, 0x42,
-	0xb5, 0x1b, 0x33, 0xb7, 0x12, 0xf2, 0x96, 0x7c, 0x15, 0xda, 0x8d, 0xdf, 0xd0, 0x4d, 0x29, 0x32,
-	0x73, 0xa3, 0x23, 0xd2, 0x08, 0x84, 0xe4, 0x76, 0xb3, 0x5f, 0x1f, 0x74, 0x86, 0x87, 0x7f, 0x33,
-	0xb5, 0xa1, 0x73, 0x27, 0x24, 0xbf, 0x0d, 0x65, 0xb2, 0x61, 0x1a, 0xee, 0x9d, 0x93, 0xf6, 0x5e,
-	0xa2, 0x16, 0xa9, 0xaf, 0xc5, 0x46, 0xf7, 0x6a, 0xb3, 0x72, 0xa4, 0x07, 0xa4, 0xf9, 0xc8, 0xfd,
-	0x07, 0xa1, 0x8b, 0xb4, 0x99, 0x59, 0x2e, 0x6b, 0x17, 0xf8, 0xfa, 0x2c, 0xcb, 0x01, 0x6d, 0x73,
-	0x40, 0xbb, 0x1c, 0xf0, 0xb3, 0x02, 0xfc, 0xa6, 0x00, 0xbf, 0x2b, 0xc0, 0x99, 0x02, 0xfc, 0xa1,
-	0x00, 0x7f, 0x2a, 0x40, 0x3b, 0x05, 0xf8, 0xa5, 0x00, 0x94, 0x15, 0x80, 0xb6, 0x05, 0xa0, 0x59,
-	0x4b, 0xf7, 0x1e, 0x7d, 0x05, 0x00, 0x00, 0xff, 0xff, 0xca, 0xf2, 0x98, 0x15, 0xaf, 0x01, 0x00,
-	0x00,
+	// 486 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x92, 0x41, 0x6f, 0xd3, 0x30,
+	0x14, 0xc7, 0xe3, 0xa5, 0x2d, 0xd4, 0xa5, 0xa3, 0xb2, 0x40, 0x84, 0x82, 0xbc, 0x6a, 0x5c, 0x8a,
+	0x84, 0x12, 0xa9, 0x9b, 0x00, 0x21, 0x04, 0x62, 0xeb, 0x0e, 0x3d, 0x4c, 0x42, 0x16, 0x70, 0xad,
+	0x5e, 0x32, 0xd3, 0x46, 0x4d, 0xe2, 0x28, 0xf1, 0x80, 0xdd, 0xf8, 0x08, 0x7c, 0x0a, 0xc4, 0xd7,
+	0xe0, 0xc6, 0xb1, 0xc7, 0x1d, 0x69, 0x7a, 0xe1, 0xb8, 0x8f, 0x80, 0x6c, 0x27, 0xd5, 0xda, 0xf5,
+	0xe6, 0xfc, 0xfd, 0x7b, 0xff, 0xfc, 0x9f, 0xdf, 0xc3, 0x1d, 0xc8, 0x73, 0x2e, 0xc7, 0x67, 0x20,
+	0xc1, 0x4d, 0x33, 0x21, 0x05, 0x69, 0xc4, 0xe2, 0x8c, 0x47, 0x79, 0x77, 0x30, 0x09, 0x65, 0x04,
+	0xbe, 0x1b, 0x88, 0xd8, 0x83, 0x28, 0x9d, 0x82, 0x0c, 0x83, 0x59, 0xee, 0x7d, 0x0b, 0xa6, 0x90,
+	0x4c, 0x78, 0xe6, 0x19, 0xcc, 0xd3, 0x45, 0xb9, 0xa9, 0xed, 0xee, 0x4d, 0x84, 0x98, 0x44, 0xdc,
+	0x88, 0xfe, 0xf9, 0x67, 0x4f, 0x86, 0x31, 0xcf, 0x25, 0xc4, 0x69, 0x09, 0xd0, 0x4d, 0xe0, 0x6b,
+	0x06, 0x69, 0xca, 0xb3, 0xd2, 0x60, 0xff, 0xa7, 0x8d, 0xdb, 0xef, 0xd5, 0x29, 0x10, 0xd1, 0x3b,
+	0x95, 0x8c, 0x3c, 0xc5, 0x9d, 0xb4, 0x14, 0xc6, 0x3a, 0xeb, 0x68, 0xe8, 0xa0, 0x1e, 0xea, 0xd7,
+	0xd8, 0xdd, 0xf4, 0x3a, 0x38, 0x1a, 0x92, 0x67, 0xf8, 0x76, 0x25, 0x39, 0x3b, 0x3d, 0xd4, 0x6f,
+	0x0d, 0x3a, 0xae, 0x49, 0xe9, 0x56, 0x9e, 0x6c, 0x45, 0x90, 0x27, 0xb8, 0xae, 0xfd, 0x1c, 0x5b,
+	0xa3, 0xed, 0x0a, 0xd5, 0x6e, 0xcc, 0xdc, 0x29, 0x28, 0x98, 0x42, 0x98, 0x38, 0xb5, 0x75, 0xe8,
+	0x58, 0x89, 0xcc, 0xdc, 0x91, 0x63, 0xbc, 0x1b, 0x64, 0x1c, 0x64, 0x28, 0x92, 0xb1, 0x1f, 0x89,
+	0x60, 0xe6, 0xd4, 0x35, 0xfd, 0xd8, 0x35, 0xdd, 0xba, 0x55, 0xb7, 0xee, 0xc7, 0x51, 0x22, 0x9f,
+	0x1f, 0x7e, 0x82, 0xe8, 0x9c, 0xb3, 0x76, 0x55, 0x73, 0xa4, 0x4a, 0xc8, 0x5b, 0xbc, 0x12, 0xd4,
+	0x34, 0xb8, 0xd3, 0xd0, 0x1e, 0xdd, 0x1b, 0x1e, 0x1f, 0xaa, 0x27, 0x65, 0x77, 0xaa, 0x82, 0x21,
+	0x48, 0x4e, 0x0e, 0x70, 0x2d, 0xe6, 0x12, 0x9c, 0x5b, 0x3d, 0xbb, 0xdf, 0x1a, 0xec, 0x6d, 0x76,
+	0xae, 0xdb, 0x72, 0x4f, 0xb9, 0x84, 0x93, 0x44, 0x66, 0x17, 0x4c, 0xc3, 0xdd, 0x17, 0xb8, 0xb9,
+	0x92, 0x48, 0x07, 0xdb, 0x33, 0x7e, 0xa1, 0x5f, 0xb7, 0xc9, 0xd4, 0x91, 0xdc, 0xc3, 0xf5, 0x2f,
+	0x2a, 0xac, 0x7e, 0xce, 0x26, 0x33, 0x1f, 0xaf, 0x76, 0x5e, 0xa2, 0xfd, 0xdf, 0x08, 0x3f, 0x38,
+	0x85, 0x6c, 0xc6, 0x25, 0xf8, 0x11, 0x5f, 0x1f, 0xd9, 0x6b, 0xbc, 0xbb, 0x3e, 0x32, 0x6d, 0xd9,
+	0x1a, 0xdc, 0xdf, 0x9a, 0x89, 0xb5, 0xd7, 0xe6, 0x48, 0xfa, 0xb8, 0x11, 0x6b, 0xe3, 0xcd, 0x19,
+	0x9e, 0x94, 0xab, 0xc7, 0xca, 0x7b, 0xf2, 0x06, 0x3f, 0x8a, 0x57, 0x11, 0xc6, 0x37, 0xb6, 0xc4,
+	0xd6, 0x5b, 0xf2, 0x30, 0xde, 0x9e, 0x72, 0x34, 0x3c, 0x3a, 0x9c, 0x2f, 0xa8, 0x75, 0xb9, 0xa0,
+	0xd6, 0xd5, 0x82, 0xa2, 0xef, 0x05, 0x45, 0xbf, 0x0a, 0x8a, 0xfe, 0x14, 0x14, 0xcd, 0x0b, 0x8a,
+	0xfe, 0x16, 0x14, 0xfd, 0x2b, 0xa8, 0x75, 0x55, 0x50, 0xf4, 0x63, 0x49, 0xad, 0xf9, 0x92, 0x5a,
+	0x97, 0x4b, 0x6a, 0xf9, 0x0d, 0xfd, 0xa3, 0x83, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff, 0x2e, 0xf7,
+	0x4b, 0x93, 0x3a, 0x03, 0x00, 0x00,
 }
 
 func (this *ProtocolAsset) Equal(that interface{}) bool {
@@ -164,6 +251,12 @@ func (this *ProtocolAsset) Equal(that interface{}) bool {
 	if !this.Chain.Equal(that1.Chain) {
 		return false
 	}
+	if !this.CreationBlock.Equal(that1.CreationBlock) {
+		return false
+	}
+	if !this.CreationDate.Equal(that1.CreationDate) {
+		return false
+	}
 	if len(this.Meta) != len(that1.Meta) {
 		return false
 	}
@@ -174,11 +267,41 @@ func (this *ProtocolAsset) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *MarketableProtocolAsset) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*MarketableProtocolAsset)
+	if !ok {
+		that2, ok := that.(MarketableProtocolAsset)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.ProtocolAsset.Equal(that1.ProtocolAsset) {
+		return false
+	}
+	if !this.Market.Equal(that1.Market) {
+		return false
+	}
+	if this.MarketableProtocolAssetID != that1.MarketableProtocolAssetID {
+		return false
+	}
+	return true
+}
 func (this *ProtocolAsset) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 9)
+	s := make([]string, 0, 11)
 	s = append(s, "&models.ProtocolAsset{")
 	s = append(s, "ProtocolAssetID: "+fmt.Sprintf("%#v", this.ProtocolAssetID)+",\n")
 	if this.Protocol != nil {
@@ -189,6 +312,12 @@ func (this *ProtocolAsset) GoString() string {
 	}
 	if this.Chain != nil {
 		s = append(s, "Chain: "+fmt.Sprintf("%#v", this.Chain)+",\n")
+	}
+	if this.CreationBlock != nil {
+		s = append(s, "CreationBlock: "+fmt.Sprintf("%#v", this.CreationBlock)+",\n")
+	}
+	if this.CreationDate != nil {
+		s = append(s, "CreationDate: "+fmt.Sprintf("%#v", this.CreationDate)+",\n")
 	}
 	keysForMeta := make([]string, 0, len(this.Meta))
 	for k, _ := range this.Meta {
@@ -203,6 +332,22 @@ func (this *ProtocolAsset) GoString() string {
 	if this.Meta != nil {
 		s = append(s, "Meta: "+mapStringForMeta+",\n")
 	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *MarketableProtocolAsset) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 7)
+	s = append(s, "&models.MarketableProtocolAsset{")
+	if this.ProtocolAsset != nil {
+		s = append(s, "ProtocolAsset: "+fmt.Sprintf("%#v", this.ProtocolAsset)+",\n")
+	}
+	if this.Market != nil {
+		s = append(s, "Market: "+fmt.Sprintf("%#v", this.Market)+",\n")
+	}
+	s = append(s, "MarketableProtocolAssetID: "+fmt.Sprintf("%#v", this.MarketableProtocolAssetID)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -250,8 +395,32 @@ func (m *ProtocolAsset) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			dAtA[i] = 0xa
 			i = encodeVarintAssetData(dAtA, i, uint64(baseI-i))
 			i--
-			dAtA[i] = 0x2a
+			dAtA[i] = 0x3a
 		}
+	}
+	if m.CreationDate != nil {
+		{
+			size, err := m.CreationDate.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintAssetData(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
+	if m.CreationBlock != nil {
+		{
+			size, err := m.CreationBlock.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintAssetData(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
 	}
 	if m.Chain != nil {
 		{
@@ -297,6 +466,58 @@ func (m *ProtocolAsset) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *MarketableProtocolAsset) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MarketableProtocolAsset) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MarketableProtocolAsset) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.MarketableProtocolAssetID != 0 {
+		i = encodeVarintAssetData(dAtA, i, uint64(m.MarketableProtocolAssetID))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.Market != nil {
+		{
+			size, err := m.Market.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintAssetData(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.ProtocolAsset != nil {
+		{
+			size, err := m.ProtocolAsset.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintAssetData(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintAssetData(dAtA []byte, offset int, v uint64) int {
 	offset -= sovAssetData(v)
 	base := offset
@@ -329,6 +550,14 @@ func (m *ProtocolAsset) Size() (n int) {
 		l = m.Chain.Size()
 		n += 1 + l + sovAssetData(uint64(l))
 	}
+	if m.CreationBlock != nil {
+		l = m.CreationBlock.Size()
+		n += 1 + l + sovAssetData(uint64(l))
+	}
+	if m.CreationDate != nil {
+		l = m.CreationDate.Size()
+		n += 1 + l + sovAssetData(uint64(l))
+	}
 	if len(m.Meta) > 0 {
 		for k, v := range m.Meta {
 			_ = k
@@ -336,6 +565,26 @@ func (m *ProtocolAsset) Size() (n int) {
 			mapEntrySize := 1 + len(k) + sovAssetData(uint64(len(k))) + 1 + len(v) + sovAssetData(uint64(len(v)))
 			n += mapEntrySize + 1 + sovAssetData(uint64(mapEntrySize))
 		}
+	}
+	return n
+}
+
+func (m *MarketableProtocolAsset) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ProtocolAsset != nil {
+		l = m.ProtocolAsset.Size()
+		n += 1 + l + sovAssetData(uint64(l))
+	}
+	if m.Market != nil {
+		l = m.Market.Size()
+		n += 1 + l + sovAssetData(uint64(l))
+	}
+	if m.MarketableProtocolAssetID != 0 {
+		n += 1 + sovAssetData(uint64(m.MarketableProtocolAssetID))
 	}
 	return n
 }
@@ -365,7 +614,21 @@ func (this *ProtocolAsset) String() string {
 		`Protocol:` + strings.Replace(fmt.Sprintf("%v", this.Protocol), "Protocol", "models.Protocol", 1) + `,`,
 		`Asset:` + strings.Replace(fmt.Sprintf("%v", this.Asset), "Asset", "models.Asset", 1) + `,`,
 		`Chain:` + strings.Replace(fmt.Sprintf("%v", this.Chain), "Chain", "models.Chain", 1) + `,`,
+		`CreationBlock:` + strings.Replace(fmt.Sprintf("%v", this.CreationBlock), "UInt64Value", "types.UInt64Value", 1) + `,`,
+		`CreationDate:` + strings.Replace(fmt.Sprintf("%v", this.CreationDate), "Timestamp", "types.Timestamp", 1) + `,`,
 		`Meta:` + mapStringForMeta + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *MarketableProtocolAsset) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&MarketableProtocolAsset{`,
+		`ProtocolAsset:` + strings.Replace(this.ProtocolAsset.String(), "ProtocolAsset", "ProtocolAsset", 1) + `,`,
+		`Market:` + strings.Replace(fmt.Sprintf("%v", this.Market), "Exchange", "models.Exchange", 1) + `,`,
+		`MarketableProtocolAssetID:` + fmt.Sprintf("%v", this.MarketableProtocolAssetID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -536,6 +799,78 @@ func (m *ProtocolAsset) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreationBlock", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAssetData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CreationBlock == nil {
+				m.CreationBlock = &types.UInt64Value{}
+			}
+			if err := m.CreationBlock.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreationDate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAssetData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CreationDate == nil {
+				m.CreationDate = &types.Timestamp{}
+			}
+			if err := m.CreationDate.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Meta", wireType)
 			}
 			var msglen int
@@ -661,6 +996,147 @@ func (m *ProtocolAsset) Unmarshal(dAtA []byte) error {
 			}
 			m.Meta[mapkey] = mapvalue
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAssetData(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MarketableProtocolAsset) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAssetData
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MarketableProtocolAsset: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MarketableProtocolAsset: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProtocolAsset", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAssetData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ProtocolAsset == nil {
+				m.ProtocolAsset = &ProtocolAsset{}
+			}
+			if err := m.ProtocolAsset.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Market", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAssetData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAssetData
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Market == nil {
+				m.Market = &models.Exchange{}
+			}
+			if err := m.Market.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MarketableProtocolAssetID", wireType)
+			}
+			m.MarketableProtocolAssetID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAssetData
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MarketableProtocolAssetID |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAssetData(dAtA[iNdEx:])

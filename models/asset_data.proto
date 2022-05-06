@@ -2,11 +2,21 @@ syntax = "proto3";
 package models;
 
 import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 message ProtocolAsset {
     uint64 protocol_assetID = 1;
     models.Protocol protocol = 2;
     models.Asset asset = 3;
     models.Chain chain = 4;
-    map<string, string> meta = 5;
+    google.protobuf.UInt64Value creation_block = 5;
+    google.protobuf.Timestamp creation_date = 6;
+    map<string, string> meta = 7;
+}
+
+message MarketableProtocolAsset {
+    ProtocolAsset protocol_asset = 1;
+    models.Exchange market = 2;
+    uint64 marketable_protocol_assetID = 3;
 }

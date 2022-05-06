@@ -65,6 +65,7 @@ enum RejectionReason {
     UnknowProtocol = 30;
     MissingProtocolAsset = 31;
     UnknownProtocolAsset = 32;
+    UnknownAsset = 33;
 }
 
 enum FeeType {
@@ -152,17 +153,17 @@ message HistoricalUnipoolV3DataResponse {
     RejectionReason rejection_reason = 6;
 }
 
-message HistoricalProtocolAssetTransferRequest {
+message HistoricalSalesRequest {
     uint64 requestID = 1;
-    uint64 protocol_assetID = 2;
-    uint64 start = 3;
-    uint64 stop = 4;
+    uint64 marketable_protocol_assetID = 2;
+    google.protobuf.Timestamp from = 3;
+    google.protobuf.Timestamp to = 4;
 }
 
-message HistoricalProtocolAssetTransferResponse {
+message HistoricalSalesResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    repeated models.ProtocolAssetUpdate update = 3;
+    repeated models.Sale sale = 3;
     uint64 seq_num = 4;
     bool success = 5;
     RejectionReason rejection_reason = 6;
@@ -555,6 +556,21 @@ message TransferDataResponse {
     RejectionReason rejection_reason = 5;
 }
 
+message HistoricalProtocolAssetTransferRequest {
+    uint64 requestID = 1;
+    uint64 protocol_assetID = 2;
+    uint64 start = 3;
+    uint64 stop = 4;
+}
+
+message HistoricalProtocolAssetTransferResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.ProtocolAssetUpdate update = 3;
+    uint64 seq_num = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
 
 message ProtocolAssetTransferRequest{
     uint64 requestID = 1;
@@ -602,6 +618,33 @@ message ProtocolAssetList {
     uint64 requestID = 1;
     uint64 responseID = 2;
     repeated models.ProtocolAsset protocol_assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message MarketableProtocolAssetListRequest {
+    uint64 requestID = 1;
+    bool subscribe = 2;
+    actor.PID subscriber = 3;
+}
+
+message MarketableProtocolAssetList {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    repeated models.MarketableProtocolAsset marketable_protocol_assets = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
+}
+
+message MarketableProtocolAssetDefinitionRequest {
+    uint64 requestID = 1;
+    uint64 marketable_protocol_assetID = 2;
+}
+
+message MarketableProtocolAssetDefinitionResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    models.MarketableProtocolAsset marketable_protocol_asset = 3;
     bool success = 4;
     RejectionReason rejection_reason = 5;
 }

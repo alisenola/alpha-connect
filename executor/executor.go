@@ -65,9 +65,13 @@ func (state *Executor) Receive(context actor.Context) {
 		*messages.HistoricalUnipoolV3DataRequest,
 		*messages.HistoricalFundingRatesRequest,
 		*messages.HistoricalLiquidationsRequest,
+		*messages.HistoricalSalesRequest,
 		*messages.SecurityDefinitionRequest,
 		*messages.SecurityListRequest,
 		*messages.SecurityList,
+		*messages.MarketableProtocolAssetList,
+		*messages.MarketableProtocolAssetListRequest,
+		*messages.MarketableProtocolAssetDefinitionRequest,
 		*messages.AccountMovementRequest,
 		*messages.TradeCaptureReportRequest,
 		*messages.PositionsRequest,
@@ -84,7 +88,7 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnExchangesMessage", log.Error(err))
 			panic(err)
 		}
-		//state.logger.Info("message forwarded to exchange executor")
+	//state.logger.Info("message forwarded to exchange executor")
 	case *messages.ProtocolAssetListRequest,
 		*messages.ProtocolAssetList,
 		*messages.HistoricalProtocolAssetTransferRequest,
@@ -94,7 +98,7 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnProtocolsMessage", log.Error(err))
 			panic(err)
 		}
-		//state.logger.Info("message forwarded to to protocols executor")
+		//state.logger.Info("message forwarded to protocols executor")
 	}
 }
 
