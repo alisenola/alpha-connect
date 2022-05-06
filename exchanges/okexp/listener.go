@@ -221,7 +221,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
 	}
 
-	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2TBTChannel); err != nil {
+	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2Channel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
 	}
 

@@ -69,7 +69,6 @@ func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, acc
 	}
 }
 
-/*
 func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, instrument *models.Instrument) {
 	// Request the same from binance directly
 	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
@@ -128,7 +127,6 @@ func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, ac
 		}
 	}
 }
-*/
 
 func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, filter *messages.OrderFilter) {
 	// Request the same from binance directly

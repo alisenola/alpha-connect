@@ -123,7 +123,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 		OrderStatusRequest(t, ctx, tc)
 	}
 	if tc.GetPositionsLimit {
-		GetPositionsLimit(t, ctx, tc)
+		GetPositionsLimitShort(t, ctx, tc)
 	}
 	if tc.GetPositionsMarket {
 		GetPositionsMarket(t, ctx, tc)
@@ -604,7 +604,7 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	time.Sleep(3 * time.Second)
 
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
-
+	checkPositions(t, ctx.as, ctx.executor, tc.Account, tc.Instrument)
 	fmt.Println("CLOSING")
 	// Close position
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
@@ -626,6 +626,58 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	time.Sleep(2 * time.Second)
 
 	checkBalances(t, ctx.as, ctx.executor, tc.Account)
+	checkPositions(t, ctx.as, ctx.executor, tc.Account, tc.Instrument)
+}
+
+func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
+	// Market sell
+	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+		Account: tc.Account,
+		Order: &messages.NewOrder{
+			ClientOrderID: uuid.NewV1().String(),
+			Instrument:    tc.Instrument,
+			OrderType:     models.Limit,
+			OrderSide:     models.Sell,
+			Price:         &types.DoubleValue{Value: 32000},
+			Quantity:      0.001,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	newOrderResponse := res.(*messages.NewOrderSingleResponse)
+	if !newOrderResponse.Success {
+		t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
+	}
+
+	time.Sleep(3 * time.Second)
+
+	checkBalances(t, ctx.as, ctx.executor, tc.Account)
+	checkPositions(t, ctx.as, ctx.executor, tc.Account, tc.Instrument)
+	fmt.Println("CLOSING")
+
+	// Market buy
+	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+		Account: tc.Account,
+		Order: &messages.NewOrder{
+			ClientOrderID:         orderID,
+			Instrument:            tc.Instrument,
+			OrderType:             models.Limit,
+			OrderSide:             models.Buy,
+			Price:                 &types.DoubleValue{Value: 80000},
+			Quantity:              0.001,
+			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	checkBalances(t, ctx.as, ctx.executor, tc.Account)
+	checkPositions(t, ctx.as, ctx.executor, tc.Account, tc.Instrument)
 }
 
 func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
