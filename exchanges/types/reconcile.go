@@ -2,15 +2,16 @@ package types
 
 import (
 	goContext "context"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"math/rand"
 	"strconv"
@@ -51,7 +52,7 @@ func (state *BaseReconcile) OnAccountMovementRequest(context actor.Context) erro
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -69,27 +70,17 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 		{Key: "type", Value: "TRADE"},
 	}
 	if msg.Filter.From != nil {
-		from, err := types.TimestampFromProto(msg.Filter.From)
-		if err != nil {
-			res.Success = false
-			res.RejectionReason = messages.InvalidRequest
-			return nil
-		}
+		from := msg.Filter.From.AsTime()
 		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$gt", Value: from}}})
 	}
 	if msg.Filter.To != nil {
-		to, err := types.TimestampFromProto(msg.Filter.To)
-		if err != nil {
-			res.Success = false
-			res.RejectionReason = messages.InvalidRequest
-			return nil
-		}
+		to := msg.Filter.To.AsTime()
 		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$lt", Value: to}}})
 	}
 	cur, err := state.GetTransactions().Find(goContext.Background(), filter)
 	if err != nil {
 		res.Success = false
-		res.RejectionReason = messages.Other
+		res.RejectionReason = messages.RejectionReason_Other
 		state.GetLogger().Error("error fetching trades", log.Error(err))
 		return nil
 	}
@@ -99,32 +90,32 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 		if err := cur.Decode(tx); err != nil {
 			state.GetLogger().Error("error decoding tx", log.Error(err))
 			res.Success = false
-			res.RejectionReason = messages.Other
+			res.RejectionReason = messages.RejectionReason_Other
 			return nil
 		}
-		side := models.Buy
+		side := models.Side_Buy
 		if tx.Fill.Quantity < 0 {
-			side = models.Sell
+			side = models.Side_Sell
 		}
 		secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
-		ts, _ := types.TimestampProto(tx.Time)
+		ts := timestamppb.New(tx.Time)
 		var commission float64
 		var commissionAsset *xchangerModels.Asset
 		for _, m := range tx.Movements {
-			if m.Reason == int32(messages.Commission) {
+			if m.Reason == int32(messages.AccountMovementType_Commission) {
 				commission = m.Quantity
 				commissionAsset, _ = constants.GetAssetByID(m.AssetID)
 			}
 		}
 		res.Trades = append(res.Trades, &models.TradeCapture{
 			Side:            side,
-			Type:            models.Regular,
+			Type:            models.TradeType_Regular,
 			Price:           tx.Fill.Price,
 			Quantity:        math.Abs(tx.Fill.Quantity),
 			Commission:      commission,
 			CommissionAsset: commissionAsset,
 			TradeID:         tx.ID,
-			Instrument:      &models.Instrument{SecurityID: &types.UInt64Value{Value: secID}},
+			Instrument:      &models.Instrument{SecurityID: &wrapperspb.UInt64Value{Value: secID}},
 			Trade_LinkID:    nil,
 			OrderID:         nil,
 			ClientOrderID:   nil,

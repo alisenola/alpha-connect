@@ -2,8 +2,8 @@ package bitmex
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -208,7 +208,7 @@ func (state *PaperAccountListener) OnNewOrderSingle(context actor.Context) error
 		OrderID:               "",
 		ClientOrderID:         req.Order.ClientOrderID,
 		Instrument:            req.Order.Instrument,
-		OrderStatus:           models.PendingNew,
+		OrderStatus:           models.OrderStatus_PendingNew,
 		OrderType:             req.Order.OrderType,
 		Side:                  req.Order.OrderSide,
 		TimeInForce:           req.Order.TimeInForce,
@@ -235,7 +235,7 @@ func (state *PaperAccountListener) OnNewOrderSingle(context actor.Context) error
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingNew {
+			if report.ExecutionType == messages.ExecutionType_PendingNew {
 				report, err := state.account.ConfirmNewOrder(order.ClientOrderID, order.ClientOrderID)
 				if err != nil {
 					return fmt.Errorf("error confirming new order: %v", err)
@@ -261,7 +261,7 @@ func (state *PaperAccountListener) OnNewOrderBulkRequest(context actor.Context) 
 			OrderID:               "",
 			ClientOrderID:         reqOrder.ClientOrderID,
 			Instrument:            reqOrder.Instrument,
-			OrderStatus:           models.PendingNew,
+			OrderStatus:           models.OrderStatus_PendingNew,
 			OrderType:             reqOrder.OrderType,
 			Side:                  reqOrder.OrderSide,
 			TimeInForce:           reqOrder.TimeInForce,
@@ -275,7 +275,7 @@ func (state *PaperAccountListener) OnNewOrderBulkRequest(context actor.Context) 
 		if res != nil {
 			// Cancel all new order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}
@@ -342,7 +342,7 @@ func (state *PaperAccountListener) OnOrderCancelRequest(context actor.Context) e
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingCancel {
+			if report.ExecutionType == messages.ExecutionType_PendingCancel {
 				report, err := state.account.ConfirmCancelOrder(ID)
 				if err != nil {
 					return fmt.Errorf("error confirming cancel: %v", err)
@@ -383,7 +383,7 @@ func (state *PaperAccountListener) OnOrderReplaceRequest(context actor.Context) 
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingReplace {
+			if report.ExecutionType == messages.ExecutionType_PendingReplace {
 				report, err := state.account.ConfirmReplaceOrder(ID, "")
 				if err != nil {
 					return fmt.Errorf("error confirming cancel: %v", err)
@@ -414,7 +414,7 @@ func (state *PaperAccountListener) OnOrderBulkReplaceRequest(context actor.Conte
 		if res != nil {
 			// Reject all replace order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectReplaceOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}
@@ -468,14 +468,14 @@ func (state *PaperAccountListener) OnOrderMassCancelRequest(context actor.Contex
 	}
 	var reports []*messages.ExecutionReport
 	for _, o := range orders {
-		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
+		if o.OrderStatus != models.OrderStatus_New && o.OrderStatus != models.OrderStatus_PartiallyFilled {
 			continue
 		}
 		report, res := state.account.CancelOrder(o.ClientOrderID)
 		if res != nil {
 			// Reject all cancel order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}

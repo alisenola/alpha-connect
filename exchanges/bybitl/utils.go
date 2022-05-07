@@ -2,27 +2,28 @@ package bybitl
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"strconv"
 )
 
 func statusToBybitl(status models.OrderStatus) bybitl.OrderStatus {
 	switch status {
-	case models.New:
+	case models.OrderStatus_New:
 		return bybitl.OrderNew
-	case models.PendingCancel:
+	case models.OrderStatus_PendingCancel:
 		return bybitl.OrderPendingCancel
-	case models.PendingNew, models.PendingReplace:
+	case models.OrderStatus_PendingNew, models.OrderStatus_PendingReplace:
 		return bybitl.OrderCreated
-	case models.Filled:
+	case models.OrderStatus_Filled:
 		return bybitl.OrderFilled
-	case models.Canceled:
+	case models.OrderStatus_Canceled:
 		return bybitl.OrderCancelled
-	case models.Rejected:
+	case models.OrderStatus_Rejected:
 		return bybitl.OrderRejected
 	default:
 		return ""
@@ -34,68 +35,68 @@ func orderToModel(order *bybitl.ActiveOrder) *models.Order {
 		OrderID:       order.OrderId,
 		ClientOrderID: order.OrderLinkId,
 		Instrument: &models.Instrument{
-			Exchange: &constants.BYBITL,
-			Symbol:   &types.StringValue{Value: order.Symbol},
+			Exchange: constants.BYBITL,
+			Symbol:   &wrapperspb.StringValue{Value: order.Symbol},
 		},
-		Price:          &types.DoubleValue{Value: order.Price},
+		Price:          &wrapperspb.DoubleValue{Value: order.Price},
 		LeavesQuantity: order.Qty - order.CumExecQty,
 		CumQuantity:    order.CumExecQty,
-		CreationTime:   &types.Timestamp{Seconds: order.CreatedTime.Unix()},
+		CreationTime:   timestamppb.New(order.CreatedTime),
 	}
 
 	if order.CloseOnTrigger {
-		o.ExecutionInstructions = append(o.ExecutionInstructions, models.CloseOnTrigger)
+		o.ExecutionInstructions = append(o.ExecutionInstructions, models.ExecutionInstruction_CloseOnTrigger)
 	}
 	if order.ReduceOnly {
-		o.ExecutionInstructions = append(o.ExecutionInstructions, models.ReduceOnly)
+		o.ExecutionInstructions = append(o.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
 	}
 
 	switch order.OrderStatus {
 	case bybitl.OrderCreated:
-		o.OrderStatus = models.Created
+		o.OrderStatus = models.OrderStatus_Created
 	case bybitl.OrderRejected:
-		o.OrderStatus = models.Rejected
+		o.OrderStatus = models.OrderStatus_Rejected
 	case bybitl.OrderNew:
-		o.OrderStatus = models.New
+		o.OrderStatus = models.OrderStatus_New
 	case bybitl.OrderPartiallyFilled:
-		o.OrderStatus = models.PartiallyFilled
+		o.OrderStatus = models.OrderStatus_PartiallyFilled
 	case bybitl.OrderFilled:
-		o.OrderStatus = models.Filled
+		o.OrderStatus = models.OrderStatus_Filled
 	case bybitl.OrderCancelled:
-		o.OrderStatus = models.Canceled
+		o.OrderStatus = models.OrderStatus_Canceled
 	case bybitl.OrderPendingCancel:
-		o.OrderStatus = models.PendingCancel
+		o.OrderStatus = models.OrderStatus_PendingCancel
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", order.OrderStatus)
 	}
 
 	switch order.OrderType {
 	case bybitl.LimitOrder:
-		o.OrderType = models.Limit
+		o.OrderType = models.OrderType_Limit
 	case bybitl.MarketOrder:
-		o.OrderType = models.Market
+		o.OrderType = models.OrderType_Market
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", order.OrderType)
 	}
 
 	switch order.Side {
 	case bybitl.Buy:
-		o.Side = models.Buy
+		o.Side = models.Side_Buy
 	case bybitl.Sell:
-		o.Side = models.Sell
+		o.Side = models.Side_Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
 	}
 
 	switch order.TimeInForce {
 	case bybitl.GoodTillCancel:
-		o.TimeInForce = models.GoodTillCancel
+		o.TimeInForce = models.TimeInForce_GoodTillCancel
 	case bybitl.ImmediateOrCancel:
-		o.TimeInForce = models.ImmediateOrCancel
+		o.TimeInForce = models.TimeInForce_ImmediateOrCancel
 	case bybitl.FillOrKill:
-		o.TimeInForce = models.FillOrKill
+		o.TimeInForce = models.TimeInForce_FillOrKill
 	case bybitl.PostOnly:
-		o.TimeInForce = models.PostOnly
+		o.TimeInForce = models.TimeInForce_PostOnly
 	default:
 		fmt.Println("UNKNOWN ORDER TIME IN FORCE", order.TimeInForce)
 	}
@@ -108,67 +109,67 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 		OrderID:       order.OrderId,
 		ClientOrderID: order.OrderLinkId,
 		Instrument: &models.Instrument{
-			Exchange: &constants.BYBITL,
-			Symbol:   &types.StringValue{Value: order.Symbol},
+			Exchange: constants.BYBITL,
+			Symbol:   &wrapperspb.StringValue{Value: order.Symbol},
 		},
 		LeavesQuantity: order.LeavesQty,
 		CumQuantity:    order.CumExecQty,
-		Price:          &types.DoubleValue{Value: order.Price},
+		Price:          &wrapperspb.DoubleValue{Value: order.Price},
 	}
 
 	if order.ReduceOnly {
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
 	}
 	if order.CloseOnTrigger {
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.CloseOnTrigger)
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_CloseOnTrigger)
 	}
 
 	switch order.OrderStatus {
 	case bybitl.OrderCreated:
-		ord.OrderStatus = models.Created
+		ord.OrderStatus = models.OrderStatus_Created
 	case bybitl.OrderRejected:
-		ord.OrderStatus = models.Rejected
+		ord.OrderStatus = models.OrderStatus_Rejected
 	case bybitl.OrderNew:
-		ord.OrderStatus = models.New
+		ord.OrderStatus = models.OrderStatus_New
 	case bybitl.OrderPartiallyFilled:
-		ord.OrderStatus = models.PartiallyFilled
+		ord.OrderStatus = models.OrderStatus_PartiallyFilled
 	case bybitl.OrderFilled:
-		ord.OrderStatus = models.Filled
+		ord.OrderStatus = models.OrderStatus_Filled
 	case bybitl.OrderCancelled:
-		ord.OrderStatus = models.Canceled
+		ord.OrderStatus = models.OrderStatus_Canceled
 	case bybitl.OrderPendingCancel:
-		ord.OrderStatus = models.PendingCancel
+		ord.OrderStatus = models.OrderStatus_PendingCancel
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", order.OrderStatus)
 	}
 
 	switch order.OrderType {
 	case bybitl.LimitOrder:
-		ord.OrderType = models.Limit
+		ord.OrderType = models.OrderType_Limit
 	case bybitl.MarketOrder:
-		ord.OrderType = models.Market
+		ord.OrderType = models.OrderType_Market
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", order.OrderType)
 	}
 
 	switch order.Side {
 	case bybitl.Buy:
-		ord.Side = models.Buy
+		ord.Side = models.Side_Buy
 	case bybitl.Sell:
-		ord.Side = models.Sell
+		ord.Side = models.Side_Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
 	}
 
 	switch order.TimeInForce {
 	case bybitl.GoodTillCancel:
-		ord.TimeInForce = models.GoodTillCancel
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
 	case bybitl.ImmediateOrCancel:
-		ord.TimeInForce = models.ImmediateOrCancel
+		ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
 	case bybitl.FillOrKill:
-		ord.TimeInForce = models.FillOrKill
+		ord.TimeInForce = models.TimeInForce_FillOrKill
 	case bybitl.PostOnly:
-		ord.TimeInForce = models.PostOnly
+		ord.TimeInForce = models.TimeInForce_PostOnly
 	default:
 		fmt.Println("UNKNOWN ORDER TIME IN FORCE", order.TimeInForce)
 	}
@@ -182,38 +183,38 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	var tif bybitl.TimeInForce
 	var redo = false
 
-	if order.OrderSide == models.Buy {
+	if order.OrderSide == models.Side_Buy {
 		side = bybitl.Buy
 	} else {
 		side = bybitl.Sell
 	}
 	switch order.OrderType {
-	case models.Limit:
+	case models.OrderType_Limit:
 		typ = bybitl.LimitOrder
-	case models.Market:
+	case models.OrderType_Market:
 		typ = bybitl.MarketOrder
 	default:
-		rej := messages.UnsupportedOrderType
+		rej := messages.RejectionReason_UnsupportedOrderType
 		return nil, &rej
 	}
 
 	switch order.TimeInForce {
-	case models.Session:
+	case models.TimeInForce_Session:
 		tif = bybitl.GoodTillCancel
-	case models.GoodTillCancel:
+	case models.TimeInForce_GoodTillCancel:
 		tif = bybitl.GoodTillCancel
-	case models.ImmediateOrCancel:
+	case models.TimeInForce_ImmediateOrCancel:
 		tif = bybitl.ImmediateOrCancel
-	case models.FillOrKill:
+	case models.TimeInForce_FillOrKill:
 		tif = bybitl.FillOrKill
 	}
 
 	for _, exec := range order.ExecutionInstructions {
-		rej := messages.UnsupportedOrderCharacteristic
+		rej := messages.RejectionReason_UnsupportedOrderCharacteristic
 		switch exec {
-		case models.ReduceOnly:
+		case models.ExecutionInstruction_ReduceOnly:
 			redo = true
-		case models.ParticipateDoNotInitiate:
+		case models.ExecutionInstruction_ParticipateDoNotInitiate:
 			tif = bybitl.PostOnly
 		default:
 			return nil, &rej

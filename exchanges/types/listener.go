@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"math/rand"
 )
@@ -35,7 +35,7 @@ func (state *BaseListener) OnMarketDataRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

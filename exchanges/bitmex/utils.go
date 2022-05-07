@@ -13,43 +13,43 @@ func buildPostOrderRequest(order *messages.NewOrder) (bitmex.PostOrderRequest, *
 	request.SetClOrdID(order.ClientOrderID)
 
 	switch order.OrderSide {
-	case models.Buy:
+	case models.Side_Buy:
 		request.SetSide(bitmex.BUY_ORDER_SIDE)
-	case models.Sell:
+	case models.Side_Sell:
 		request.SetSide(bitmex.SELL_ORDER_SIDE)
 	default:
 		request.SetSide(bitmex.BUY_ORDER_SIDE)
 	}
 
 	switch order.OrderType {
-	case models.Limit:
+	case models.OrderType_Limit:
 		request.SetOrderType(bitmex.LIMIT)
-	case models.Market:
+	case models.OrderType_Market:
 		request.SetOrderType(bitmex.MARKET)
-	case models.Stop:
+	case models.OrderType_Stop:
 		request.SetOrderType(bitmex.STOP)
-	case models.StopLimit:
+	case models.OrderType_StopLimit:
 		request.SetOrderType(bitmex.STOP_LIMIT)
-	case models.LimitIfTouched:
+	case models.OrderType_LimitIfTouched:
 		request.SetOrderType(bitmex.LIMIT_IF_TOUCHED)
-	case models.MarketIfTouched:
+	case models.OrderType_MarketIfTouched:
 		request.SetOrderType(bitmex.MARKET_IF_TOUCHED)
 	default:
-		rej := messages.UnsupportedOrderType
+		rej := messages.RejectionReason_UnsupportedOrderType
 		return nil, &rej
 	}
 
 	switch order.TimeInForce {
-	case models.Session:
+	case models.TimeInForce_Session:
 		request.SetTimeInForce(bitmex.TIF_DAY)
-	case models.GoodTillCancel:
+	case models.TimeInForce_GoodTillCancel:
 		request.SetTimeInForce(bitmex.GOOD_TILL_CANCEL)
-	case models.ImmediateOrCancel:
+	case models.TimeInForce_ImmediateOrCancel:
 		request.SetTimeInForce(bitmex.IMMEDIATE_OR_CANCEL)
-	case models.FillOrKill:
+	case models.TimeInForce_FillOrKill:
 		request.SetTimeInForce(bitmex.FILL_OR_KILL)
 	default:
-		rej := messages.UnsupportedOrderTimeInForce
+		rej := messages.RejectionReason_UnsupportedOrderTimeInForce
 		return nil, &rej
 	}
 
@@ -60,7 +60,7 @@ func buildPostOrderRequest(order *messages.NewOrder) (bitmex.PostOrderRequest, *
 	// TODO handle multiple exec inst
 	if len(order.ExecutionInstructions) > 0 {
 		switch order.ExecutionInstructions[0] {
-		case models.ParticipateDoNotInitiate:
+		case models.ExecutionInstruction_ParticipateDoNotInitiate:
 			request.SetExecInst(bitmex.EI_PARTICIPATE_DO_NOT_INITIATE)
 		}
 	}

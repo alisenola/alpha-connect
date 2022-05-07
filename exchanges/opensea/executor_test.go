@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"io/ioutil"
@@ -61,8 +60,8 @@ OUTER:
 		r, err := as.Root.RequestFuture(executor, &messages.HistoricalSalesRequest{
 			RequestID:                 uint64(time.Now().UnixNano()),
 			MarketableProtocolAssetID: coll.MarketableProtocolAssetID,
-			From:                      &types.Timestamp{Seconds: from},
-			To:                        &types.Timestamp{Seconds: from + step},
+			From:                      utils.SecondToTimestamp(uint64(from)),
+			To:                        utils.SecondToTimestamp(uint64(from + step)),
 		}, 5*time.Minute).Result()
 		if err != nil {
 			t.Fatal(err)

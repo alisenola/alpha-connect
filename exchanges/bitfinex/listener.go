@@ -4,9 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"strings"
@@ -323,11 +323,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Aggregation: models.L2,
+			Aggregation: models.OrderBookAggregation_L2,
 		}, 10*time.Second).Result()
 	if err == nil {
 		msg := res.(*messages.MarketDataResponse)
@@ -398,8 +398,8 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:          bids,
 		Asks:          asks,
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+		TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -438,7 +438,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 		obDelta := &models.OBL2Update{
-			Levels:    []gmodels.OrderBookLevel{level},
+			Levels:    []*gmodels.OrderBookLevel{level},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
@@ -495,7 +495,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		if tradeData.Amount < 0 {
 			state.instrumentData.aggTrade.Trades = append(
 				state.instrumentData.aggTrade.Trades,
-				models.Trade{
+				&models.Trade{
 					Price:    tradeData.Price,
 					Quantity: -tradeData.Amount,
 					ID:       tradeData.ID,
@@ -503,7 +503,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		} else {
 			state.instrumentData.aggTrade.Trades = append(
 				state.instrumentData.aggTrade.Trades,
-				models.Trade{
+				&models.Trade{
 					Price:    tradeData.Price,
 					Quantity: tradeData.Amount,
 					ID:       tradeData.ID,
@@ -516,7 +516,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		refresh := &messages.MarketDataIncrementalRefresh{
 			Stats: []*models.Stat{{
 				Timestamp: utils.MilliToTimestamp(ts),
-				StatType:  models.OpenInterest,
+				StatType:  models.StatType_OpenInterest,
 				Value:     status.OpenInterest,
 			}},
 			SeqNum: state.instrumentData.seqNum + 1,
@@ -524,7 +524,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		if state.instrumentData.lastFundingTime < status.FundingEventMs {
 			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(status.FundingEventMs),
-				StatType:  models.FundingRate,
+				StatType:  models.StatType_FundingRate,
 				Value:     status.CurrentFunding,
 			})
 			state.instrumentData.lastFundingTime = status.FundingEventMs
@@ -572,7 +572,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataResponse)
 	if !msg.Success {
 		// We want to converge towards the right value,
-		if msg.RejectionReason == messages.RateLimitExceeded {
+		if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded {
 			fbdLock.Lock()
 			fbd = time.Duration(float64(fbd) * 1.01)
 			fbdLock.Unlock()
@@ -698,11 +698,11 @@ func (state *Listener) updateFullBook(context actor.Context) error {
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Aggregation: models.L2,
+			Aggregation: models.OrderBookAggregation_L2,
 		})
 
 	return nil

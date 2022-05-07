@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -17,6 +16,8 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/binance"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"math/rand"
 	"net/http"
@@ -237,30 +238,30 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.QuoteCurrency = quoteCurrency
 		switch symbol.Status {
 		case "PRE_TRADING":
-			security.Status = models.PreTrading
+			security.Status = models.InstrumentStatus_PreTrading
 		case "TRADING":
-			security.Status = models.Trading
+			security.Status = models.InstrumentStatus_Trading
 		case "POST_TRADING":
-			security.Status = models.PostTrading
+			security.Status = models.InstrumentStatus_PostTrading
 		case "END_OF_DAY":
-			security.Status = models.EndOfDay
+			security.Status = models.InstrumentStatus_EndOfDay
 		case "HALT":
-			security.Status = models.Halt
+			security.Status = models.InstrumentStatus_Halt
 		case "AUCTION_MATCH":
-			security.Status = models.AuctionMatch
+			security.Status = models.InstrumentStatus_AuctionMatch
 		case "BREAK":
-			security.Status = models.Break
+			security.Status = models.InstrumentStatus_Break
 		default:
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = &constants.BINANCE
+		security.Exchange = constants.BINANCE
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		for _, filter := range symbol.Filters {
 			if filter.FilterType == "PRICE_FILTER" {
-				security.MinPriceIncrement = &types.DoubleValue{Value: filter.TickSize}
+				security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: filter.TickSize}
 			} else if filter.FilterType == "LOT_SIZE" {
-				security.RoundLot = &types.DoubleValue{Value: filter.StepSize}
+				security.RoundLot = &wrapperspb.DoubleValue{Value: filter.StepSize}
 			}
 		}
 		securities = append(securities, &security)
@@ -307,12 +308,12 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.UnsupportedSubscription
+		response.RejectionReason = messages.RejectionReason_UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}
 	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		response.RejectionReason = messages.MissingInstrument
+		response.RejectionReason = messages.RejectionReason_MissingInstrument
 		context.Respond(response)
 		return nil
 	}
@@ -325,17 +326,17 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -347,7 +348,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
@@ -355,7 +356,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			}
 			return
@@ -364,14 +365,14 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		err = json.Unmarshal(queryResponse.Response, &obData)
 		if err != nil {
 			state.logger.Info("error decoding query response", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
 		if obData.Code != 0 {
 			err = fmt.Errorf("error getting orderbook: %d %s", obData.Code, obData.Message)
 			state.logger.Info("error decoding query response", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -379,14 +380,14 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		bids, asks, err := obData.ToBidAsk()
 		if err != nil {
 			state.logger.Info("error decoding query response", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
 		snapshot = &models.OBL2Snapshot{
 			Bids:      bids,
 			Asks:      asks,
-			Timestamp: &types.Timestamp{Seconds: 0, Nanos: 0},
+			Timestamp: timestamppb.Now(),
 		}
 		response.SnapshotL2 = snapshot
 		response.SeqNum = obData.LastUpdateID
@@ -408,12 +409,12 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	clOrderID := ""
 	if msg.Filter != nil {
 		if msg.Filter.OrderStatus != nil {
-			response.RejectionReason = messages.UnsupportedFilter
+			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
 			context.Respond(response)
 			return nil
 		}
 		if msg.Filter.Side != nil {
-			response.RejectionReason = messages.UnsupportedFilter
+			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
 			context.Respond(response)
 			return nil
 		}
@@ -423,7 +424,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			} else if msg.Filter.Instrument.SecurityID != nil {
 				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
 				if !ok {
-					response.RejectionReason = messages.UnknownSecurityID
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 					context.Respond(response)
 					return nil
 				}
@@ -447,7 +448,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		if orderID != "" {
 			orderIDInt, err := strconv.ParseInt(orderID, 10, 64)
 			if err != nil {
-				response.RejectionReason = messages.UnsupportedFilter
+				response.RejectionReason = messages.RejectionReason_UnsupportedFilter
 				context.Respond(response)
 				return nil
 			}
@@ -472,7 +473,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -480,10 +481,10 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("request error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -496,7 +497,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -505,7 +506,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 			}
 			return
@@ -515,7 +516,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			err = json.Unmarshal(queryResponse.Response, &orders)
 			if err != nil {
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
 			}
@@ -524,13 +525,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			err = json.Unmarshal(queryResponse.Response, &sorder)
 			if err != nil {
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
 			}
 			if sorder.Code != 0 {
 				state.logger.Info("api error", log.Error(errors.New(sorder.Message)))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
 			}
@@ -543,12 +544,12 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			sec, ok := state.symbolToSec[o.Symbol]
 			if !ok {
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
 			}
 			ord := OrderToModel(&o)
-			ord.Instrument.SecurityID = &types.UInt64Value{Value: sec.SecurityID}
+			ord.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
 			morders = append(morders, ord)
 		}
 		response.Success = true
@@ -588,7 +589,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -596,9 +597,9 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -610,7 +611,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
@@ -618,7 +619,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http server error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			}
 			return
@@ -626,7 +627,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		var account binance.AccountInformationResponse
 		err = json.Unmarshal(queryResponse.Response, &account)
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -666,19 +667,19 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 
 	if state.secondOrderRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 
 	if state.dayOrderRateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -690,7 +691,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			symbol = req.Order.Instrument.Symbol.Value
 			sec, ok := state.symbolToSec[symbol]
 			if !ok {
-				response.RejectionReason = messages.UnknownSecurityID
+				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Respond(response)
 				return nil
 			}
@@ -699,7 +700,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		} else if req.Order.Instrument.SecurityID != nil {
 			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
 			if !ok {
-				response.RejectionReason = messages.UnknownSecurityID
+				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Respond(response)
 				return nil
 			}
@@ -708,7 +709,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
 		}
 	} else {
-		response.RejectionReason = messages.UnknownSecurityID
+		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 		context.Respond(response)
 		return nil
 	}
@@ -731,9 +732,9 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	state.dayOrderRateLimit.Request(1)
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -745,7 +746,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 				err := fmt.Errorf(
@@ -753,7 +754,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http server error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			}
 			return
@@ -761,7 +762,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		var order binance.NewOrderResponse
 		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -786,25 +787,25 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		} else if req.Instrument.SecurityID != nil {
 			sec, ok := state.securities[req.Instrument.SecurityID.Value]
 			if !ok {
-				response.RejectionReason = messages.UnknownSecurityID
+				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Respond(response)
 				return nil
 			}
 			symbol = sec.Symbol
 		}
 	} else {
-		response.RejectionReason = messages.UnknownSecurityID
+		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 		context.Respond(response)
 		return nil
 	}
 	if req.OrderID == nil {
-		response.RejectionReason = messages.UnknownOrder
+		response.RejectionReason = messages.RejectionReason_UnknownOrder
 		context.Respond(response)
 		return nil
 	}
 	orderID, err := strconv.ParseInt(req.OrderID.Value, 10, 64)
 	if err != nil {
-		response.RejectionReason = messages.UnknownOrder
+		response.RejectionReason = messages.RejectionReason_UnknownOrder
 		context.Respond(response)
 		return nil
 	}
@@ -817,24 +818,24 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	fmt.Println(request.URL)
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 
 	qr.globalRateLimit.Request(weight)
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
 		queryResponse := res.(*jobs.PerformQueryResponse)
 		if queryResponse.StatusCode != 200 {
 			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 
 				var res binance.BaseResponse
 				if err := json.Unmarshal(queryResponse.Response, &res); err != nil {
@@ -847,11 +848,11 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 					return
 				}
 				if res.Code == -1020 {
-					response.RejectionReason = messages.UnsupportedRequest
+					response.RejectionReason = messages.RejectionReason_UnsupportedRequest
 				} else if res.Code < -1100 && res.Code > -1199 {
-					response.RejectionReason = messages.InvalidRequest
+					response.RejectionReason = messages.RejectionReason_InvalidRequest
 				} else if res.Code == -2011 && res.Message == "Unknown order sent." {
-					response.RejectionReason = messages.UnknownOrder
+					response.RejectionReason = messages.RejectionReason_UnknownOrder
 				}
 
 				err := fmt.Errorf(
@@ -866,7 +867,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http server error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 			}
 
@@ -876,7 +877,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		err = json.Unmarshal(queryResponse.Response, &order)
 		if err != nil {
 			state.logger.Info("error unmarshalling", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
 		}

@@ -3,9 +3,8 @@ package bitz
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitz"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -150,11 +150,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.Name
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.BITZ
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.BITZ
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
-		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.NumberFloat))}
-		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(pair.PriceFloat))}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / math.Pow(10, float64(pair.NumberFloat))}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: 1. / math.Pow(10, float64(pair.PriceFloat))}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		securities = append(securities, &security)
 	}

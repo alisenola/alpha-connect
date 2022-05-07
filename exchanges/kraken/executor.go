@@ -3,9 +3,8 @@ package kraken
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -160,12 +160,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.WSName
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.KRAKEN
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.KRAKEN
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(pair.PairDecimals)}
-		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(pair.LotDecimals)}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: 1. / math.Pow10(pair.PairDecimals)}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / math.Pow10(pair.LotDecimals)}
 
 		securities = append(securities, &security)
 	}
@@ -196,7 +196,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	context.Respond(&messages.HistoricalLiquidationsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -210,12 +210,12 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.UnsupportedSubscription
+		response.RejectionReason = messages.RejectionReason_UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}
 	if msg.Instrument == nil || msg.Instrument.Symbol == nil {
-		response.RejectionReason = messages.MissingInstrument
+		response.RejectionReason = messages.RejectionReason_MissingInstrument
 		context.Respond(response)
 		return nil
 	}
@@ -227,7 +227,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -236,10 +236,10 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -252,7 +252,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			} else if queryResponse.StatusCode >= 500 {
@@ -261,7 +261,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
@@ -276,7 +276,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
 			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
 		}

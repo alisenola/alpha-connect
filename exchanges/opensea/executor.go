@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"math/big"
@@ -16,18 +15,17 @@ import (
 	"strconv"
 	"time"
 
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/models"
-	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	models2 "gitlab.com/alphaticks/xchanger/models"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
-
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	extype "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
+	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	opensea "gitlab.com/alphaticks/xchanger/exchanges/opensea"
+	models2 "gitlab.com/alphaticks/xchanger/models"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 )
 
 type QueryRunner struct {
@@ -170,7 +168,7 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 					CreationBlock:   pa.CreationBlock,
 					Meta:            pa.Meta,
 				},
-				Market: &constants.OPENSEA,
+				Market: constants.OPENSEA,
 			},
 		)
 	}
@@ -212,13 +210,13 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if state.credentials.APIKey == "" {
-		msg.RejectionReason = messages.UnsupportedRequest
+		msg.RejectionReason = messages.RejectionReason_UnsupportedRequest
 		context.Respond(msg)
 		return nil
 	}
 	pAsset := state.marketableProtocolAssets[req.MarketableProtocolAssetID]
 	if pAsset == nil {
-		msg.RejectionReason = messages.UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
@@ -238,7 +236,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	}
 	r, weight, err := opensea.GetEvents(params, state.credentials.APIKey)
 	if err != nil {
-		msg.RejectionReason = messages.UnsupportedOrderCharacteristic
+		msg.RejectionReason = messages.RejectionReason_UnsupportedOrderCharacteristic
 		context.Respond(msg)
 		return nil
 	}
@@ -253,7 +251,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	var processFuture func(res interface{}, err error)
 	processFuture = func(res interface{}, err error) {
 		if err != nil {
-			msg.RejectionReason = messages.HTTPError
+			msg.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, msg)
 			return
 		}
@@ -263,13 +261,13 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 				err := fmt.Errorf("%d %s", resp.StatusCode, string(resp.Response))
 				state.logger.Warn("http client error", log.Error(err))
-				msg.RejectionReason = messages.HTTPError
+				msg.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, msg)
 				return
 			} else if resp.StatusCode >= 500 {
 				err := fmt.Errorf("%d %s", resp.StatusCode, string(resp.Response))
 				state.logger.Warn("http server error", log.Error(err))
-				msg.RejectionReason = messages.HTTPError
+				msg.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, msg)
 				return
 			}
@@ -278,7 +276,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 
 		var events opensea.EventsResponse
 		if err := json.Unmarshal(resp.Response, &events); err != nil {
-			msg.RejectionReason = messages.ExchangeAPIError
+			msg.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, msg)
 			return
 		}
@@ -359,7 +357,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 			params.SetCursor(cursor)
 			r, weight, err = opensea.GetEvents(params, state.credentials.APIKey)
 			if err != nil {
-				msg.RejectionReason = messages.UnsupportedOrderCharacteristic
+				msg.RejectionReason = messages.RejectionReason_UnsupportedOrderCharacteristic
 				context.Send(sender, msg)
 				return
 			}
@@ -367,7 +365,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				qr.rateLimit.WaitRequest(weight)
 				fut := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 15*time.Second)
 				qr.rateLimit.Request(weight)
-				context.AwaitFuture(fut, processFuture)
+				context.ReenterAfter(fut, processFuture)
 				return
 			}()
 		} else {
@@ -379,7 +377,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		}
 	}
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: r}, 10*time.Minute)
-	context.AwaitFuture(future, processFuture)
+	context.ReenterAfter(future, processFuture)
 	return nil
 }
 

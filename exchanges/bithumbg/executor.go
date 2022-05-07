@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bithumbg"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -156,13 +156,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Symbol
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.BITHUMBG
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.BITHUMBG
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.IsInverse = false
-		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[0]))}
-		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[1]))}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[0]))}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / math.Pow(10, float64(symbol.Accuracy[1]))}
 		securities = append(securities, &security)
 	}
 	state.securities = make(map[uint64]*models.Security)
@@ -204,17 +204,17 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.UnsupportedSubscription
+		response.RejectionReason = messages.RejectionReason_UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}
 	if msg.Instrument == nil {
-		response.RejectionReason = messages.MissingInstrument
+		response.RejectionReason = messages.RejectionReason_MissingInstrument
 		context.Respond(response)
 		return nil
 	}
@@ -224,19 +224,19 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	} else if msg.Instrument.SecurityID != nil {
 		sec, ok := state.securities[msg.Instrument.SecurityID.Value]
 		if !ok {
-			response.RejectionReason = messages.UnknownSecurityID
+			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 			context.Respond(response)
 			return nil
 		}
 		symbol = sec.Symbol
 	}
 	if symbol == "" {
-		response.RejectionReason = messages.UnknownSymbol
+		response.RejectionReason = messages.RejectionReason_UnknownSymbol
 		context.Respond(response)
 		return nil
 	}
 
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		var snapshot *models.OBL2Snapshot
 		// Get http request and the expected response
 		request, weight, err := bithumbg.GetSpotOrderBook(symbol)
@@ -247,10 +247,10 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		state.rateLimit.Request(weight)
 		future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-		context.AwaitFuture(future, func(res interface{}, err error) {
+		context.ReenterAfter(future, func(res interface{}, err error) {
 			if err != nil {
 				state.logger.Warn("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
@@ -262,7 +262,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
 					state.logger.Warn("http client error", log.Error(err))
-					response.RejectionReason = messages.HTTPError
+					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Respond(response)
 				} else if queryResponse.StatusCode >= 500 {
 					err := fmt.Errorf(
@@ -270,7 +270,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
 					state.logger.Warn("http client error", log.Error(err))
-					response.RejectionReason = messages.HTTPError
+					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Respond(response)
 				}
 				return
@@ -278,26 +278,26 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			var bresponse bithumbg.Response
 			if err := json.Unmarshal(queryResponse.Response, &bresponse); err != nil {
 				state.logger.Warn("error decoding query response", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
 			if bresponse.Code != "0" {
 				state.logger.Warn("error getting order book data", log.Error(errors.New(bresponse.Msg)))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
 			var obData bithumbg.OrderBook
 			if err := json.Unmarshal(bresponse.Data, &obData); err != nil {
 				state.logger.Warn("error decoding query response", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
 
 			bidst, askst := obData.ToBidAsk()
-			var bids, asks []gmodels.OrderBookLevel
+			var bids, asks []*gmodels.OrderBookLevel
 			for _, b := range bidst {
 				if b.Quantity == 0. {
 					continue

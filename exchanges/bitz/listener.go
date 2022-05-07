@@ -3,9 +3,8 @@ package bitz
 import (
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -13,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitz"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sort"
@@ -256,8 +256,8 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:          state.instrumentData.orderBook.GetBids(0),
 		Asks:          state.instrumentData.orderBook.GetAsks(0),
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+		TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -345,7 +345,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				Trades:      nil,
 			}
 			for _, trade := range buyTrades {
-				trd := models.Trade{
+				trd := &models.Trade{
 					Price:    trade.Price,
 					Quantity: trade.Quantity,
 					ID:       trade.ID,
@@ -371,7 +371,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				Trades:      nil,
 			}
 			for _, trade := range sellTrades {
-				trd := models.Trade{
+				trd := &models.Trade{
 					Price:    trade.Price,
 					Quantity: trade.Quantity,
 					ID:       trade.ID,

@@ -2,8 +2,7 @@ package utils_test
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -20,7 +19,7 @@ import (
 
 var FBinanceAccount = &models.Account{
 	Name:     "299211",
-	Exchange: &constants.FBINANCE,
+	Exchange: constants.FBINANCE,
 	ApiCredentials: &xchangerModels.APICredentials{
 		APIKey:    "MpYkeK3pGP80gGiIrqWtLNwjJmyK2DTREYzNx8Cyc3AWTkl2T0iWnQEtdCIlvAoE",
 		APISecret: "CJcJZEkktzhGzEdQhclfHcfJz5k01OY6n42MeF9B3oQWGqba3RrXEnG4bZktXQNu",
@@ -29,7 +28,7 @@ var FBinanceAccount = &models.Account{
 
 func TestTradeReceiver(t *testing.T) {
 	exchgs := []*xchangerModels.Exchange{
-		&constants.FBINANCE,
+		constants.FBINANCE,
 	}
 	accnt, err := account.NewAccount(FBinanceAccount)
 	if err != nil {
@@ -66,9 +65,9 @@ func TestTradeReceiver(t *testing.T) {
 	for _, sec := range securities.Securities {
 		if sec.Symbol == "BZRXUSDT" {
 			receiver := utils.NewTradeReceiver(as, FBinanceAccount, &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 				Exchange:   sec.Exchange,
-				Symbol:     &types.StringValue{Value: sec.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
 			}, 0, false, uint64(time.Now().UnixNano()), ch)
 			receivers = append(receivers, receiver)
 		}

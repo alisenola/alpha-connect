@@ -3,9 +3,8 @@ package bybits
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -16,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybits"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -177,12 +177,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Name
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.BYBITS
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.BYBITS
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.MinPricePrecision}
-		security.RoundLot = &types.DoubleValue{Value: symbol.BasePrecision}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: symbol.MinPricePrecision}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: symbol.BasePrecision}
 		securities = append(securities, &security)
 	}
 

@@ -10,8 +10,8 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -174,7 +174,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 
 	pa, ok := state.protocolAssets[req.ProtocolAssetID]
 	if !ok {
-		msg.RejectionReason = messages.UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
@@ -182,7 +182,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
 		state.logger.Warn("error getting erc721 ABI", log.Error(err))
-		msg.RejectionReason = messages.ABIError
+		msg.RejectionReason = messages.RejectionReason_ABIError
 		context.Respond(msg)
 		return nil
 	}
@@ -194,7 +194,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	addressBig, ok := big.NewInt(1).SetString(pa.Meta["address"][2:], 16)
 	if !ok {
 		state.logger.Warn("invalid protocol asset address", log.Error(err))
-		msg.RejectionReason = messages.UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
 	}
@@ -208,10 +208,10 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	}
 	qr := state.queryRunnerETH
 	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 15*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
-			msg.RejectionReason = messages.EthRPCError
+			msg.RejectionReason = messages.RejectionReason_EthRPCError
 			context.Respond(msg)
 			return
 		}
@@ -219,7 +219,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		resp := res.(*jobs.PerformLogsQueryResponse)
 		if resp.Error != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
-			msg.RejectionReason = messages.EthRPCError
+			msg.RejectionReason = messages.RejectionReason_EthRPCError
 			context.Respond(msg)
 			return
 		}
@@ -231,7 +231,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				event := nft.ERC721Transfer{}
 				if err := eth.UnpackLog(eabi, &event, "Transfer", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					msg.RejectionReason = messages.EthRPCError
+					msg.RejectionReason = messages.RejectionReason_EthRPCError
 					context.Respond(msg)
 					return
 				}

@@ -15,7 +15,7 @@ func TestMarketData(t *testing.T) {
 		Symbol:       "OMG-USD",
 		SecurityType: enum.SecurityType_CRYPTO_PERP,
 		Exchange:     constants.HUOBIP,
-		BaseCurrency: xmodels.Asset{
+		BaseCurrency: &xmodels.Asset{
 			ID:       32,
 			Name:     "",
 			Symbol:   "OMG",
@@ -26,6 +26,6 @@ func TestMarketData(t *testing.T) {
 		RoundLot:          1,
 		HasMaturityDate:   false,
 		IsInverse:         true,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 	})
 }

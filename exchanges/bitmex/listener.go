@@ -4,9 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
@@ -207,17 +207,17 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 	}
 
-	var bids, asks []gmodels.OrderBookLevel
+	var bids, asks []*gmodels.OrderBookLevel
 
 	for _, data := range obData.Data {
 		if data.Side == "Buy" {
-			bids = append(bids, gmodels.OrderBookLevel{
+			bids = append(bids, &gmodels.OrderBookLevel{
 				Price:    state.instrumentData.levelIDToPrice[data.ID],
 				Quantity: float64(data.Size),
 				Bid:      true,
 			})
 		} else {
-			asks = append(asks, gmodels.OrderBookLevel{
+			asks = append(asks, &gmodels.OrderBookLevel{
 				Price:    state.instrumentData.levelIDToPrice[data.ID],
 				Quantity: float64(data.Size),
 				Bid:      false,
@@ -275,8 +275,8 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:          state.instrumentData.orderBook.GetBids(0),
 		Asks:          state.instrumentData.orderBook.GetAsks(0),
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+		TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -312,17 +312,17 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 
-		var bids, asks []gmodels.OrderBookLevel
+		var bids, asks []*gmodels.OrderBookLevel
 
 		for _, data := range obData.Data {
 			if data.Side == "Buy" {
-				bids = append(bids, gmodels.OrderBookLevel{
+				bids = append(bids, &gmodels.OrderBookLevel{
 					Price:    state.instrumentData.levelIDToPrice[data.ID],
 					Quantity: float64(data.Size),
 					Bid:      true,
 				})
 			} else {
-				asks = append(asks, gmodels.OrderBookLevel{
+				asks = append(asks, &gmodels.OrderBookLevel{
 					Price:    state.instrumentData.levelIDToPrice[data.ID],
 					Quantity: float64(data.Size),
 					Bid:      false,
@@ -332,7 +332,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 
 		limitDelta := &models.OBL2Update{
-			Levels:    []gmodels.OrderBookLevel{},
+			Levels:    []*gmodels.OrderBookLevel{},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
@@ -397,7 +397,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					Trades:      nil,
 				}
 			}
-			trade := models.Trade{
+			trade := &models.Trade{
 				Price:    trade.Price,
 				Quantity: float64(trade.Size),
 				ID:       binary.LittleEndian.Uint64(tradeID.Bytes()[0:8]),
@@ -443,7 +443,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
-				StatType:  models.FundingRate,
+				StatType:  models.StatType_FundingRate,
 				Value:     f.FundingRate,
 			})
 			context.Send(context.Parent(), refresh)
@@ -457,7 +457,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				context.Send(context.Parent(), &messages.MarketDataIncrementalRefresh{
 					Stats: []*models.Stat{{
 						Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
-						StatType:  models.OpenInterest,
+						StatType:  models.StatType_OpenInterest,
 						Value:     float64(*f.OpenInterest),
 					}},
 					SeqNum: state.instrumentData.seqNum + 1,

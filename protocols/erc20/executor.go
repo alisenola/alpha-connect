@@ -9,8 +9,8 @@ import (
 
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -111,7 +111,7 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			assets,
 			&models.ProtocolAsset{
 				ProtocolAssetID: protocolAsset.ProtocolAssetId,
-				Protocol:        &constants.ERC20,
+				Protocol:        constants.ERC20,
 				Asset:           as,
 				Chain:           ch,
 				CreationBlock:   protocolAsset.CreationBlock,

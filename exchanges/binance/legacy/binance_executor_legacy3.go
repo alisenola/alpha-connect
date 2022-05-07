@@ -4,8 +4,8 @@ package legacy
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"github.com/gogo/protobuf/types"
 	"github.com/quickfixgo/enum"
 	fix50sl "github.com/quickfixgo/fix50/securitylist"
@@ -149,7 +149,7 @@ func (state *Executor) updateExchangeInfos(context actor.Context) error {
 	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res types{}, err error) {
+	context.ReenterAfter(future, func(res types{}, err error) {
 
 		if err != nil {
 			// TODO LOG
@@ -199,7 +199,7 @@ func (state *Executor) GetOrderBookL2Request(context actor.Context) error {
 	state.globalRateLimit.Request(weight)
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res types{}, err error) {
+	context.ReenterAfter(future, func(res types{}, err error) {
 		if err != nil {
 			context.Respond(&executor.GetOrderBookL2Response{
 				RequestID: msg.RequestID,

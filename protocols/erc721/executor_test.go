@@ -45,7 +45,7 @@ type ERC721Contract struct {
 }
 
 func TestExecutor(t *testing.T) {
-	as, executor, loader, cancel := tests.StartExecutor(t, &constants.ERC721)
+	as, executor, loader, cancel := tests.StartExecutor(t, constants.ERC721)
 	defer cancel()
 	_, err := as.Root.RequestFuture(loader, &utils.Ready{}, 15*time.Second).Result()
 	if err != nil {

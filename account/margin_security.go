@@ -2,10 +2,10 @@ package account
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"sync"
 )
@@ -380,9 +380,9 @@ func (sec *MarginSecurity) Clear() {
 
 func (sec *MarginSecurity) GetInstrument() *models.Instrument {
 	return &models.Instrument{
-		SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+		SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 		Exchange:   sec.Exchange,
-		Symbol:     &types.StringValue{Value: sec.Symbol},
+		Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
 	}
 }
 

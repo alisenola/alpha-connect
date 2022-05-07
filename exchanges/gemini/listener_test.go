@@ -20,6 +20,6 @@ func TestMarketData(t *testing.T) {
 		RoundLot:          1e-8,
 		HasMaturityDate:   false,
 		IsInverse:         false,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 	})
 }

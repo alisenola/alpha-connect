@@ -3,9 +3,8 @@ package bybitl
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -13,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	"go.mongodb.org/mongo-driver/mongo"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"net"
 	"net/http"
@@ -229,8 +229,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			Account: state.account.Account,
 			Filter: &messages.OrderFilter{
 				Instrument: &models.Instrument{
-					SecurityID: &types.UInt64Value{Value: fs.SecurityID},
-					Symbol:     &types.StringValue{Value: fs.Symbol},
+					SecurityID: &wrapperspb.UInt64Value{Value: fs.SecurityID},
+					Symbol:     &wrapperspb.StringValue{Value: fs.Symbol},
 					Exchange:   fs.Exchange,
 				},
 			},
@@ -312,10 +312,10 @@ func (state *AccountListener) OnAccountDataRequest(context actor.Context) error 
 	takerFee := state.account.GetTakerFee()
 
 	if makerFee != nil {
-		resp.MakerFee = &types.DoubleValue{Value: *makerFee}
+		resp.MakerFee = &wrapperspb.DoubleValue{Value: *makerFee}
 	}
 	if takerFee != nil {
-		resp.TakerFee = &types.DoubleValue{Value: *takerFee}
+		resp.TakerFee = &wrapperspb.DoubleValue{Value: *takerFee}
 	}
 	context.Respond(resp)
 	return nil
@@ -366,7 +366,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 		OrderID:               "",
 		ClientOrderID:         req.Order.ClientOrderID,
 		Instrument:            req.Order.Instrument,
-		OrderStatus:           models.PendingNew,
+		OrderStatus:           models.OrderStatus_PendingNew,
 		OrderType:             req.Order.OrderType,
 		Side:                  req.Order.OrderSide,
 		TimeInForce:           req.Order.TimeInForce,
@@ -392,18 +392,18 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingNew {
+			if report.ExecutionType == messages.ExecutionType_PendingNew {
 				fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
+				context.ReenterAfter(fut, func(res interface{}, err error) {
 					if err != nil {
-						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
+						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.RejectionReason_Other)
 						if err != nil {
 							panic(err)
 						}
 						context.Respond(&messages.NewOrderSingleResponse{
 							RequestID:       req.RequestID,
 							Success:         false,
-							RejectionReason: messages.Other,
+							RejectionReason: messages.RejectionReason_Other,
 						})
 						if report != nil {
 							report.SeqNum = state.seqNum + 1
@@ -462,11 +462,11 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingCancel {
+			if report.ExecutionType == messages.ExecutionType_PendingCancel {
 				fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
+				context.ReenterAfter(fut, func(res interface{}, err error) {
 					if err != nil {
-						report, err := state.account.RejectCancelOrder(ID, messages.Other)
+						report, err := state.account.RejectCancelOrder(ID, messages.RejectionReason_Other)
 						if err != nil {
 							panic(err)
 						}
@@ -510,13 +510,13 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	}
 	var reports []*messages.ExecutionReport
 	for _, o := range orders {
-		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
+		if o.OrderStatus != models.OrderStatus_New && o.OrderStatus != models.OrderStatus_PartiallyFilled {
 			continue
 		}
 		report, res := state.account.CancelOrder(o.OrderID)
 		if res != nil {
 			for _, r := range reports {
-				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}
@@ -544,10 +544,10 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		context.Send(context.Parent(), report)
 	}
 	fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
-	context.AwaitFuture(fut, func(res interface{}, err error) {
+	context.ReenterAfter(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
-				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
@@ -560,7 +560,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 			context.Respond(&messages.OrderMassCancelResponse{
 				RequestID:       req.RequestID,
 				Success:         false,
-				RejectionReason: messages.Other,
+				RejectionReason: messages.RejectionReason_Other,
 			})
 			return
 		}
@@ -607,15 +607,15 @@ func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error
 	report.SeqNum = state.seqNum + 1
 	state.seqNum += 1
 	context.Send(context.Parent(), report)
-	if report.OrderStatus == models.PendingReplace {
+	if report.OrderStatus == models.OrderStatus_PendingReplace {
 		fut := context.RequestFuture(state.bybitlExecutor, req, 10*time.Second)
-		context.AwaitFuture(fut, func(res interface{}, err error) {
+		context.ReenterAfter(fut, func(res interface{}, err error) {
 			if err != nil {
-				report, err := state.account.RejectReplaceOrder(Id, messages.Other)
+				report, err := state.account.RejectReplaceOrder(Id, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
-				response.RejectionReason = messages.Other
+				response.RejectionReason = messages.RejectionReason_Other
 				context.Respond(response)
 				if report != nil {
 					report.SeqNum = state.seqNum + 1
@@ -637,7 +637,7 @@ func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error
 					context.Send(context.Parent(), report)
 				}
 			} else {
-				report, err := state.account.RejectReplaceOrder(Id, messages.Other)
+				report, err := state.account.RejectReplaceOrder(Id, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
@@ -701,7 +701,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				// New Order
 				if !state.account.HasOrder(order.OrderLinkId) {
 					o := wsOrderToModel(&order)
-					o.OrderStatus = models.PendingNew
+					o.OrderStatus = models.OrderStatus_PendingNew
 					_, rej := state.account.NewOrder(o)
 					if rej != nil {
 						return fmt.Errorf("error creating new order: %s", rej.String())
@@ -735,7 +735,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				// therefore we won't go through the branch above that confirms the new order.
 				// Therefore, we check if it's pendingNew, and we confirm it here. We let
 				// the confirmFill to the bybitl.WSExecutions
-				if ord.OrderStatus == models.PendingNew {
+				if ord.OrderStatus == models.OrderStatus_PendingNew {
 					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
 					if err != nil {
 						return fmt.Errorf("error confirming filled order: %v", err)

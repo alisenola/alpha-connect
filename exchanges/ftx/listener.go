@@ -3,9 +3,8 @@ package ftx
 import (
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -16,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sort"
@@ -223,12 +223,12 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		return fmt.Errorf("was expecting WSOrderBookGroupedUpdate, got %s", reflect.TypeOf(ws.Msg.Message).String())
 	}
 
-	var bids, asks []gmodels.OrderBookLevel
+	var bids, asks []*gmodels.OrderBookLevel
 	for _, bid := range obUpdate.Snapshot.Bids {
 		if bid.Quantity == 0 {
 			continue
 		}
-		bids = append(bids, gmodels.OrderBookLevel{
+		bids = append(bids, &gmodels.OrderBookLevel{
 			Price:    bid.Price,
 			Quantity: bid.Quantity,
 			Bid:      true,
@@ -238,7 +238,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if ask.Quantity == 0 {
 			continue
 		}
-		asks = append(asks, gmodels.OrderBookLevel{
+		asks = append(asks, &gmodels.OrderBookLevel{
 			Price:    ask.Price,
 			Quantity: ask.Quantity,
 			Bid:      false,
@@ -292,21 +292,21 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
 
 	if msg.Subscribe {
 		for _, stat := range msg.Stats {
-			if stat == models.OpenInterest && state.openInterestTicker == nil {
+			if stat == models.StatType_OpenInterest && state.openInterestTicker == nil {
 				if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP || state.security.SecurityType == enum.SecurityType_CRYPTO_FUT {
 					openInterestTicker := time.NewTicker(10 * time.Second)
 					state.openInterestTicker = openInterestTicker
@@ -345,14 +345,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 		obDelta := &models.OBL2Update{
-			Levels:    make([]gmodels.OrderBookLevel, nLevels),
+			Levels:    make([]*gmodels.OrderBookLevel, nLevels),
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
 
 		lvlIdx := 0
 		for _, bid := range obData.Snapshot.Bids {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Quantity,
 				Bid:      true,
@@ -362,7 +362,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			instr.orderBook.UpdateOrderBookLevel(level)
 		}
 		for _, ask := range obData.Snapshot.Asks {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Quantity,
 				Bid:      false,
@@ -433,7 +433,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					Trades:      nil,
 				}
 			}
-			trade := models.Trade{
+			trade := &models.Trade{
 				Price:    trade.Price,
 				Quantity: trade.Size,
 				ID:       trade.ID,
@@ -498,14 +498,14 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		&messages.MarketStatisticsRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Statistics: []models.StatType{models.OpenInterest, models.FundingRate},
+			Statistics: []models.StatType{models.StatType_OpenInterest, models.StatType_FundingRate},
 		}, 2*time.Second)
 
-	context.AwaitFuture(fut, func(res interface{}, err error) {
+	context.ReenterAfter(fut, func(res interface{}, err error) {
 		if err != nil {
 			if err == actor.ErrTimeout {
 				oidLock.Lock()
@@ -521,7 +521,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		msg := res.(*messages.MarketStatisticsResponse)
 		if !msg.Success {
 			// We want to converge towards the right value,
-			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
+			if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
 				oidLock.Unlock()

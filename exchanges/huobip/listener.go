@@ -3,9 +3,8 @@ package huobip
 import (
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -16,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobip"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sort"
@@ -298,20 +298,20 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
 
 	if msg.Subscribe {
 		for _, stat := range msg.Stats {
-			if stat == models.OpenInterest && state.openInterestTicker == nil {
+			if stat == models.StatType_OpenInterest && state.openInterestTicker == nil {
 				if state.security.SecurityType == enum.SecurityType_CRYPTO_PERP || state.security.SecurityType == enum.SecurityType_CRYPTO_FUT {
 					openInterestTicker := time.NewTicker(10 * time.Second)
 					state.openInterestTicker = openInterestTicker
@@ -365,7 +365,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		for _, bid := range res.Bids {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Quantity,
 				Bid:      true,
@@ -374,7 +374,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			obDelta.Levels = append(obDelta.Levels, level)
 		}
 		for _, ask := range res.Asks {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Quantity,
 				Bid:      false,
@@ -440,7 +440,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				aggHelpR = aggHelp
 			}
 
-			trd := models.Trade{
+			trd := &models.Trade{
 				Price:    trade.Price,
 				Quantity: trade.Amount,
 				ID:       trade.ID,
@@ -466,7 +466,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			}
 			refresh.Stats = append(refresh.Stats, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(r.SettlementTime),
-				StatType:  models.FundingRate,
+				StatType:  models.StatType_FundingRate,
 				Value:     r.FundingRate,
 			})
 			context.Send(context.Parent(), refresh)
@@ -559,14 +559,14 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		&messages.MarketStatisticsRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Statistics: []models.StatType{models.OpenInterest},
+			Statistics: []models.StatType{models.StatType_OpenInterest},
 		}, 2*time.Second)
 
-	context.AwaitFuture(fut, func(res interface{}, err error) {
+	context.ReenterAfter(fut, func(res interface{}, err error) {
 		if err != nil {
 			if err == actor.ErrTimeout {
 				oidLock.Lock()
@@ -580,7 +580,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		msg := res.(*messages.MarketStatisticsResponse)
 		if !msg.Success {
 			// We want to converge towards the right value,
-			if msg.RejectionReason == messages.RateLimitExceeded || msg.RejectionReason == messages.HTTPError {
+			if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
 				state.openInterestTicker.Reset(oid)

@@ -1,7 +1,7 @@
 package exchanges
 
 import (
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/binance"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bitfinex"

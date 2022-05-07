@@ -3,9 +3,8 @@ package hitbtc
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -154,12 +154,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.ID
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.HITBTC
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.HITBTC
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: symbol.QuantityIncrement}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: symbol.TickSize}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: symbol.QuantityIncrement}
 
 		securities = append(securities, &security)
 	}

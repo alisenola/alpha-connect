@@ -4,9 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -16,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bithumbg"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
@@ -188,11 +188,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Aggregation: models.L2,
+			Aggregation: models.OrderBookAggregation_L2,
 		},
 		5*time.Second)
 
@@ -274,13 +274,13 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -318,7 +318,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		for _, bid := range res.Bids {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Quantity,
 				Bid:      true,
@@ -327,7 +327,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			obDelta.Levels = append(obDelta.Levels, level)
 		}
 		for _, ask := range res.Asks {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Quantity,
 				Bid:      false,
@@ -358,7 +358,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			Bid:         res.Side == "sell",
 			Timestamp:   utils.MilliToTimestamp(ts),
 			AggregateID: uint64(res.Version),
-			Trades: []models.Trade{{
+			Trades: []*models.Trade{{
 				Price:    res.Price,
 				Quantity: res.Volume,
 				ID:       uint64(res.Version),

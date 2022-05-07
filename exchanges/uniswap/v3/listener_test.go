@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -21,7 +21,7 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
-	as, executor, cleaner := tests.StartExecutor(t, &constants.UNISWAPV3, nil)
+	as, executor, cleaner := tests.StartExecutor(t, constants.UNISWAPV3, nil)
 	defer cleaner()
 
 	securityID := []uint64{
@@ -101,19 +101,19 @@ func TestMarketData(t *testing.T) {
 		Symbol:            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 		SecurityType:      enum.SecurityType_CRYPTO_AMM,
 		Exchange:          constants.UNISWAPV3,
-		QuoteCurrency: xchangerModels.Asset{
+		QuoteCurrency: &xchangerModels.Asset{
 			Symbol: "WETH",
 			Name:   "wrapped-ether",
 			ID:     0,
 		},
-		BaseCurrency: xchangerModels.Asset{
+		BaseCurrency: &xchangerModels.Asset{
 			Symbol: "USDC",
 			Name:   "usdc",
 			ID:     1,
 		},
 		HasMaturityDate:   false,
 		IsInverse:         false,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 		MinPriceIncrement: 10,
 	}
 

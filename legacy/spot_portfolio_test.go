@@ -14,8 +14,8 @@ var spotInstruments = []*exchanges.Instrument{
 	&exchanges.Instrument{
 		Exchange: constants.BINANCE,
 		Pair: &models.Pair{
-			Base:  &constants.ETHEREUM,
-			Quote: &constants.TETHER,
+			Base:  constants.ETHEREUM,
+			Quote: constants.TETHER,
 		},
 		TickPrecision: 100,
 		LotPrecision:  100,

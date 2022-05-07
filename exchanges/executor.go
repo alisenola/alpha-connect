@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/commands"
@@ -296,7 +296,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 
 		state.executors[exch.ID], _ = context.SpawnNamed(props, exch.Name+"_executor")
 	}
@@ -390,8 +390,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 		state.accountManagers[accnt.Name] = context.Spawn(props)
 	}
 
@@ -408,7 +408,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		context.Respond(&messages.AccountDataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownAccount,
+			RejectionReason: messages.RejectionReason_UnknownAccount,
 		})
 		return nil
 	}
@@ -424,8 +424,8 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.accountManagers[request.Account.Name] = pid
 		context.Forward(pid)
@@ -436,34 +436,34 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 
 func (state *Executor) getSecurity(instr *models.Instrument) (*models.Security, *messages.RejectionReason) {
 	if instr == nil {
-		rej := messages.MissingInstrument
+		rej := messages.RejectionReason_MissingInstrument
 		return nil, &rej
 	}
 	if instr.SecurityID != nil {
 		if sec, ok := state.securities[instr.SecurityID.Value]; ok {
 			return sec, nil
 		} else {
-			rej := messages.UnknownSecurityID
+			rej := messages.RejectionReason_UnknownSecurityID
 			return nil, &rej
 		}
 	} else if instr.Symbol != nil {
 		if instr.Exchange == nil {
-			rej := messages.UnknownExchange
+			rej := messages.RejectionReason_UnknownExchange
 			return nil, &rej
 		}
 		symbolsToSecs, ok := state.symbToSecs[instr.Exchange.ID]
 		if !ok {
-			rej := messages.UnknownExchange
+			rej := messages.RejectionReason_UnknownExchange
 			return nil, &rej
 		}
 		sec, ok := symbolsToSecs[instr.Symbol.Value]
 		if !ok {
-			rej := messages.UnknownSymbol
+			rej := messages.RejectionReason_UnknownSymbol
 			return nil, &rej
 		}
 		return sec, nil
 	} else {
-		rej := messages.MissingInstrument
+		rej := messages.RejectionReason_MissingInstrument
 		return nil, &rej
 	}
 }
@@ -482,8 +482,8 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool)).WithSupervisor(
-			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool), actor.WithSupervisor(
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
 		context.Forward(pid)
@@ -506,8 +506,8 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool)).WithSupervisor(
-			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool), actor.WithSupervisor(
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
 		context.Forward(pid)
@@ -532,7 +532,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 		context.Respond(&messages.HistoricalUnipoolV3DataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 	}
 	context.Forward(exchange)
@@ -556,7 +556,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		context.Respond(&messages.MarketStatisticsResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 		return nil
 	}
@@ -581,7 +581,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		context.Respond(&messages.HistoricalLiquidationsResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 		return nil
 	}
@@ -606,7 +606,7 @@ func (state *Executor) OnHistoricalOpenInterestsRequest(context actor.Context) e
 		context.Respond(&messages.HistoricalOpenInterestsResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 		return nil
 	}
@@ -631,7 +631,7 @@ func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) er
 		context.Respond(&messages.HistoricalFundingRatesResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 		return nil
 	}
@@ -647,7 +647,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		context.Respond(&messages.HistoricalSalesResponse{
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
 		})
 		return nil
 	}
@@ -656,7 +656,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		context.Respond(&messages.HistoricalSalesResponse{
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.UnknownExchange,
+			RejectionReason: messages.RejectionReason_UnknownExchange,
 		})
 		return nil
 	}
@@ -755,7 +755,7 @@ func (state *Executor) OnMarketableProtocolsAssetDefinitionRequest(context actor
 		context.Respond(&messages.MarketableProtocolAssetDefinitionResponse{
 			RequestID:       req.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
 		})
 	}
 	context.Respond(&messages.MarketableProtocolAssetDefinitionResponse{
@@ -827,7 +827,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -838,7 +838,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -854,7 +854,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -865,7 +865,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -880,7 +880,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 			Positions:       nil,
 		})
 		return nil
@@ -891,7 +891,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 			Positions:       nil,
 		})
 		return nil
@@ -907,7 +907,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 			Balances:        nil,
 		})
 		return nil
@@ -918,7 +918,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 			Balances:        nil,
 		})
 		return nil
@@ -933,7 +933,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		context.Respond(&messages.OrderList{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -942,7 +942,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		context.Respond(&messages.OrderList{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -956,7 +956,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -964,7 +964,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidRequest,
+			RejectionReason: messages.RejectionReason_InvalidRequest,
 		})
 		return nil
 	}
@@ -973,7 +973,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		context.Respond(&messages.NewOrderSingleResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -987,7 +987,7 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 		context.Respond(&messages.NewOrderBulkResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -996,7 +996,7 @@ func (state *Executor) OnNewOrderBulkRequest(context actor.Context) error {
 		context.Respond(&messages.NewOrderBulkResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1018,7 +1018,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		context.Respond(&messages.OrderReplaceResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1027,7 +1027,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		context.Respond(&messages.OrderReplaceResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1041,7 +1041,7 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 		context.Respond(&messages.OrderBulkReplaceResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1050,7 +1050,7 @@ func (state *Executor) OnOrderBulkReplaceRequest(context actor.Context) error {
 		context.Respond(&messages.OrderBulkReplaceResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1064,7 +1064,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1073,7 +1073,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1087,7 +1087,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1096,7 +1096,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       msg.RequestID,
 			Success:         false,
-			RejectionReason: messages.InvalidAccount,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
 		})
 		return nil
 	}
@@ -1110,7 +1110,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		context.Respond(&messages.AccountDataResponse{
 			RequestID:       request.RequestID,
 			Success:         false,
-			RejectionReason: messages.UnknownAccount,
+			RejectionReason: messages.RejectionReason_UnknownAccount,
 		})
 		return nil
 	}
@@ -1128,8 +1128,8 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.accountManagers[request.Account.Name] = pid
 		context.Respond(&commands.GetAccountResponse{

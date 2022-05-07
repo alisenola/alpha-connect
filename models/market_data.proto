@@ -1,10 +1,10 @@
 syntax = "proto3";
 package models;
+option go_package = "gitlab.com/alphaticks/alpha-connect/models";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "gitlab.com/alphaticks/gorderbook/gorderbook.models/protos.proto";
+import "gitlab.com/alphaticks/gorderbook/gorderbook.models/gorderbook.proto";
 
 enum StatType {
     IndexValue = 0;
@@ -39,30 +39,30 @@ message OBL1Snapshot {
 }
 
 message OBL2Update {
-    repeated gorderbook.models.OrderBookLevel levels = 1 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.OrderBookLevel levels = 1;
     google.protobuf.Timestamp timestamp = 2;
     bool trade = 4;
 }
 
 message OBL2Snapshot {
-    repeated gorderbook.models.OrderBookLevel bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.models.OrderBookLevel asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.OrderBookLevel bids = 2;
+    repeated gorderbook.models.OrderBookLevel asks = 3;
     google.protobuf.Timestamp timestamp = 4;
     google.protobuf.UInt64Value tick_precision = 5;
     google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Update {
-    repeated gorderbook.models.Order bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.models.Order asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order bids = 2;
+    repeated gorderbook.models.Order asks = 3;
     google.protobuf.Timestamp timestamp = 4;
     google.protobuf.UInt64Value tick_precision = 5;
     google.protobuf.UInt64Value lot_precision = 6;
 }
 
 message OBL3Snapshot {
-    repeated gorderbook.models.Order bids = 2 [(gogoproto.nullable) = false];
-    repeated gorderbook.models.Order asks = 3 [(gogoproto.nullable) = false];
+    repeated gorderbook.models.Order bids = 2;
+    repeated gorderbook.models.Order asks = 3;
     google.protobuf.Timestamp timestamp = 4;
 }
 
@@ -113,7 +113,7 @@ message AggregatedTrade {
     bool bid = 1;
     google.protobuf.Timestamp timestamp = 2;
     uint64 aggregateID = 3;
-    repeated Trade trades = 4 [(gogoproto.nullable) = false];
+    repeated Trade trades = 4;
 }
 
 message Liquidation {

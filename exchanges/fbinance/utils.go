@@ -2,11 +2,11 @@ package fbinance
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"strconv"
 )
 
@@ -15,23 +15,23 @@ func wsOrderToModel(o *fbinance.WSExecution) *models.Order {
 		OrderID:       fmt.Sprintf("%d", o.OrderID),
 		ClientOrderID: o.ClientOrderID,
 		Instrument: &models.Instrument{
-			Exchange: &constants.FBINANCE,
-			Symbol:   &types.StringValue{Value: o.Symbol},
+			Exchange: constants.FBINANCE,
+			Symbol:   &wrapperspb.StringValue{Value: o.Symbol},
 		},
 		LeavesQuantity: o.OrigQuantity - o.CumQuantity,
 		CumQuantity:    o.CumQuantity,
 	}
 	if o.ReduceOnly {
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
 	}
 
 	switch o.OrderStatus {
 	case fbinance.NEW_ORDER:
-		ord.OrderStatus = models.New
+		ord.OrderStatus = models.OrderStatus_New
 	case fbinance.CANCELED_ORDER:
-		ord.OrderStatus = models.Canceled
+		ord.OrderStatus = models.OrderStatus_Canceled
 	case fbinance.PARTIALLY_FILLED:
-		ord.OrderStatus = models.PartiallyFilled
+		ord.OrderStatus = models.OrderStatus_PartiallyFilled
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", o.OrderStatus)
 	}
@@ -52,41 +52,41 @@ func wsOrderToModel(o *fbinance.WSExecution) *models.Order {
 
 	switch o.OrderType {
 	case fbinance.LIMIT_ORDER:
-		ord.OrderType = models.Limit
+		ord.OrderType = models.OrderType_Limit
 	case fbinance.MARKET_ORDER:
-		ord.OrderType = models.Market
+		ord.OrderType = models.OrderType_Market
 	case fbinance.STOP_LOSS_ORDER:
-		ord.OrderType = models.Stop
+		ord.OrderType = models.OrderType_Stop
 	case fbinance.STOP_LOSS_LIMIT_ORDER:
-		ord.OrderType = models.StopLimit
+		ord.OrderType = models.OrderType_StopLimit
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", o.OrderType)
 	}
 
 	switch o.Side {
 	case fbinance.BUY_ORDER:
-		ord.Side = models.Buy
+		ord.Side = models.Side_Buy
 	case fbinance.SELL_ODER:
-		ord.Side = models.Sell
+		ord.Side = models.Side_Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", o.Side)
 	}
 
 	switch o.TimeInForce {
 	case fbinance.GOOD_TILL_CANCEL:
-		ord.TimeInForce = models.GoodTillCancel
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
 	case fbinance.FILL_OR_KILL:
-		ord.TimeInForce = models.FillOrKill
+		ord.TimeInForce = models.TimeInForce_FillOrKill
 	case fbinance.IMMEDIATE_OR_CANCEL:
-		ord.TimeInForce = models.ImmediateOrCancel
+		ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
 	case fbinance.GOOD_TILL_CROSSING:
-		ord.TimeInForce = models.GoodTillCancel
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ParticipateDoNotInitiate)
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ParticipateDoNotInitiate)
 	default:
 		fmt.Println("UNKNOWN TOF", o.TimeInForce)
 	}
 
-	ord.Price = &types.DoubleValue{Value: o.OrigPrice}
+	ord.Price = &wrapperspb.DoubleValue{Value: o.OrigPrice}
 	return ord
 }
 
@@ -95,23 +95,23 @@ func orderToModel(o *fbinance.OrderData) *models.Order {
 		OrderID:       fmt.Sprintf("%d", o.OrderID),
 		ClientOrderID: o.ClientOrderID,
 		Instrument: &models.Instrument{
-			Exchange: &constants.FBINANCE,
-			Symbol:   &types.StringValue{Value: o.Symbol},
+			Exchange: constants.FBINANCE,
+			Symbol:   &wrapperspb.StringValue{Value: o.Symbol},
 		},
 		LeavesQuantity: o.OriginalQuantity - o.ExecutedQuantity, // TODO check
 		CumQuantity:    o.CumQuantity,
 	}
 	if o.ReduceOnly {
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ReduceOnly)
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
 	}
 
 	switch o.Status {
 	case fbinance.NEW_ORDER:
-		ord.OrderStatus = models.New
+		ord.OrderStatus = models.OrderStatus_New
 	case fbinance.CANCELED_ORDER:
-		ord.OrderStatus = models.Canceled
+		ord.OrderStatus = models.OrderStatus_Canceled
 	case fbinance.PARTIALLY_FILLED:
-		ord.OrderStatus = models.PartiallyFilled
+		ord.OrderStatus = models.OrderStatus_PartiallyFilled
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", o.Status)
 	}
@@ -132,63 +132,63 @@ func orderToModel(o *fbinance.OrderData) *models.Order {
 
 	switch o.Type {
 	case fbinance.LIMIT_ORDER:
-		ord.OrderType = models.Limit
+		ord.OrderType = models.OrderType_Limit
 	case fbinance.MARKET_ORDER:
-		ord.OrderType = models.Market
+		ord.OrderType = models.OrderType_Market
 	case fbinance.STOP_LOSS_ORDER:
-		ord.OrderType = models.Stop
+		ord.OrderType = models.OrderType_Stop
 	case fbinance.STOP_LOSS_LIMIT_ORDER:
-		ord.OrderType = models.StopLimit
+		ord.OrderType = models.OrderType_StopLimit
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", o.Type)
 	}
 
 	switch o.Side {
 	case fbinance.BUY_ORDER:
-		ord.Side = models.Buy
+		ord.Side = models.Side_Buy
 	case fbinance.SELL_ODER:
-		ord.Side = models.Sell
+		ord.Side = models.Side_Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", o.Side)
 	}
 
 	switch o.TimeInForce {
 	case fbinance.GOOD_TILL_CANCEL:
-		ord.TimeInForce = models.GoodTillCancel
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
 	case fbinance.FILL_OR_KILL:
-		ord.TimeInForce = models.FillOrKill
+		ord.TimeInForce = models.TimeInForce_FillOrKill
 	case fbinance.IMMEDIATE_OR_CANCEL:
-		ord.TimeInForce = models.ImmediateOrCancel
+		ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
 	case fbinance.GOOD_TILL_CROSSING:
-		ord.TimeInForce = models.GoodTillCancel
-		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ParticipateDoNotInitiate)
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ParticipateDoNotInitiate)
 	default:
 		fmt.Println("UNKNOWN TOF", o.TimeInForce)
 	}
 
-	ord.Price = &types.DoubleValue{Value: o.Price}
+	ord.Price = &wrapperspb.DoubleValue{Value: o.Price}
 	return ord
 }
 
 func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (fbinance.NewOrderRequest, *messages.RejectionReason) {
 	var side fbinance.OrderSide
 	var typ fbinance.OrderType
-	if order.OrderSide == models.Buy {
+	if order.OrderSide == models.Side_Buy {
 		side = fbinance.BUY_ORDER
 	} else {
 		side = fbinance.SELL_ODER
 	}
 	switch order.OrderType {
-	case models.Limit:
+	case models.OrderType_Limit:
 		typ = fbinance.LIMIT_ORDER
-	case models.Market:
+	case models.OrderType_Market:
 		typ = fbinance.MARKET_ORDER
-	case models.Stop:
+	case models.OrderType_Stop:
 		typ = fbinance.STOP_LOSS_ORDER
-	case models.StopLimit:
+	case models.OrderType_StopLimit:
 		typ = fbinance.STOP_LOSS_LIMIT_ORDER
 	default:
-		rej := messages.UnsupportedOrderType
+		rej := messages.RejectionReason_UnsupportedOrderType
 		return nil, &rej
 	}
 
@@ -198,18 +198,18 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	request.SetQuantity(order.Quantity, lotPrecision)
 	request.SetNewClientOrderID(order.ClientOrderID)
 
-	if order.OrderType != models.Market {
+	if order.OrderType != models.OrderType_Market {
 		switch order.TimeInForce {
-		case models.Session:
+		case models.TimeInForce_Session:
 			request.SetTimeInForce(fbinance.GOOD_TILL_CANCEL)
-		case models.GoodTillCancel:
+		case models.TimeInForce_GoodTillCancel:
 			request.SetTimeInForce(fbinance.GOOD_TILL_CANCEL)
-		case models.ImmediateOrCancel:
+		case models.TimeInForce_ImmediateOrCancel:
 			request.SetTimeInForce(fbinance.IMMEDIATE_OR_CANCEL)
-		case models.FillOrKill:
+		case models.TimeInForce_FillOrKill:
 			request.SetTimeInForce(fbinance.FILL_OR_KILL)
 		default:
-			rej := messages.UnsupportedOrderTimeInForce
+			rej := messages.RejectionReason_UnsupportedOrderTimeInForce
 			return nil, &rej
 		}
 	}
@@ -219,13 +219,13 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	}
 
 	for _, exec := range order.ExecutionInstructions {
-		rej := messages.UnsupportedOrderCharacteristic
+		rej := messages.RejectionReason_UnsupportedOrderCharacteristic
 		switch exec {
-		case models.ReduceOnly:
+		case models.ExecutionInstruction_ReduceOnly:
 			if err := request.SetReduceOnly(true); err != nil {
 				return nil, &rej
 			}
-		case models.ParticipateDoNotInitiate:
+		case models.ExecutionInstruction_ParticipateDoNotInitiate:
 			request.SetTimeInForce(fbinance.GOOD_TILL_CROSSING)
 		default:
 			return nil, &rej

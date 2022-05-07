@@ -5,8 +5,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
@@ -277,7 +277,7 @@ func (state *BaseExecutor) OnHistoricalOpenInterestsRequest(context actor.Contex
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -288,7 +288,7 @@ func (state *BaseExecutor) OnHistoricalFundingRatesRequest(context actor.Context
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -299,7 +299,7 @@ func (state *BaseExecutor) OnHistoricalLiquidationsRequest(context actor.Context
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -310,7 +310,7 @@ func (state *BaseExecutor) OnMarketStatisticsRequest(context actor.Context) erro
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -321,7 +321,7 @@ func (state *BaseExecutor) OnMarketDataRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -332,7 +332,7 @@ func (state *BaseExecutor) OnAccountMovementRequest(context actor.Context) error
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -343,7 +343,7 @@ func (state *BaseExecutor) OnTradeCaptureReportRequest(context actor.Context) er
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -354,7 +354,7 @@ func (state *BaseExecutor) OnOrderStatusRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -365,7 +365,7 @@ func (state *BaseExecutor) OnPositionsRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -376,7 +376,7 @@ func (state *BaseExecutor) OnBalancesRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -387,7 +387,7 @@ func (state *BaseExecutor) OnNewOrderSingleRequest(context actor.Context) error 
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -398,7 +398,7 @@ func (state *BaseExecutor) OnNewOrderBulkRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -409,7 +409,7 @@ func (state *BaseExecutor) OnOrderReplaceRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -420,7 +420,7 @@ func (state *BaseExecutor) OnOrderBulkReplaceRequest(context actor.Context) erro
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -431,7 +431,7 @@ func (state *BaseExecutor) OnOrderCancelRequest(context actor.Context) error {
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -442,7 +442,7 @@ func (state *BaseExecutor) OnOrderMassCancelRequest(context actor.Context) error
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -453,7 +453,7 @@ func (state *BaseExecutor) OnHistoricalUnipoolV3DataRequest(context actor.Contex
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -464,7 +464,7 @@ func (state *BaseExecutor) OnHistoricalSalesRequest(context actor.Context) error
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

@@ -1,7 +1,8 @@
 syntax = "proto3";
 package models;
+option go_package = "gitlab.com/alphaticks/alpha-connect/models";
 
-import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "gitlab.com/alphaticks/xchanger/models/xchanger.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/timestamp.proto";
 

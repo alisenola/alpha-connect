@@ -3,8 +3,8 @@ package bithumb
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -138,7 +138,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	var securities []*models.Security
 	for k := range tickers.Tickers {
 		baseStr := strings.ToUpper(k)
-		quoteCurrency := &constants.SOUTH_KOREAN_WON
+		quoteCurrency := constants.SOUTH_KOREAN_WON
 
 		baseCurrency, ok := constants.GetAssetBySymbol(baseStr)
 		if !ok {
@@ -150,8 +150,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.Format(bithumb.SYMBOL_FORMAT)
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.BITHUMB
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.BITHUMB
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.IsInverse = false

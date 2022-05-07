@@ -13,19 +13,13 @@ PROTO_FILES := $(shell find . \( -path "./languages" -o -path "./specification" 
 PROTO_GEN_FILES = $(patsubst %.proto, %.pb.go, $(PROTO_FILES))
 
 # Protobuf generator
-PROTO_MAKER := protoc --gogoslick_out=Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,$\
-Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,$\
-Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types,$\
-Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,$\
-Mgoogle/protobuf/wrappers.proto=github.com/gogo/protobuf/types,$\
-plugins=grpc:.
+PROTO_MAKER := protoc --go_out=. --go_opt=paths=source_relative
 
 
 protogen: $(PROTO_GEN_FILES)
 
 %.pb.go: %.proto
 	cd $(dir $<); $(PROTO_MAKER) --proto_path=. --proto_path=$(GOPATH)/include ./*.proto
-	sed -i '' -En -e '/^package [[:alpha:]]+/,$$p' $@
 
 # }}} Protobuf end
 

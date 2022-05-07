@@ -1,8 +1,8 @@
 package coinbasepro
 
 import (
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/exchanges"
@@ -66,7 +66,7 @@ func (state *FixExecutor) OnMarketStatisticsRequest(context actor.Context) error
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

@@ -4,9 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
@@ -276,13 +276,13 @@ func (state *ListenerL2) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MicroToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -370,7 +370,7 @@ func (state *ListenerL2) onWebsocketMessage(context actor.Context) error {
 
 		state.instrumentData.aggTrade.Trades = append(
 			state.instrumentData.aggTrade.Trades,
-			models.Trade{
+			&models.Trade{
 				Price:    tradeData.Price,
 				Quantity: tradeData.Amount,
 				ID:       tradeData.ID,

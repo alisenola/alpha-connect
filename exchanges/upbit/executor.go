@@ -3,8 +3,8 @@ package upbit
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -148,8 +148,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Market
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.UPBIT
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.UPBIT
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.IsInverse = false
@@ -183,7 +183,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	context.Respond(&messages.HistoricalLiquidationsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -193,7 +193,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

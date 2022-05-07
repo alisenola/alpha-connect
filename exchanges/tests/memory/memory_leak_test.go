@@ -2,7 +2,7 @@ package memory
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -19,7 +19,7 @@ import (
 
 func TestMemoryLeak(t *testing.T) {
 
-	exch := &constants.COINBASEPRO
+	exch := constants.COINBASEPRO
 	as, ex, cancel := tests.StartExecutor(t, exch, nil)
 	defer cancel()
 
@@ -78,7 +78,7 @@ func TestMemoryLeak(t *testing.T) {
 		RoundLot:          1e-04,
 		HasMaturityDate:   false,
 		IsInverse:         false,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 	}
 	//TODO Check if MDChecker replaced OBChecker
 	for i := 0; i < 10; i++ {

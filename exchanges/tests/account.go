@@ -2,11 +2,11 @@ package tests
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"testing"
 	"time"
@@ -106,7 +106,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
 		RequestID:   0,
 		Instrument:  tc.Instrument,
-		Aggregation: models.L2,
+		Aggregation: models.OrderBookAggregation_L2,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -165,8 +165,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if orderList.Success {
 		t.Fatalf("wasn't expecting success")
 	}
-	if orderList.RejectionReason != messages.InvalidAccount {
-		t.Fatalf("was expecting %s, got %s", messages.InvalidAccount.String(), orderList.RejectionReason.String())
+	if orderList.RejectionReason != messages.RejectionReason_InvalidAccount {
+		t.Fatalf("was expecting %s, got %s", messages.RejectionReason_InvalidAccount.String(), orderList.RejectionReason.String())
 	}
 	if len(orderList.Orders) > 0 {
 		t.Fatalf("was expecting no order")
@@ -200,7 +200,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderID:       nil,
 			ClientOrderID: nil,
 			Instrument:    tc.Instrument,
-			OrderStatus:   &messages.OrderStatusValue{Value: models.New},
+			OrderStatus:   &messages.OrderStatusValue{Value: models.OrderStatus_New},
 		},
 	}, 10*time.Second).Result()
 
@@ -227,11 +227,11 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.GoodTillCancel,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_GoodTillCancel,
 			Quantity:      0.001,
-			Price:         &types.DoubleValue{Value: 30000.},
+			Price:         &wrapperspb.DoubleValue{Value: 30000.},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -247,7 +247,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 	time.Sleep(3 * time.Second)
 	filter := &messages.OrderFilter{
-		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 		Instrument:  tc.Instrument,
 	}
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
@@ -275,7 +275,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting 1 open order, got %d", len(orderList.Orders))
 	}
 	order := orderList.Orders[0]
-	if order.OrderStatus != models.New {
+	if order.OrderStatus != models.OrderStatus_New {
 		t.Fatalf("order status not new")
 	}
 	if int(order.LeavesQuantity*1000) != 1 {
@@ -284,13 +284,13 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if int(order.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
 	}
-	if order.OrderType != models.Limit {
+	if order.OrderType != models.OrderType_Limit {
 		t.Fatalf("was expecting limit order type")
 	}
-	if order.TimeInForce != models.GoodTillCancel {
+	if order.TimeInForce != models.TimeInForce_GoodTillCancel {
 		t.Fatalf("was expecting GoodTillCancel time in force")
 	}
-	if order.Side != models.Buy {
+	if order.Side != models.Side_Buy {
 		t.Fatalf("was expecting buy side order")
 	}
 
@@ -298,7 +298,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		RequestID:  0,
 		Account:    tc.Account,
 		Instrument: tc.Instrument,
-		OrderID:    &types.StringValue{Value: order.OrderID},
+		OrderID:    &wrapperspb.StringValue{Value: order.OrderID},
 	}, 10*time.Second).Result()
 
 	if err != nil {
@@ -320,7 +320,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			OrderID:    &types.StringValue{Value: order.OrderID},
+			OrderID:    &wrapperspb.StringValue{Value: order.OrderID},
 			Instrument: tc.Instrument,
 		},
 	}, 10*time.Second).Result()
@@ -340,7 +340,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting 1 order, got %d", len(orderList.Orders))
 	}
 	order = orderList.Orders[0]
-	if order.OrderStatus != models.Canceled {
+	if order.OrderStatus != models.OrderStatus_Canceled {
 		t.Fatalf("order status not Canceled, but %s", order.OrderStatus)
 	}
 	if int(order.LeavesQuantity) != 0 {
@@ -371,8 +371,8 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if response.Success {
 		t.Fatalf("was expecting unsucessful request")
 	}
-	if response.RejectionReason != messages.InvalidAccount {
-		t.Fatalf("was expecting %s got %s", messages.InvalidAccount.String(), response.RejectionReason.String())
+	if response.RejectionReason != messages.RejectionReason_InvalidAccount {
+		t.Fatalf("was expecting %s got %s", messages.RejectionReason_InvalidAccount.String(), response.RejectionReason.String())
 	}
 
 	// Test no orders
@@ -400,19 +400,19 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 30000.},
+			Price:         &wrapperspb.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      1.,
-			Price:         &types.DoubleValue{Value: 30000.},
+			Price:         &wrapperspb.DoubleValue{Value: 30000.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -426,8 +426,8 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if response.Success {
 		t.Fatalf("was expecting unsuccessful")
 	}
-	if response.RejectionReason != messages.DifferentSymbols {
-		t.Fatalf("was expecting %s, got %s", messages.DifferentSymbols.String(), response.RejectionReason.String())
+	if response.RejectionReason != messages.RejectionReason_DifferentSymbols {
+		t.Fatalf("was expecting %s, got %s", messages.RejectionReason_DifferentSymbols.String(), response.RejectionReason.String())
 	}
 
 	order1ClID := uuid.NewV1().String()
@@ -439,19 +439,19 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      2,
-			Price:         &types.DoubleValue{Value: 30000.},
+			Price:         &wrapperspb.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: order2ClID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 30010.},
+			Price:         &wrapperspb.DoubleValue{Value: 30010.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -473,7 +473,7 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &types.StringValue{Value: order1ClID},
+			ClientOrderID: &wrapperspb.StringValue{Value: order1ClID},
 			Instrument:    tc.Instrument,
 		},
 	}, 10*time.Second).Result()
@@ -493,7 +493,7 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting 1 order, got %d", len(orderList.Orders))
 	}
 	order1 := orderList.Orders[0]
-	if order1.OrderStatus != models.New {
+	if order1.OrderStatus != models.OrderStatus_New {
 		t.Fatalf("order status not new %s", order1.OrderStatus.String())
 	}
 	if int(order1.LeavesQuantity) != 2 {
@@ -502,13 +502,13 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if int(order1.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
 	}
-	if order1.OrderType != models.Limit {
+	if order1.OrderType != models.OrderType_Limit {
 		t.Fatalf("was expecting limit order type")
 	}
-	if order1.TimeInForce != models.Session {
+	if order1.TimeInForce != models.TimeInForce_Session {
 		t.Fatalf("was expecting session time in force")
 	}
-	if order1.Side != models.Buy {
+	if order1.Side != models.Side_Buy {
 		t.Fatalf("was expecting buy side order")
 	}
 
@@ -518,7 +518,7 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &types.StringValue{Value: order2ClID},
+			ClientOrderID: &wrapperspb.StringValue{Value: order2ClID},
 			Instrument:    tc.Instrument,
 		},
 	}, 10*time.Second).Result()
@@ -538,7 +538,7 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("was expecting 1 order, got %d", len(orderList.Orders))
 	}
 	order2 := orderList.Orders[0]
-	if order2.OrderStatus != models.New {
+	if order2.OrderStatus != models.OrderStatus_New {
 		t.Fatalf("order status not new")
 	}
 	if int(order2.LeavesQuantity) != 1 {
@@ -547,13 +547,13 @@ func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if int(order2.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
 	}
-	if order2.OrderType != models.Limit {
+	if order2.OrderType != models.OrderType_Limit {
 		t.Fatalf("was expecting limit order type")
 	}
-	if order2.TimeInForce != models.Session {
+	if order2.TimeInForce != models.TimeInForce_Session {
 		t.Fatalf("was expecting session time in force")
 	}
-	if order2.Side != models.Buy {
+	if order2.Side != models.Side_Buy {
 		t.Fatalf("was expecting buy side order")
 	}
 
@@ -586,9 +586,9 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			Price:         &types.DoubleValue{Value: 80000},
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			Price:         &wrapperspb.DoubleValue{Value: 80000},
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -612,11 +612,11 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID:         uuid.NewV1().String(),
 			Instrument:            tc.Instrument,
-			OrderType:             models.Limit,
-			OrderSide:             models.Sell,
-			Price:                 &types.DoubleValue{Value: 32000},
+			OrderType:             models.OrderType_Limit,
+			OrderSide:             models.Side_Sell,
+			Price:                 &wrapperspb.DoubleValue{Value: 32000},
 			Quantity:              0.001,
-			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -636,9 +636,9 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Sell,
-			Price:         &types.DoubleValue{Value: 32000},
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Sell,
+			Price:         &wrapperspb.DoubleValue{Value: 32000},
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -663,11 +663,11 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID:         orderID,
 			Instrument:            tc.Instrument,
-			OrderType:             models.Limit,
-			OrderSide:             models.Buy,
-			Price:                 &types.DoubleValue{Value: 80000},
+			OrderType:             models.OrderType_Limit,
+			OrderSide:             models.Side_Buy,
+			Price:                 &wrapperspb.DoubleValue{Value: 80000},
 			Quantity:              0.001,
-			ExecutionInstructions: []models.ExecutionInstruction{models.ReduceOnly},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ReduceOnly},
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -689,11 +689,11 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
-			Price:         &types.DoubleValue{Value: 35000.},
+			Price:         &wrapperspb.DoubleValue{Value: 35000.},
 		},
 	}, 10*time.Second).Result()
 
@@ -717,8 +717,8 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Instrument: tc.Instrument,
 		Update: &messages.OrderUpdate{
 			OrderID:           nil,
-			OrigClientOrderID: &types.StringValue{Value: orderID},
-			Quantity:          &types.DoubleValue{Value: 0.002},
+			OrigClientOrderID: &wrapperspb.StringValue{Value: orderID},
+			Quantity:          &wrapperspb.DoubleValue{Value: 0.002},
 			Price:             nil,
 		},
 	}, 10*time.Second).Result()
@@ -741,7 +741,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &types.StringValue{Value: orderID},
+			ClientOrderID: &wrapperspb.StringValue{Value: orderID},
 		},
 	}, 10*time.Second).Result()
 
@@ -773,19 +773,19 @@ func OrderBulkReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Orders: []*messages.NewOrder{{
 			ClientOrderID: order1ClID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 30000.},
+			Price:         &wrapperspb.DoubleValue{Value: 30000.},
 		}, {
 			ClientOrderID: order2ClID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Limit,
-			OrderSide:     models.Buy,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Limit,
+			OrderSide:     models.Side_Buy,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      1,
-			Price:         &types.DoubleValue{Value: 30010.},
+			Price:         &wrapperspb.DoubleValue{Value: 30010.},
 		}},
 	}, 10*time.Second).Result()
 
@@ -809,13 +809,13 @@ func OrderBulkReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Updates: []*messages.OrderUpdate{
 			{
 				OrderID:           nil,
-				OrigClientOrderID: &types.StringValue{Value: order1ClID},
-				Quantity:          &types.DoubleValue{Value: 2},
+				OrigClientOrderID: &wrapperspb.StringValue{Value: order1ClID},
+				Quantity:          &wrapperspb.DoubleValue{Value: 2},
 				Price:             nil,
 			}, {
 				OrderID:           nil,
-				OrigClientOrderID: &types.StringValue{Value: order2ClID},
-				Quantity:          &types.DoubleValue{Value: 2},
+				OrigClientOrderID: &wrapperspb.StringValue{Value: order2ClID},
+				Quantity:          &wrapperspb.DoubleValue{Value: 2},
 				Price:             nil,
 			},
 		},
@@ -840,7 +840,7 @@ func OrderBulkReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &types.StringValue{Value: order1ClID},
+			ClientOrderID: &wrapperspb.StringValue{Value: order1ClID},
 		},
 	}, 10*time.Second).Result()
 
@@ -868,7 +868,7 @@ func OrderBulkReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &types.StringValue{Value: order2ClID},
+			ClientOrderID: &wrapperspb.StringValue{Value: order2ClID},
 		},
 	}, 10*time.Second).Result()
 
@@ -899,8 +899,8 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: orderID,
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Buy,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Buy,
 			Quantity:      0.005,
 		},
 	}, 10*time.Second).Result()
@@ -925,9 +925,9 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Sell,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -946,9 +946,9 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Sell,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -965,9 +965,9 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Sell,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -984,9 +984,9 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Sell,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -1003,9 +1003,9 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Order: &messages.NewOrder{
 			ClientOrderID: uuid.NewV1().String(),
 			Instrument:    tc.Instrument,
-			OrderType:     models.Market,
-			OrderSide:     models.Sell,
-			TimeInForce:   models.Session,
+			OrderType:     models.OrderType_Market,
+			OrderSide:     models.Side_Sell,
+			TimeInForce:   models.TimeInForce_Session,
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -1027,11 +1027,11 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Order: &messages.NewOrder{
 				ClientOrderID: id[i],
 				Instrument:    tc.Instrument,
-				OrderType:     models.Limit,
-				OrderSide:     models.Buy,
-				TimeInForce:   models.GoodTillCancel,
+				OrderType:     models.OrderType_Limit,
+				OrderSide:     models.Side_Buy,
+				TimeInForce:   models.TimeInForce_GoodTillCancel,
 				Quantity:      0.001 * float64(1+i),
-				Price:         &types.DoubleValue{Value: 30000.},
+				Price:         &wrapperspb.DoubleValue{Value: 30000.},
 			},
 		}, 10*time.Second).Result()
 		if err != nil {
@@ -1049,7 +1049,7 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	time.Sleep(30 * time.Second)
 	filter := &messages.OrderFilter{
 		Instrument:  tc.Instrument,
-		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 	//Cancel all the orders
@@ -1073,7 +1073,7 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	time.Sleep(20 * time.Second)
 	filter = &messages.OrderFilter{
 		Instrument:  tc.Instrument,
-		OrderStatus: &messages.OrderStatusValue{Value: models.New},
+		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 	// Fetch all orders
@@ -1081,7 +1081,7 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
 			Account: tc.Account,
 			Filter: &messages.OrderFilter{
-				ClientOrderID: &types.StringValue{Value: id[i]},
+				ClientOrderID: &wrapperspb.StringValue{Value: id[i]},
 			},
 		}, 10*time.Second).Result()
 		if err != nil {

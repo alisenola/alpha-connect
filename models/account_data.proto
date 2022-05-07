@@ -1,7 +1,9 @@
 syntax = "proto3";
 package models;
 
-import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+option go_package = "gitlab.com/alphaticks/alpha-connect/models";
+
+import "gitlab.com/alphaticks/xchanger/models/xchanger.proto";
 
 message Account {
     string name = 1;

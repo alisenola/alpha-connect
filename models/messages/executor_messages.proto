@@ -1,17 +1,19 @@
 syntax = "proto3";
 package messages;
 
+option go_package = "gitlab.com/alphaticks/alpha-connect/models/messages";
+
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
-import "gitlab.com/alphaticks/xchanger/models/protos.proto";
+import "gitlab.com/alphaticks/xchanger/models/xchanger.proto";
 
 import "gitlab.com/alphaticks/alpha-connect/models/market_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/security_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/account_data.proto";
 import "gitlab.com/alphaticks/alpha-connect/models/asset_data.proto";
 
-import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
+import "github.com/asynkron/protoactor-go/actor/actor.proto";
 
 enum ExecutionType {
     New = 0;

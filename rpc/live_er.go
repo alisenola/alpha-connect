@@ -3,13 +3,9 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/pkg/errors"
+	"github.com/asynkron/protoactor-go/actor"
 	_ "gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-grpc"
-	"gitlab.com/alphaticks/tickstore/actors/messages/remote/query"
-	"gitlab.com/alphaticks/tickstore/actors/messages/remote/store"
-	"io"
 	"log"
 	"time"
 )
@@ -58,71 +54,76 @@ func (s *LiveER) Write(stream tickstore_grpc.Store_WriteServer) error {
 }
 
 func (s *LiveER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_grpc.Store_QueryServer) error {
-
-	// TODO more checks, prevent too big batch size, etc..
-	if qr.BatchSize == 0 || qr.Timeout == 0 {
-		return fmt.Errorf("batch size or time out unspecified")
-	}
-
-	done := false
-	go func() {
-		<-stream.Context().Done()
-		done = true
-	}()
-
-	res, err := s.ctx.RequestFuture(s.store, &store.GetQueryReaderRequest{
-		Query:     qr,
-		RequestID: 0,
-	}, 30*time.Second).Result()
-	if err != nil {
-		return fmt.Errorf("unable to get reader: %v", err)
-	}
-	msg := res.(*store.GetQueryReaderResponse)
-	if msg.Error != "" {
-		return errors.New(msg.Error)
-	}
-	queryReader := msg.Reader
-	defer func() {
-		// stop the query
-		s.ctx.Send(
-			queryReader,
-			&query.CloseQueryReader{})
-	}()
-
-	for {
-		res, err := s.ctx.RequestFuture(
-			queryReader,
-			&query.ReadQueryEventBatchRequest{
-				RequestID: 0,
-				Timeout:   qr.Timeout,
-				BatchSize: qr.BatchSize,
-			},
-			500*time.Second).Result()
-		if err != nil {
-			return fmt.Errorf("error reading batch from actor: %v", err)
-		}
-		msg := res.(*query.ReadQueryEventBatchResponse)
-		// we can have an error on msg but with still some events in the batch
-		// or it can be an empty batch in case of streaming
-		if msg.Batch != nil && !done {
-			if err := stream.Send(msg.Batch); err != nil {
-				return fmt.Errorf("error sending batch: %v", err)
-			}
-		}
-
-		if msg.Error != "" {
-			if msg.Error == io.EOF.Error() {
-				return nil
-			} else {
-				return errors.New(msg.Error)
-			}
-		}
-
-		// if context is done, stop
-		if done {
-			break
-		}
-	}
-
 	return nil
+
+	/*
+		// TODO more checks, prevent too big batch size, etc..
+		if qr.BatchSize == 0 || qr.Timeout == 0 {
+			return fmt.Errorf("batch size or time out unspecified")
+		}
+
+		done := false
+		go func() {
+			<-stream.Context().Done()
+			done = true
+		}()
+
+
+		res, err := s.ctx.RequestFuture(s.store, &store.GetQueryReaderRequest{
+			Query:     qr,
+			RequestID: 0,
+		}, 30*time.Second).Result()
+		if err != nil {
+			return fmt.Errorf("unable to get reader: %v", err)
+		}
+		msg := res.(*store.GetQueryReaderResponse)
+		if msg.Error != "" {
+			return errors.New(msg.Error)
+		}
+		queryReader := msg.Reader
+		defer func() {
+			// stop the query
+			s.ctx.Send(
+				queryReader,
+				&query.CloseQueryReader{})
+		}()
+
+		for {
+			res, err := s.ctx.RequestFuture(
+				queryReader,
+				&query.ReadQueryEventBatchRequest{
+					RequestID: 0,
+					Timeout:   qr.Timeout,
+					BatchSize: qr.BatchSize,
+				},
+				500*time.Second).Result()
+			if err != nil {
+				return fmt.Errorf("error reading batch from actor: %v", err)
+			}
+			msg := res.(*query.ReadQueryEventBatchResponse)
+			// we can have an error on msg but with still some events in the batch
+			// or it can be an empty batch in case of streaming
+			if msg.Batch != nil && !done {
+				if err := stream.Send(msg.Batch); err != nil {
+					return fmt.Errorf("error sending batch: %v", err)
+				}
+			}
+
+			if msg.Error != "" {
+				if msg.Error == io.EOF.Error() {
+					return nil
+				} else {
+					return errors.New(msg.Error)
+				}
+			}
+
+			// if context is done, stop
+			if done {
+				break
+			}
+		}
+
+		return nil
+
+	*/
 }

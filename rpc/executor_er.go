@@ -4,7 +4,7 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"log"
 	"reflect"

@@ -1,104 +1,104 @@
 package account
 
 import (
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"testing"
 )
 
 var bitstampAccount = &models.Account{
 	Name:     "1",
-	Exchange: &constants.BITSTAMP,
+	Exchange: constants.BITSTAMP,
 }
 
 var bitmexAccount = &models.Account{
 	Name:     "1",
-	Exchange: &constants.BITMEX,
+	Exchange: constants.BITMEX,
 }
 
 var fbinanceAccount = &models.Account{
 	Name:     "1",
-	Exchange: &constants.FBINANCE,
+	Exchange: constants.FBINANCE,
 }
 
 var BTCUSD_PERP_SEC = &models.Security{
 	SecurityID:        9999999,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          &constants.BITMEX,
+	Exchange:          constants.BITMEX,
 	Symbol:            "XBTUSD",
-	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
-	RoundLot:          &types.DoubleValue{Value: 1},
-	Underlying:        &constants.BITCOIN,
-	QuoteCurrency:     &constants.DOLLAR,
+	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+	Underlying:        constants.BITCOIN,
+	QuoteCurrency:     constants.DOLLAR,
 	IsInverse:         true,
-	MakerFee:          &types.DoubleValue{Value: -0.00025},
-	TakerFee:          &types.DoubleValue{Value: 0.00075},
-	Multiplier:        &types.DoubleValue{Value: -1.},
+	MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
+	TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
+	Multiplier:        &wrapperspb.DoubleValue{Value: -1.},
 	MaturityDate:      nil,
 }
 
 var BTCUSDT_PERP_SEC = &models.Security{
 	SecurityID:        7744455,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          &constants.FBINANCE,
+	Exchange:          constants.FBINANCE,
 	Symbol:            "BTCUSDT",
-	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
-	RoundLot:          &types.DoubleValue{Value: 1},
-	Underlying:        &constants.BITCOIN,
-	QuoteCurrency:     &constants.TETHER,
+	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+	Underlying:        constants.BITCOIN,
+	QuoteCurrency:     constants.TETHER,
 	IsInverse:         false,
-	MakerFee:          &types.DoubleValue{Value: 0.0002},
-	TakerFee:          &types.DoubleValue{Value: 0.0004},
-	Multiplier:        &types.DoubleValue{Value: 1.},
+	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0002},
+	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0004},
+	Multiplier:        &wrapperspb.DoubleValue{Value: 1.},
 	MaturityDate:      nil,
 }
 
 var ETHUSD_PERP_SEC = &models.Security{
 	SecurityID:        8888888,
 	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          &constants.BITMEX,
+	Exchange:          constants.BITMEX,
 	Symbol:            "ETHUSD",
-	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
-	RoundLot:          &types.DoubleValue{Value: 1},
-	Underlying:        &constants.ETHEREUM,
-	QuoteCurrency:     &constants.DOLLAR,
+	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+	Underlying:        constants.ETHEREUM,
+	QuoteCurrency:     constants.DOLLAR,
 	IsInverse:         false,
-	MakerFee:          &types.DoubleValue{Value: -0.00025},
-	TakerFee:          &types.DoubleValue{Value: 0.00075},
-	Multiplier:        &types.DoubleValue{Value: 0.000001},
+	MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
+	TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
+	Multiplier:        &wrapperspb.DoubleValue{Value: 0.000001},
 	MaturityDate:      nil,
 }
 
 var BTCUSD_SPOT_SEC = &models.Security{
 	SecurityID:        7777777,
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-	Exchange:          &constants.BITSTAMP,
+	Exchange:          constants.BITSTAMP,
 	Symbol:            "BTCUSD",
-	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
-	RoundLot:          &types.DoubleValue{Value: 0.0001},
-	Underlying:        &constants.BITCOIN,
-	QuoteCurrency:     &constants.DOLLAR,
+	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+	RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
+	Underlying:        constants.BITCOIN,
+	QuoteCurrency:     constants.DOLLAR,
 	IsInverse:         false,
-	MakerFee:          &types.DoubleValue{Value: 0.0025},
-	TakerFee:          &types.DoubleValue{Value: 0.0025},
+	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
 	MaturityDate:      nil,
 }
 
 var ETHUSD_SPOT_SEC = &models.Security{
 	SecurityID:        6666666,
 	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-	Exchange:          &constants.BITSTAMP,
+	Exchange:          constants.BITSTAMP,
 	Symbol:            "ETHUSD",
-	MinPriceIncrement: &types.DoubleValue{Value: 0.05},
-	RoundLot:          &types.DoubleValue{Value: 0.0001},
-	Underlying:        &constants.ETHEREUM,
-	QuoteCurrency:     &constants.DOLLAR,
+	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+	RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
+	Underlying:        constants.ETHEREUM,
+	QuoteCurrency:     constants.DOLLAR,
 	IsInverse:         false,
-	MakerFee:          &types.DoubleValue{Value: 0.0025},
-	TakerFee:          &types.DoubleValue{Value: 0.0025},
+	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
 	MaturityDate:      nil,
 }
 
@@ -117,17 +117,17 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -142,17 +142,17 @@ func TestAccount_ConfirmFill(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -221,17 +221,17 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -246,17 +246,17 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -328,17 +328,17 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 2.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 20000.},
+		Price:          &wrapperspb.DoubleValue{Value: 20000.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -353,17 +353,17 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -445,17 +445,17 @@ func TestAccount_Compare(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -465,17 +465,17 @@ func TestAccount_Compare(t *testing.T) {
 		OrderID:       "buy",
 		ClientOrderID: "buy",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -504,17 +504,17 @@ func TestAccount_Compare(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -524,17 +524,17 @@ func TestAccount_Compare(t *testing.T) {
 		OrderID:       "sell",
 		ClientOrderID: "sell",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10.,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 10.},
+		Price:          &wrapperspb.DoubleValue{Value: 10.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())

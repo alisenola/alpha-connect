@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/models"
@@ -117,9 +117,9 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
 	}
-	assets := make(map[uint32]models.Asset)
+	assets := make(map[uint32]*models.Asset)
 	for _, a := range res.Assets {
-		assets[a.AssetId] = models.Asset{
+		assets[a.AssetId] = &models.Asset{
 			Symbol: a.Symbol,
 			Name:   a.Name,
 			ID:     a.AssetId,
@@ -133,9 +133,9 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
 	}
-	protocols := make(map[uint32]models.Protocol)
+	protocols := make(map[uint32]*models.Protocol)
 	for _, p := range resp.Protocols {
-		protocols[p.ProtocolId] = models.Protocol{
+		protocols[p.ProtocolId] = &models.Protocol{
 			ID:   p.ProtocolId,
 			Name: p.Name,
 		}
@@ -148,9 +148,9 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error fetching assets: %v", err)
 	}
-	chains := make(map[uint32]models.Chain)
+	chains := make(map[uint32]*models.Chain)
 	for _, c := range resc.Chains {
-		chains[c.ChainId] = models.Chain{
+		chains[c.ChainId] = &models.Chain{
 			ID:   c.ChainId,
 			Type: c.Type,
 			Name: c.Name,

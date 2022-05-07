@@ -2,7 +2,7 @@ package data
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore-types/tickobjects"
@@ -16,7 +16,7 @@ import (
 func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *actor.PID, func()) {
 	exch := []*xchangerModels.Exchange{
 		exchange,
-		&constants.COINBASEPRO,
+		constants.COINBASEPRO,
 	}
 	as := actor.NewActorSystem()
 	cfg := exchanges.ExecutorConfig{
@@ -29,7 +29,7 @@ func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *acto
 }
 
 func TestLiveQuery(t *testing.T) {
-	as, executor, clean := StartExecutor(&constants.BINANCE)
+	as, executor, clean := StartExecutor(constants.BINANCE)
 	defer clean()
 	lt, err := NewLiveStore(as, executor)
 	if err != nil {

@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobil"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -178,22 +178,22 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.QuoteCurrency = quoteCurrency
 		switch symbol.ContractStatus {
 		case 0:
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		case 1:
-			security.Status = models.Trading
+			security.Status = models.InstrumentStatus_Trading
 		case 2:
-			security.Status = models.PreTrading
+			security.Status = models.InstrumentStatus_PreTrading
 		case 3:
-			security.Status = models.Break
+			security.Status = models.InstrumentStatus_Break
 		default:
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = &constants.HUOBIL
+		security.Exchange = constants.HUOBIL
 		security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceTick}
-		security.RoundLot = &types.DoubleValue{Value: 1}
-		security.Multiplier = &types.DoubleValue{Value: symbol.ContractSize}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: symbol.PriceTick}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1}
+		security.Multiplier = &wrapperspb.DoubleValue{Value: symbol.ContractSize}
 		securities = append(securities, &security)
 		state.Securities[security.SecurityID] = &security
 		state.SymbolToSec[security.Symbol] = &security
@@ -216,7 +216,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	}
 	sec := state.GetSecurity(msg.Instrument)
 	if sec == nil {
-		response.RejectionReason = messages.MissingInstrument
+		response.RejectionReason = messages.RejectionReason_MissingInstrument
 		context.Respond(response)
 		return nil
 	}
@@ -231,7 +231,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	}
 	for _, stat := range msg.Statistics {
 		switch stat {
-		case models.OpenInterest, models.FundingRate:
+		case models.StatType_OpenInterest, models.StatType_FundingRate:
 			if has(stat) {
 				continue
 			}
@@ -243,7 +243,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			qr := state.getQueryRunner()
 
 			if qr == nil {
-				response.RejectionReason = messages.RateLimitExceeded
+				response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 				context.Respond(response)
 				return nil
 			}
@@ -253,7 +253,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			res, err := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: req}, 10*time.Second).Result()
 			if err != nil {
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return nil
 			}
@@ -265,7 +265,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
 					state.logger.Info("http client error", log.Error(err))
-					response.RejectionReason = messages.HTTPError
+					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Respond(response)
 					return nil
 				} else if queryResponse.StatusCode >= 500 {
@@ -274,7 +274,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 						queryResponse.StatusCode,
 						string(queryResponse.Response))
 					state.logger.Info("http client error", log.Error(err))
-					response.RejectionReason = messages.HTTPError
+					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Respond(response)
 					return nil
 				}
@@ -285,20 +285,20 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			err = json.Unmarshal(queryResponse.Response, &ores)
 			if err != nil {
 				state.logger.Info("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return nil
 			}
 
 			if ores.Status != "ok" {
 				state.logger.Info("http error", log.Error(errors.New(ores.Status)))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return nil
 			}
 			response.Statistics = append(response.Statistics, &models.Stat{
 				Timestamp: utils.MilliToTimestamp(uint64(ores.Ts)),
-				StatType:  models.OpenInterest,
+				StatType:  models.StatType_OpenInterest,
 				Value:     ores.Data[0].Volume * sec.Multiplier.Value,
 			})
 		}

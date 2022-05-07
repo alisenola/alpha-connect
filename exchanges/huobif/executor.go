@@ -3,9 +3,8 @@ package huobif
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,8 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobif"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -148,30 +149,30 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		/*
 			0: Delisting,1: Listing,2: Pending Listing,3: Suspension,4: Suspending of Listing,5: In Settlement,6: Delivering,7: Settlement Completed,8: Delivered,9: Suspending of Trade
 		*/
-		quoteCurrency := &constants.DOLLAR
+		quoteCurrency := constants.DOLLAR
 		security := models.Security{}
 		security.Symbol = symbol.ContractCode
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
 		switch symbol.ContractStatus {
 		case 0:
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		case 1:
-			security.Status = models.Trading
+			security.Status = models.InstrumentStatus_Trading
 		case 2:
-			security.Status = models.PreTrading
+			security.Status = models.InstrumentStatus_PreTrading
 		case 3:
-			security.Status = models.Break
+			security.Status = models.InstrumentStatus_Break
 		default:
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = &constants.HUOBIF
+		security.Exchange = constants.HUOBIF
 		security.SecurityType = enum.SecurityType_CRYPTO_FUT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceTick}
-		security.RoundLot = &types.DoubleValue{Value: 1}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: symbol.PriceTick}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1}
 		security.IsInverse = true
-		security.Multiplier = &types.DoubleValue{Value: symbol.ContractSize}
+		security.Multiplier = &wrapperspb.DoubleValue{Value: symbol.ContractSize}
 
 		date, err := time.Parse("20060102", symbol.DeliveryDate)
 		if err != nil {
@@ -179,7 +180,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		// Note: deliver at 8 AM GMT
 		date = date.Add(8 * time.Hour)
-		security.MaturityDate, err = types.TimestampProto(date)
+		security.MaturityDate = timestamppb.New(date)
 		if err != nil {
 			return fmt.Errorf("error parsing delivery date %s: %v", symbol.DeliveryDate, err)
 		}

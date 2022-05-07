@@ -2,21 +2,21 @@ package data
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	pbtypes "github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore/parsing"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"sync"
 	"time"
 )
 
 type SecurityInfo struct {
 	securityID        uint64
-	minPriceIncrement *pbtypes.DoubleValue
-	roundLot          *pbtypes.DoubleValue
+	minPriceIncrement *wrapperspb.DoubleValue
+	roundLot          *wrapperspb.DoubleValue
 	tickPrecision     uint64
 	lotPrecision      uint64
 }
@@ -134,7 +134,7 @@ func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, er
 	// Place in map[securityID]Functor, use security ID as object ID
 	feeds := make(map[uint64]*Feed)
 	for _, s := range inputSecurities {
-		if s.Status != models.Trading {
+		if s.Status != models.InstrumentStatus_Trading {
 			continue
 		}
 		sec := lt.securities[s.SecurityID]

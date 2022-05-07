@@ -1,7 +1,6 @@
 package account
 
 import (
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -60,17 +59,17 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 90.},
+		Price:          &wrapperspb.DoubleValue{Value: 90.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -108,17 +107,17 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 10,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 90.},
+		Price:          &wrapperspb.DoubleValue{Value: 90.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -155,17 +154,17 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 100,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 90.},
+		Price:          &wrapperspb.DoubleValue{Value: 90.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -179,17 +178,17 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 		OrderID:       "sell1",
 		ClientOrderID: "sell1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: 100,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: 110.},
+		Price:          &wrapperspb.DoubleValue{Value: 110.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -222,12 +221,12 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	}
 	dollarBalance := &models.Balance{
 		Account:  "1",
-		Asset:    &constants.DOLLAR,
+		Asset:    constants.DOLLAR,
 		Quantity: 100,
 	}
 	ethereumBalance := &models.Balance{
 		Account:  "1",
-		Asset:    &constants.ETHEREUM,
+		Asset:    constants.ETHEREUM,
 		Quantity: 10,
 	}
 	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, nil, nil); err != nil {
@@ -253,17 +252,17 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_SPOT_SEC.SecurityID},
-			Exchange:   &constants.BITSTAMP,
-			Symbol:     &types.StringValue{Value: "BTCUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_SPOT_SEC.SecurityID},
+			Exchange:   constants.BITSTAMP,
+			Symbol:     &wrapperspb.StringValue{Value: "BTCUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -308,17 +307,17 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		OrderID:       "buy2",
 		ClientOrderID: "buy2",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_SPOT_SEC.SecurityID},
-			Exchange:   &constants.BITSTAMP,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_SPOT_SEC.SecurityID},
+			Exchange:   constants.BITSTAMP,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -381,17 +380,17 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -456,17 +455,17 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		OrderID:       "buy2",
 		ClientOrderID: "buy2",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -530,17 +529,17 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		OrderID:       "sell1",
 		ClientOrderID: "sell1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -604,17 +603,17 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		OrderID:       "sell2",
 		ClientOrderID: "sell2",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: ETHUSD_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -710,17 +709,17 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "XBTUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "XBTUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Buy,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Buy,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
@@ -787,17 +786,17 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 		OrderID:       "sell2",
 		ClientOrderID: "sell2",
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
-			Exchange:   &constants.BITMEX,
-			Symbol:     &types.StringValue{Value: "ETHUSD"},
+			SecurityID: &wrapperspb.UInt64Value{Value: BTCUSDT_PERP_SEC.SecurityID},
+			Exchange:   constants.BITMEX,
+			Symbol:     &wrapperspb.StringValue{Value: "ETHUSD"},
 		},
-		OrderStatus:    models.PendingNew,
-		OrderType:      models.Limit,
-		Side:           models.Sell,
-		TimeInForce:    models.Session,
+		OrderStatus:    models.OrderStatus_PendingNew,
+		OrderType:      models.OrderType_Limit,
+		Side:           models.Side_Sell,
+		TimeInForce:    models.TimeInForce_Session,
 		LeavesQuantity: o.Quantity,
 		CumQuantity:    0,
-		Price:          &types.DoubleValue{Value: o.Price},
+		Price:          &wrapperspb.DoubleValue{Value: o.Price},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())

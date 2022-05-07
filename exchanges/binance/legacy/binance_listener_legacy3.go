@@ -4,8 +4,8 @@ package legacy
 import (
 	"container/list"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"github.com/quickfixgo/enum"
 	fix50mdir "github.com/quickfixgo/fix50/marketdataincrementalrefresh"
 	fix50mdr "github.com/quickfixgo/fix50/marketdatarequest"

@@ -3,12 +3,12 @@ package v3_test
 import (
 	"context"
 	"fmt"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -20,7 +20,7 @@ import (
 )
 
 func TestPoolData(t *testing.T) {
-	as, executor, cleaner := tests.StartExecutor(t, &constants.UNISWAPV3, nil)
+	as, executor, cleaner := tests.StartExecutor(t, constants.UNISWAPV3, nil)
 	defer cleaner()
 
 	securityID := []uint64{
@@ -55,9 +55,9 @@ func TestPoolData(t *testing.T) {
 	res, err = as.Root.RequestFuture(executor, &messages.HistoricalUnipoolV3DataRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: sec.SecurityID},
+			SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 			Exchange:   sec.Exchange,
-			Symbol:     &types.StringValue{Value: sec.Symbol},
+			Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
 		},
 		Start: 12376729,
 		End:   12376729 + 2000,
@@ -90,25 +90,24 @@ func TestPoolData(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot := pool.GetSnapshot()
-	if query.Pool.Liquidity.Cmp(snapshot.Liquidity) != 0 {
+	liquidity := big.NewInt(0).SetBytes(snapshot.Liquidity[:])
+	if query.Pool.Liquidity.Cmp(liquidity) != 0 {
 		t.Fatalf(
 			"different liquidity: got %s for replay and %s for graph pool",
-			snapshot.Liquidity.String(),
+			liquidity.String(),
 			query.Pool.Liquidity.String(),
 		)
 	}
-	if query.Pool.SqrtPrice.Cmp(snapshot.SqrtPriceX96.Add(snapshot.SqrtPriceX96, big.NewInt(int64(delta)))) != 0 {
+	sqrtPriceX96 := big.NewInt(0).SetBytes(snapshot.SqrtPriceX96[:])
+	if query.Pool.SqrtPrice.Cmp(sqrtPriceX96.Add(sqrtPriceX96, big.NewInt(int64(delta)))) != 0 {
 		t.Fatalf(
 			"different sqrtPriceX96: got %s for replay and %s for graph pool",
-			snapshot.SqrtPriceX96.String(),
+			sqrtPriceX96.String(),
 			query.Pool.SqrtPrice.String(),
 		)
 	}
 
 	for k := range snapshot.Ticks {
 		fmt.Println("tick", k)
-		tick := pool.GetTickValue(k)
-		fmt.Println("Liquidity Net", tick.LiquidityNet)
-		fmt.Println("Liquidity Gross", tick.LiquidityGross)
 	}
 }

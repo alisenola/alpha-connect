@@ -2,12 +2,12 @@ package executor_test
 
 import (
 	"fmt"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -75,9 +75,9 @@ func TestMainExecutor(t *testing.T) {
 	res, err = as.Root.RequestFuture(ex, &messages.HistoricalUnipoolV3DataRequest{
 		RequestID: 0,
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: s.SecurityID},
+			SecurityID: &wrapperspb.UInt64Value{Value: s.SecurityID},
 			Exchange:   s.Exchange,
-			Symbol:     &types.StringValue{Value: s.Symbol},
+			Symbol:     &wrapperspb.StringValue{Value: s.Symbol},
 		},
 		Start: 14268513 - 100,
 		End:   14268513,

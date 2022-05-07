@@ -3,9 +3,8 @@ package bitfinex
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -228,11 +228,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.QuoteCurrency = quoteCurrency
 		}
 
-		security.Status = models.Trading
+		security.Status = models.InstrumentStatus_Trading
 		security.Symbol = symbol.Pair
-		security.Exchange = &constants.BITFINEX
+		security.Exchange = constants.BITFINEX
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.RoundLot = &types.DoubleValue{Value: 1. / 100000000.}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / 100000000.}
 		securities = append(securities, &security)
 	}
 
@@ -265,12 +265,12 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if msg.Subscribe {
-		response.RejectionReason = messages.UnsupportedSubscription
+		response.RejectionReason = messages.RejectionReason_UnsupportedSubscription
 		context.Respond(response)
 		return nil
 	}
 	if msg.Instrument == nil {
-		response.RejectionReason = messages.MissingInstrument
+		response.RejectionReason = messages.RejectionReason_MissingInstrument
 		context.Respond(response)
 		return nil
 	}
@@ -283,17 +283,17 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	qr := state.getQueryRunner("OB")
 
 	if qr == nil {
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
 	qr.obRateLimit.Request(weight)
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -306,7 +306,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			} else if queryResponse.StatusCode >= 500 {
@@ -315,7 +315,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Info("http client error", log.Error(err))
-				response.RejectionReason = messages.HTTPError
+				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Respond(response)
 				return
 			}
@@ -327,19 +327,19 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
 			state.logger.Info("http client error", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
 		}
-		var bids []gmodels.OrderBookLevel
-		var asks []gmodels.OrderBookLevel
+		var bids []*gmodels.OrderBookLevel
+		var asks []*gmodels.OrderBookLevel
 		// TS is float in seconds, * 1000 + rounding to get millisecond
 		var ts uint64 = 0
 		for _, bid := range obData.Bids {
 			if uint64(bid.Timestamp*1000) > ts {
 				ts = uint64(bid.Timestamp * 1000)
 			}
-			bids = append(bids, gmodels.OrderBookLevel{
+			bids = append(bids, &gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Amount,
 				Bid:      true,
@@ -349,7 +349,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			if uint64(ask.Timestamp*1000) > ts {
 				ts = uint64(ask.Timestamp * 1000)
 			}
-			asks = append(asks, gmodels.OrderBookLevel{
+			asks = append(asks, &gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Amount,
 				Bid:      false,

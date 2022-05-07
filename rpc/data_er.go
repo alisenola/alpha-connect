@@ -3,7 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/data"
 	_ "gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-grpc"

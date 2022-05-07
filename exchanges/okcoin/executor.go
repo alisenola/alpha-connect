@@ -3,9 +3,8 @@ package okcoin
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/okcoin"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"net/http"
 	"reflect"
 	"time"
@@ -140,12 +140,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.InstrumentID
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.OKCOIN
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.OKCOIN
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: pair.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: pair.SizeIncrement}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: pair.TickSize}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: pair.SizeIncrement}
 		securities = append(securities, &security)
 	}
 	state.securities = securities

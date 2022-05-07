@@ -2,8 +2,7 @@ package data
 
 import (
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	"github.com/melaurent/gotickfile/v2"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -12,6 +11,7 @@ import (
 	"gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/tickstore/parsing"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sync"
@@ -85,9 +85,9 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 	lq.measurement = *tmpFunctor.Measurement
 
 	for _, f := range feeds {
-		aggregation := models.L2
+		aggregation := models.OrderBookAggregation_L2
 		receiver := utils.NewMDReceiver(as, executor, &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: f.security.securityID},
+			SecurityID: &wrapperspb.UInt64Value{Value: f.security.securityID},
 		}, aggregation, f.requestID, lq.ch)
 		f.receiver = receiver
 		lq.subscriptions[f.requestID] = f

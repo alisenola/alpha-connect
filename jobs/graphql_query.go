@@ -2,7 +2,7 @@ package jobs
 
 import (
 	goContext "context"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/go-graphql-client"
 )
 

@@ -8,8 +8,8 @@ import (
 
 	models2 "gitlab.com/alphaticks/xchanger/models"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -117,7 +117,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown protocol %s", protocol.Name)
 		}
-		props := actor.PropsFromProducer(producer).WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 
 		state.executors[protocol.ID], _ = context.SpawnNamed(props, protocol.Name+"_executor")
 	}
@@ -217,7 +217,7 @@ func (state *Executor) OnProtocolAssetTransferRequest(context actor.Context) err
 	if !ok {
 		context.Respond(&messages.ProtocolAssetList{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
 			Success:         false,
 		})
 		return nil
@@ -225,8 +225,8 @@ func (state *Executor) OnProtocolAssetTransferRequest(context actor.Context) err
 	if pid, ok := state.dataManagers[a.Protocol.ID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(a)).WithSupervisor(
-			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second))
+		props := actor.PropsFromProducer(NewDataManagerProducer(a), actor.WithSupervisor(
+			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.dataManagers[a.Protocol.ID] = pid
 		context.Forward(pid)
@@ -240,7 +240,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	if !ok {
 		context.Respond(&messages.ProtocolAssetList{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
 			Success:         false,
 		})
 		return nil
@@ -249,7 +249,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	if !ok {
 		context.Respond(&messages.HistoricalProtocolAssetTransferResponse{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.UnknowProtocol,
+			RejectionReason: messages.RejectionReason_UnknowProtocol,
 			Success:         false,
 		})
 	}
@@ -264,7 +264,7 @@ func (state *Executor) OnProtocolAssetDefinition(context actor.Context) error {
 	if !ok {
 		context.Respond(&messages.ProtocolAssetDefinitionResponse{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
 			Success:         false,
 		})
 		return nil
@@ -280,19 +280,19 @@ func (state *Executor) OnProtocolAssetDefinition(context actor.Context) error {
 
 func (state *Executor) getProtocolAsset(asset *models.ProtocolAsset) (*models.ProtocolAsset, *messages.RejectionReason) {
 	if asset == nil {
-		rej := messages.MissingProtocolAsset
+		rej := messages.RejectionReason_MissingProtocolAsset
 		return nil, &rej
 	}
 	if asset.Protocol != nil && asset.Asset != nil && asset.Chain != nil {
-		ID := utils.GetProtocolAssetID(*asset.Asset, *asset.Protocol, *asset.Chain)
+		ID := utils.GetProtocolAssetID(asset.Asset, asset.Protocol, asset.Chain)
 		if a, ok := state.protocolAssets[ID]; !ok {
-			rej := messages.UnknownProtocolAsset
+			rej := messages.RejectionReason_UnknownProtocolAsset
 			return nil, &rej
 		} else {
 			return a, nil
 		}
 	} else {
-		rej := messages.MissingProtocolAsset
+		rej := messages.RejectionReason_MissingProtocolAsset
 		return nil, &rej
 	}
 }

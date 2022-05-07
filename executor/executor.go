@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -111,9 +111,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	)
 
 	exProducer := exchanges.NewExecutorProducer(state.cfgEx)
-	exProps := actor.PropsFromProducer(exProducer).WithSupervisor(
+	exProps := actor.PropsFromProducer(exProducer, actor.WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
-	)
+	))
 	exEx, err := context.SpawnNamed(exProps, "exchanges")
 	if err != nil {
 		return fmt.Errorf("error spawning exchanges executor: %v", err)
@@ -121,9 +121,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.executorEx = exEx
 
 	prProducer := protocols.NewExecutorProducer(state.cfgPr)
-	prProps := actor.PropsFromProducer(prProducer).WithSupervisor(
+	prProps := actor.PropsFromProducer(prProducer, actor.WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
-	)
+	))
 	prEx, err := context.SpawnNamed(prProps, "protocols")
 	if err != nil {
 		return fmt.Errorf("error spawning protocols executor: %v", err)

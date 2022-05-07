@@ -1,7 +1,9 @@
 syntax = "proto3";
 package messages;
 
-import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
+option go_package = "gitlab.com/alphaticks/alpha-connect/models/messages";
+
+import "github.com/asynkron/protoactor-go/actor/actor.proto";
 import "google/protobuf/any.proto";
 
 message RemotePubSubMessage {

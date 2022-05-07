@@ -10,7 +10,7 @@ import (
 
 	"gitlab.com/alphaticks/xchanger/constants"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -22,9 +22,9 @@ type MDTest struct {
 	SecurityID         uint64
 	Symbol             string
 	SecurityType       string
-	Exchange           xchangerModels.Exchange
-	BaseCurrency       xchangerModels.Asset
-	QuoteCurrency      xchangerModels.Asset
+	Exchange           *xchangerModels.Exchange
+	BaseCurrency       *xchangerModels.Asset
+	QuoteCurrency      *xchangerModels.Asset
 	MinPriceIncrement  float64
 	RoundLot           float64
 	HasMaturityDate    bool
@@ -83,7 +83,7 @@ func MarketData(t *testing.T, test MDTest) {
 	if err != nil {
 		t.Fatalf("failed to load assets: %v", err)
 	}
-	assets := make(map[uint32]xchangerModels.Asset)
+	assets := make(map[uint32]*xchangerModels.Asset)
 	err = json.Unmarshal(b, &assets)
 	if err != nil {
 		t.Fatalf("error parsing assets: %v", err)
@@ -91,7 +91,7 @@ func MarketData(t *testing.T, test MDTest) {
 	if err := constants.LoadAssets(assets); err != nil {
 		t.Fatalf("error loading assets: %v", err)
 	}
-	as, executor, clean := StartExecutor(t, &test.Exchange, nil)
+	as, executor, clean := StartExecutor(t, test.Exchange, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()

@@ -7,14 +7,14 @@ import (
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"os"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -36,7 +36,7 @@ func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.
 	exch := []*xchangerModels.Exchange{
 		exchange,
 	}
-	configAs := actor.NewConfig().WithDeveloperSupervisionLogging(true).WithDeadLetterThrottleCount(1000)
+	configAs := actor.NewConfig() //.WithDeveloperSupervisionLogging(true).WithDeadLetterThrottleCount(1000)
 	as := actor.NewActorSystemWithConfig(configAs)
 	var accnts []*account.Account
 	if acc != nil {
@@ -142,12 +142,12 @@ func (state *MDChecker) Initialize(context actor.Context) error {
 		Subscribe:  true,
 		Subscriber: context.Self(),
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+			SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 			Exchange:   state.security.Exchange,
-			Symbol:     &types.StringValue{Value: state.security.Symbol},
+			Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 		},
-		Aggregation: models.L2,
-		Stats:       []models.StatType{models.OpenInterest, models.FundingRate},
+		Aggregation: models.OrderBookAggregation_L2,
+		Stats:       []models.StatType{models.StatType_OpenInterest, models.StatType_FundingRate},
 	}, 80*time.Second).Result()
 	if err != nil {
 		return err
@@ -353,9 +353,9 @@ func (state *PoolV3Checker) Initialize(context actor.Context) error {
 		Subscribe:  true,
 		Subscriber: context.Self(),
 		Instrument: &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+			SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 			Exchange:   state.security.Exchange,
-			Symbol:     &types.StringValue{Value: state.security.Symbol},
+			Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 		},
 	}, 80*time.Second).Result()
 	if err != nil {

@@ -4,9 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -16,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitstamp"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
@@ -30,7 +30,7 @@ type InstrumentDataL3 struct {
 	lastHBTime     time.Time
 	aggTrade       *models.AggregatedTrade
 	lastAggTradeTs uint64
-	levelDeltas    []gmodels.OrderBookLevel
+	levelDeltas    []*gmodels.OrderBookLevel
 }
 
 // OBType: OBL3
@@ -210,11 +210,11 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Aggregation: models.L3,
+			Aggregation: models.OrderBookAggregation_L3,
 		},
 		5*time.Second)
 
@@ -291,7 +291,7 @@ func (state *ListenerL3) OnMarketDataRequest(context actor.Context) error {
 		response := &messages.MarketDataResponse{
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
-			RejectionReason: messages.Other,
+			RejectionReason: messages.RejectionReason_Other,
 			Success:         false,
 		}
 		context.Respond(response)
@@ -303,13 +303,13 @@ func (state *ListenerL3) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -327,7 +327,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 	case bitstamp.WSCreatedOrder:
 		o := msg.Message.(bitstamp.WSCreatedOrder)
-		order := gmodels.Order{
+		order := &gmodels.Order{
 			Price:    o.Price,
 			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
@@ -346,7 +346,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 			} else {
 				quantity = state.instrumentData.orderBook.GetAsk(order.Price)
 			}
-			levelDelta := gmodels.OrderBookLevel{
+			levelDelta := &gmodels.OrderBookLevel{
 				Price:    o.Price,
 				Quantity: quantity,
 				Bid:      o.OrderType == 0,
@@ -361,7 +361,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 	case bitstamp.WSChangedOrder:
 		o := msg.Message.(bitstamp.WSChangedOrder)
-		order := gmodels.Order{
+		order := &gmodels.Order{
 			Price:    o.Price,
 			Quantity: math.Round(o.Amount*float64(state.instrumentData.lotPrecision)) / float64(state.instrumentData.lotPrecision),
 			Bid:      o.OrderType == 0,
@@ -381,7 +381,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 					quantity = state.instrumentData.orderBook.GetAsk(oldO.Price)
 				}
 
-				state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
+				state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, &gmodels.OrderBookLevel{
 					Price:    oldO.Price,
 					Quantity: quantity,
 					Bid:      oldO.Bid,
@@ -395,7 +395,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 		} else {
 			quantity = state.instrumentData.orderBook.GetAsk(o.Price)
 		}
-		state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
+		state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, &gmodels.OrderBookLevel{
 			Price:    o.Price,
 			Quantity: quantity,
 			Bid:      order.Bid,
@@ -419,7 +419,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 				quantity = state.instrumentData.orderBook.GetAsk(oldO.Price)
 			}
 
-			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, gmodels.OrderBookLevel{
+			state.instrumentData.levelDeltas = append(state.instrumentData.levelDeltas, &gmodels.OrderBookLevel{
 				Price:    oldO.Price,
 				Quantity: quantity,
 				Bid:      o.OrderType == 0,
@@ -467,7 +467,7 @@ func (state *ListenerL3) onWebsocketMessage(context actor.Context) error {
 
 		state.instrumentData.aggTrade.Trades = append(
 			state.instrumentData.aggTrade.Trades,
-			models.Trade{
+			&models.Trade{
 				Price:    tradeData.Price,
 				Quantity: tradeData.Amount,
 				ID:       tradeData.ID,
@@ -534,8 +534,8 @@ func (state *ListenerL3) postDelta(context actor.Context, ts uint64) {
 
 	if len(state.instrumentData.levelDeltas) > 1 {
 		// Aggregate
-		bids := make(map[uint64]gmodels.OrderBookLevel)
-		asks := make(map[uint64]gmodels.OrderBookLevel)
+		bids := make(map[uint64]*gmodels.OrderBookLevel)
+		asks := make(map[uint64]*gmodels.OrderBookLevel)
 		for _, l := range state.instrumentData.levelDeltas {
 			k := uint64(math.Round(l.Price * float64(state.instrumentData.tickPrecision)))
 			if l.Bid {

@@ -4,18 +4,18 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
-	"github.com/gogo/protobuf/types"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"sort"
 )
 
-func SecurityID(typ, symbol, exchange string, maturityDate *types.Timestamp) uint64 {
+func SecurityID(typ, symbol, exchange string, maturityDate *timestamppb.Timestamp) uint64 {
 	tags := map[string]string{
 		"type":     typ,
 		"symbol":   symbol,
 		"exchange": exchange,
 	}
 	if maturityDate != nil {
-		ts, _ := types.TimestampFromProto(maturityDate)
+		ts := maturityDate.AsTime()
 		tags["maturityDate"] = ts.String()
 	}
 	var keys []string

@@ -3,13 +3,14 @@ package account
 import (
 	"errors"
 	"fmt"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"sync"
 	"time"
@@ -19,8 +20,8 @@ type Order struct {
 	*models.Order
 	lastEventTime          time.Time
 	previousStatus         models.OrderStatus
-	pendingAmendPrice      *types.DoubleValue
-	pendingAmendQty        *types.DoubleValue
+	pendingAmendPrice      *wrapperspb.DoubleValue
+	pendingAmendQty        *wrapperspb.DoubleValue
 	unknownOrderErrorCount int
 }
 
@@ -73,7 +74,7 @@ type Account struct {
 }
 
 func NewAccount(account *models.Account) (*Account, error) {
-	quoteCurrency := &constants.DOLLAR
+	quoteCurrency := constants.DOLLAR
 	accnt := &Account{
 		Account:         account,
 		ordersID:        make(map[string]*Order),
@@ -88,19 +89,19 @@ func NewAccount(account *models.Account) (*Account, error) {
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
-		accnt.MarginCurrency = &constants.TETHER
+		accnt.MarginCurrency = constants.TETHER
 		accnt.MarginPrecision = 100000000
 	case constants.BITMEX.ID:
-		accnt.MarginCurrency = &constants.BITCOIN
+		accnt.MarginCurrency = constants.BITCOIN
 		accnt.MarginPrecision = 1. / 0.00000001
 	case constants.FTX.ID:
-		accnt.MarginCurrency = &constants.DOLLAR
+		accnt.MarginCurrency = constants.DOLLAR
 		accnt.MarginPrecision = 100000000
 	case constants.DYDX.ID:
-		accnt.MarginCurrency = &constants.USDC
+		accnt.MarginCurrency = constants.USDC
 		accnt.MarginPrecision = 1e6
 	case constants.BYBITL.ID:
-		accnt.MarginCurrency = &constants.TETHER
+		accnt.MarginCurrency = constants.TETHER
 		accnt.MarginPrecision = 1e8
 	}
 	if accnt.MarginCurrency != nil {
@@ -183,8 +184,8 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		accnt.ordersID[o.OrderID] = ord
 		accnt.ordersClID[o.ClientOrderID] = ord
 		// Add orders to security
-		if (o.OrderStatus == models.New || o.OrderStatus == models.PartiallyFilled) && o.OrderType == models.Limit {
-			if o.Side == models.Buy {
+		if (o.OrderStatus == models.OrderStatus_New || o.OrderStatus == models.OrderStatus_PartiallyFilled) && o.OrderType == models.OrderType_Limit {
+			if o.Side == models.Side_Buy {
 				accnt.securities[o.Instrument.SecurityID.Value].AddBidOrder(o.ClientOrderID, o.Price.Value, o.LeavesQuantity, 0)
 			} else {
 				accnt.securities[o.Instrument.SecurityID.Value].AddAskOrder(o.ClientOrderID, o.Price.Value, o.LeavesQuantity, 0)
@@ -232,18 +233,18 @@ func (accnt *Account) getSec(instrument *models.Instrument) (Security, *messages
 		var ok bool
 		sec, ok = accnt.securities[instrument.SecurityID.Value]
 		if !ok {
-			res := messages.UnknownSecurityID
+			res := messages.RejectionReason_UnknownSecurityID
 			return nil, &res
 		}
 	} else if instrument.Symbol != nil {
 		var ok bool
 		sec, ok = accnt.symbolToSec[instrument.Symbol.Value]
 		if !ok {
-			res := messages.UnknownSymbol
+			res := messages.RejectionReason_UnknownSymbol
 			return nil, &res
 		}
 	} else {
-		res := messages.InvalidRequest
+		res := messages.RejectionReason_InvalidRequest
 		return nil, &res
 	}
 
@@ -254,15 +255,15 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	accnt.Lock()
 	defer accnt.Unlock()
 	if _, ok := accnt.ordersClID[order.ClientOrderID]; ok {
-		res := messages.DuplicateOrder
+		res := messages.RejectionReason_DuplicateOrder
 		return nil, &res
 	}
-	if order.OrderStatus != models.PendingNew {
-		res := messages.Other
+	if order.OrderStatus != models.OrderStatus_PendingNew {
+		res := messages.RejectionReason_Other
 		return nil, &res
 	}
 	if order.Instrument == nil {
-		res := messages.UnknownSymbol
+		res := messages.RejectionReason_UnknownSymbol
 		return nil, &res
 	}
 
@@ -271,27 +272,27 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 		return nil, rej
 	}
 	if order.Instrument.SecurityID == nil {
-		order.Instrument.SecurityID = &types.UInt64Value{Value: sec.GetSecurity().SecurityID}
+		order.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.GetSecurity().SecurityID}
 	}
 	if order.Instrument.Symbol == nil {
-		order.Instrument.Symbol = &types.StringValue{Value: sec.GetSecurity().Symbol}
+		order.Instrument.Symbol = &wrapperspb.StringValue{Value: sec.GetSecurity().Symbol}
 	}
 	if order.CreationTime == nil {
-		order.CreationTime, _ = types.TimestampProto(time.Now())
+		order.CreationTime = timestamppb.New(time.Now())
 	}
 	lotPrecision := sec.GetLotPrecision()
 	rawLeavesQuantity := lotPrecision * order.LeavesQuantity
 	if math.Abs(rawLeavesQuantity-math.Round(rawLeavesQuantity)) > 0.00001 {
-		res := messages.IncorrectQuantity
+		res := messages.RejectionReason_IncorrectQuantity
 		return nil, &res
 	}
 	rawCumQty := int64(math.Round(order.CumQuantity * lotPrecision))
 	if rawCumQty > 0 {
-		res := messages.IncorrectQuantity
+		res := messages.RejectionReason_IncorrectQuantity
 		return nil, &res
 	}
-	if order.OrderType == models.Limit && order.Price == nil {
-		res := messages.InvalidOrder
+	if order.OrderType == models.OrderType_Limit && order.Price == nil {
+		res := messages.RejectionReason_InvalidOrder
 		return nil, &res
 	}
 	accnt.ordersClID[order.ClientOrderID] = &Order{
@@ -302,14 +303,14 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	}
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.PendingNew,
+		ExecutionType:   messages.ExecutionType_PendingNew,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -320,12 +321,12 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
 	}
-	if order.OrderStatus != models.PendingNew {
+	if order.OrderStatus != models.OrderStatus_PendingNew {
 		// Order already confirmed, nop
 		return nil, nil
 	}
 	order.OrderID = ID
-	order.OrderStatus = models.New
+	order.OrderStatus = models.OrderStatus_New
 	order.lastEventTime = time.Now()
 	accnt.ordersID[ID] = order
 
@@ -334,8 +335,8 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 		return nil, fmt.Errorf("unknown instrument: %s", rej.String())
 	}
 
-	if order.OrderType == models.Limit {
-		if order.Side == models.Buy {
+	if order.OrderType == models.OrderType_Limit {
+		if order.Side == models.Side_Buy {
 			accnt.securities[sec.GetSecurity().SecurityID].AddBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		} else {
 			accnt.securities[sec.GetSecurity().SecurityID].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
@@ -344,14 +345,14 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.New,
+		ExecutionType:   messages.ExecutionType_New,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -362,24 +363,24 @@ func (accnt *Account) RejectNewOrder(clientID string, reason messages.RejectionR
 	if !ok {
 		return nil, fmt.Errorf("unknown order %s", clientID)
 	}
-	order.OrderStatus = models.Rejected
+	order.OrderStatus = models.OrderStatus_Rejected
 	delete(accnt.ordersClID, clientID)
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Rejected,
-		OrderStatus:     models.Rejected,
+		ExecutionType:   messages.ExecutionType_Rejected,
+		OrderStatus:     models.OrderStatus_Rejected,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 		RejectionReason: reason,
 	}, nil
 }
 
-func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity *types.DoubleValue) (*messages.ExecutionReport, *messages.RejectionReason) {
+func (accnt *Account) ReplaceOrder(ID string, price *wrapperspb.DoubleValue, quantity *wrapperspb.DoubleValue) (*messages.ExecutionReport, *messages.RejectionReason) {
 	accnt.Lock()
 	defer accnt.Unlock()
 	var order *Order
@@ -388,30 +389,30 @@ func (accnt *Account) ReplaceOrder(ID string, price *types.DoubleValue, quantity
 		order = accnt.ordersID[ID]
 	}
 	if order == nil {
-		res := messages.UnknownOrder
+		res := messages.RejectionReason_UnknownOrder
 		return nil, &res
 	}
-	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled {
-		res := messages.NonReplaceableOrder
+	if order.OrderStatus != models.OrderStatus_New && order.OrderStatus != models.OrderStatus_PartiallyFilled {
+		res := messages.RejectionReason_NonReplaceableOrder
 		return nil, &res
 	}
 
 	order.pendingAmendPrice = price
 	order.pendingAmendQty = quantity
 	order.previousStatus = order.OrderStatus
-	order.OrderStatus = models.PendingReplace
+	order.OrderStatus = models.OrderStatus_PendingReplace
 	order.lastEventTime = time.Now()
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.PendingReplace,
-		OrderStatus:     models.PendingReplace,
+		ExecutionType:   messages.ExecutionType_PendingReplace,
+		OrderStatus:     models.OrderStatus_PendingReplace,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -426,7 +427,7 @@ func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.Execution
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	if order.OrderStatus != models.PendingReplace {
+	if order.OrderStatus != models.OrderStatus_PendingReplace {
 		return nil, ErrNotPendingReplace
 	}
 	order.OrderStatus = order.previousStatus
@@ -447,8 +448,8 @@ func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.Execution
 		order.OrderID = newID
 	}
 
-	if order.OrderType == models.Limit {
-		if order.Side == models.Buy {
+	if order.OrderType == models.OrderType_Limit {
+		if order.Side == models.Side_Buy {
 			accnt.securities[order.Instrument.SecurityID.Value].UpdateBidOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity)
 		} else {
 			accnt.securities[order.Instrument.SecurityID.Value].UpdateAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity)
@@ -457,14 +458,14 @@ func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.Execution
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Canceled,
-		OrderStatus:     models.Canceled,
+		ExecutionType:   messages.ExecutionType_Canceled,
+		OrderStatus:     models.OrderStatus_Canceled,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -480,21 +481,21 @@ func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionRea
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
 
-	if order.OrderStatus == models.PendingReplace {
+	if order.OrderStatus == models.OrderStatus_PendingReplace {
 		order.OrderStatus = order.previousStatus
 		order.lastEventTime = time.Now()
 	}
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Rejected,
+		ExecutionType:   messages.ExecutionType_Rejected,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 		RejectionReason: reason,
 	}, nil
 }
@@ -508,33 +509,33 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 		order = accnt.ordersID[ID]
 	}
 	if order == nil {
-		res := messages.UnknownOrder
+		res := messages.RejectionReason_UnknownOrder
 		return nil, &res
 	}
-	if order.OrderStatus == models.PendingCancel {
-		res := messages.CancelAlreadyPending
+	if order.OrderStatus == models.OrderStatus_PendingCancel {
+		res := messages.RejectionReason_CancelAlreadyPending
 		return nil, &res
 	}
-	if order.OrderStatus != models.New && order.OrderStatus != models.PartiallyFilled && order.OrderStatus != models.PendingNew {
-		res := messages.NonCancelableOrder
+	if order.OrderStatus != models.OrderStatus_New && order.OrderStatus != models.OrderStatus_PartiallyFilled && order.OrderStatus != models.OrderStatus_PendingNew {
+		res := messages.RejectionReason_NonCancelableOrder
 		return nil, &res
 	}
 
 	// Save current order status in case cancel gets rejected
 	order.previousStatus = order.OrderStatus
-	order.OrderStatus = models.PendingCancel
+	order.OrderStatus = models.OrderStatus_PendingCancel
 	order.lastEventTime = time.Now()
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.PendingCancel,
-		OrderStatus:     models.PendingCancel,
+		ExecutionType:   messages.ExecutionType_PendingCancel,
+		OrderStatus:     models.OrderStatus_PendingCancel,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -549,15 +550,15 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	if order.OrderStatus == models.Canceled {
+	if order.OrderStatus == models.OrderStatus_Canceled {
 		return nil, nil
 	}
 
-	order.OrderStatus = models.Canceled
+	order.OrderStatus = models.OrderStatus_Canceled
 	order.lastEventTime = time.Now()
 	order.LeavesQuantity = 0.
-	if order.OrderType == models.Limit {
-		if order.Side == models.Buy {
+	if order.OrderType == models.OrderType_Limit {
+		if order.Side == models.Side_Buy {
 			accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
 		} else {
 			accnt.securities[order.Instrument.SecurityID.Value].RemoveAskOrder(order.ClientOrderID)
@@ -566,14 +567,14 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Canceled,
-		OrderStatus:     models.Canceled,
+		ExecutionType:   messages.ExecutionType_Canceled,
+		OrderStatus:     models.OrderStatus_Canceled,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -588,15 +589,15 @@ func (accnt *Account) ConfirmExpiredOrder(ID string) (*messages.ExecutionReport,
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	if order.OrderStatus == models.Expired {
+	if order.OrderStatus == models.OrderStatus_Expired {
 		return nil, nil
 	}
 
-	order.OrderStatus = models.Expired
+	order.OrderStatus = models.OrderStatus_Expired
 	order.lastEventTime = time.Now()
 	order.LeavesQuantity = 0.
-	if order.OrderType == models.Limit {
-		if order.Side == models.Buy {
+	if order.OrderType == models.OrderType_Limit {
+		if order.Side == models.Side_Buy {
 			accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
 		} else {
 			accnt.securities[order.Instrument.SecurityID.Value].RemoveAskOrder(order.ClientOrderID)
@@ -605,14 +606,14 @@ func (accnt *Account) ConfirmExpiredOrder(ID string) (*messages.ExecutionReport,
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Expired,
-		OrderStatus:     models.Expired,
+		ExecutionType:   messages.ExecutionType_Expired,
+		OrderStatus:     models.OrderStatus_Expired,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 	}, nil
 }
 
@@ -627,8 +628,8 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	if order == nil {
 		return nil, fmt.Errorf("unknown order %s", ID)
 	}
-	if order.OrderStatus == models.PendingCancel {
-		if reason == messages.UnknownOrder {
+	if order.OrderStatus == models.OrderStatus_PendingCancel {
+		if reason == messages.RejectionReason_UnknownOrder {
 			order.unknownOrderErrorCount += 1
 			if order.unknownOrderErrorCount > 3 {
 				return nil, fmt.Errorf("unknown order %s, missed a fill", ID)
@@ -641,14 +642,14 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Rejected,
+		ExecutionType:   messages.ExecutionType_Rejected,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
+		TransactionTime: timestamppb.Now(),
 		RejectionReason: reason,
 	}, nil
 }
@@ -678,21 +679,21 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	order.LeavesQuantity = leavesQuantity
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
 	if rawFillQuantity == rawLeavesQuantity {
-		order.OrderStatus = models.Filled
+		order.OrderStatus = models.OrderStatus_Filled
 	} else {
-		order.OrderStatus = models.PartiallyFilled
+		order.OrderStatus = models.OrderStatus_PartiallyFilled
 	}
 	order.lastEventTime = time.Now()
 
-	if order.OrderType == models.Limit {
-		if order.Side == models.Buy {
-			if order.OrderStatus == models.Filled {
+	if order.OrderType == models.OrderType_Limit {
+		if order.Side == models.Side_Buy {
+			if order.OrderStatus == models.OrderStatus_Filled {
 				accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
 			} else {
 				accnt.securities[order.Instrument.SecurityID.Value].UpdateBidOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
 			}
 		} else {
-			if order.OrderStatus == models.Filled {
+			if order.OrderStatus == models.OrderStatus_Filled {
 				accnt.securities[order.Instrument.SecurityID.Value].RemoveAskOrder(order.ClientOrderID)
 			} else {
 				accnt.securities[order.Instrument.SecurityID.Value].UpdateAskOrderQuantity(order.ClientOrderID, order.LeavesQuantity)
@@ -702,22 +703,22 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 
 	er := &messages.ExecutionReport{
 		OrderID:         order.OrderID,
-		ClientOrderID:   &types.StringValue{Value: order.ClientOrderID},
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
 		ExecutionID:     "", // TODO
-		ExecutionType:   messages.Trade,
+		ExecutionType:   messages.ExecutionType_Trade,
 		OrderStatus:     order.OrderStatus,
 		Instrument:      order.Instrument,
 		LeavesQuantity:  order.LeavesQuantity,
 		CumQuantity:     order.CumQuantity,
-		TransactionTime: types.TimestampNow(),
-		TradeID:         &types.StringValue{Value: tradeID},
-		FillPrice:       &types.DoubleValue{Value: price},
-		FillQuantity:    &types.DoubleValue{Value: quantity},
+		TransactionTime: timestamppb.Now(),
+		TradeID:         &wrapperspb.StringValue{Value: tradeID},
+		FillPrice:       &wrapperspb.DoubleValue{Value: price},
+		FillQuantity:    &wrapperspb.DoubleValue{Value: quantity},
 	}
 
 	switch sec := sec.(type) {
 	case *SpotSecurity:
-		if order.Side == models.Buy {
+		if order.Side == models.Side_Buy {
 			accnt.balances[sec.Underlying.ID] += uint64(math.Round(quantity * accnt.MarginPrecision))
 			accnt.balances[sec.QuoteCurrency.ID] -= uint64(math.Round(quantity * price * accnt.MarginPrecision))
 		} else {
@@ -729,7 +730,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		// Margin
 		//fmt.Println("MARGIN POS", float64(pos.cost) / accnt.MarginPrecision, float64(pos.rawSize) / accnt.MarginPrecision)
 		var fee, cost int64
-		if order.Side == models.Buy {
+		if order.Side == models.Side_Buy {
 			fee, cost = pos.Buy(price, quantity, taker)
 		} else {
 			fee, cost = pos.Sell(price, quantity, taker)
@@ -738,10 +739,10 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 
 		accnt.margin -= fee
 		accnt.margin -= cost
-		er.FeeAmount = &types.DoubleValue{Value: float64(fee) / accnt.MarginPrecision}
+		er.FeeAmount = &wrapperspb.DoubleValue{Value: float64(fee) / accnt.MarginPrecision}
 		er.FeeCurrency = accnt.MarginCurrency
-		er.FeeBasis = messages.Percentage
-		er.FeeType = messages.ExchangeFees
+		er.FeeBasis = messages.FeeBasis_Percentage
+		er.FeeType = messages.FeeType_ExchangeFees
 		// TODO mutex on position ?
 		sec.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
@@ -967,7 +968,7 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 
 func (accnt *Account) CheckExpiration() error {
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.PendingNew || o.OrderStatus == models.PendingCancel || o.OrderStatus == models.PendingReplace) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
+		if (o.OrderStatus == models.OrderStatus_PendingNew || o.OrderStatus == models.OrderStatus_PendingCancel || o.OrderStatus == models.OrderStatus_PendingReplace) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
 			return fmt.Errorf("order %s in unknown state", k)
 		}
 	}
@@ -978,7 +979,7 @@ func (accnt *Account) CleanOrders() {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.Filled || o.OrderStatus == models.Canceled) && (time.Since(o.lastEventTime) > time.Minute) {
+		if (o.OrderStatus == models.OrderStatus_Filled || o.OrderStatus == models.OrderStatus_Canceled) && (time.Since(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
 			delete(accnt.ordersID, o.OrderID)
 		}

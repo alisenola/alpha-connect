@@ -3,9 +3,8 @@ package bybiti
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -16,6 +15,8 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybiti"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -171,8 +172,8 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = symbol.Name
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.Trading
-		security.Exchange = &constants.BYBITI
+		security.Status = models.InstrumentStatus_Trading
+		security.Exchange = constants.BYBITI
 		day := symbol.Alias[len(symbol.Alias)-2:]
 		if unicode.IsNumber(rune(day[0])) && unicode.IsNumber(rune(day[1])) {
 			security.SecurityType = enum.SecurityType_CRYPTO_FUT
@@ -193,21 +194,17 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				year += 1
 			}
 			date := time.Date(year, time.Month(monthInt), int(dayInt), 0, 0, 0, 0, time.UTC)
-			ts, err := types.TimestampProto(date)
-			if err != nil {
-				state.logger.Info("error converting date")
-				continue
-			}
+			ts := timestamppb.New(date)
 			security.MaturityDate = ts
 		} else {
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: symbol.PriceFilter.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: symbol.LotSizeFilter.QuantityStep}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: symbol.PriceFilter.TickSize}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.QuantityStep}
 		security.IsInverse = true
-		security.MakerFee = &types.DoubleValue{Value: symbol.MakerFee}
-		security.TakerFee = &types.DoubleValue{Value: symbol.TakerFee}
+		security.MakerFee = &wrapperspb.DoubleValue{Value: symbol.MakerFee}
+		security.TakerFee = &wrapperspb.DoubleValue{Value: symbol.TakerFee}
 
 		securities = append(securities, &security)
 	}
@@ -254,7 +251,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	// Find security
 	if msg.Instrument == nil || msg.Instrument.SecurityID == nil {
 		response.Success = false
-		response.RejectionReason = messages.UnknownSecurityID
+		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 		context.Respond(response)
 		return nil
 	}
@@ -262,7 +259,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	security, ok := state.securities[securityID]
 	if !ok {
 		response.Success = false
-		response.RejectionReason = messages.UnknownSecurityID
+		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 		context.Respond(response)
 		return nil
 	}
@@ -290,7 +287,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	if qr == nil {
 		response.Success = false
-		response.RejectionReason = messages.RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -299,10 +296,10 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res interface{}, err error) {
+	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("request error", log.Error(err))
-			response.RejectionReason = messages.HTTPError
+			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Respond(response)
 			return
 		}
@@ -315,7 +312,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Warn("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 			} else if queryResponse.StatusCode >= 500 {
 
@@ -324,7 +321,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 					queryResponse.StatusCode,
 					string(queryResponse.Response))
 				state.logger.Warn("http error", log.Error(err))
-				response.RejectionReason = messages.ExchangeAPIError
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 			}
 			return
@@ -341,14 +338,14 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		err = json.Unmarshal(queryResponse.Response, &bres)
 		if err != nil {
 			state.logger.Warn("http error", log.Error(err))
-			response.RejectionReason = messages.ExchangeAPIError
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
 		}
 
 		if bres.ReturnCode != 0 {
 			state.logger.Warn("http error", log.Error(errors.New(bres.ReturnMessage)))
-			response.RejectionReason = messages.ExchangeAPIError
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
 		}
@@ -380,7 +377,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

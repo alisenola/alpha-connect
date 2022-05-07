@@ -3,9 +3,8 @@ package deribit
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/deribit"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -200,9 +200,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			}
 			security := models.Security{}
 			if i.IsActive {
-				security.Status = models.Trading
+				security.Status = models.InstrumentStatus_Trading
 			} else {
-				security.Status = models.Disabled
+				security.Status = models.InstrumentStatus_Disabled
 			}
 			security.Symbol = i.InstrumentName
 			baseCurrency, ok := constants.GetAssetBySymbol(i.BaseCurrency)
@@ -215,19 +215,19 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 			security.QuoteCurrency = quoteCurrency
-			security.Exchange = &constants.DERIBIT
+			security.Exchange = constants.DERIBIT
 			if i.SettlementPeriod == "perpetual" {
 				security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			} else {
 				security.SecurityType = enum.SecurityType_CRYPTO_FUT
 				security.MaturityDate = utils.MilliToTimestamp(i.ExpirationTimestamp)
 			}
-			security.MakerFee = &types.DoubleValue{Value: i.MakerCommission}
-			security.TakerFee = &types.DoubleValue{Value: i.TakerCommission}
+			security.MakerFee = &wrapperspb.DoubleValue{Value: i.MakerCommission}
+			security.TakerFee = &wrapperspb.DoubleValue{Value: i.TakerCommission}
 
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &types.DoubleValue{Value: i.TickSize}
-			security.RoundLot = &types.DoubleValue{Value: i.ContractSize}
+			security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: i.TickSize}
+			security.RoundLot = &wrapperspb.DoubleValue{Value: i.ContractSize}
 			security.IsInverse = true
 
 			securities = append(securities, &security)
@@ -272,7 +272,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	context.Respond(&messages.HistoricalLiquidationsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -282,7 +282,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

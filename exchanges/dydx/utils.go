@@ -2,23 +2,23 @@ package dydx
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/dydx"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"time"
 )
 
 func statusToDydx(status models.OrderStatus) dydx.OrderStatus {
 	switch status {
-	case models.New:
+	case models.OrderStatus_New:
 		return dydx.ORDER_OPEN
-	case models.PendingNew, models.PendingCancel, models.PendingReplace:
+	case models.OrderStatus_PendingNew, models.OrderStatus_PendingCancel, models.OrderStatus_PendingReplace:
 		return dydx.ORDER_PENDING
-	case models.Filled:
+	case models.OrderStatus_Filled:
 		return dydx.ORDER_FILLED
-	case models.Canceled:
+	case models.OrderStatus_Canceled:
 		return dydx.ORDER_CANCELED
 	default:
 		return ""
@@ -27,9 +27,9 @@ func statusToDydx(status models.OrderStatus) dydx.OrderStatus {
 
 func sideToDydx(side models.Side) dydx.OrderSide {
 	switch side {
-	case models.Buy:
+	case models.Side_Buy:
 		return dydx.BUY
-	case models.Sell:
+	case models.Side_Sell:
 		return dydx.SELL
 	default:
 		return ""
@@ -41,8 +41,8 @@ func orderToModel(o dydx.Order) *models.Order {
 		OrderID:       o.ID,
 		ClientOrderID: o.ClientID,
 		Instrument: &models.Instrument{
-			Exchange: &constants.DYDX,
-			Symbol:   &types.StringValue{Value: o.Market},
+			Exchange: constants.DYDX,
+			Symbol:   &wrapperspb.StringValue{Value: o.Market},
 		},
 		LeavesQuantity: o.RemainingSize, // TODO check
 		CumQuantity:    o.Size - o.RemainingSize,
@@ -51,54 +51,54 @@ func orderToModel(o dydx.Order) *models.Order {
 	switch o.Status {
 	case dydx.ORDER_OPEN:
 		if o.Size != o.RemainingSize {
-			ord.OrderStatus = models.PartiallyFilled
+			ord.OrderStatus = models.OrderStatus_PartiallyFilled
 		} else {
-			ord.OrderStatus = models.New
+			ord.OrderStatus = models.OrderStatus_New
 		}
 	case dydx.ORDER_FILLED:
-		ord.OrderStatus = models.Filled
+		ord.OrderStatus = models.OrderStatus_Filled
 	case dydx.ORDER_CANCELED:
-		ord.OrderStatus = models.Canceled
+		ord.OrderStatus = models.OrderStatus_Canceled
 	case dydx.ORDER_PENDING:
-		ord.OrderStatus = models.PendingNew
+		ord.OrderStatus = models.OrderStatus_PendingNew
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", o.Status)
 	}
 
 	switch o.Type {
 	case dydx.LIMIT:
-		ord.OrderType = models.Limit
+		ord.OrderType = models.OrderType_Limit
 	case dydx.MARKET:
-		ord.OrderType = models.Market
+		ord.OrderType = models.OrderType_Market
 	case dydx.STOP_LIMIT:
-		ord.OrderType = models.StopLimit
+		ord.OrderType = models.OrderType_StopLimit
 	case dydx.TAKE_PROFIT, dydx.TRAILING_STOP:
-		ord.OrderType = models.TrailingStopLimit
+		ord.OrderType = models.OrderType_TrailingStopLimit
 	default:
 		fmt.Println("UNKNOWN ORDER TYPE", o.Type)
 	}
 
 	switch o.Side {
 	case dydx.BUY:
-		ord.Side = models.Buy
+		ord.Side = models.Side_Buy
 	case dydx.SELL:
-		ord.Side = models.Sell
+		ord.Side = models.Side_Sell
 	default:
 		fmt.Println("UNKNOWN ORDER SIDE", o.Side)
 	}
 
 	switch o.TimeInForce {
 	case dydx.GOOD_TIL_TIME:
-		ord.TimeInForce = models.GoodTillCancel
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
 	case dydx.FILL_OR_KILL:
-		ord.TimeInForce = models.FillOrKill
+		ord.TimeInForce = models.TimeInForce_FillOrKill
 	case dydx.IMMEDIATE_OR_CANCEL:
-		ord.TimeInForce = models.ImmediateOrCancel
+		ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
 	default:
 		fmt.Println("UNKNOWN TOF", o.TimeInForce)
 	}
 
-	ord.Price = &types.DoubleValue{Value: o.Price}
+	ord.Price = &wrapperspb.DoubleValue{Value: o.Price}
 	return ord
 }
 
@@ -108,28 +108,28 @@ func buildCreateOrderParams(symbol string, o *messages.NewOrder) *dydx.CreateOrd
 	var tif dydx.OrderTIF
 	var postOnly = false
 	var price float64
-	if o.OrderSide == models.Buy {
+	if o.OrderSide == models.Side_Buy {
 		side = dydx.BUY
 	} else {
 		side = dydx.SELL
 	}
 	switch o.OrderType {
-	case models.Limit:
+	case models.OrderType_Limit:
 		typ = dydx.LIMIT
-	case models.Market:
+	case models.OrderType_Market:
 		typ = dydx.MARKET
-	case models.StopLimit:
+	case models.OrderType_StopLimit:
 		typ = dydx.STOP_LIMIT
-	case models.TrailingStopLimit:
+	case models.OrderType_TrailingStopLimit:
 		typ = dydx.TRAILING_STOP
 	}
-	if o.OrderType != models.Market {
+	if o.OrderType != models.OrderType_Market {
 		switch o.TimeInForce {
-		case models.GoodTillCancel:
+		case models.TimeInForce_GoodTillCancel:
 			tif = dydx.GOOD_TIL_TIME
-		case models.FillOrKill:
+		case models.TimeInForce_FillOrKill:
 			tif = dydx.FILL_OR_KILL
-		case models.ImmediateOrCancel:
+		case models.TimeInForce_ImmediateOrCancel:
 			tif = dydx.IMMEDIATE_OR_CANCEL
 		}
 	} else {
@@ -137,7 +137,7 @@ func buildCreateOrderParams(symbol string, o *messages.NewOrder) *dydx.CreateOrd
 	}
 
 	for _, exec := range o.ExecutionInstructions {
-		if exec == models.ParticipateDoNotInitiate {
+		if exec == models.ExecutionInstruction_ParticipateDoNotInitiate {
 			postOnly = true
 		}
 	}

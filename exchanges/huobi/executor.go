@@ -3,9 +3,8 @@ package huobi
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/huobi"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -166,15 +166,15 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
 		if symbol.State == "online" {
-			security.Status = models.Trading
+			security.Status = models.InstrumentStatus_Trading
 		} else {
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = &constants.HUOBI
+		security.Exchange = constants.HUOBI
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.PricePrecision))}
-		security.RoundLot = &types.DoubleValue{Value: 1. / math.Pow10(int(symbol.AmountPrecision))}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: 1. / math.Pow10(int(symbol.PricePrecision))}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / math.Pow10(int(symbol.AmountPrecision))}
 		securities = append(securities, &security)
 	}
 	state.securities = securities

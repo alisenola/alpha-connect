@@ -3,9 +3,8 @@ package fbinance
 import (
 	goContext "context"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -15,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"strconv"
@@ -153,7 +153,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 			state.lastTradeID[secID] = tradeID
 		}
 		for _, m := range tx.Movements {
-			if messages.AccountMovementType(m.Reason) == messages.RealizedPnl {
+			if messages.AccountMovementType(m.Reason) == messages.AccountMovementType_RealizedPnl {
 				realized2 += m.Quantity
 			}
 			balances[m.AssetID] += m.Quantity
@@ -257,15 +257,15 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	for _, sec := range state.securities {
 		instrument := &models.Instrument{
-			SecurityID: &types.UInt64Value{Value: sec.SecurityID},
-			Symbol:     &types.StringValue{Value: sec.Symbol},
+			SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+			Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
 		}
 		done := false
 		for !done {
 			res, err := context.RequestFuture(state.fbinanceExecutor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
-					FromID:     &types.StringValue{Value: fmt.Sprintf("%d", state.lastTradeID[sec.SecurityID]+1)},
+					FromID:     &wrapperspb.StringValue{Value: fmt.Sprintf("%d", state.lastTradeID[sec.SecurityID]+1)},
 					Instrument: instrument,
 				},
 				Account: state.account,
@@ -283,7 +283,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			}
 			progress := false
 			for _, trd := range trds.Trades {
-				ts, _ := types.TimestampFromProto(trd.TransactionTime)
+				ts := trd.TransactionTime.AsTime()
 				secID := fmt.Sprintf("%d", trd.Instrument.SecurityID.Value)
 				var realized int64
 				if trd.Quantity < 0 {
@@ -305,7 +305,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				// Realized PnL
 				if realized != 0 {
 					tx.Movements = append(tx.Movements, extypes.Movement{
-						Reason:   int32(messages.RealizedPnl),
+						Reason:   int32(messages.AccountMovementType_RealizedPnl),
 						AssetID:  constants.TETHER.ID,
 						Quantity: -float64(realized) / 1e8,
 					})
@@ -313,7 +313,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				// Commission
 				if trd.Commission != 0 {
 					tx.Movements = append(tx.Movements, extypes.Movement{
-						Reason:   int32(messages.Commission),
+						Reason:   int32(messages.AccountMovementType_Commission),
 						AssetID:  constants.TETHER.ID,
 						Quantity: -trd.Commission,
 					})
@@ -343,7 +343,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 	for !done {
 		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
 			RequestID: 0,
-			Type:      messages.FundingFee,
+			Type:      messages.AccountMovementType_FundingFee,
 			Filter: &messages.AccountMovementFilter{
 				From: utils.MilliToTimestamp(state.lastFundingTs + 1),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
@@ -363,7 +363,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		}
 		progress := false
 		for _, m := range mvts.Movements {
-			ts, _ := types.TimestampFromProto(m.Time)
+			ts := m.Time.AsTime()
 			tx := extypes.Transaction{
 				Type:    "FUNDING",
 				SubType: m.Subtype,
@@ -372,7 +372,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				Account: state.account.Name,
 				Fill:    nil,
 				Movements: []extypes.Movement{{
-					Reason:   int32(messages.FundingFee),
+					Reason:   int32(messages.AccountMovementType_FundingFee),
 					AssetID:  m.Asset.ID,
 					Quantity: m.Change,
 				}},
@@ -393,7 +393,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 	for !done {
 		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
 			RequestID: 0,
-			Type:      messages.Deposit,
+			Type:      messages.AccountMovementType_Deposit,
 			Filter: &messages.AccountMovementFilter{
 				From: utils.MilliToTimestamp(state.lastDepositTs + 1),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
@@ -413,7 +413,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		}
 		progress := false
 		for _, m := range mvts.Movements {
-			ts, _ := types.TimestampFromProto(m.Time)
+			ts := m.Time.AsTime()
 			tx := extypes.Transaction{
 				Type:    "DEPOSIT",
 				SubType: m.Subtype,
@@ -422,7 +422,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				Account: state.account.Name,
 				Fill:    nil,
 				Movements: []extypes.Movement{{
-					Reason:   int32(messages.Deposit),
+					Reason:   int32(messages.AccountMovementType_Deposit),
 					AssetID:  m.Asset.ID,
 					Quantity: m.Change,
 				}},
@@ -443,7 +443,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 	for !done {
 		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
 			RequestID: 0,
-			Type:      messages.Withdrawal,
+			Type:      messages.AccountMovementType_Withdrawal,
 			Filter: &messages.AccountMovementFilter{
 				From: utils.MilliToTimestamp(state.lastWithdrawalTs + 1),
 				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
@@ -463,7 +463,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		}
 		progress := false
 		for _, m := range mvts.Movements {
-			ts, _ := types.TimestampFromProto(m.Time)
+			ts := m.Time.AsTime()
 			tx := extypes.Transaction{
 				Type:    "WITHDRAWAL",
 				SubType: m.Subtype,
@@ -472,7 +472,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				Account: state.account.Name,
 				Fill:    nil,
 				Movements: []extypes.Movement{{
-					Reason:   int32(messages.Withdrawal),
+					Reason:   int32(messages.AccountMovementType_Withdrawal),
 					AssetID:  m.Asset.ID,
 					Quantity: m.Change,
 				}},

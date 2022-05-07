@@ -21,7 +21,7 @@ func TestMarketData(t *testing.T) {
 		RoundLot:          1e-6,
 		HasMaturityDate:   false,
 		IsInverse:         false,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 		IgnoreSizeResidue: true,
 	})
 }
@@ -32,7 +32,7 @@ func TestSlowMarketData(t *testing.T) {
 		Symbol:       "kaneth",
 		SecurityType: enum.SecurityType_CRYPTO_SPOT,
 		Exchange:     constants.HUOBI,
-		BaseCurrency: xchangerModels.Asset{
+		BaseCurrency: &xchangerModels.Asset{
 			Symbol: "KAN",
 			Name:   "bitkan",
 			ID:     220,
@@ -42,7 +42,7 @@ func TestSlowMarketData(t *testing.T) {
 		RoundLot:          0.01,
 		HasMaturityDate:   false,
 		IsInverse:         false,
-		Status:            models.Trading,
+		Status:            models.InstrumentStatus_Trading,
 		IgnoreSizeResidue: true,
 	})
 }

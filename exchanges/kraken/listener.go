@@ -3,9 +3,8 @@ package kraken
 import (
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/kraken"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sort"
@@ -289,13 +289,13 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -324,14 +324,14 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
 
 		obDelta := &models.OBL2Update{
-			Levels:    []gmodels.OrderBookLevel{},
+			Levels:    []*gmodels.OrderBookLevel{},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
 
 		lvlIdx := 0
 		for _, bid := range obData.Bids {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    bid.Price,
 				Quantity: bid.Amount,
 				Bid:      true,
@@ -342,7 +342,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		}
 
 		for _, ask := range obData.Asks {
-			level := gmodels.OrderBookLevel{
+			level := &gmodels.OrderBookLevel{
 				Price:    ask.Price,
 				Quantity: ask.Amount,
 				Bid:      false,
@@ -405,7 +405,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				Trades:      nil,
 			}
 			for _, trade := range buyTrades {
-				trd := models.Trade{
+				trd := &models.Trade{
 					Price:    trade.Price,
 					Quantity: trade.Volume,
 					ID:       tradeID,
@@ -432,7 +432,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				Trades:      nil,
 			}
 			for _, trade := range sellTrades {
-				trd := models.Trade{
+				trd := &models.Trade{
 					Price:    trade.Price,
 					Quantity: trade.Volume,
 					ID:       tradeID,

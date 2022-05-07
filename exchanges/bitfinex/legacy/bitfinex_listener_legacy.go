@@ -4,7 +4,7 @@ package legacy
 import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bitfinex"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"fmt"
 	"time"
 	exchangeModels "gitlab.com/alphaticks/alpha-connect/models/exchanges"

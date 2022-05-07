@@ -2,7 +2,7 @@ package exchanges
 
 import (
 	"encoding/json"
-	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -19,28 +19,28 @@ import (
 func TestSecurities(t *testing.T) {
 	as := actor.NewActorSystem()
 	exchanges := []*xchangerModels.Exchange{
-		&constants.BITMEX,
-		&constants.BINANCE,
-		&constants.BITFINEX,
-		&constants.BITSTAMP,
-		&constants.COINBASEPRO,
-		&constants.GEMINI,
-		&constants.KRAKEN,
-		&constants.CRYPTOFACILITIES,
-		&constants.OKCOIN,
-		&constants.FBINANCE,
-		&constants.HITBTC,
-		&constants.BITZ,
-		&constants.HUOBI,
-		&constants.FTX,
-		&constants.UPBIT,
+		constants.BITMEX,
+		constants.BINANCE,
+		constants.BITFINEX,
+		constants.BITSTAMP,
+		constants.COINBASEPRO,
+		constants.GEMINI,
+		constants.KRAKEN,
+		constants.CRYPTOFACILITIES,
+		constants.OKCOIN,
+		constants.FBINANCE,
+		constants.HITBTC,
+		constants.BITZ,
+		constants.HUOBI,
+		constants.FTX,
+		constants.UPBIT,
 	}
 	conn, err := grpc.Dial("gs://patrick-configs/assets.json", grpc.WithInsecure())
 	if err != nil {
 		panic(err)
 	}
 	reg := registry.NewPublicRegistryClient(conn)
-	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewAssetLoaderProducer(reg)))
+	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(reg)))
 	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
 	if err != nil {
 		panic(err)

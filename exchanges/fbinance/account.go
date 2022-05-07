@@ -3,9 +3,8 @@ package fbinance
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"gitlab.com/alphaticks/xchanger/utils"
 	"go.mongodb.org/mongo-driver/mongo"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"net"
 	"net/http"
@@ -393,10 +393,10 @@ func (state *AccountListener) OnAccountDataRequest(context actor.Context) error 
 	makerFee := state.account.GetMakerFee()
 	takerFee := state.account.GetTakerFee()
 	if makerFee != nil {
-		res.MakerFee = &types.DoubleValue{Value: *makerFee}
+		res.MakerFee = &wrapperspb.DoubleValue{Value: *makerFee}
 	}
 	if takerFee != nil {
-		res.TakerFee = &types.DoubleValue{Value: *takerFee}
+		res.TakerFee = &wrapperspb.DoubleValue{Value: *takerFee}
 	}
 
 	context.Respond(res)
@@ -467,7 +467,7 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 		OrderID:               "",
 		ClientOrderID:         req.Order.ClientOrderID,
 		Instrument:            req.Order.Instrument,
-		OrderStatus:           models.PendingNew,
+		OrderStatus:           models.OrderStatus_PendingNew,
 		OrderType:             req.Order.OrderType,
 		Side:                  req.Order.OrderSide,
 		TimeInForce:           req.Order.TimeInForce,
@@ -493,18 +493,18 @@ func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingNew {
+			if report.ExecutionType == messages.ExecutionType_PendingNew {
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
+				context.ReenterAfter(fut, func(res interface{}, err error) {
 					if err != nil {
-						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.Other)
+						report, err := state.account.RejectNewOrder(order.ClientOrderID, messages.RejectionReason_Other)
 						if err != nil {
 							panic(err)
 						}
 						context.Respond(&messages.NewOrderSingleResponse{
 							RequestID:       req.RequestID,
 							Success:         false,
-							RejectionReason: messages.Other,
+							RejectionReason: messages.RejectionReason_Other,
 						})
 						if report != nil {
 							report.SeqNum = state.seqNum + 1
@@ -554,11 +554,11 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 	}
 	for _, order := range req.Orders {
 		if order.Instrument == nil || order.Instrument.Symbol == nil {
-			response.RejectionReason = messages.UnknownSymbol
+			response.RejectionReason = messages.RejectionReason_UnknownSymbol
 			context.Respond(response)
 			return nil
 		} else if symbol != order.Instrument.Symbol.Value {
-			response.RejectionReason = messages.DifferentSymbols
+			response.RejectionReason = messages.RejectionReason_DifferentSymbols
 			context.Respond(response)
 			return nil
 		}
@@ -568,7 +568,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			OrderID:               "",
 			ClientOrderID:         reqOrder.ClientOrderID,
 			Instrument:            reqOrder.Instrument,
-			OrderStatus:           models.PendingNew,
+			OrderStatus:           models.OrderStatus_PendingNew,
 			OrderType:             reqOrder.OrderType,
 			Side:                  reqOrder.OrderSide,
 			TimeInForce:           reqOrder.TimeInForce,
@@ -582,7 +582,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		if res != nil {
 			// Cancel all new order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}
@@ -605,10 +605,10 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		context.Send(context.Parent(), report)
 	}
 	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-	context.AwaitFuture(fut, func(res interface{}, err error) {
+	context.ReenterAfter(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
-				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
@@ -622,7 +622,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			context.Respond(&messages.NewOrderBulkResponse{
 				RequestID:       req.RequestID,
 				Success:         false,
-				RejectionReason: messages.Other,
+				RejectionReason: messages.RejectionReason_Other,
 			})
 			return
 		}
@@ -643,7 +643,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 			}
 		} else {
 			for _, r := range reports {
-				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.account.RejectNewOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
@@ -693,11 +693,11 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			report.SeqNum = state.seqNum + 1
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
-			if report.ExecutionType == messages.PendingCancel {
+			if report.ExecutionType == messages.ExecutionType_PendingCancel {
 				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-				context.AwaitFuture(fut, func(res interface{}, err error) {
+				context.ReenterAfter(fut, func(res interface{}, err error) {
 					if err != nil {
-						report, err := state.account.RejectCancelOrder(ID, messages.Other)
+						report, err := state.account.RejectCancelOrder(ID, messages.RejectionReason_Other)
 						if err != nil {
 							panic(err)
 						}
@@ -741,14 +741,14 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	}
 	var reports []*messages.ExecutionReport
 	for _, o := range orders {
-		if o.OrderStatus != models.New && o.OrderStatus != models.PartiallyFilled {
+		if o.OrderStatus != models.OrderStatus_New && o.OrderStatus != models.OrderStatus_PartiallyFilled {
 			continue
 		}
 		report, res := state.account.CancelOrder(o.ClientOrderID)
 		if res != nil {
 			// Reject all cancel order up until now
 			for _, r := range reports {
-				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					return err
 				}
@@ -777,10 +777,10 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		context.Send(context.Parent(), report)
 	}
 	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-	context.AwaitFuture(fut, func(res interface{}, err error) {
+	context.ReenterAfter(fut, func(res interface{}, err error) {
 		if err != nil {
 			for _, r := range reports {
-				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.Other)
+				report, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
 				if err != nil {
 					panic(err)
 				}
@@ -793,7 +793,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 			context.Respond(&messages.OrderMassCancelResponse{
 				RequestID:       req.RequestID,
 				Success:         false,
-				RejectionReason: messages.Other,
+				RejectionReason: messages.RejectionReason_Other,
 			})
 
 			return
@@ -843,7 +843,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			if !state.account.HasOrder(exec.ClientOrderID) {
 				// We don't have the order, was created by another client
 				o := wsOrderToModel(exec)
-				o.OrderStatus = models.PendingNew
+				o.OrderStatus = models.OrderStatus_PendingNew
 				_, rej := state.account.NewOrder(o)
 				if rej != nil {
 					return fmt.Errorf("error creating new order: %s", rej.String())
@@ -901,11 +901,11 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		var reason messages.AccountMovementType
 		switch udata.Account.Reason {
 		case "DEPOSIT":
-			reason = messages.Deposit
+			reason = messages.AccountMovementType_Deposit
 		case "WITHDRAW":
-			reason = messages.Withdrawal
+			reason = messages.AccountMovementType_Withdrawal
 		case "FUNDING_FEE":
-			reason = messages.FundingFee
+			reason = messages.AccountMovementType_FundingFee
 		default:
 			// Skip
 			return nil

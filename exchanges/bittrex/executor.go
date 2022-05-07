@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models/messages/executor"
@@ -87,7 +87,7 @@ func (state *Executor) GetInstrumentsRequest(context actor.Context) error {
 
 	future := context.RequestFuture(state.queryRunner, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
 
-	context.AwaitFuture(future, func(res types{}, err error) {
+	context.ReenterAfter(future, func(res types{}, err error) {
 		if err != nil {
 			context.Respond(&executor.GetInstrumentsResponse{
 				RequestID:   msg.RequestID,

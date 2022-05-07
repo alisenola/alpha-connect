@@ -3,9 +3,8 @@ package cryptofacilities
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -15,6 +14,8 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -156,11 +157,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
 		if instrument.Tradeable {
-			security.Status = models.Trading
+			security.Status = models.InstrumentStatus_Trading
 		} else {
-			security.Status = models.Disabled
+			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = &constants.CRYPTOFACILITIES
+		security.Exchange = constants.CRYPTOFACILITIES
 		splits := strings.Split(instrument.Symbol, "_")
 		switch splits[0] {
 		case "pv":
@@ -184,10 +185,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if err != nil {
 				continue
 			}
-			security.MaturityDate, err = types.TimestampProto(date)
-			if err != nil {
-				continue
-			}
+			security.MaturityDate = timestamppb.New(date)
 		case "fi":
 			// Future inverse
 			security.SecurityType = enum.SecurityType_CRYPTO_FUT
@@ -197,14 +195,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if err != nil {
 				continue
 			}
-			security.MaturityDate, err = types.TimestampProto(date)
-			if err != nil {
-				continue
-			}
+			security.MaturityDate = timestamppb.New(date)
 		}
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-		security.MinPriceIncrement = &types.DoubleValue{Value: instrument.TickSize}
-		security.RoundLot = &types.DoubleValue{Value: float64(instrument.ContractSize)}
+		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: instrument.TickSize}
+		security.RoundLot = &wrapperspb.DoubleValue{Value: float64(instrument.ContractSize)}
 		securities = append(securities, &security)
 	}
 
@@ -234,7 +229,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 	context.Respond(&messages.HistoricalLiquidationsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -244,7 +239,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

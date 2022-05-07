@@ -3,9 +3,8 @@ package bybits
 import (
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybits"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"sort"
@@ -272,8 +272,8 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		Bids:          bids,
 		Asks:          asks,
 		Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-		TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-		LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+		TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+		LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 	}
 	context.Respond(&messages.MarketDataResponse{
 		RequestID:  msg.RequestID,
@@ -307,7 +307,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		for _, dd := range msg {
 			for _, a := range dd.Asks {
-				level := gmodels.OrderBookLevel{
+				level := &gmodels.OrderBookLevel{
 					Price:    a.Price,
 					Quantity: a.Size,
 					Bid:      false,
@@ -316,7 +316,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				obDelta.Levels = append(obDelta.Levels, level)
 			}
 			for _, b := range dd.Bids {
-				level := gmodels.OrderBookLevel{
+				level := &gmodels.OrderBookLevel{
 					Price:    b.Price,
 					Quantity: b.Size,
 					Bid:      true,
@@ -421,7 +421,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 				aggIDLast = aggID
 			}
 
-			trd := models.Trade{
+			trd := &models.Trade{
 				Price:    trade.Price,
 				Quantity: trade.Quantity,
 				ID:       trade.TradeID,

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/protocols"
-	"math"
 	"net"
 	"os"
 	"os/signal"
@@ -13,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/remote"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/remote"
 	"gitlab.com/alphaticks/alpha-connect/data"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/rpc"
@@ -63,37 +62,37 @@ func main() {
 		if actorAdvertisedAddress != "" {
 			conf.AdvertisedHost = actorAdvertisedAddress
 		}
-		conf = conf.WithServerOptions(grpc.MaxRecvMsgSize(math.MaxInt64))
+		//conf = conf.WithServerOptions()
 		rem := remote.NewRemote(as, conf)
 		rem.Start()
 	}
 
 	// Start actors
 	exch := []*models.Exchange{
-		&constants.BINANCE,
-		&constants.BITFINEX,
-		&constants.BITSTAMP,
-		&constants.COINBASEPRO,
-		&constants.GEMINI,
-		&constants.KRAKEN,
-		&constants.CRYPTOFACILITIES,
-		&constants.OKCOIN,
-		&constants.FBINANCE,
-		&constants.HITBTC,
-		&constants.HUOBI,
-		&constants.FTX,
-		&constants.BITMEX,
-		&constants.BITSTAMP,
-		&constants.DERIBIT,
-		&constants.HUOBIP,
-		&constants.HUOBIF,
-		&constants.BYBITI,
-		&constants.BYBITL,
-		&constants.UPBIT,
-		&constants.BITHUMB,
-		&constants.BITHUMBG,
-		&constants.DYDX,
-		&constants.OKEXP,
+		constants.BINANCE,
+		constants.BITFINEX,
+		constants.BITSTAMP,
+		constants.COINBASEPRO,
+		constants.GEMINI,
+		constants.KRAKEN,
+		constants.CRYPTOFACILITIES,
+		constants.OKCOIN,
+		constants.FBINANCE,
+		constants.HITBTC,
+		constants.HUOBI,
+		constants.FTX,
+		constants.BITMEX,
+		constants.BITSTAMP,
+		constants.DERIBIT,
+		constants.HUOBIP,
+		constants.HUOBIF,
+		constants.BYBITI,
+		constants.BYBITL,
+		constants.UPBIT,
+		constants.BITHUMB,
+		constants.BITHUMBG,
+		constants.DYDX,
+		constants.OKEXP,
 	}
 	// EXECUTOR //
 	registryAddress := "registry.alphaticks.io:7001"

@@ -3,8 +3,8 @@ package types
 import (
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
@@ -85,7 +85,7 @@ func (state *BaseExecutor) OnProtocolAssetListRequest(context actor.Context) err
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }
@@ -96,7 +96,7 @@ func (state *BaseExecutor) OnHistoricalProtocolAssetTransferRequest(context acto
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
-		RejectionReason: messages.UnsupportedRequest,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
 	return nil
 }

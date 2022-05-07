@@ -4,9 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/AsynkronIT/protoactor-go/log"
-	"github.com/gogo/protobuf/types"
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/coinbasepro"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
@@ -199,11 +199,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,
 			Instrument: &models.Instrument{
-				SecurityID: &types.UInt64Value{Value: state.security.SecurityID},
+				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
 				Exchange:   state.security.Exchange,
-				Symbol:     &types.StringValue{Value: state.security.Symbol},
+				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
 			},
-			Aggregation: models.L3,
+			Aggregation: models.OrderBookAggregation_L3,
 		},
 		5*time.Second)
 
@@ -318,13 +318,13 @@ func (state *Listener) OnMarketDataRequest(context actor.Context) error {
 		SeqNum:     state.instrumentData.seqNum,
 		Success:    true,
 	}
-	if msg.Aggregation == models.L2 {
+	if msg.Aggregation == models.OrderBookAggregation_L2 {
 		snapshot := &models.OBL2Snapshot{
 			Bids:          state.instrumentData.orderBook.GetBids(0),
 			Asks:          state.instrumentData.orderBook.GetAsks(0),
 			Timestamp:     utils.MilliToTimestamp(state.instrumentData.lastUpdateTime),
-			TickPrecision: &types.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
-			LotPrecision:  &types.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
+			TickPrecision: &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.TickPrecision},
+			LotPrecision:  &wrapperspb.UInt64Value{Value: state.instrumentData.orderBook.LotPrecision},
 		}
 		response.SnapshotL2 = snapshot
 	}
@@ -445,7 +445,7 @@ func (state *Listener) onOpenOrder(order coinbasepro.WSOpenOrder, context actor.
 		return fmt.Errorf("error parsing order uuid: %v", err)
 	}
 
-	obOrder := gmodels.Order{
+	obOrder := &gmodels.Order{
 		Price:    order.Price,
 		Quantity: order.RemainingSize,
 		Bid:      order.Side == "buy",
@@ -461,7 +461,7 @@ func (state *Listener) onOpenOrder(order coinbasepro.WSOpenOrder, context actor.
 		quantity = state.instrumentData.orderBook.GetAsk(order.Price)
 	}
 
-	levelDelta := gmodels.OrderBookLevel{
+	levelDelta := &gmodels.OrderBookLevel{
 		Price:    order.Price,
 		Quantity: quantity,
 		Bid:      order.Side == "buy",
@@ -476,7 +476,7 @@ func (state *Listener) onOpenOrder(order coinbasepro.WSOpenOrder, context actor.
 
 	// SEND DELTA //
 	obDelta := &models.OBL2Update{
-		Levels:    []gmodels.OrderBookLevel{levelDelta},
+		Levels:    []*gmodels.OrderBookLevel{levelDelta},
 		Timestamp: utils.MilliToTimestamp(ts),
 		Trade:     false,
 	}
@@ -514,7 +514,7 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 	orderID := binary.LittleEndian.Uint64(orderUUID.Bytes()[0:8])
 
 	if instr.orderBook.HasOrder(orderID) {
-		obOrder := gmodels.Order{
+		obOrder := &gmodels.Order{
 			Price:    order.Price,
 			Quantity: order.NewSize,
 			Bid:      order.Side == "buy",
@@ -534,7 +534,7 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 			quantity = instr.orderBook.GetAsk(newOrder.Price)
 		}
 
-		levelDelta := gmodels.OrderBookLevel{
+		levelDelta := &gmodels.OrderBookLevel{
 			Price:    newOrder.Price,
 			Quantity: quantity,
 			Bid:      order.Side == "buy",
@@ -547,7 +547,7 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 		}
 		// SEND DELTA //
 		obDelta := &models.OBL2Update{
-			Levels:    []gmodels.OrderBookLevel{levelDelta},
+			Levels:    []*gmodels.OrderBookLevel{levelDelta},
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
@@ -604,7 +604,7 @@ func (state *Listener) onMatchOrder(order coinbasepro.WSMatchOrder, context acto
 		quantity = instr.orderBook.GetAsk(price)
 	}
 
-	levelDelta := gmodels.OrderBookLevel{
+	levelDelta := &gmodels.OrderBookLevel{
 		Price:    order.Price,
 		Quantity: quantity,
 		Bid:      order.Side == "buy",
@@ -617,7 +617,7 @@ func (state *Listener) onMatchOrder(order coinbasepro.WSMatchOrder, context acto
 	}
 	// SEND OBDELTA //
 	obDelta := &models.OBL2Update{
-		Levels:    []gmodels.OrderBookLevel{levelDelta},
+		Levels:    []*gmodels.OrderBookLevel{levelDelta},
 		Timestamp: utils.MilliToTimestamp(ts),
 		Trade:     true,
 	}
@@ -656,7 +656,7 @@ func (state *Listener) onMatchOrder(order coinbasepro.WSMatchOrder, context acto
 
 	state.instrumentData.aggTrade.Trades = append(
 		state.instrumentData.aggTrade.Trades,
-		models.Trade{
+		&models.Trade{
 			Price:    levelDelta.Price,
 			Quantity: order.Size,
 			ID:       order.Sequence,
@@ -701,7 +701,7 @@ func (state *Listener) onDoneOrder(order coinbasepro.WSDoneOrder, context actor.
 				quantity = instr.orderBook.GetAsk(obOrder.Price)
 			}
 
-			levelDelta := gmodels.OrderBookLevel{
+			levelDelta := &gmodels.OrderBookLevel{
 				Price:    obOrder.Price,
 				Quantity: quantity,
 				Bid:      obOrder.Bid,
@@ -714,7 +714,7 @@ func (state *Listener) onDoneOrder(order coinbasepro.WSDoneOrder, context actor.
 			ts := uint64(order.Time.UnixNano()) / 1000000
 
 			obDelta := &models.OBL2Update{
-				Levels:    []gmodels.OrderBookLevel{levelDelta},
+				Levels:    []*gmodels.OrderBookLevel{levelDelta},
 				Timestamp: utils.MilliToTimestamp(ts),
 				Trade:     false,
 			}
