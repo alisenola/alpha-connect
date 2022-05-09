@@ -756,6 +756,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				if err != nil {
 					return fmt.Errorf("error confirming filled order: %v", err)
 				}
+				fmt.Println("FEE", exec.ExecFee, report.FeeAmount.Value)
 				if report != nil {
 					report.SeqNum = state.seqNum + 1
 					state.seqNum += 1

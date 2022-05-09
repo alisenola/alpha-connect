@@ -95,11 +95,11 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	}
 	response := res.ProtocolAssets
 	for _, protocolAsset := range response {
-		if addr, ok := protocolAsset.Meta["address"]; !ok || len(addr) < 2 {
+		if protocolAsset.ContractAddress == nil || len(protocolAsset.ContractAddress.Value) < 2 {
 			state.logger.Warn("invalid protocol asset address")
 			continue
 		}
-		_, ok := big.NewInt(1).SetString(protocolAsset.Meta["address"][2:], 16)
+		_, ok := big.NewInt(1).SetString(protocolAsset.ContractAddress.Value, 16)
 		if !ok {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
@@ -132,9 +132,10 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 					Name: ch.Name,
 					Type: ch.Type,
 				},
-				CreationDate:  protocolAsset.CreationDate,
-				CreationBlock: protocolAsset.CreationBlock,
-				Meta:          protocolAsset.Meta,
+				CreationDate:    protocolAsset.CreationDate,
+				CreationBlock:   protocolAsset.CreationBlock,
+				ContractAddress: protocolAsset.ContractAddress,
+				Decimals:        protocolAsset.Decimals,
 			})
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
@@ -195,7 +196,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		eabi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
-	addressBig, ok := big.NewInt(1).SetString(pa.Meta["address"][2:], 16)
+	addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value, 16)
 	if !ok {
 		state.logger.Warn("invalid protocol asset address", log.Error(err))
 		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset

@@ -87,17 +87,17 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	}
 	response := res.ProtocolAssets
 	for _, protocolAsset := range response {
-		if addr, ok := protocolAsset.Meta["address"]; !ok || len(addr) < 2 {
+		if protocolAsset.ContractAddress == nil || len(protocolAsset.ContractAddress.Value) < 2 {
 			state.logger.Warn("invalid protocol asset address")
 			continue
 		}
-		_, ok := big.NewInt(1).SetString(protocolAsset.Meta["address"][2:], 16)
+		_, ok := big.NewInt(1).SetString(protocolAsset.ContractAddress.Value[2:], 16)
 		if !ok {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
 		}
-		if _, ok := protocolAsset.Meta["decimals"]; !ok {
-			state.logger.Warn("invalid protocol asset decimals")
+		if protocolAsset.Decimals == nil {
+			state.logger.Warn("unknown protocol asset decimals")
 			continue
 		}
 		as, ok := constants.GetAssetByID(protocolAsset.AssetId)
@@ -119,7 +119,8 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 				Chain:           ch,
 				CreationBlock:   protocolAsset.CreationBlock,
 				CreationDate:    protocolAsset.CreationDate,
-				Meta:            protocolAsset.Meta,
+				ContractAddress: protocolAsset.ContractAddress,
+				Decimals:        protocolAsset.Decimals,
 			})
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)

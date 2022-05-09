@@ -103,13 +103,13 @@ func (state *Listener) Receive(context actor.Context) {
 }
 
 func (state *Listener) Initialize(context actor.Context) error {
-	addr, ok := state.collection.Meta["address"]
-	if !ok || len(addr) < 2 {
-		return fmt.Errorf("invalid collection address: %s", state.collection.Meta["address"])
+	addr := state.collection.ContractAddress
+	if addr == nil || len(addr.Value) < 2 {
+		return fmt.Errorf("invalid collection address")
 	}
-	addressBig, ok := big.NewInt(1).SetString(state.collection.Meta["address"][2:], 16)
+	addressBig, ok := big.NewInt(1).SetString(addr.Value[2:], 16)
 	if !ok {
-		return fmt.Errorf("invalid collection address: %s", state.collection.Meta["address"])
+		return fmt.Errorf("invalid collection address: %s", addr.Value)
 	}
 	copy(state.address[:], addressBig.Bytes())
 
@@ -119,7 +119,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("protocol", "ERC-721"),
-		log.String("contract", addr),
+		log.String("contract", addr.Value),
 	)
 
 	state.instrument = &InstrumentData{

@@ -656,6 +656,8 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220507071824-ca77a4da668c h1:5dx8zst8fjSY0SAP2NOPXF/sbzqJuAbZhVKNqeG3MrY=
 gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220507071824-ca77a4da668c/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220509142452-008a1a45e129 h1:FymMy22dELV4GEHwvKO4z41WfaiBwsPGdJ26J//pgLQ=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220509142452-008a1a45e129/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23/go.mod h1:4QnreY1TWUZ7RGr5jrO+DzUPv4ObemeoPRAse5auY9c=
 gitlab.com/alphaticks/gorderbook v0.0.0-20220507064833-3bb45d8aa619 h1:X7EFaHGctIZ+vgFEN8kcpxygwZzVYJaJtPsXjJvXnoY=

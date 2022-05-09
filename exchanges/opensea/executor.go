@@ -97,7 +97,7 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 	defer cancel()
 	//TODO add matic and solana protocols
 	filter := registry.MarketableProtocolAssetFilter{
-		MarketId: []uint32{constants.OPENSEA.ID},
+		ExchangeId: []uint32{constants.OPENSEA.ID},
 	}
 	in := registry.MarketableProtocolAssetsRequest{
 		Filter: &filter,
@@ -131,11 +131,11 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 	//Create the marketable assets from the protocol assets and the marketable protocol assets
 	for _, marketable := range marketables {
 		pa := idToProtocolAsset[marketable.ProtocolAssetId]
-		if addr, ok := pa.Meta["address"]; !ok || len(addr) < 2 {
+		if pa.ContractAddress == nil || len(pa.ContractAddress.Value) < 2 {
 			state.logger.Warn("invalid protocol asset address")
 			continue
 		}
-		_, ok := big.NewInt(1).SetString(pa.Meta["address"][2:], 16)
+		_, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
 		if !ok {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
@@ -166,7 +166,8 @@ func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) 
 					Chain:           ch,
 					CreationDate:    pa.CreationDate,
 					CreationBlock:   pa.CreationBlock,
-					Meta:            pa.Meta,
+					ContractAddress: pa.ContractAddress,
+					Decimals:        pa.Decimals,
 				},
 				Market: constants.OPENSEA,
 			},
@@ -225,7 +226,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	qr := state.getQueryRunner()
 
 	params := opensea.NewGetEventsParams()
-	add := pAsset.ProtocolAsset.Meta["address"]
+	add := pAsset.ProtocolAsset.ContractAddress.Value
 	params.SetAssetContractAddress(add)
 	params.SetEventType("successful")
 	if req.To != nil {

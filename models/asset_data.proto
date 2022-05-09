@@ -13,7 +13,8 @@ message ProtocolAsset {
     models.Chain chain = 4;
     google.protobuf.UInt64Value creation_block = 5;
     google.protobuf.Timestamp creation_date = 6;
-    map<string, string> meta = 7;
+    google.protobuf.StringValue contract_address = 7;
+    google.protobuf.UInt32Value decimals = 8;
 }
 
 message MarketableProtocolAsset {
