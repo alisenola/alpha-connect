@@ -74,7 +74,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 }
 
 func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
+	if state.registry == nil {
+		return nil
+	}
 	assets := make([]*models.ProtocolAsset, 0)
+
 	reg := state.registry
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
