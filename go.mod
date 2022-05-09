@@ -16,7 +16,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220310143132-1156205f526d
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220507105811-56dca5222bc7
+	gitlab.com/alphaticks/xchanger v0.0.0-20220509103553-c1040d27ea9f
 	go.mongodb.org/mongo-driver v1.9.1
 	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
@@ -98,3 +98,5 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
+
+//replace gitlab.com/alphaticks/xchanger => ../xchanger

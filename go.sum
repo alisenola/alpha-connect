@@ -678,6 +678,8 @@ gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d h1:ADKl
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
 gitlab.com/alphaticks/xchanger v0.0.0-20220507105811-56dca5222bc7 h1:YoNl6EFU7KrDW7q4BJs2HJd2AtDh9ImAJRq94Y91O8s=
 gitlab.com/alphaticks/xchanger v0.0.0-20220507105811-56dca5222bc7/go.mod h1:rrish+CGVGv74jH6YIeGlD9v885HSKm/QRUiQZjNn1w=
+gitlab.com/alphaticks/xchanger v0.0.0-20220509103553-c1040d27ea9f h1:bbetZRr5Q+DxoRIpvyKwQVfwlm6ldr0KRzxgAeHCMsc=
+gitlab.com/alphaticks/xchanger v0.0.0-20220509103553-c1040d27ea9f/go.mod h1:rrish+CGVGv74jH6YIeGlD9v885HSKm/QRUiQZjNn1w=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
