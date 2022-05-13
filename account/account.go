@@ -951,14 +951,12 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	if accnt.MarginCurrency == nil {
-		fmt.Println("NO MARGIN CURRENCY")
 		return 0.
 	}
 	var availableMargin int64 = 0
 	availableMargin += accnt.margin
 	availableMargin += accnt.balances[accnt.MarginCurrency.ID]
 
-	fmt.Println(accnt.balances, accnt.margin)
 	if model != nil {
 		for k, b := range accnt.balances {
 			if k == accnt.MarginCurrency.ID {
