@@ -69,6 +69,7 @@ func (state *MarketData) Receive(context actor.Context) {
 		}
 
 	case *actor.Stopping:
+		state.ticker = nil
 
 	case *actor.Stopped:
 
