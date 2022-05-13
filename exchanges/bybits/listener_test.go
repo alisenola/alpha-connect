@@ -23,19 +23,3 @@ func TestMarketData(t *testing.T) {
 		Status:            models.InstrumentStatus_Trading,
 	})
 }
-
-func TestMarketData2(t *testing.T) {
-	tests.MarketData(t, tests.MDTest{
-		SecurityID:        7604099800167109686,
-		Symbol:            "LTCUSDT",
-		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-		Exchange:          constants.BYBITS,
-		BaseCurrency:      constants.LITECOIN,
-		QuoteCurrency:     constants.TETHER,
-		MinPriceIncrement: 0.01,
-		RoundLot:          1e-05,
-		HasMaturityDate:   false,
-		IsInverse:         false,
-		Status:            models.InstrumentStatus_Trading,
-	})
-}

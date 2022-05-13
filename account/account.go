@@ -62,7 +62,7 @@ type Account struct {
 	securities      map[uint64]Security
 	symbolToSec     map[string]Security
 	positions       map[uint64]*Position
-	balances        map[uint32]uint64
+	balances        map[uint32]int64
 	assets          map[uint32]*xchangerModels.Asset
 	margin          int64
 	MarginCurrency  *xchangerModels.Asset
@@ -81,7 +81,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		ordersClID:      make(map[string]*Order),
 		securities:      make(map[uint64]Security),
 		positions:       make(map[uint64]*Position),
-		balances:        make(map[uint32]uint64),
+		balances:        make(map[uint32]int64),
 		assets:          make(map[uint32]*xchangerModels.Asset),
 		margin:          0,
 		quoteCurrency:   quoteCurrency,
@@ -119,7 +119,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.securities = make(map[uint64]Security)
 	accnt.symbolToSec = make(map[string]Security)
 	accnt.positions = make(map[uint64]*Position)
-	accnt.balances = make(map[uint32]uint64)
+	accnt.balances = make(map[uint32]int64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
 	accnt.takerFee = takerFee
 	accnt.makerFee = makerFee
@@ -221,7 +221,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.margin = 0
 	for _, b := range balances {
 		accnt.assets[b.Asset.ID] = b.Asset
-		accnt.balances[b.Asset.ID] = uint64(math.Round(b.Quantity * accnt.MarginPrecision))
+		accnt.balances[b.Asset.ID] = int64(math.Round(b.Quantity * accnt.MarginPrecision))
 	}
 
 	return nil
@@ -719,11 +719,11 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	switch sec := sec.(type) {
 	case *SpotSecurity:
 		if order.Side == models.Side_Buy {
-			accnt.balances[sec.Underlying.ID] += uint64(math.Round(quantity * accnt.MarginPrecision))
-			accnt.balances[sec.QuoteCurrency.ID] -= uint64(math.Round(quantity * price * accnt.MarginPrecision))
+			accnt.balances[sec.Underlying.ID] += int64(math.Round(quantity * accnt.MarginPrecision))
+			accnt.balances[sec.QuoteCurrency.ID] -= int64(math.Round(quantity * price * accnt.MarginPrecision))
 		} else {
-			accnt.balances[sec.Underlying.ID] -= uint64(math.Round(quantity))
-			accnt.balances[sec.QuoteCurrency.ID] += uint64(math.Round(quantity * price * accnt.MarginPrecision))
+			accnt.balances[sec.Underlying.ID] -= int64(math.Round(quantity))
+			accnt.balances[sec.QuoteCurrency.ID] += int64(math.Round(quantity * price * accnt.MarginPrecision))
 		}
 	case *MarginSecurity:
 		pos := accnt.positions[sec.SecurityID]
@@ -772,7 +772,7 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 	if accnt.MarginCurrency != nil && asset.ID == accnt.MarginCurrency.ID {
 		accnt.margin = 0.
 	}
-	accnt.balances[asset.ID] = uint64(math.Round(balance * accnt.MarginPrecision))
+	accnt.balances[asset.ID] = int64(math.Round(balance * accnt.MarginPrecision))
 	return &messages.AccountUpdate{
 		Type:    reason,
 		Asset:   accnt.assets[asset.ID],
@@ -783,12 +783,7 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 func (accnt *Account) settle() {
 	// Only for margin accounts
 	if accnt.MarginCurrency != nil {
-		if accnt.margin < 0 {
-			// TODO check less than zero
-			accnt.balances[accnt.MarginCurrency.ID] -= uint64(-accnt.margin)
-		} else {
-			accnt.balances[accnt.MarginCurrency.ID] += uint64(accnt.margin)
-		}
+		accnt.balances[accnt.MarginCurrency.ID] += accnt.margin
 		accnt.margin = 0
 	}
 }
@@ -943,12 +938,8 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 	if accnt.MarginCurrency == nil {
 		return 0.
 	}
-	var availableMargin uint64 = 0
-	if accnt.margin < 0 {
-		availableMargin -= uint64(-accnt.margin)
-	} else {
-		availableMargin += uint64(accnt.margin)
-	}
+	var availableMargin int64 = 0
+	availableMargin += accnt.margin
 	availableMargin += accnt.balances[accnt.MarginCurrency.ID]
 
 	if model != nil {
@@ -958,7 +949,7 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 			} else {
 				pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
 				if ok {
-					availableMargin += uint64(math.Round(float64(b) * pp))
+					availableMargin += int64(math.Round(float64(b) * pp))
 				}
 			}
 		}

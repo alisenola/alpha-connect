@@ -1198,6 +1198,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 				state.logger.Error("got balance for unknown asset", log.String("asset", b.Coin))
 				continue
 			}
+			fmt.Println("BALANCE", asset, b.Total)
 			response.Balances = append(response.Balances, &models.Balance{
 				Account:  msg.Account.Name,
 				Asset:    asset,

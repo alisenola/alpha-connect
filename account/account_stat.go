@@ -127,12 +127,8 @@ func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.Marke
 func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	var availableMargin uint64 = 0
-	if accnt.margin < 0 {
-		availableMargin -= uint64(-accnt.margin)
-	} else {
-		availableMargin += uint64(accnt.margin)
-	}
+	var availableMargin int64 = 0
+	availableMargin += accnt.margin
 	availableMargin += accnt.balances[accnt.MarginCurrency.ID]
 
 	usedMargin := 0.
