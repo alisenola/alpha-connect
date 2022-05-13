@@ -292,6 +292,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.Exchanges {
+		fmt.Println("NEW EXCHANGE", exch.Name)
 		producer := NewExchangeExecutorProducer(exch, state.DialerPool, state.ExecutorConfig)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)

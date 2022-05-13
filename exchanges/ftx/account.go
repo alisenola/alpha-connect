@@ -295,6 +295,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	m := modeling.NewMapMarketModel()
 	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
 	fmt.Println("INIT", state.account.GetMargin(m))
+	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	securityMap := make(map[uint64]*models.Security)
 	for _, sec := range filteredSecurities {
 		securityMap[sec.SecurityID] = sec

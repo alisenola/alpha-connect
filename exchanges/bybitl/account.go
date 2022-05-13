@@ -6,6 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger"
@@ -262,6 +263,11 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
+
+	m := modeling.NewMapMarketModel()
+	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
+	fmt.Println("MARGIN", state.account.GetMargin(nil))
+	fmt.Println("MARGIN", state.account.GetMargin(m))
 
 	checkAccountTicker := time.NewTicker(5 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker

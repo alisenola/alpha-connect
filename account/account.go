@@ -90,17 +90,32 @@ func NewAccount(account *models.Account) (*Account, error) {
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
 		accnt.MarginCurrency = constants.TETHER
+		if constants.TETHER == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
 		accnt.MarginPrecision = 100000000
 	case constants.BITMEX.ID:
 		accnt.MarginCurrency = constants.BITCOIN
+		if constants.BITCOIN == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
 		accnt.MarginPrecision = 1. / 0.00000001
 	case constants.FTX.ID:
 		accnt.MarginCurrency = constants.DOLLAR
+		if constants.DOLLAR == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
 		accnt.MarginPrecision = 100000000
 	case constants.DYDX.ID:
 		accnt.MarginCurrency = constants.USDC
+		if constants.USDC == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
 		accnt.MarginPrecision = 1e6
 	case constants.BYBITL.ID:
+		if constants.TETHER == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
 		accnt.MarginCurrency = constants.TETHER
 		accnt.MarginPrecision = 1e8
 	}
@@ -936,12 +951,14 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	if accnt.MarginCurrency == nil {
+		fmt.Println("NO MARGIN CURRENCY")
 		return 0.
 	}
 	var availableMargin int64 = 0
 	availableMargin += accnt.margin
 	availableMargin += accnt.balances[accnt.MarginCurrency.ID]
 
+	fmt.Println(accnt.balances, accnt.margin)
 	if model != nil {
 		for k, b := range accnt.balances {
 			if k == accnt.MarginCurrency.ID {
