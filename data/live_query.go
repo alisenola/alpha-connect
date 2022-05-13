@@ -165,7 +165,6 @@ func (lq *LiveQuery) next() bool {
 			ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
 
 			snapshot := market.NewRawOrderBook(ob).ToSnapshot()
-
 			if functor, ok := lq.objects[feed.groupID]; ok {
 				deltas, err := functor.ApplySnapshot(snapshot, feed.security.securityID, ts)
 				if err != nil {

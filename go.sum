@@ -712,6 +712,10 @@ gitlab.com/alphaticks/tickfunctors v0.0.0-20220331074342-e03e53c21e43 h1:ObWCdmO
 gitlab.com/alphaticks/tickfunctors v0.0.0-20220331074342-e03e53c21e43/go.mod h1:32uBXYYI55ACR7jEsrOnglGnStFLt0DAGmhy5eVfvPY=
 gitlab.com/alphaticks/tickfunctors v0.0.0-20220507073213-b097675cc3a9 h1:t9oQL4sTX+ukRCQhHX5gRd6g4lodCtQSebB2s8gY+N0=
 gitlab.com/alphaticks/tickfunctors v0.0.0-20220507073213-b097675cc3a9/go.mod h1:6TMFUQ0RE4FaRR1y9CcS2J+yvGUZhUVGy2PyHIltbl0=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220513095946-8560d4509ca3 h1:tjvPKBuB+1aa4eVVsYgemrZVa5Rm53XD539EictjTLU=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220513095946-8560d4509ca3/go.mod h1:1IDrTjbkXq3E2GTtjwhXIk2Y2quCkte6sfG30Eu+7u0=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220513100305-54584c7c93aa h1:h/a0B6xnCI30g5ryzbZw7kzoozMHt16QxQRKcfbpxIY=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20220513100305-54584c7c93aa/go.mod h1:1IDrTjbkXq3E2GTtjwhXIk2Y2quCkte6sfG30Eu+7u0=
 gitlab.com/alphaticks/tickstore v0.0.0-20220507051256-c97068caaf43 h1:LJwU8gEvyup7nbGpdXNlZjBKybJ3mdVp2OETRCdvu0Q=
 gitlab.com/alphaticks/tickstore v0.0.0-20220507051256-c97068caaf43/go.mod h1:arsnz/MR2hHrm79mS+2GunwJzWk1A/CqsGuS998GBj4=
 gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b h1:E24MuDEqPcs7Iq4uVTMgofX6yqZZYLVAlS+EYI2zFUk=
