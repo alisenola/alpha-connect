@@ -121,9 +121,11 @@ func (state *DataManager) OnProtocolAssetTransferResponse(context actor.Context)
 	update := context.Message().(*messages.ProtocolAssetTransferResponse)
 	for k, v := range state.subscribers {
 		forward := &messages.ProtocolAssetTransferResponse{
-			RequestID:  k,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Update:     update.Update,
+			RequestID:       k,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         update.Success,
+			SeqNum:          update.SeqNum,
+			RejectionReason: update.RejectionReason,
 		}
 		context.Send(v, forward)
 	}

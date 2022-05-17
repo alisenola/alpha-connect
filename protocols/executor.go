@@ -259,7 +259,6 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 
 func (state *Executor) OnProtocolAssetDefinition(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetDefinitionRequest)
-	fmt.Println(req.ProtocolAssetID, state.protocolAssets)
 	a, ok := state.protocolAssets[req.ProtocolAssetID]
 	if !ok {
 		context.Respond(&messages.ProtocolAssetDefinitionResponse{
