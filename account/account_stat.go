@@ -149,6 +149,34 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
+func (accnt *Account) GetNetMargin(model modeling.Market) float64 {
+	netMargin := accnt.GetMargin(model)
+	accnt.RLock()
+	defer accnt.RUnlock()
+	//fmt.Println("AV MARGIN", availableMargin)
+	for k, p := range accnt.positions {
+		// Entry price not defined if size = 0, division by 0 !
+		if p.rawSize == 0 {
+			continue
+		}
+		exitPrice, ok := model.GetPrice(k)
+		if !ok {
+			panic("no price for position")
+		}
+		cost := float64(p.cost) / accnt.MarginPrecision
+
+		if p.inverse {
+			unrealizedPnL := (1./exitPrice)*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
+			netMargin += unrealizedPnL
+		} else {
+			unrealizedPnL := exitPrice*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
+			netMargin += unrealizedPnL
+		}
+	}
+
+	return math.Max(netMargin, 0.)
+}
+
 func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
 	availableMargin := accnt.GetMargin(model)
 	accnt.RLock()
