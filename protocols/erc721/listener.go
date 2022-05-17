@@ -29,7 +29,6 @@ type checkSockets struct{}
 //Check socket for uniswap also
 
 type InstrumentData struct {
-	events          []*models.ProtocolAssetUpdate
 	seqNum          uint64
 	lastBlockUpdate uint64
 	lastHB          time.Time
@@ -123,7 +122,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 	)
 
 	state.instrument = &InstrumentData{
-		events:          make([]*models.ProtocolAssetUpdate, 0),
 		seqNum:          uint64(time.Now().UnixNano()),
 		lastBlockUpdate: 0,
 	}
@@ -156,7 +154,6 @@ func (state *Listener) OnProtocolAssetTransferRequest(context actor.Context) err
 	context.Respond(&messages.ProtocolAssetTransferResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Update:     state.instrument.events,
 		Success:    true,
 		SeqNum:     state.instrument.seqNum,
 	})
