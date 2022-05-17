@@ -1231,8 +1231,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 				context.Respond(response)
 				return nil
 			}
-			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
-			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
+			tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
 		} else if req.Order.Instrument.SecurityID != nil {
 			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
 			if !ok {
@@ -1241,8 +1241,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 				return nil
 			}
 			symbol = sec.Symbol
-			tickPrecision = int(math.Log10(math.Ceil(1. / sec.MinPriceIncrement.Value)))
-			lotPrecision = int(math.Log10(math.Ceil(1. / sec.RoundLot.Value)))
+			tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
+			lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
 		}
 	} else {
 		response.RejectionReason = messages.RejectionReason_UnknownSecurityID

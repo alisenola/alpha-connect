@@ -12,43 +12,17 @@ type Market interface {
 	GetPairPrice(base, quote uint32) (float64, bool)
 }
 
-type LongShortModel interface {
-	GetPenalty(fee float64) float64
-	GetScore(ID uint64) (float64, bool)
+type Model interface {
+	Forward(selector int, tick, objectID uint64, object tickobjects.TickObject)
+	Backward()
+	Ready() bool
+	Frequency() uint64
 	GetSelectors() []string
-}
-
-type ConstantLongShortModel struct {
-	penalty float64
-	scores  map[uint64]float64
-}
-
-func NewConstantLongShortModel(penalty float64) *ConstantLongShortModel {
-	return &ConstantLongShortModel{
-		penalty: penalty,
-		scores:  make(map[uint64]float64),
-	}
-}
-
-func (m *ConstantLongShortModel) GetPenalty(_ float64) float64 {
-	return m.penalty
-}
-
-func (m *ConstantLongShortModel) SetScore(ID uint64, score float64) {
-	m.scores[ID] = score
-}
-
-func (m *ConstantLongShortModel) GetScore(ID uint64) (float64, bool) {
-	s, ok := m.scores[ID]
-	return s, ok
-}
-
-func (m *ConstantLongShortModel) GetSelectors() []string {
-	return nil
 }
 
 type MarketModel interface {
 	Market
+	Model
 	GetSamplePairPrices(base uint32, quote uint32, time uint64, sampleSize int) []float64
 	GetSamplePrices(ID uint64, time uint64, sampleSize int) []float64
 	GetSampleMatchBid(ID uint64, time uint64, sampleSize int) []float64
@@ -58,11 +32,157 @@ type MarketModel interface {
 	SetSellTradeModel(ID uint64, model SellTradeModel)
 }
 
+type AllocationModel interface {
+	Model
+	GetAllocationDelta(ID uint64, margin, size, cost float64) (float64, bool)
+}
+
+type LongShortModel interface {
+	Model
+	GetPenalty(fee float64) float64
+	GetScore(ID uint64) (float64, bool)
+	GetSelectors() []string
+}
+
+type LongModel interface {
+	Model
+	GetLongScore(ID uint64) float64
+	//GetExitLongELR(ID uint64, fee, lambda float64) float64
+}
+
+type ShortModel interface {
+	Model
+	GetShortScore(ID uint64) float64
+	//GetExitShortELR(ID uint64, fee, lambda float64) float64
+}
+
+type PriceModel interface {
+	Model
+	GetPrice(feedID uint64) float64
+	GetSamplePrices(feedID uint64, time uint64, sampleSize int) []float64
+}
+
+type SellTradeModel interface {
+	Model
+	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
+}
+
+type BuyTradeModel interface {
+	Model
+	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
+}
+
+type MarketAllocationModel struct {
+	sync.RWMutex
+	AllocationModel
+	prices map[uint64]float64
+}
+
+func NewMarketAllocationModel(model AllocationModel) *MarketAllocationModel {
+	return &MarketAllocationModel{
+		AllocationModel: model,
+		prices:          make(map[uint64]float64),
+	}
+}
+
+func (m *MarketAllocationModel) SetPrice(ID uint64, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	m.prices[ID] = p
+}
+
+func (m *MarketAllocationModel) SetPairPrice(base, quote uint32, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	m.prices[ID] = p
+}
+
+func (m *MarketAllocationModel) GetPrice(ID uint64) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
+func (m *MarketAllocationModel) GetPairPrice(base, quote uint32) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
+type MarketLongShortModel struct {
+	sync.RWMutex
+	model  LongShortModel
+	prices map[uint64]float64
+}
+
+func NewMarketLongShortModel(model LongShortModel) *MarketLongShortModel {
+	return &MarketLongShortModel{
+		model:  model,
+		prices: make(map[uint64]float64),
+	}
+}
+
+func (m *MarketLongShortModel) SetPrice(ID uint64, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	m.prices[ID] = p
+}
+
+func (m *MarketLongShortModel) SetPairPrice(base, quote uint32, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	m.prices[ID] = p
+}
+
+func (m *MarketLongShortModel) GetPrice(ID uint64) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
+func (m *MarketLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
+func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
+	return m.model.GetPenalty(fee)
+}
+
+func (m *MarketLongShortModel) GetScore(ID uint64) (float64, bool) {
+	return m.model.GetScore(ID)
+}
+
 type MapMarketModel struct {
 	buyTradeModels  map[uint64]BuyTradeModel
 	sellTradeModels map[uint64]SellTradeModel
 	priceModels     map[uint64]PriceModel
 	selectors       []string
+}
+
+func (m *MapMarketModel) Forward(selector int, tick, objectID uint64, object tickobjects.TickObject) {
+	return
+}
+
+func (m *MapMarketModel) Backward() {
+	return
+}
+
+func (m *MapMarketModel) Ready() bool {
+	return true
+}
+
+func (m *MapMarketModel) Frequency() uint64 {
+	return 0
 }
 
 func NewMapMarketModel() *MapMarketModel {
@@ -127,113 +247,33 @@ func (m *MapMarketModel) GetSelectors() []string {
 	return m.selectors
 }
 
-type MarketLongShortModel struct {
-	sync.RWMutex
-	model  LongShortModel
-	prices map[uint64]float64
+type ConstantLongShortModel struct {
+	penalty float64
+	scores  map[uint64]float64
 }
 
-func NewMarketLongShortModel(model LongShortModel) *MarketLongShortModel {
-	return &MarketLongShortModel{
-		model:  model,
-		prices: make(map[uint64]float64),
+func NewConstantLongShortModel(penalty float64) *ConstantLongShortModel {
+	return &ConstantLongShortModel{
+		penalty: penalty,
+		scores:  make(map[uint64]float64),
 	}
 }
 
-func (m *MarketLongShortModel) SetPrice(ID uint64, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	m.prices[ID] = p
+func (m *ConstantLongShortModel) GetPenalty(_ float64) float64 {
+	return m.penalty
 }
 
-func (m *MarketLongShortModel) SetPairPrice(base, quote uint32, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	m.prices[ID] = p
+func (m *ConstantLongShortModel) SetScore(ID uint64, score float64) {
+	m.scores[ID] = score
 }
 
-func (m *MarketLongShortModel) GetPrice(ID uint64) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	p, ok := m.prices[ID]
-	return p, ok
+func (m *ConstantLongShortModel) GetScore(ID uint64) (float64, bool) {
+	s, ok := m.scores[ID]
+	return s, ok
 }
 
-func (m *MarketLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	p, ok := m.prices[ID]
-	return p, ok
-}
-
-func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
-	return m.model.GetPenalty(fee)
-}
-
-func (m *MarketLongShortModel) GetScore(ID uint64) (float64, bool) {
-	return m.model.GetScore(ID)
-}
-
-/*
-func (m *MapLongShortModel) GetEnterShortELR(ID uint64, fee, lambda float64) float64 {
-	return m.shortModels[ID].GetEnterShortELR(ID, fee, lambda)
-}
-
-func (m *MapLongShortModel) GetExitShortELR(ID uint64, fee, lambda float64) float64 {
-	return m.shortModels[ID].GetExitShortELR(ID, fee, lambda)
-}
-*/
-
-/*
-func (m *MapModel) Progress(time uint64) {
-	for _, m := range m.priceModels {
-		m.Progress(time)
-	}
-	for _, m := range m.sellTradeModels {
-		m.Progress(time)
-	}
-	for _, m := range m.buyTradeModels {
-		m.Progress(time)
-	}
-}
-*/
-
-type Model interface {
-	Forward(selector int, tick, objectID uint64, object tickobjects.TickObject)
-	Backward()
-	Ready() bool
-	Frequency() uint64
-	GetSelectors() []string
-}
-
-type LongModel interface {
-	Model
-	GetLongScore(ID uint64) float64
-	//GetExitLongELR(ID uint64, fee, lambda float64) float64
-}
-
-type ShortModel interface {
-	Model
-	GetShortScore(ID uint64) float64
-	//GetExitShortELR(ID uint64, fee, lambda float64) float64
-}
-
-type PriceModel interface {
-	Model
-	GetPrice(feedID uint64) float64
-	GetSamplePrices(feedID uint64, time uint64, sampleSize int) []float64
-}
-
-type SellTradeModel interface {
-	Model
-	GetSampleMatchBid(securityID uint64, time uint64, sampleSize int) []float64
-}
-
-type BuyTradeModel interface {
-	Model
-	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
+func (m *ConstantLongShortModel) GetSelectors() []string {
+	return nil
 }
 
 type ConstantPriceModel struct {
