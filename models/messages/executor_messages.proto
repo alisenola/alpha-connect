@@ -68,6 +68,7 @@ enum RejectionReason {
     MissingProtocolAsset = 31;
     UnknownProtocolAsset = 32;
     UnknownAsset = 33;
+    EthRPCTimeout = 34;
 }
 
 enum FeeType {
@@ -584,10 +585,9 @@ message ProtocolAssetTransferRequest{
 message ProtocolAssetTransferResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
-    repeated models.ProtocolAssetUpdate update = 3;
-    uint64 seq_num = 4;
-    bool success = 5;
-    RejectionReason rejection_reason = 6;
+    uint64 seq_num = 3;
+    bool success = 4;
+    RejectionReason rejection_reason = 5;
 }
 
 message ProtocolAssetDataIncrementalRefresh {
