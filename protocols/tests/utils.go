@@ -118,7 +118,16 @@ func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.
 		return nil
 	}
 	state.seqNum = res.SeqNum
-	state.updates = append(state.updates, res.Update)
-	fmt.Println(state.updates)
+	for _, check := range state.updates {
+		for _, up := range res.Update {
+			if up.Block <= check.Block {
+				return fmt.Errorf("incorrect block order, %d >= %d", check.Block, up.Block)
+			}
+			if up.Removed {
+				return fmt.Errorf("block should have been removed")
+			}
+		}
+	}
+	state.updates = append(state.updates, res.Update...)
 	return nil
 }

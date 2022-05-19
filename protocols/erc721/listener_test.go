@@ -1,7 +1,7 @@
 package erc721_test
 
 import (
-	"fmt"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"testing"
 	"time"
 
@@ -13,8 +13,8 @@ import (
 )
 
 func TestListener(t *testing.T) {
-	protocol := models2.Protocol{Name: "ERC-721", ID: 0x01}
-	as, ex, _, clean := tests.StartExecutor(t, &protocol)
+	protocol := constants.ERC721
+	as, ex, _, clean := tests.StartExecutor(t, protocol)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
@@ -30,19 +30,18 @@ func TestListener(t *testing.T) {
 	}
 	assetTest := models.ProtocolAsset{
 		Asset: &models2.Asset{
-			Symbol: "BAYC",
+			ID: 478,
 		},
 	}
 	var asset *models.ProtocolAsset
 	for _, a := range response.ProtocolAssets {
-		if assetTest.Asset.Symbol == a.Asset.Symbol {
+		if assetTest.Asset.ID == a.Asset.ID {
 			asset = a
 		}
 	}
 	if asset == nil {
 		t.Fatal("asset not found")
 	}
-	fmt.Println("asset", asset)
 	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
 	checker := as.Root.Spawn(props)
 	defer as.Root.Poison(checker)
