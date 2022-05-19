@@ -294,9 +294,7 @@ func (state *Listener) onCheckSockets(context actor.Context) error {
 		_, err := state.client.BlockNumber(ctx)
 		if err != nil {
 			state.logger.Info("eth client err", log.Error(err))
-			if err := state.subscribeLogs(context); err != nil {
-				return fmt.Errorf("error subscribing to logs: %v", err)
-			}
+			return fmt.Errorf("error checking sockets: %v", err)
 		}
 	}
 
