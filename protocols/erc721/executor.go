@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sort"
 	"time"
 
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -60,7 +61,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_2)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -228,13 +229,19 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 
 		resp := res.(*jobs.PerformLogsQueryResponse)
 		if resp.Error != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
+			state.logger.Warn("error at eth rpc server", log.Error(resp.Error))
 			msg.RejectionReason = messages.RejectionReason_EthRPCError
 			context.Respond(msg)
 			return
 		}
 
 		events := make([]*models.ProtocolAssetUpdate, 0)
+		sort.Slice(resp.Logs, func(i, j int) bool {
+			if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
+				return resp.Logs[i].Index < resp.Logs[j].Index
+			}
+			return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
+		})
 		for i, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
