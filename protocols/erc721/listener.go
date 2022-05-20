@@ -355,9 +355,9 @@ func (state *Listener) Clean(context actor.Context) error {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
 	}
-	if state.socketTicker != nil {
-		state.socketTicker.Stop()
-		state.socketTicker = nil
+	if state.flushTicker != nil {
+		state.flushTicker.Stop()
+		state.flushTicker = nil
 	}
 	return nil
 }
