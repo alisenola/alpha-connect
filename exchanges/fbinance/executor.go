@@ -140,13 +140,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting exchange info: status code %d", queryResponse.StatusCode)
 	}
 
-	var exchangeInfo fbinance.ExchangeInfo
+	var exchangeInfo fbinance.ExchangeInfoResponse
 	err = json.Unmarshal(queryResponse.Response, &exchangeInfo)
 	if err != nil {
 		return fmt.Errorf("error decoding query response: %v", err)
 	}
 	if exchangeInfo.Code != 0 {
-		return fmt.Errorf("error getting exchange info: %s", exchangeInfo.Msg)
+		return fmt.Errorf("error getting exchange info: %s", exchangeInfo.Message)
 	}
 
 	// Initialize rate limit
@@ -217,7 +217,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			return err
 		}
 	}
-	var exchangeInfo fbinance.ExchangeInfo
+	var exchangeInfo fbinance.ExchangeInfoResponse
 	err = json.Unmarshal(resp.Response, &exchangeInfo)
 	if err != nil {
 		err = fmt.Errorf(
@@ -229,7 +229,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		err = fmt.Errorf(
 			"fbinance api error: %d %s",
 			exchangeInfo.Code,
-			exchangeInfo.Msg)
+			exchangeInfo.Message)
 		return err
 	}
 
@@ -395,7 +395,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				return nil
 			}
 
-			var oires fbinance.OpenInterestData
+			var oires fbinance.OpenInterestResponse
 			err = json.Unmarshal(queryResponse.Response, &oires)
 			if err != nil {
 				state.logger.Info("http error", log.Error(err))
@@ -405,7 +405,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			}
 
 			if oires.Code != 0 {
-				state.logger.Info("http error", log.Error(errors.New(oires.Msg)))
+				state.logger.Info("http error", log.Error(errors.New(oires.Message)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return nil
@@ -491,7 +491,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			}
 			return
 		}
-		var obData fbinance.OrderBookData
+		var obData fbinance.OrderBookResponse
 		err = json.Unmarshal(queryResponse.Response, &obData)
 		if err != nil {
 			err = fmt.Errorf("error decoding query response: %v", err)
@@ -501,7 +501,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			return
 		}
 		if obData.Code != 0 {
-			err = fmt.Errorf("error getting orderbook: %d %s", obData.Code, obData.Msg)
+			err = fmt.Errorf("error getting orderbook: %d %s", obData.Code, obData.Message)
 			state.logger.Info("http client error", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)

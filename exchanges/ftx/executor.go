@@ -198,6 +198,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = market.Name
 		security.Exchange = constants.FTX
 
+		if strings.Contains(market.BaseCurrency, "BEAR") ||
+			strings.Contains(market.BaseCurrency, "BULL") ||
+			strings.Contains(market.BaseCurrency, "HALF") ||
+			strings.Contains(market.BaseCurrency, "HEDGE") {
+			continue
+		}
 		switch market.Type {
 		case "spot":
 			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)

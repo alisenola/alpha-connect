@@ -128,7 +128,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastBlockUpdate: 0,
 	}
 
-	client, err := ethclient.Dial(protocols.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(protocols.ETH_CLIENT_WS_1)
 	if err != nil {
 		return fmt.Errorf("error dialing eth rpc client: %v", err)
 	}

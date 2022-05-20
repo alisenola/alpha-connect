@@ -53,7 +53,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_1)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}

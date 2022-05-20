@@ -216,11 +216,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, symbol := range exchangeInfo.Symbols {
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
-			/*
-				if symbol.Status == "TRADING" {
-					fmt.Println("UNKNOWN BASE CURRENCY", symbol.BaseAsset)
-				}
-			*/
+			if symbol.Status == "TRADING" {
+				state.logger.Info(fmt.Sprintf("unknown base currency %s", symbol.BaseAsset))
+			}
 			continue
 		}
 		quote := symbol.QuoteAsset
