@@ -107,7 +107,7 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, int64, error) {
 			500,
 			false,
 			true,
-			false,
+			true,
 			true,
 			true)
 		if err != nil {
