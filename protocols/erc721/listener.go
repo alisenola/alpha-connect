@@ -161,7 +161,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 			case <-socketTicker.C:
 				context.Send(pid, &checkSockets{})
 			case <-time.After(10 * time.Second):
-				return
+				if socketTicker != state.socketTicker {
+					return
+				}
 			}
 		}
 	}(context.Self())
