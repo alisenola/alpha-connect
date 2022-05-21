@@ -4,9 +4,9 @@ import (
 	"container/list"
 	goContext "context"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"math/big"
 	"reflect"
-	"sort"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -29,12 +29,12 @@ import (
 type checkSockets struct{}
 type flush struct{}
 type protoUpdates struct {
-	*models.ProtocolAssetUpdate
-	Hash  common.Hash
-	Index uint
+	Transfer  *gorderbook_models.AssetTransfer
+	Timestamp *timestamppb.Timestamp
+	Block     uint64
+	Hash      common.Hash
+	Index     uint
 }
-
-//Check socket for uniswap also
 
 type InstrumentData struct {
 	seqNum          uint64
@@ -53,6 +53,7 @@ type Listener struct {
 	socketTicker *time.Ticker
 	flushTicker  *time.Ticker
 	lastPingTime time.Time
+	update       *models.ProtocolAssetUpdate
 	updates      *list.List
 }
 
@@ -237,20 +238,20 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 }
 
 func (state *Listener) onLog(context actor.Context) error {
-	req := context.Message().(*ethTypes.Log)
-	if req.Removed {
+	log := context.Message().(*ethTypes.Log)
+	if log.Removed {
 		el := state.updates.Front()
 		removed := false
 		for ; el != nil; el = el.Next() {
 			update := el.Value.(*protoUpdates)
-			if update.Hash == req.TxHash {
+			if update.Hash == log.TxHash {
 				state.updates.Remove(el)
 				removed = true
 				break
 			}
 		}
 		if !removed {
-			return fmt.Errorf("removed log not found for hash %v", req.TxHash)
+			return fmt.Errorf("removed log not found for hash %v", log.TxHash)
 		}
 	}
 	eabi, err := nft.ERC721MetaData.GetAbi()
@@ -258,33 +259,29 @@ func (state *Listener) onLog(context actor.Context) error {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
 
-	var updt *models.ProtocolAssetUpdate
-	switch req.Topics[0] {
+	switch log.Topics[0] {
 	case eabi.Events["Transfer"].ID:
 		event := new(nft.ERC721Transfer)
-		if err := xutils.UnpackLog(eabi, event, "Transfer", *req); err != nil {
+		if err := xutils.UnpackLog(eabi, event, "Transfer", *log); err != nil {
 			return fmt.Errorf("error unpacking log: %v", err)
 		}
-		block, err := state.client.BlockByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
+		header, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(log.BlockNumber)))
 		if err != nil {
 			return fmt.Errorf("error getting block number: %v", err)
 		}
-		updt = &models.ProtocolAssetUpdate{
+		uptHash := &protoUpdates{
 			Transfer: &gorderbook_models.AssetTransfer{
 				From:    event.From[:],
 				To:      event.To[:],
 				TokenId: event.TokenId.Bytes(),
 			},
-			Block:     req.BlockNumber,
-			Timestamp: utils.SecondToTimestamp(block.Time()),
+			Block:     log.BlockNumber,
+			Timestamp: utils.SecondToTimestamp(header.Time),
+			Hash:      log.TxHash,
+			Index:     log.Index,
 		}
+		state.updates.PushBack(uptHash)
 	}
-	uptHash := &protoUpdates{
-		ProtocolAssetUpdate: updt,
-		Hash:                req.TxHash,
-		Index:               req.Index,
-	}
-	state.updates.PushBack(uptHash)
 	return nil
 }
 
@@ -314,37 +311,34 @@ func (state *Listener) onFlush(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error fetching block number: %v", err)
 	}
-	var updts []*protoUpdates
+	var update *models.ProtocolAssetUpdate
 	for el := state.updates.Front(); el != nil; el = state.updates.Front() {
-		update := el.Value.(*protoUpdates)
-		nextBlock := uint64(0)
-		if el.Next() != nil {
-			nextBlock = el.Next().Value.(*protoUpdates).Block
+		updt := el.Value.(*protoUpdates)
+		if updt.Block > current-4 {
+			// we are done
+			break
 		}
-		if update.Block <= current-4 {
-			updts = append(updts, update)
-			if update.Block != nextBlock {
-				sort.Slice(updts, func(i, j int) bool {
-					return updts[i].Index < updts[j].Index
-				})
-				var u []*models.ProtocolAssetUpdate
-				for _, updt := range updts {
-					u = append(u, updt.ProtocolAssetUpdate)
-				}
+		if update == nil || update.Block != updt.Block {
+			// No update or new block, publish
+			if update != nil {
 				context.Send(context.Parent(),
 					&messages.ProtocolAssetDataIncrementalRefresh{
 						ResponseID: uint64(time.Now().UnixNano()),
 						SeqNum:     state.instrument.seqNum + 1,
-						Update:     u,
+						Update:     update,
 					})
 				state.instrument.lastBlockUpdate = update.Block
 				state.instrument.seqNum += 1
-				updts = nil
+				update = nil
 			}
-			state.updates.Remove(el)
-		} else {
-			break
+			update = &models.ProtocolAssetUpdate{
+				Transfers: nil,
+				Block:     updt.Block,
+				Timestamp: updt.Timestamp,
+			}
 		}
+		update.Transfers = append(update.Transfers, updt.Transfer)
+		state.updates.Remove(el)
 	}
 	return nil
 }

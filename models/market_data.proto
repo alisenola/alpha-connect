@@ -96,7 +96,7 @@ message UPV3Update {
 }
 
 message ProtocolAssetUpdate {
-    gorderbook.models.AssetTransfer transfer = 1;
+    repeated gorderbook.models.AssetTransfer transfers = 1;
     uint64 block = 2;
     google.protobuf.Timestamp timestamp = 3;
 }

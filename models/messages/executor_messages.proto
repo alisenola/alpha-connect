@@ -580,7 +580,7 @@ message ProtocolAssetDataIncrementalRefresh {
     uint64 requestID = 1;
     uint64 responseID = 2;
     uint64 seq_num = 3;
-    repeated models.ProtocolAssetUpdate update = 4;
+    models.ProtocolAssetUpdate update = 4;
 }
 
 message ProtocolAssetDefinitionRequest {

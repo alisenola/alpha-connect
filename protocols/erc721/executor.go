@@ -242,6 +242,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			}
 			return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
 		})
+		var update *models.ProtocolAssetUpdate
 		for i, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
@@ -252,17 +253,25 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					context.Respond(msg)
 					return
 				}
-				t := &models.ProtocolAssetUpdate{
-					Transfer: &gorderbook.AssetTransfer{
-						From:    event.From[:],
-						To:      event.To[:],
-						TokenId: event.TokenId.Bytes(),
-					},
-					Block:     l.BlockNumber,
-					Timestamp: utils.SecondToTimestamp(resp.Times[i]),
+				if update == nil || update.Block != l.BlockNumber {
+					if update != nil {
+						events = append(events, update)
+					}
+					update = &models.ProtocolAssetUpdate{
+						Transfers: nil,
+						Block:     l.BlockNumber,
+						Timestamp: utils.SecondToTimestamp(resp.Times[i]),
+					}
 				}
-				events = append(events, t)
+				update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
+					From:    event.From[:],
+					To:      event.To[:],
+					TokenId: event.TokenId.Bytes(),
+				})
 			}
+		}
+		if update != nil {
+			events = append(events, update)
 		}
 		msg.Update = events
 		msg.Success = true
