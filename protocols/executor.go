@@ -82,9 +82,9 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing HistoricalProtocolAssetTransferRequest", log.Error(err))
 			panic(err)
 		}
-	case *messages.ProtocolAssetTransferRequest:
-		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing ProtocolAssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetDataRequest:
+		if err := state.OnProtocolAssetDataRequest(context); err != nil {
+			state.logger.Error("error processing ProtocolAssetDataRequest", log.Error(err))
 			panic(err)
 		}
 	case *messages.ProtocolAssetDefinitionRequest:
@@ -211,8 +211,8 @@ func (state *Executor) OnProtocolAssetList(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnProtocolAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.ProtocolAssetTransferRequest)
+func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetDataRequest)
 	a, ok := state.protocolAssets[req.ProtocolAssetID]
 	if !ok {
 		context.Respond(&messages.ProtocolAssetList{

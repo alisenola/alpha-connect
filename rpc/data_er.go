@@ -16,6 +16,7 @@ import (
 )
 
 type DataER struct {
+	tickstore_grpc.UnimplementedStoreServer
 	ctx    *actor.RootContext
 	store  *data.StorageClient
 	Logger *log.Logger

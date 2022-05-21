@@ -258,7 +258,6 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 						To:      event.To[:],
 						TokenId: event.TokenId.Bytes(),
 					},
-					Removed:   l.Removed,
 					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(resp.Times[i]),
 				}

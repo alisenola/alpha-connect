@@ -13,7 +13,7 @@ type Listener interface {
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
-	OnTransferDataRequest(context actor.Context) error
+	OnProtocolAssetDataRequest(context actor.Context) error
 }
 
 type BaseListener struct{}
@@ -30,9 +30,9 @@ func (state *BaseListener) Clean(context actor.Context) error {
 	panic("not implemented")
 }
 
-func (state *BaseListener) OnTransferDataRequest(context actor.Context) error {
-	req := context.Message().(*messages.TransferDataRequest)
-	context.Respond(&messages.TransferDataResponse{
+func (state *BaseListener) OnProtocolAssetDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetDataRequest)
+	context.Respond(&messages.ProtocolAssetDataResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
@@ -67,9 +67,9 @@ func (state *BaseListener) Receive(context actor.Context) {
 		}
 		state.GetLogger().Info("actor restarting")
 
-	case *messages.TransferDataRequest:
-		if err := state.OnTransferDataRequest(context); err != nil {
-			state.GetLogger().Error("error processing OnTransferDataRequest", log.Error(err))
+	case *messages.ProtocolAssetDataRequest:
+		if err := state.OnProtocolAssetDataRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnProtocolAssetDataRequest", log.Error(err))
 			panic(err)
 		}
 	}

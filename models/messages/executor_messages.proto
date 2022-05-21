@@ -545,20 +545,6 @@ message OrderMassCancelResponse {
     RejectionReason rejection_reason = 4;
 }
 
-message TransferDataRequest {
-    uint64 requestID = 1;
-    bool subscribe = 2;
-    actor.PID subscriber = 3;
-}
-
-message TransferDataResponse {
-    uint64 requestID = 1;
-    uint64 responseID = 2;
-    uint64 seq_num = 3;
-    bool success = 4;
-    RejectionReason rejection_reason = 5;
-}
-
 message HistoricalProtocolAssetTransferRequest {
     uint64 requestID = 1;
     uint64 protocol_assetID = 2;
@@ -575,14 +561,14 @@ message HistoricalProtocolAssetTransferResponse {
     RejectionReason rejection_reason = 6;
 }
 
-message ProtocolAssetTransferRequest{
+message ProtocolAssetDataRequest{
     uint64 requestID = 1;
     bool subscribe = 2;
     actor.PID subscriber = 3;
     uint64 protocol_assetID = 4;
 }
 
-message ProtocolAssetTransferResponse {
+message ProtocolAssetDataResponse {
     uint64 requestID = 1;
     uint64 responseID = 2;
     uint64 seq_num = 3;

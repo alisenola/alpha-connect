@@ -92,7 +92,7 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.ProtocolAssetListRequest,
 		*messages.ProtocolAssetList,
 		*messages.HistoricalProtocolAssetTransferRequest,
-		*messages.ProtocolAssetTransferRequest,
+		*messages.ProtocolAssetDataRequest,
 		*messages.ProtocolAssetDefinitionRequest:
 		if err := state.OnProtocolsMessage(context); err != nil {
 			state.logger.Error("error processing OnProtocolsMessage", log.Error(err))

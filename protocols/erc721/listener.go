@@ -43,7 +43,7 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	types.Listener
+	types.BaseListener
 	client       *ethclient.Client
 	instrument   *InstrumentData
 	iterator     *xutils.LogIterator
@@ -111,9 +111,9 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing log", log.Error(err))
 			panic(err)
 		}
-	case *messages.ProtocolAssetTransferRequest:
-		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing ProtocolAssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetDataRequest:
+		if err := state.OnProtocolAssetDataRequest(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
 		}
 	}
 }
@@ -188,9 +188,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) OnProtocolAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.ProtocolAssetTransferRequest)
-	context.Respond(&messages.ProtocolAssetTransferResponse{
+func (state *Listener) OnProtocolAssetDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetDataRequest)
+	context.Respond(&messages.ProtocolAssetDataResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
@@ -275,7 +275,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				To:      event.To[:],
 				TokenId: event.TokenId.Bytes(),
 			},
-			Removed:   req.Removed,
 			Block:     req.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(block.Time()),
 		}
