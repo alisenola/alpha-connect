@@ -778,8 +778,8 @@ func (accnt *Account) ConfirmFunding(security uint64, markPrice, fundingFee floa
 }
 
 func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64, reason messages.AccountMovementType) (*messages.AccountUpdate, error) {
-	accnt.RLock()
-	defer accnt.RUnlock()
+	accnt.Lock()
+	defer accnt.Unlock()
 	if _, ok := accnt.assets[asset.ID]; !ok {
 		accnt.assets[asset.ID] = asset
 	}
