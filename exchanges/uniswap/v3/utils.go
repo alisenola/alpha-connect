@@ -12,9 +12,6 @@ const (
 )
 
 func ProcessUpdate(pool *gorderbook.UnipoolV3, update *models.UPV3Update) error {
-	if update.Removed {
-		return nil
-	}
 	if i := update.Initialize; i != nil {
 		sqrt := big.NewInt(1).SetBytes(i.SqrtPriceX96)
 		pool.Initialize(

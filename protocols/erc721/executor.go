@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"sort"
 	"time"
 
 	"gitlab.com/alphaticks/alpha-connect/utils"
@@ -60,7 +61,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_1)
+	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_2)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -99,7 +100,7 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			state.logger.Warn("invalid protocol asset address")
 			continue
 		}
-		_, ok := big.NewInt(1).SetString(protocolAsset.ContractAddress.Value, 16)
+		_, ok := big.NewInt(1).SetString(protocolAsset.ContractAddress.Value[2:], 16)
 		if !ok {
 			state.logger.Warn("invalid protocol asset address", log.Error(err))
 			continue
@@ -196,7 +197,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		eabi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
-	addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value, 16)
+	addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
 	if !ok {
 		state.logger.Warn("invalid protocol asset address", log.Error(err))
 		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
@@ -216,20 +217,31 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
-			msg.RejectionReason = messages.RejectionReason_EthRPCError
+			switch err.Error() {
+			case "future: timeout":
+				msg.RejectionReason = messages.RejectionReason_EthRPCTimeout
+			default:
+				msg.RejectionReason = messages.RejectionReason_EthRPCError
+			}
 			context.Respond(msg)
 			return
 		}
 
 		resp := res.(*jobs.PerformLogsQueryResponse)
 		if resp.Error != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
+			state.logger.Warn("error at eth rpc server", log.Error(resp.Error))
 			msg.RejectionReason = messages.RejectionReason_EthRPCError
 			context.Respond(msg)
 			return
 		}
 
 		events := make([]*models.ProtocolAssetUpdate, 0)
+		sort.Slice(resp.Logs, func(i, j int) bool {
+			if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
+				return resp.Logs[i].Index < resp.Logs[j].Index
+			}
+			return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
+		})
 		for i, l := range resp.Logs {
 			switch l.Topics[0] {
 			case eabi.Events["Transfer"].ID:
@@ -246,7 +258,6 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 						To:      event.To[:],
 						TokenId: event.TokenId.Bytes(),
 					},
-					Removed:   l.Removed,
 					Block:     l.BlockNumber,
 					Timestamp: utils.SecondToTimestamp(resp.Times[i]),
 				}

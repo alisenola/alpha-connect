@@ -20,7 +20,7 @@ import (
 )
 
 func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem, *actor.PID, *actor.PID, func()) {
-	registryAddress := "127.0.0.1:7001"
+	registryAddress := "127.0.0.1:8001"
 	if os.Getenv("REGISTRY_ADDRESS") != "" {
 		registryAddress = os.Getenv("REGISTRY_ADDRESS")
 	}
@@ -34,9 +34,8 @@ func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem
 		Registry:  reg,
 		Protocols: []*models2.Protocol{protocol},
 	}
-	config := actor.Config{}
-	config = config.WithDeveloperSupervisionLogging(true).WithDeadLetterRequestLogging(true)
-	as := actor.NewActorSystemWithConfig(config)
+	config := actor.Config{DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
+	as := actor.NewActorSystemWithConfig(&config)
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(protocols.NewExecutorProducer(&cfg)), "executor")
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +103,9 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	if !ok {
 		return fmt.Errorf("error for type assertion %v", err)
 	}
-	state.updates = updt.Update
+	if !updt.Success {
+		return fmt.Errorf("error on ProtocolAssetTransferResponse, got %s", updt.RejectionReason.String())
+	}
 	return nil
 }
 
@@ -117,7 +118,16 @@ func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.
 		return nil
 	}
 	state.seqNum = res.SeqNum
-	state.updates = append(state.updates, res.Update)
-	fmt.Println(state.updates)
+	for _, check := range state.updates {
+		for _, up := range res.Update {
+			if up.Block <= check.Block {
+				return fmt.Errorf("incorrect block order, %d >= %d", check.Block, up.Block)
+			}
+			if up.Removed {
+				return fmt.Errorf("block should have been removed")
+			}
+		}
+	}
+	state.updates = append(state.updates, res.Update...)
 	return nil
 }

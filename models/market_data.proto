@@ -91,16 +91,14 @@ message UPV3Update {
     gorderbook.models.UPV3Flash flash = 6;
     gorderbook.models.UPV3SetFeeProtocol set_fee_protocol = 7;
     gorderbook.models.UPV3CollectProtocol collect_protocol = 8;
-    bool removed = 9;
-    uint64 block = 10;
-    google.protobuf.Timestamp timestamp = 11;
+    uint64 block = 9;
+    google.protobuf.Timestamp timestamp = 10;
 }
 
 message ProtocolAssetUpdate {
     gorderbook.models.AssetTransfer transfer = 1;
-    bool removed = 2;
-    uint64 block = 3;
-    google.protobuf.Timestamp timestamp = 4;
+    uint64 block = 2;
+    google.protobuf.Timestamp timestamp = 3;
 }
 
 message Trade {

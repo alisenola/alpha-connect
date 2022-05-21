@@ -60,15 +60,15 @@ func (state *DataManager) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
-	case *messages.ProtocolAssetTransferRequest:
-		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing OnProtocolAssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetDataRequest:
+		if err := state.OnProtocolAssetDataRequest(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
 			panic(err)
 		}
 
-	case *messages.ProtocolAssetTransferResponse:
-		if err := state.OnProtocolAssetTransferResponse(context); err != nil {
-			state.logger.Error("error processing OnProtocolAssetTransferResponse", log.Error(err))
+	case *messages.ProtocolAssetDataResponse:
+		if err := state.OnProtocolAssetDataResponse(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetDataResponse", log.Error(err))
 			panic(err)
 		}
 
@@ -104,8 +104,8 @@ func (state *DataManager) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *DataManager) OnProtocolAssetTransferRequest(context actor.Context) error {
-	request := context.Message().(*messages.ProtocolAssetTransferRequest)
+func (state *DataManager) OnProtocolAssetDataRequest(context actor.Context) error {
+	request := context.Message().(*messages.ProtocolAssetDataRequest)
 
 	if request.Subscribe {
 		state.subscribers[request.RequestID] = request.Subscriber
@@ -117,13 +117,15 @@ func (state *DataManager) OnProtocolAssetTransferRequest(context actor.Context) 
 	return nil
 }
 
-func (state *DataManager) OnProtocolAssetTransferResponse(context actor.Context) error {
-	update := context.Message().(*messages.ProtocolAssetTransferResponse)
+func (state *DataManager) OnProtocolAssetDataResponse(context actor.Context) error {
+	update := context.Message().(*messages.ProtocolAssetDataResponse)
 	for k, v := range state.subscribers {
-		forward := &messages.ProtocolAssetTransferResponse{
-			RequestID:  k,
-			ResponseID: uint64(time.Now().UnixNano()),
-			Update:     update.Update,
+		forward := &messages.ProtocolAssetDataResponse{
+			RequestID:       k,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         update.Success,
+			SeqNum:          update.SeqNum,
+			RejectionReason: update.RejectionReason,
 		}
 		context.Send(v, forward)
 	}

@@ -1,10 +1,12 @@
 package erc721
 
 import (
+	"container/list"
 	goContext "context"
 	"fmt"
 	"math/big"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -25,18 +27,23 @@ import (
 )
 
 type checkSockets struct{}
+type flush struct{}
+type protoUpdates struct {
+	*models.ProtocolAssetUpdate
+	Hash  common.Hash
+	Index uint
+}
 
 //Check socket for uniswap also
 
 type InstrumentData struct {
-	events          []*models.ProtocolAssetUpdate
 	seqNum          uint64
 	lastBlockUpdate uint64
 	lastHB          time.Time
 }
 
 type Listener struct {
-	types.Listener
+	types.BaseListener
 	client       *ethclient.Client
 	instrument   *InstrumentData
 	iterator     *xutils.LogIterator
@@ -44,7 +51,9 @@ type Listener struct {
 	collection   *models.ProtocolAsset
 	logger       *log.Logger
 	socketTicker *time.Ticker
+	flushTicker  *time.Ticker
 	lastPingTime time.Time
+	updates      *list.List
 }
 
 func NewListenerProducer(collection *models.ProtocolAsset) actor.Producer {
@@ -60,6 +69,8 @@ func NewListener(collection *models.ProtocolAsset) actor.Actor {
 		collection:   collection,
 		logger:       nil,
 		socketTicker: nil,
+		flushTicker:  nil,
+		updates:      nil,
 	}
 }
 
@@ -90,14 +101,19 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error checking sockets", log.Error(err))
 			panic(err)
 		}
+	case *flush:
+		if err := state.onFlush(context); err != nil {
+			state.logger.Error("error flushing updates", log.Error(err))
+			panic(err)
+		}
 	case *ethTypes.Log:
 		if err := state.onLog(context); err != nil {
 			state.logger.Error("error processing log", log.Error(err))
 			panic(err)
 		}
-	case *messages.ProtocolAssetTransferRequest:
-		if err := state.OnProtocolAssetTransferRequest(context); err != nil {
-			state.logger.Error("error processing ProtocolAssetTransferRequest", log.Error(err))
+	case *messages.ProtocolAssetDataRequest:
+		if err := state.OnProtocolAssetDataRequest(context); err != nil {
+			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
 		}
 	}
 }
@@ -123,12 +139,11 @@ func (state *Listener) Initialize(context actor.Context) error {
 	)
 
 	state.instrument = &InstrumentData{
-		events:          make([]*models.ProtocolAssetUpdate, 0),
 		seqNum:          uint64(time.Now().UnixNano()),
 		lastBlockUpdate: 0,
 	}
 
-	client, err := ethclient.Dial(protocols.ETH_CLIENT_WS_1)
+	client, err := ethclient.Dial(protocols.ETH_CLIENT_WS_2)
 	if err != nil {
 		return fmt.Errorf("error dialing eth rpc client: %v", err)
 	}
@@ -141,22 +156,43 @@ func (state *Listener) Initialize(context actor.Context) error {
 	socketTicker := time.NewTicker(5 * time.Second)
 	state.socketTicker = socketTicker
 	go func(pid *actor.PID) {
-		select {
-		case <-socketTicker.C:
-			context.Send(pid, &checkSockets{})
-		case <-time.After(10 * time.Second):
-			return
+		for {
+			select {
+			case <-socketTicker.C:
+				context.Send(pid, &checkSockets{})
+			case <-time.After(10 * time.Second):
+				if socketTicker != state.socketTicker {
+					return
+				}
+			}
 		}
 	}(context.Self())
+
+	flushTicker := time.NewTicker(10 * time.Second)
+	state.flushTicker = flushTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case <-flushTicker.C:
+				context.Send(pid, &flush{})
+			case <-time.After(20 * time.Second):
+				if flushTicker != state.flushTicker {
+					return
+				}
+			}
+		}
+	}(context.Self())
+
+	state.updates = list.New()
+
 	return nil
 }
 
-func (state *Listener) OnProtocolAssetTransferRequest(context actor.Context) error {
-	req := context.Message().(*messages.ProtocolAssetTransferRequest)
-	context.Respond(&messages.ProtocolAssetTransferResponse{
+func (state *Listener) OnProtocolAssetDataRequest(context actor.Context) error {
+	req := context.Message().(*messages.ProtocolAssetDataRequest)
+	context.Respond(&messages.ProtocolAssetDataResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
-		Update:     state.instrument.events,
 		Success:    true,
 		SeqNum:     state.instrument.seqNum,
 	})
@@ -173,7 +209,6 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
 	it := xutils.NewLogIterator(eabi)
-
 	query := [][]interface{}{{
 		eabi.Events["Transfer"].ID,
 	}}
@@ -203,6 +238,21 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 
 func (state *Listener) onLog(context actor.Context) error {
 	req := context.Message().(*ethTypes.Log)
+	if req.Removed {
+		el := state.updates.Front()
+		removed := false
+		for ; el != nil; el = el.Next() {
+			update := el.Value.(*protoUpdates)
+			if update.Hash == req.TxHash {
+				state.updates.Remove(el)
+				removed = true
+				break
+			}
+		}
+		if !removed {
+			return fmt.Errorf("removed log not found for hash %v", req.TxHash)
+		}
+	}
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting abi: %v", err)
@@ -211,8 +261,8 @@ func (state *Listener) onLog(context actor.Context) error {
 	var updt *models.ProtocolAssetUpdate
 	switch req.Topics[0] {
 	case eabi.Events["Transfer"].ID:
-		event := nft.ERC721Transfer{}
-		if err := xutils.UnpackLog(eabi, &event, "Transfer", *req); err != nil {
+		event := new(nft.ERC721Transfer)
+		if err := xutils.UnpackLog(eabi, event, "Transfer", *req); err != nil {
 			return fmt.Errorf("error unpacking log: %v", err)
 		}
 		block, err := state.client.BlockByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
@@ -225,33 +275,27 @@ func (state *Listener) onLog(context actor.Context) error {
 				To:      event.To[:],
 				TokenId: event.TokenId.Bytes(),
 			},
-			Removed:   event.Raw.Removed,
-			Block:     event.Raw.BlockNumber,
+			Block:     req.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(block.Time()),
 		}
 	}
-	context.Send(
-		context.Parent(),
-		&messages.ProtocolAssetDataIncrementalRefresh{
-			ResponseID: uint64(time.Now().UnixNano()),
-			SeqNum:     state.instrument.seqNum + 1,
-			Update:     updt,
-		})
-	state.instrument.lastBlockUpdate = updt.Block
-	state.instrument.seqNum += 1
+	uptHash := &protoUpdates{
+		ProtocolAssetUpdate: updt,
+		Hash:                req.TxHash,
+		Index:               req.Index,
+	}
+	state.updates.PushBack(uptHash)
 	return nil
 }
 
 func (state *Listener) onCheckSockets(context actor.Context) error {
 	if time.Since(state.lastPingTime) > 5*time.Second {
-		ctx, cancel := goContext.WithTimeout(goContext.Background(), 5*time.Second)
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 		defer cancel()
 		_, err := state.client.BlockNumber(ctx)
 		if err != nil {
 			state.logger.Info("eth client err", log.Error(err))
-			if err := state.subscribeLogs(context); err != nil {
-				return fmt.Errorf("error subscribing to logs: %v", err)
-			}
+			return fmt.Errorf("error checking sockets: %v", err)
 		}
 	}
 
@@ -265,6 +309,54 @@ func (state *Listener) onCheckSockets(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) onFlush(context actor.Context) error {
+	current, err := state.client.BlockNumber(goContext.Background())
+	if err != nil {
+		return fmt.Errorf("error fetching block number: %v", err)
+	}
+	var updts []*protoUpdates
+	for el := state.updates.Front(); el != nil; el = state.updates.Front() {
+		update := el.Value.(*protoUpdates)
+		nextBlock := uint64(0)
+		if el.Next() != nil {
+			nextBlock = el.Next().Value.(*protoUpdates).Block
+		}
+		if update.Block <= current-4 {
+			updts = append(updts, update)
+			if update.Block != nextBlock {
+				sort.Slice(updts, func(i, j int) bool {
+					return updts[i].Index < updts[j].Index
+				})
+				var u []*models.ProtocolAssetUpdate
+				for _, updt := range updts {
+					u = append(u, updt.ProtocolAssetUpdate)
+				}
+				context.Send(context.Parent(),
+					&messages.ProtocolAssetDataIncrementalRefresh{
+						ResponseID: uint64(time.Now().UnixNano()),
+						SeqNum:     state.instrument.seqNum + 1,
+						Update:     u,
+					})
+				state.instrument.lastBlockUpdate = update.Block
+				state.instrument.seqNum += 1
+				updts = nil
+			}
+			state.updates.Remove(el)
+		} else {
+			break
+		}
+	}
+	return nil
+}
+
 func (state *Listener) Clean(context actor.Context) error {
+	if state.socketTicker != nil {
+		state.socketTicker.Stop()
+		state.socketTicker = nil
+	}
+	if state.flushTicker != nil {
+		state.flushTicker.Stop()
+		state.flushTicker = nil
+	}
 	return nil
 }

@@ -284,7 +284,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				SqrtPriceX96: event.SqrtPriceX96.Bytes(),
 				Tick:         int32(event.Tick.Int64()),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -302,7 +301,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -320,7 +318,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:   event.Amount0.Bytes(),
 				Amount1:   event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -336,7 +333,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0:      event.Amount0.Bytes(),
 				Amount1:      event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -353,7 +349,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -367,7 +362,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				Amount0: event.Amount0.Bytes(),
 				Amount1: event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -380,7 +374,6 @@ func (state *Listener) onLog(context actor.Context) error {
 			SetFeeProtocol: &gorderbook.UPV3SetFeeProtocol{
 				FeesProtocol: uint32(event.FeeProtocol0New) + uint32(event.FeeProtocol1New)<<8,
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
@@ -394,7 +387,6 @@ func (state *Listener) onLog(context actor.Context) error {
 				AmountRequested0: event.Amount0.Bytes(),
 				AmountRequested1: event.Amount1.Bytes(),
 			},
-			Removed:   msg.Removed,
 			Block:     msg.BlockNumber,
 			Timestamp: utils.SecondToTimestamp(header.Time),
 		}
