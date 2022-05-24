@@ -12,7 +12,7 @@ func TestExecutorPublic(t *testing.T) {
 	tests.ExPub(t, tests.ExPubTest{
 		Instrument: &models.Instrument{
 			Exchange: constants.FTX,
-			Symbol:   &wrapperspb.StringValue{Value: "BTC-PERP"},
+			Symbol:   &wrapperspb.StringValue{Value: "ZIL-PERP"},
 		},
 		SecurityListRequest: true,
 		MarketDataRequest:   true,

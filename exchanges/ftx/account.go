@@ -171,6 +171,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *ftx.WSOrdersUpdate:
+		if err := state.onWSOrdersUpdate(context); err != nil {
+			state.logger.Error("error processing onWebsocketMessage", log.Error(err))
+			panic(err)
+		}
+
 	case *checkSocket:
 		if err := state.checkSocket(context); err != nil {
 			state.logger.Error("error checking socket", log.Error(err))
@@ -711,9 +717,9 @@ func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.ExecutionType_PendingReplace {
 				if req.Update.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
+					o := state.account.GetOrder(ID)
+					if o == nil {
+						return fmt.Errorf("order does not exists")
 					}
 					req.Update.OrderID = &wrapperspb.StringValue{Value: o.OrderID}
 				}
@@ -798,9 +804,9 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.ExecutionType_PendingCancel {
 				if req.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
+					o := state.account.GetOrder(ID)
+					if o == nil {
+						return fmt.Errorf("order does not exists")
 					}
 					req.OrderID = &wrapperspb.StringValue{Value: o.OrderID}
 				}
@@ -930,6 +936,48 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 	return nil
 }
 
+func (state *AccountListener) onWSOrdersUpdate(context actor.Context) error {
+	res := context.Message().(*ftx.WSOrdersUpdate)
+	fmt.Println("RETRYING")
+	switch res.Order.Status {
+	case ftx.NEW_ORDER:
+		// If we don't have the order, it was created by someone else, add it.
+		if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
+			fmt.Println("INSERTING NEW !!!")
+			_, rej := state.account.NewOrder(WSOrderToModel(res.Order))
+			if rej != nil {
+				return fmt.Errorf("error creating new order: %s", rej.String())
+			}
+			_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+			if err != nil {
+				return fmt.Errorf("error creating new order: %v", err)
+			}
+		}
+	case ftx.CLOSED_ORDER:
+		if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
+			// Order closed because of filled
+			if res.Order.ClientID != nil && state.account.HasOrder(*res.Order.ClientID) {
+				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+				if err != nil {
+					return fmt.Errorf("error confirming new order: %v", err)
+				}
+			}
+			return nil
+		}
+		orderID := fmt.Sprintf("%d", res.Order.ID)
+		report, err := state.account.ConfirmCancelOrder(orderID)
+		if err != nil {
+			return fmt.Errorf("error confirming cancel order: %v", err)
+		}
+		if report != nil {
+			report.SeqNum = state.seqNum + 1
+			state.seqNum += 1
+			context.Send(context.Parent(), report)
+		}
+	}
+	return nil
+}
+
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
 	if state.ws == nil || msg.WSID != state.ws.ID {
@@ -970,7 +1018,25 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				}
 				return nil
 			}
-			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))
+			orderID := fmt.Sprintf("%d", res.Order.ID)
+			order := state.account.GetOrder(orderID)
+			if order == nil {
+				// Order doesn't exists, we need to wait for the executor call to resolve
+				go func() {
+					time.Sleep(100 * time.Millisecond)
+					context.Send(context.Self(), &res)
+				}()
+				return nil
+
+			} else if order.CumQuantity != res.Order.FilledSize {
+				// Order got a fill that we haven't processed yet
+				go func() {
+					time.Sleep(100 * time.Millisecond)
+					context.Send(context.Self(), &res)
+				}()
+				return nil
+			}
+			report, err := state.account.ConfirmCancelOrder(orderID)
 			if err != nil {
 				return fmt.Errorf("error confirming cancel order: %v", err)
 			}

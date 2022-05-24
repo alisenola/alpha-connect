@@ -673,7 +673,10 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 		})
 		return nil
 	}
-	order, _ := state.account.GetOrder(ID)
+	order := state.account.GetOrder(ID)
+	if order == nil {
+		return fmt.Errorf("order %s does not exists", ID)
+	}
 	report, res := state.account.CancelOrder(order.OrderID)
 	req.ClientOrderID = nil
 	req.OrderID = &wrapperspb.StringValue{Value: order.OrderID}

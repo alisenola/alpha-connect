@@ -633,9 +633,9 @@ func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.ExecutionType_PendingReplace {
 				if req.Update.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
+					o := state.account.GetOrder(ID)
+					if o == nil {
+						return fmt.Errorf("order does not exists")
 					}
 					req.Update.OrderID = &wrapperspb.StringValue{Value: o.OrderID}
 				}
@@ -720,9 +720,9 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.ExecutionType_PendingCancel {
 				if req.OrderID == nil {
-					o, err := state.account.GetOrder(ID)
-					if err != nil {
-						return fmt.Errorf("error getting existing order: %v", err)
+					o := state.account.GetOrder(ID)
+					if o == nil {
+						return fmt.Errorf("order does not exists")
 					}
 					req.OrderID = &wrapperspb.StringValue{Value: o.OrderID}
 				}

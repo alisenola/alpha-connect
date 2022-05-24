@@ -795,9 +795,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			fmt.Println(o)
 			switch o.Status {
 			case dydx.ORDER_OPEN, dydx.ORDER_FILLED:
-				ao, err := state.account.GetOrder(o.ClientID)
-				if err != nil {
-					return fmt.Errorf("error getting order: %v", err)
+				ao := state.account.GetOrder(o.ClientID)
+				if ao != nil {
+					return fmt.Errorf("order does not exists")
 				}
 				if ao.OrderStatus == models.OrderStatus_PendingNew {
 					report, err := state.account.ConfirmNewOrder(o.ClientID, o.ID)
@@ -811,9 +811,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					}
 				}
 			case dydx.ORDER_CANCELED:
-				ao, err := state.account.GetOrder(o.ClientID)
-				if err != nil {
-					return fmt.Errorf("error getting order: %v", err)
+				ao := state.account.GetOrder(o.ClientID)
+				if ao != nil {
+					return fmt.Errorf("order does not exists")
 				}
 				if ao.OrderStatus != models.OrderStatus_Canceled {
 					report, err := state.account.ConfirmCancelOrder(o.ClientID)

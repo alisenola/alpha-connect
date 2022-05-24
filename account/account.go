@@ -816,7 +816,7 @@ func (accnt *Account) HasOrder(ID string) bool {
 	return order != nil
 }
 
-func (accnt *Account) GetOrder(ID string) (*models.Order, error) {
+func (accnt *Account) GetOrder(ID string) *models.Order {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	var order *Order
@@ -825,9 +825,9 @@ func (accnt *Account) GetOrder(ID string) (*models.Order, error) {
 		order = accnt.ordersID[ID]
 	}
 	if order == nil {
-		return nil, fmt.Errorf("unknown order %s", ID)
+		return nil
 	}
-	return order.Order, nil
+	return order.Order
 }
 
 func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {

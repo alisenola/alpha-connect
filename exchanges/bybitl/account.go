@@ -733,9 +733,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					context.Send(context.Parent(), report)
 				}
 			case bybitl.OrderFilled:
-				ord, err := state.account.GetOrder(order.OrderLinkId)
-				if err != nil {
-					return fmt.Errorf("error getting order: %v", err)
+				ord := state.account.GetOrder(order.OrderLinkId)
+				if ord == nil {
+					return fmt.Errorf("order %s does not exists", order.OrderLinkId)
 				}
 				// If instantly filled, we will not receive an update with a bybitl.OrderNew status
 				// therefore we won't go through the branch above that confirms the new order.
