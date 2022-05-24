@@ -695,7 +695,9 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
 	if rawFillQuantity == rawLeavesQuantity {
 		order.OrderStatus = models.OrderStatus_Filled
-	} else {
+	} else if order.OrderStatus == models.OrderStatus_New {
+		// Only set it to partially filled if its in new status
+		// otherwise, will overwrite pending state
 		order.OrderStatus = models.OrderStatus_PartiallyFilled
 	}
 	order.lastEventTime = time.Now()
