@@ -3,6 +3,7 @@ package ftx
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -140,4 +141,58 @@ func OrderToModel(o ftx.Order) *models.Order {
 	ord.Price = &wrapperspb.DoubleValue{Value: o.Price}
 
 	return ord
+}
+
+func buildPlaceOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (ftx.NewOrderRequest, *messages.RejectionReason) {
+	request := ftx.NewOrderRequest{
+		Market: symbol,
+	}
+
+	if order.OrderSide == models.Side_Buy {
+		request.Side = ftx.BUY
+	} else {
+		request.Side = ftx.SELL
+	}
+	switch order.OrderType {
+	case models.OrderType_Limit:
+		request.Type = ftx.LIMIT_ORDER
+	case models.OrderType_Market:
+		request.Type = ftx.MARKET_ORDER
+	default:
+		rej := messages.RejectionReason_UnsupportedOrderType
+		return request, &rej
+	}
+
+	request.Size = order.Quantity
+	request.ClientID = order.ClientOrderID
+
+	if order.OrderType != models.OrderType_Market {
+		switch order.TimeInForce {
+		case models.TimeInForce_ImmediateOrCancel:
+			request.Ioc = true
+		case models.TimeInForce_GoodTillCancel:
+			request.Ioc = false
+		default:
+			rej := messages.RejectionReason_UnsupportedOrderTimeInForce
+			return request, &rej
+		}
+	}
+
+	if order.Price != nil {
+		request.Price = &order.Price.Value
+	}
+
+	for _, exec := range order.ExecutionInstructions {
+		switch exec {
+		case models.ExecutionInstruction_ReduceOnly:
+			request.ReduceOnly = true
+		case models.ExecutionInstruction_ParticipateDoNotInitiate:
+			request.PostOnly = true
+		default:
+			rej := messages.RejectionReason_UnsupportedOrderCharacteristic
+			return request, &rej
+		}
+	}
+
+	return request, nil
 }

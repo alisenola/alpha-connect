@@ -111,6 +111,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.AccountInformationRequest:
+		if err := state.OnAccountInformationRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountInformationRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.AccountMovementRequest:
 		if err := state.OnAccountMovementRequest(context); err != nil {
 			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
@@ -283,19 +289,33 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
+	// Then fetch fees
+	res, err = context.RequestFuture(state.ftxExecutor, &messages.AccountInformationRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting account information from executor: %v", err)
+	}
+
+	information, ok := res.(*messages.AccountInformationResponse)
+	if !ok {
+		return fmt.Errorf("was expecting AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !information.Success {
+		return fmt.Errorf("error fetching account information: %s", information.RejectionReason.String())
+	}
+
 	// Sync account
-	// TODO
-	makerFee := 0.
-	takerFee := 0.00038
+	makerFee := information.MakerFee.Value
+	takerFee := information.TakerFee.Value
 	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
-	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	m := modeling.NewMapMarketModel()
 	m.SetPriceModel(uint64(constants.TETHER.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(1))
-	fmt.Println("INIT", state.account.GetMargin(m))
-	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	securityMap := make(map[uint64]*models.Security)
 	for _, sec := range filteredSecurities {
 		securityMap[sec.SecurityID] = sec
@@ -437,7 +457,6 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 }
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
-	fmt.Println("GOT ORDERE STATUS REQUEST")
 	req := context.Message().(*messages.OrderStatusRequest)
 	orders := state.account.GetOrders(req.Filter)
 	context.Respond(&messages.OrderList{
@@ -448,13 +467,17 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 	return nil
 }
 
+func (state *AccountListener) OnAccountInformationRequest(context actor.Context) error {
+	context.Forward(state.ftxExecutor)
+	return nil
+}
+
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
 	context.Forward(state.ftxExecutor)
 	return nil
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	fmt.Println("FORWARDING TRADE CAPTURE REPORT REQUEST")
 	context.Forward(state.ftxExecutor)
 	return nil
 }
@@ -462,7 +485,6 @@ func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context)
 func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	req.Account = state.account.Account
-	fmt.Println("GOT NEW ORDER", req.Order.Instrument)
 	// Check order quantity
 	order := &models.Order{
 		OrderID:               "",
@@ -665,7 +687,6 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 }
 
 func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
-	fmt.Println("ORDER REPLACE REQUEST ACCOUNT")
 	req := context.Message().(*messages.OrderReplaceRequest)
 	var ID string
 	if req.Update.OrigClientOrderID != nil {
@@ -940,7 +961,13 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 		case ftx.CLOSED_ORDER:
 			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
-				// Order closed because of filled, let the fill update manage it
+				// Order closed because of filled
+				if res.Order.ClientID != nil && state.account.HasOrder(*res.Order.ClientID) {
+					_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+					if err != nil {
+						return fmt.Errorf("error confirming new order: %v", err)
+					}
+				}
 				return nil
 			}
 			report, err := state.account.ConfirmCancelOrder(fmt.Sprintf("%d", res.Order.ID))

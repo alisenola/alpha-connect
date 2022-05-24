@@ -15,6 +15,7 @@ import (
 type AccountTest struct {
 	Account                 *models.Account
 	Instrument              *models.Instrument
+	SkipCheckBalance        bool
 	OrderStatusRequest      bool
 	NewOrderBulkRequest     bool
 	GetPositionsLimit       bool
@@ -140,8 +141,6 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderMassCancelRequest {
 		OrderMassCancelRequest(t, ctx, tc)
 	}
-
-	time.Sleep(1 * time.Minute)
 }
 
 func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
@@ -638,7 +637,8 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Limit,
 			OrderSide:     models.Side_Sell,
-			Price:         &wrapperspb.DoubleValue{Value: 32000},
+			TimeInForce:   models.TimeInForce_GoodTillCancel,
+			Price:         &wrapperspb.DoubleValue{Value: 28000},
 			Quantity:      0.001,
 		},
 	}, 10*time.Second).Result()
@@ -650,9 +650,11 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		t.Fatalf("error creating new order: %s", newOrderResponse.RejectionReason.String())
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
-	checkBalances(t, ctx.as, ctx.executor, tc.Account)
+	if !tc.SkipCheckBalance {
+		checkBalances(t, ctx.as, ctx.executor, tc.Account)
+	}
 	checkPositions(t, ctx.as, ctx.executor, tc.Account, tc.Instrument)
 	fmt.Println("CLOSING")
 
@@ -665,6 +667,7 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Instrument:            tc.Instrument,
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
+			TimeInForce:           models.TimeInForce_GoodTillCancel,
 			Price:                 &wrapperspb.DoubleValue{Value: 80000},
 			Quantity:              0.001,
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ReduceOnly},

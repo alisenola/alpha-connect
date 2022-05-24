@@ -402,6 +402,81 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnAccountInformationRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountInformationRequest)
+	response := &messages.AccountInformationResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	request, weight, err := ftx.GetAccountInformation(msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.rateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_Other
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.Success = false
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+			}
+			return
+		}
+		var information ftx.AccountInformationResponse
+		err = json.Unmarshal(queryResponse.Response, &information)
+		if err != nil {
+			state.logger.Info("unmarshaling error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if !information.Success {
+			state.logger.Info("api error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		response.MakerFee = &wrapperspb.DoubleValue{Value: information.Result.MakerFee}
+		response.TakerFee = &wrapperspb.DoubleValue{Value: information.Result.TakerFee}
+		response.Success = true
+		context.Respond(response)
+	})
+
+	return nil
+}
+
 func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	msg := context.Message().(*messages.AccountMovementRequest)
 	response := &messages.AccountMovementResponse{
@@ -1101,6 +1176,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && p.Future != symbol {
 				continue
 			}
+			fmt.Println("pos", p)
 			sec, ok := state.symbolToSec[p.Future]
 			if !ok {
 				err := fmt.Errorf("unknown symbol %s", p.Future)
@@ -1217,60 +1293,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	})
 
 	return nil
-}
-
-func buildPlaceOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (ftx.NewOrderRequest, *messages.RejectionReason) {
-	request := ftx.NewOrderRequest{
-		Market: symbol,
-	}
-
-	if order.OrderSide == models.Side_Buy {
-		request.Side = ftx.BUY
-	} else {
-		request.Side = ftx.SELL
-	}
-	switch order.OrderType {
-	case models.OrderType_Limit:
-		request.Type = ftx.LIMIT_ORDER
-	case models.OrderType_Market:
-		request.Type = ftx.MARKET_ORDER
-	default:
-		rej := messages.RejectionReason_UnsupportedOrderType
-		return request, &rej
-	}
-
-	request.Size = order.Quantity
-	request.ClientID = order.ClientOrderID
-
-	if order.OrderType != models.OrderType_Market {
-		switch order.TimeInForce {
-		case models.TimeInForce_ImmediateOrCancel:
-			request.Ioc = true
-		case models.TimeInForce_GoodTillCancel:
-			// Skip
-		default:
-			rej := messages.RejectionReason_UnsupportedOrderTimeInForce
-			return request, &rej
-		}
-	}
-
-	if order.Price != nil {
-		request.Price = &order.Price.Value
-	}
-
-	for _, exec := range order.ExecutionInstructions {
-		switch exec {
-		case models.ExecutionInstruction_ReduceOnly:
-			request.ReduceOnly = true
-		case models.ExecutionInstruction_ParticipateDoNotInitiate:
-			request.PostOnly = true
-		default:
-			rej := messages.RejectionReason_UnsupportedOrderCharacteristic
-			return request, &rej
-		}
-	}
-
-	return request, nil
 }
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {

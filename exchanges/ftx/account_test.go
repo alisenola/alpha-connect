@@ -18,19 +18,21 @@ var ftxAccount = &models.Account{
 	Name:     "299211",
 	Exchange: constants.FTX,
 	ApiCredentials: &xchangerModels.APICredentials{
-		APIKey:    "ej2YRRJMMwQD2qjOaRQnB18K7EWTpy3fRTP1ZZoX",
-		APISecret: "MjJSlt1ix9OLpQLzkaQPlD_-y-N7c_2-6ZQJiwlY",
+		AccountID: "integration-test",
+		APIKey:    "9VSHd0TKq5i5pRif3rJN1oB3fi2pUaNqweRSYMFZ",
+		APISecret: "R3ImbLQWsY3oJ5dXMogDP-0VmLT0BoOaTPwttmTR",
 	},
 }
 
 func TestAccountListener(t *testing.T) {
 	tests.AccntTest(t, tests.AccountTest{
-		Account:                 ftxAccount,
-		Instrument:              instrument,
-		OrderStatusRequest:      true,
-		OrderReplaceRequest:     true,
-		OrderBulkReplaceRequest: true,
-		GetPositionsLimit:       true,
-		GetPositionsMarket:      true,
+		Account:    ftxAccount,
+		Instrument: instrument,
+		//OrderStatusRequest:      true,
+		//OrderReplaceRequest:     true,
+		//OrderBulkReplaceRequest: true,
+		GetPositionsLimit: true,
+		SkipCheckBalance:  true,
+		//GetPositionsMarket:      true,
 	})
 }

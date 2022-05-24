@@ -104,7 +104,8 @@ func (state *AccountManager) Receive(context actor.Context) {
 		*messages.OrderReplaceRequest,
 		*messages.OrderBulkReplaceRequest,
 		*messages.TradeCaptureReportRequest,
-		*messages.AccountMovementRequest:
+		*messages.AccountMovementRequest,
+		*messages.AccountInformationRequest:
 
 		context.Forward(state.listener)
 

@@ -22,6 +22,7 @@ type Executor interface {
 	OnHistoricalLiquidationsRequest(context actor.Context) error
 	OnMarketStatisticsRequest(context actor.Context) error
 	OnMarketDataRequest(context actor.Context) error
+	OnAccountInformationRequest(context actor.Context) error
 	OnAccountMovementRequest(context actor.Context) error
 	OnTradeCaptureReportRequest(context actor.Context) error
 	OnOrderStatusRequest(context actor.Context) error
@@ -146,6 +147,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 	case *messages.BalancesRequest:
 		if err := state.OnBalancesRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnBalancesRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.AccountInformationRequest:
+		if err := state.OnAccountInformationRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnAccountInformationRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -318,6 +325,17 @@ func (state *BaseExecutor) OnMarketStatisticsRequest(context actor.Context) erro
 func (state *BaseExecutor) OnMarketDataRequest(context actor.Context) error {
 	req := context.Message().(*messages.MarketDataRequest)
 	context.Respond(&messages.MarketDataResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      rand.Uint64(),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnAccountInformationRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountInformationRequest)
+	context.Respond(&messages.AccountInformationResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      rand.Uint64(),
 		Success:         false,

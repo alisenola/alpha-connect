@@ -278,6 +278,20 @@ message AccountMovement {
     google.protobuf.Timestamp time = 6;
 }
 
+message AccountInformationRequest {
+    uint64 requestID = 1;
+    models.Account account = 2;
+}
+
+message AccountInformationResponse {
+    uint64 requestID = 1;
+    uint64 responseID = 2;
+    google.protobuf.DoubleValue maker_fee = 3;
+    google.protobuf.DoubleValue taker_fee = 4;
+    bool success = 5;
+    RejectionReason rejection_reason = 6;
+}
+
 message AccountMovementRequest {
     uint64 requestID = 1;
     models.Account account = 2;

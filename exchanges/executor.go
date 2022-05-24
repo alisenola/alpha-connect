@@ -175,6 +175,13 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnMarketableProtocolAssetList", log.Error(err))
 			panic(err)
 		}
+
+	case *messages.AccountInformationRequest:
+		if err := state.OnAccountInformationRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountInformationRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.AccountMovementRequest:
 		if err := state.OnAccountMovementRequest(context); err != nil {
 			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
@@ -836,6 +843,33 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if !ok {
 		fmt.Println("NOT FOUND", state.accountManagers)
 		context.Respond(&messages.TradeCaptureReport{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
+		})
+		return nil
+	}
+	context.Forward(accountManager)
+	return nil
+}
+
+func (state *Executor) OnAccountInformationRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountInformationRequest)
+	if msg.Account == nil {
+		fmt.Println("NIL")
+		context.Respond(&messages.AccountInformationResponse{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.RejectionReason_InvalidAccount,
+		})
+		return nil
+	}
+	accountManager, ok := state.accountManagers[msg.Account.Name]
+	if !ok {
+		fmt.Println("NOT FOUND", state.accountManagers)
+		context.Respond(&messages.AccountInformationResponse{
 			RequestID:       msg.RequestID,
 			ResponseID:      uint64(time.Now().UnixNano()),
 			Success:         false,
