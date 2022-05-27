@@ -810,11 +810,11 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			if market == "LUNC-PERP" {
 				market = "LUNA-PERP"
 			}
-			if _, ok := state.symbolToSec[t.Market]; ok {
-				sec := state.symbolToSec[t.Market]
+			if _, ok := state.symbolToSec[market]; ok {
+				sec := state.symbolToSec[market]
 				instrument = &models.Instrument{
 					Exchange:   constants.FTX,
-					Symbol:     &wrapperspb.StringValue{Value: t.Market},
+					Symbol:     &wrapperspb.StringValue{Value: market},
 					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 				}
 			} else {
