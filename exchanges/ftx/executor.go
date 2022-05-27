@@ -806,6 +806,10 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		for _, t := range trades.Result {
 			quantityMul := 1.
 			var instrument *models.Instrument
+			market := t.Market
+			if market == "LUNC-PERP" {
+				market = "LUNA-PERP"
+			}
 			if _, ok := state.symbolToSec[t.Market]; ok {
 				sec := state.symbolToSec[t.Market]
 				instrument = &models.Instrument{
