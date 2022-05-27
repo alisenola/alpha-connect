@@ -311,6 +311,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				splits := strings.Split(trd.Instrument.Symbol.Value, "-")
 				base, ok := constants.GetAssetBySymbol(splits[0])
 				if !ok {
+					fmt.Println(trd)
 					return fmt.Errorf("unknown symbol: %s", splits[0])
 				}
 				quote, ok := constants.GetAssetBySymbol(splits[1])
