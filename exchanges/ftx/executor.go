@@ -814,6 +814,9 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 				}
 			} else {
+				if t.QuoteCurrency == "" || t.BaseCurrency == "" {
+					fmt.Println(t)
+				}
 				instrument = &models.Instrument{
 					Exchange:   constants.FTX,
 					Symbol:     &wrapperspb.StringValue{Value: t.BaseCurrency + "-" + t.QuoteCurrency},
