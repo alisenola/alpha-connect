@@ -6,6 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"go.mongodb.org/mongo-driver/mongo"
 	"reflect"
 )
@@ -19,28 +20,30 @@ type AccountManager struct {
 	blcSubscribers  map[uint64]*actor.PID
 	listener        *actor.PID
 	account         *account.Account
+	registry        registry.PublicRegistryClient
 	txs             *mongo.Collection
 	execs           *mongo.Collection
 	logger          *log.Logger
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(account *account.Account, db *mongo.Database, paperTrading bool) actor.Producer {
+func NewAccountManagerProducer(account *account.Account, registry registry.PublicRegistryClient, db *mongo.Database, paperTrading bool) actor.Producer {
 	if db != nil {
 		return func() actor.Actor {
-			return NewAccountManager(account, db.Collection("transactions"), db.Collection("executions"), paperTrading)
+			return NewAccountManager(account, registry, db.Collection("transactions"), db.Collection("executions"), paperTrading)
 		}
 	} else {
 		return func() actor.Actor {
-			return NewAccountManager(account, nil, nil, paperTrading)
+			return NewAccountManager(account, registry, nil, nil, paperTrading)
 		}
 	}
 }
 
-func NewAccountManager(account *account.Account, txs, execs *mongo.Collection, paperTrading bool) actor.Actor {
+func NewAccountManager(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection, paperTrading bool) actor.Actor {
 	return &AccountManager{
 		account:      account,
 		txs:          txs,
+		registry:     registry,
 		execs:        execs,
 		logger:       nil,
 		paperTrading: paperTrading,
@@ -140,7 +143,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 			return fmt.Errorf("error getting account listener")
 		}
 	} else {
-		producer = NewAccountListenerProducer(state.account, state.txs, state.execs)
+		producer = NewAccountListenerProducer(state.account, state.registry, state.txs, state.execs)
 		if producer == nil {
 			return fmt.Errorf("error getting account listener")
 		}

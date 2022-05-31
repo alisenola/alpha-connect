@@ -394,7 +394,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.Accounts {
-		producer := NewAccountManagerProducer(accnt, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -428,7 +428,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -1159,7 +1159,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}

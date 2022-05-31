@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
@@ -32,6 +33,7 @@ type AccountListener struct {
 	ws                    *ftx.Websocket
 	executorManager       *actor.PID
 	logger                *log.Logger
+	registry              registry.PublicRegistryClient
 	checkAccountTicker    *time.Ticker
 	checkSocketTicker     *time.Ticker
 	checkExpirationTicker *time.Ticker
@@ -43,15 +45,16 @@ type AccountListener struct {
 	reconciler            *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, txs, execs)
+		return NewAccountListener(account, registry, txs, execs)
 	}
 }
 
-func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Actor {
 	return &AccountListener{
 		account:         account,
+		registry:        registry,
 		seqNum:          0,
 		ws:              nil,
 		executorManager: nil,
@@ -331,7 +334,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	if state.txs != nil {
 		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.txs))
 		state.reconciler = context.Spawn(props)
 	}
 

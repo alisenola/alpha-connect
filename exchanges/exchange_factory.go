@@ -35,6 +35,7 @@ import (
 	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/upbit"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 	"gitlab.com/alphaticks/xchanger/utils"
@@ -56,7 +57,7 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
@@ -65,7 +66,7 @@ func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Coll
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewAccountListener(account, txs, execs) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewAccountListener(account, txs, execs) }
+		return func() actor.Actor { return ftx.NewAccountListener(account, registry, txs, execs) }
 	case constants.FTXUS.ID:
 		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	case constants.DYDX.ID:

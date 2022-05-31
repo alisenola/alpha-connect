@@ -10,12 +10,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"math"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,25 +28,28 @@ type AccountReconcile struct {
 	account          *models.Account
 	ftxExecutor      *actor.PID
 	logger           *log.Logger
-	securities       map[uint64]*models.Security
+	securities       map[uint64]*registry.Security
+	symbToSecs       map[string]*registry.Security
 	txs              *mongo.Collection
-	positions        map[string]*account.Position
+	registry         registry.PublicRegistryClient
+	positions        map[uint64]*account.Position
 	lastDepositTs    uint64
 	lastWithdrawalTs uint64
 	lastFundingTs    uint64
 	lastTradeTs      uint64
 }
 
-func NewAccountReconcileProducer(account *models.Account, txs *mongo.Collection) actor.Producer {
+func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, txs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountReconcile(account, txs)
+		return NewAccountReconcile(account, registry, txs)
 	}
 }
 
-func NewAccountReconcile(account *models.Account, txs *mongo.Collection) actor.Actor {
+func NewAccountReconcile(account *models.Account, registry registry.PublicRegistryClient, txs *mongo.Collection) actor.Actor {
 	return &AccountReconcile{
-		account: account,
-		txs:     txs,
+		account:  account,
+		txs:      txs,
+		registry: registry,
 	}
 }
 
@@ -67,40 +71,29 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 	state.ftxExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FTX.Name+"_executor")
 	// Request securities
-	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
-	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err := state.registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
+		Filter: &registry.SecurityFilter{
+			Exchange: []string{constants.FTX.Name},
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("error getting securities: %v", err)
-	}
-	securityList, ok := res.(*messages.SecurityList)
-	if !ok {
-		return fmt.Errorf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
-	}
-	if !securityList.Success {
-		return fmt.Errorf("error getting securities: %s", securityList.RejectionReason.String())
-	}
-	// TODO filtering should be done by the executor, when specifying exchange in the request
-	var filteredSecurities []*models.Security
-	for _, s := range securityList.Securities {
-		if s.Exchange.ID == state.account.Exchange.ID {
-			filteredSecurities = append(filteredSecurities, s)
-		}
+		return fmt.Errorf("error fetching historical securities: %v", err)
 	}
 
-	securityMap := make(map[uint64]*models.Security)
-	for _, sec := range filteredSecurities {
-		securityMap[sec.SecurityID] = sec
+	state.symbToSecs = make(map[string]*registry.Security)
+	securityMap := make(map[uint64]*registry.Security)
+	for _, sec := range res.Securities {
+		securityMap[sec.SecurityId] = sec
+		state.symbToSecs[sec.Symbol] = sec
 	}
 	state.securities = securityMap
 
 	// Start reconciliation
-	state.positions = make(map[string]*account.Position)
+	state.positions = make(map[uint64]*account.Position)
 	for _, sec := range state.securities {
 		if sec.SecurityType == "CRPERP" {
-			tp := math.Ceil(1. / sec.MinPriceIncrement.Value)
-			lp := math.Ceil(1. / sec.RoundLot.Value)
-			state.positions[fmt.Sprintf("%d", sec.SecurityID)] = account.NewPosition(
-				sec.IsInverse, tp, lp, 1e8, sec.Multiplier.Value, 0, 0)
+			state.positions[sec.SecurityId] = account.NewPosition(
+				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
 	// First, calculate current positions from historical
@@ -123,9 +116,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 				sec, ok := state.securities[secID]
 				if ok && sec.SecurityType == "CRPERP" {
 					if tx.Fill.Quantity < 0 {
-						state.positions[tx.Fill.SecurityID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
+						state.positions[secID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
 					} else {
-						state.positions[tx.Fill.SecurityID].Buy(tx.Fill.Price, tx.Fill.Quantity, false)
+						state.positions[secID].Buy(tx.Fill.Price, tx.Fill.Quantity, false)
 					}
 				}
 				state.lastTradeTs = uint64(tx.Time.UnixNano() / 1000000)
@@ -145,8 +138,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 
 	for k, pos := range state.positions {
 		if ppos := pos.GetPosition(); ppos != nil {
-			kid, _ := strconv.ParseUint(k, 10, 64)
-			fmt.Println(state.securities[kid].Symbol, ppos.Quantity)
+			fmt.Println(state.securities[k].Symbol, ppos.Quantity)
 		}
 	}
 
@@ -201,7 +193,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	if err := state.reconcileTrades(context); err != nil {
 		return fmt.Errorf("error reconcile trade: %v", err)
 	}
-
 	if err := state.reconcileMovements(context); err != nil {
 		return fmt.Errorf("error reconcile movements: %v", err)
 	}
@@ -274,15 +265,22 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					Quantity:   trd.Quantity,
 				},
 			}
-			if trd.Instrument.SecurityID != nil {
-				sec := state.securities[trd.Instrument.SecurityID.Value]
+			securityID := trd.Instrument.SecurityID
+			if securityID == nil {
+				sec, ok := state.symbToSecs[trd.Instrument.Symbol.Value]
+				if ok {
+					securityID = &wrapperspb.UInt64Value{Value: sec.SecurityId}
+				}
+			}
+			if securityID != nil {
+				sec := state.securities[securityID.Value]
 				switch sec.SecurityType {
 				case "CRPERP", "CRFUT":
 					var realized int64
 					if trd.Quantity < 0 {
-						_, realized = state.positions[secID].Sell(trd.Price, -trd.Quantity, false)
+						_, realized = state.positions[sec.SecurityId].Sell(trd.Price, -trd.Quantity, false)
 					} else {
-						_, realized = state.positions[secID].Buy(trd.Price, trd.Quantity, false)
+						_, realized = state.positions[sec.SecurityId].Buy(trd.Price, trd.Quantity, false)
 					}
 					// Realized PnL
 					if realized != 0 {
@@ -294,14 +292,16 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					}
 				case "CRSPOT":
 					// SPOT trade
+					b, _ := constants.GetAssetBySymbol(sec.BaseCurrency)
 					tx.Movements = append(tx.Movements, extypes.Movement{
 						Reason:   int32(messages.AccountMovementType_Exchange),
-						AssetID:  sec.Underlying.ID,
+						AssetID:  b.ID,
 						Quantity: trd.Quantity,
 					})
+					q, _ := constants.GetAssetBySymbol(sec.QuoteCurrency)
 					tx.Movements = append(tx.Movements, extypes.Movement{
 						Reason:   int32(messages.AccountMovementType_Exchange),
-						AssetID:  sec.QuoteCurrency.ID,
+						AssetID:  q.ID,
 						Quantity: -trd.Quantity * trd.Price,
 					})
 				default:
@@ -453,6 +453,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
 				// TODO
 				if wexc, ok := err.(mongo.WriteException); ok && wexc.WriteErrors[0].Code == 11000 {
+					fmt.Println("SKIP DEPOSIT", m)
 					continue
 				} else {
 					return fmt.Errorf("error writing transaction: %v", err)
@@ -491,6 +492,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 		}
 		progress := false
 		for _, m := range mvts.Movements {
+			fmt.Println("WITHDRAWAL", m)
 			ts := m.Time.AsTime()
 			tx := extypes.Transaction{
 				Type:    "WITHDRAWAL",
@@ -508,6 +510,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
 				// TODO
 				if wexc, ok := err.(mongo.WriteException); ok && wexc.WriteErrors[0].Code == 11000 {
+					fmt.Println("SKIP WITHDRAWAL", m)
 					continue
 				} else {
 					return fmt.Errorf("error writing transaction: %v", err)
