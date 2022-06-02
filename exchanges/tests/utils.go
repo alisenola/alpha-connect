@@ -2,78 +2,16 @@ package tests
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/executor"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
-	"os"
 	"reflect"
-	"testing"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/account"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 )
-
-func StartExecutor(t *testing.T, exchange *xchangerModels.Exchange, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
-	registryAddress := "registry.alphaticks.io:8001"
-	if os.Getenv("REGISTRY_ADDRESS") != "" {
-		registryAddress = os.Getenv("REGISTRY_ADDRESS")
-	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg := registry.NewPublicRegistryClient(conn)
-	exch := []*xchangerModels.Exchange{
-		exchange,
-	}
-	configAs := actor.NewConfig() //.WithDeveloperSupervisionLogging(true).WithDeadLetterThrottleCount(1000)
-	as := actor.NewActorSystemWithConfig(configAs)
-
-	rgstr := registry.NewPublicRegistryClient(conn)
-	assetLoader := as.Root.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
-	_, err = as.Root.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
-	if err != nil {
-		panic(err)
-	}
-
-	var accnts []*account.Account
-	if acc != nil {
-		accnt, err := exchanges.NewAccount(acc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		accnts = append(accnts, accnt)
-	}
-
-	credentials := xchangerModels.APICredentials{
-		APIKey: "cb85cb07b83e4d43a2938e44e52f96ee",
-	}
-	cfgEx := &exchanges.ExecutorConfig{
-		Exchanges:          exch,
-		Strict:             true,
-		Accounts:           accnts,
-		OpenseaCredentials: &credentials,
-		DialerPool:         xchangerUtils.DefaultDialerPool,
-		Registry:           reg,
-	}
-	cfgPr := &protocols.ExecutorConfig{
-		Registry:  nil,
-		Protocols: nil,
-	}
-	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgEx, cfgPr)), "executor")
-	return as, exec, func() { _ = as.Root.PoisonFuture(exec).Wait() }
-}
 
 type GetStat struct {
 	Error     error

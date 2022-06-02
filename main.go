@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/chains"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/protocols"
 	"net"
@@ -120,7 +121,11 @@ func main() {
 		Registry:  nil,
 		Protocols: nil,
 	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgExch, cfgPrt)), "executor")
+	cfgCh := &chains.ExecutorConfig{
+		Registry: nil,
+		Chains:   nil,
+	}
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgExch, cfgPrt, cfgCh)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(

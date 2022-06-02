@@ -11,14 +11,10 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/constants"
-	xutils "gitlab.com/alphaticks/xchanger/protocols"
-
-	"gitlab.com/alphaticks/alpha-connect/jobs"
 	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/xchanger/constants"
 )
 
 type QueryRunner struct {
@@ -27,7 +23,6 @@ type QueryRunner struct {
 
 type Executor struct {
 	extype.BaseExecutor
-	queryRunnerETH *QueryRunner
 	protocolAssets map[uint64]*models.ProtocolAsset
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
@@ -35,7 +30,6 @@ type Executor struct {
 
 func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
-		queryRunnerETH: nil,
 		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
@@ -53,16 +47,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_2)
-	if err != nil {
-		return fmt.Errorf("error while dialing eth rpc client %v", err)
-	}
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewETHQuery(client)
-	})
-	state.queryRunnerETH = &QueryRunner{
-		pid: context.Spawn(props),
-	}
 	return state.UpdateProtocolAssetList(context)
 }
 

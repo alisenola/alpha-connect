@@ -1,14 +1,12 @@
 package tests
 
 import (
-	"encoding/json"
-	"io/ioutil"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/tests"
 	"math"
 	"reflect"
 	"testing"
 	"time"
-
-	"gitlab.com/alphaticks/xchanger/constants"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -79,19 +77,10 @@ func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 
 func MarketData(t *testing.T, test MDTest) {
 	t.Parallel()
-	b, err := ioutil.ReadFile("../../assets.json")
-	if err != nil {
-		t.Fatalf("failed to load assets: %v", err)
-	}
-	assets := make(map[uint32]*xchangerModels.Asset)
-	err = json.Unmarshal(b, &assets)
-	if err != nil {
-		t.Fatalf("error parsing assets: %v", err)
-	}
-	if err := constants.LoadAssets(assets); err != nil {
-		t.Fatalf("error loading assets: %v", err)
-	}
-	as, executor, clean := StartExecutor(t, test.Exchange, nil)
+
+	as, executor, clean := tests.StartExecutor(t, &exchanges.ExecutorConfig{
+		Exchanges: []*xchangerModels.Exchange{test.Exchange},
+	}, nil, nil, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()

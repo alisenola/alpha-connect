@@ -1,7 +1,14 @@
 package erc721_test
 
 import (
+	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/chains"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/protocols"
+	exTests "gitlab.com/alphaticks/alpha-connect/tests"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"google.golang.org/grpc"
 	"testing"
 	"time"
 
@@ -9,12 +16,24 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols/tests"
-	models2 "gitlab.com/alphaticks/xchanger/models"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 )
 
 func TestListener(t *testing.T) {
+	exTests.LoadStatics(t)
 	protocol := constants.ERC721
-	as, ex, _, clean := tests.StartExecutor(t, protocol)
+	registryAddress := "registry.alphaticks.io:8001"
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := registry.NewPublicRegistryClient(conn)
+
+	prCfg := &protocols.ExecutorConfig{
+		Registry:  reg,
+		Protocols: []*xchangerModels.Protocol{protocol},
+	}
+	as, ex, clean := exTests.StartExecutor(t, &exchanges.ExecutorConfig{}, prCfg, &chains.ExecutorConfig{}, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
@@ -28,9 +47,10 @@ func TestListener(t *testing.T) {
 	if !ok {
 		t.Fatal("incorrect type assertion")
 	}
+	fmt.Println(response.ProtocolAssets)
 	assetTest := models.ProtocolAsset{
-		Asset: &models2.Asset{
-			ID: 478,
+		Asset: &xchangerModels.Asset{
+			ID: 730,
 		},
 	}
 	var asset *models.ProtocolAsset
@@ -44,6 +64,8 @@ func TestListener(t *testing.T) {
 	}
 	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
 	checker := as.Root.Spawn(props)
-	defer as.Root.Poison(checker)
-	time.Sleep(3000 * time.Second)
+	time.Sleep(80 * time.Second)
+	as.Root.Poison(checker)
+	time.Sleep(10 * time.Second)
+	// TODO check if
 }

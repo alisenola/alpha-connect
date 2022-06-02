@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/chains"
 	"reflect"
 	"time"
 
@@ -14,23 +15,26 @@ import (
 )
 
 type Executor struct {
-	cfgEx      *exchanges.ExecutorConfig
-	cfgPr      *protocols.ExecutorConfig
-	executorEx *actor.PID
-	executorPr *actor.PID
-	logger     *log.Logger
+	cfgEx     *exchanges.ExecutorConfig
+	cfgPr     *protocols.ExecutorConfig
+	cfgCh     *chains.ExecutorConfig
+	exchanges *actor.PID
+	protocols *actor.PID
+	chains    *actor.PID
+	logger    *log.Logger
 }
 
-func NewExecutorProducer(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig, cfgCh *chains.ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(cfgEx, cfgPr)
+		return NewExecutor(cfgEx, cfgPr, cfgCh)
 	}
 }
 
-func NewExecutor(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig) actor.Actor {
+func NewExecutor(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig, cfgCh *chains.ExecutorConfig) actor.Actor {
 	return &Executor{
 		cfgEx: cfgEx,
 		cfgPr: cfgPr,
+		cfgCh: cfgCh,
 	}
 }
 
@@ -89,7 +93,6 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnExchangesMessage", log.Error(err))
 			panic(err)
 		}
-	//state.logger.Info("message forwarded to exchange executor")
 	case *messages.ProtocolAssetListRequest,
 		*messages.ProtocolAssetList,
 		*messages.HistoricalProtocolAssetTransferRequest,
@@ -99,7 +102,13 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnProtocolsMessage", log.Error(err))
 			panic(err)
 		}
-		//state.logger.Info("message forwarded to protocols executor")
+
+	case *messages.EVMLogsQueryRequest,
+		*messages.EVMLogsSubscribeRequest:
+		if err := state.OnChainsMessage(context); err != nil {
+			state.logger.Error("error processing OnChainsMessage", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -119,7 +128,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error spawning exchanges executor: %v", err)
 	}
-	state.executorEx = exEx
+	state.exchanges = exEx
 
 	prProducer := protocols.NewExecutorProducer(state.cfgPr)
 	prProps := actor.PropsFromProducer(prProducer, actor.WithSupervisor(
@@ -129,23 +138,41 @@ func (state *Executor) Initialize(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error spawning protocols executor: %v", err)
 	}
-	state.executorPr = prEx
+	state.protocols = prEx
+
+	chProducer := chains.NewExecutorProducer(state.cfgCh)
+	chProps := actor.PropsFromProducer(chProducer, actor.WithSupervisor(
+		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
+	))
+	chEx, err := context.SpawnNamed(chProps, "chains")
+	if err != nil {
+		return fmt.Errorf("error spawning chains executor: %v", err)
+	}
+	state.chains = chEx
 	return nil
 }
 
 func (state *Executor) OnExchangesMessage(context actor.Context) error {
-	if state.executorEx == nil {
+	if state.exchanges == nil {
 		return fmt.Errorf("missing exchanges executor")
 	}
-	context.Forward(state.executorEx)
+	context.Forward(state.exchanges)
 	return nil
 }
 
 func (state *Executor) OnProtocolsMessage(context actor.Context) error {
-	if state.executorPr == nil {
+	if state.protocols == nil {
 		return fmt.Errorf("missing protocols executor")
 	}
-	context.Forward(state.executorPr)
+	context.Forward(state.protocols)
+	return nil
+}
+
+func (state *Executor) OnChainsMessage(context actor.Context) error {
+	if state.chains == nil {
+		return fmt.Errorf("missing protocols executor")
+	}
+	context.Forward(state.chains)
 	return nil
 }
 

@@ -20,7 +20,7 @@ func NewProtocolExecutorProducer(protocol *models2.Protocol, config *ExecutorCon
 	}
 }
 
-func NewAssetListenerProducer(asset *models.ProtocolAsset) actor.Producer {
+func NewProtocolAssetListenerProducer(asset *models.ProtocolAsset) actor.Producer {
 	switch asset.Protocol.ID {
 	case constants.ERC721.ID:
 		return func() actor.Actor { return erc721.NewListener(asset) }

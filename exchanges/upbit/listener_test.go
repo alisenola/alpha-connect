@@ -9,6 +9,7 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
+	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
 		SecurityID:        10070367938184144403,
 		Symbol:            "BTC-USD",

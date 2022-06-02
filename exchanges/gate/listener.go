@@ -219,9 +219,8 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		20*time.Second)
 
 	res, err := fut.Result()
-
 	if err != nil {
-		return fmt.Errorf("error getting OBL2")
+		return fmt.Errorf("error getting market data: %v", err)
 	}
 
 	msg, ok := res.(*messages.MarketDataResponse)

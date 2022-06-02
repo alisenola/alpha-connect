@@ -4,12 +4,14 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"testing"
 )
 
 func TestMarketData(t *testing.T) {
+	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
 		SecurityID:   16932771734232838537,
 		Symbol:       "OMG-USD",

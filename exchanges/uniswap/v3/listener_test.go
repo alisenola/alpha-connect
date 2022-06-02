@@ -1,8 +1,10 @@
 package v3_test
 
+/*
 import (
 	"context"
 	"fmt"
+	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"math/big"
 	"reflect"
 	"testing"
@@ -20,8 +22,9 @@ import (
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 )
 
+
 func TestMarketData(t *testing.T) {
-	as, executor, cleaner := tests.StartExecutor(t, constants.UNISWAPV3, nil)
+	as, executor, cleaner := exTests.StartExecutor(t, constants.UNISWAPV3, nil)
 	defer cleaner()
 
 	securityID := []uint64{
@@ -131,3 +134,5 @@ func TestMarketData(t *testing.T) {
 	fmt.Println("Pool SqrtPrice", p.SqrtPriceX96.String())
 
 }
+
+*/

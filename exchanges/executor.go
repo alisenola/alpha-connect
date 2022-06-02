@@ -430,7 +430,12 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		}
 		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
 		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
+			context.Respond(&messages.AccountDataResponse{
+				RequestID:       request.RequestID,
+				Success:         false,
+				RejectionReason: messages.RejectionReason_UnknownExchange,
+			})
+			return nil
 		}
 		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))

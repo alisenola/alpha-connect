@@ -3,6 +3,7 @@ package erc721
 import (
 	goContext "context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"math/big"
 	"reflect"
 	"sort"
@@ -15,17 +16,13 @@ import (
 	"github.com/asynkron/protoactor-go/log"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
-	models2 "gitlab.com/alphaticks/xchanger/models"
-	xutils "gitlab.com/alphaticks/xchanger/protocols"
-
-	"gitlab.com/alphaticks/alpha-connect/jobs"
-	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/xchanger/eth"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
 )
 
@@ -35,15 +32,15 @@ type QueryRunner struct {
 
 type Executor struct {
 	extype.BaseExecutor
-	queryRunnerETH *QueryRunner
+	executor       *actor.PID
 	protocolAssets map[uint64]*models.ProtocolAsset
+	abi            *abi.ABI
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
 
 func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
-		queryRunnerETH: nil,
 		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
@@ -61,16 +58,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_2)
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
+
+	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
-		return fmt.Errorf("error while dialing eth rpc client %v", err)
+		return fmt.Errorf("error getting abi: %v", err)
 	}
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewETHQuery(client)
-	})
-	state.queryRunnerETH = &QueryRunner{
-		pid: context.Spawn(props),
-	}
+	state.abi = eabi
 	return state.UpdateProtocolAssetList(context)
 }
 
@@ -185,21 +179,13 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		return nil
 	}
 
-	eabi, err := nft.ERC721MetaData.GetAbi()
-	if err != nil {
-		state.logger.Warn("error getting erc721 ABI", log.Error(err))
-		msg.RejectionReason = messages.RejectionReason_ABIError
-		context.Respond(msg)
-		return nil
-	}
-
 	topics := [][]common.Hash{{
-		eabi.Events["Transfer"].ID,
+		state.abi.Events["Transfer"].ID,
 	}}
 	var address [20]byte
 	addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
 	if !ok {
-		state.logger.Warn("invalid protocol asset address", log.Error(err))
+		state.logger.Warn("invalid protocol asset address")
 		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 		context.Respond(msg)
 		return nil
@@ -212,8 +198,10 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		ToBlock:   big.NewInt(1).SetUint64(req.Stop),
 		Topics:    topics,
 	}
-	qr := state.queryRunnerETH
-	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 15*time.Second)
+	future := context.RequestFuture(state.executor, &messages.EVMLogsQueryRequest{
+		Chain: pa.Chain,
+		Query: fQuery,
+	}, 15*time.Second)
 	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
@@ -227,9 +215,9 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			return
 		}
 
-		resp := res.(*jobs.PerformLogsQueryResponse)
-		if resp.Error != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(resp.Error))
+		resp := res.(*messages.EVMLogsQueryResponse)
+		if !resp.Success {
+			state.logger.Warn("error at eth rpc server: " + resp.RejectionReason.String())
 			msg.RejectionReason = messages.RejectionReason_EthRPCError
 			context.Respond(msg)
 			return
@@ -245,22 +233,22 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		var update *models.ProtocolAssetUpdate
 		for i, l := range resp.Logs {
 			switch l.Topics[0] {
-			case eabi.Events["Transfer"].ID:
+			case state.abi.Events["Transfer"].ID:
 				event := nft.ERC721Transfer{}
-				if err := eth.UnpackLog(eabi, &event, "Transfer", l); err != nil {
+				if err := eth.UnpackLog(state.abi, &event, "Transfer", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
 					msg.RejectionReason = messages.RejectionReason_EthRPCError
 					context.Respond(msg)
 					return
 				}
-				if update == nil || update.Block != l.BlockNumber {
+				if update == nil || update.BlockNumber != l.BlockNumber {
 					if update != nil {
 						events = append(events, update)
 					}
 					update = &models.ProtocolAssetUpdate{
-						Transfers: nil,
-						Block:     l.BlockNumber,
-						Timestamp: utils.SecondToTimestamp(resp.Times[i]),
+						Transfers:   nil,
+						BlockNumber: l.BlockNumber,
+						BlockTime:   utils.SecondToTimestamp(resp.Times[i]),
 					}
 				}
 				update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{

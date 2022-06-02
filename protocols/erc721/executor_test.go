@@ -3,8 +3,17 @@ package erc721_test
 import (
 	"context"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/chains"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/protocols"
+	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	gorderbookModels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+
 	"gitlab.com/alphaticks/xchanger/constants"
+	"google.golang.org/grpc"
 	"math/big"
 	"reflect"
 	"testing"
@@ -13,10 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/alpha-connect/protocols/tests"
 	"gitlab.com/alphaticks/go-graphql-client"
 	"gitlab.com/alphaticks/gorderbook"
-	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
 type ERC721Data struct {
@@ -45,13 +52,23 @@ type ERC721Contract struct {
 }
 
 func TestExecutor(t *testing.T) {
-	as, executor, loader, cancel := tests.StartExecutor(t, constants.ERC721)
-	defer cancel()
-	_, err := as.Root.RequestFuture(loader, &utils.Ready{}, 15*time.Second).Result()
+	exTests.LoadStatics(t)
+	protocol := constants.ERC721
+	registryAddress := "registry.alphaticks.io:8001"
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
 	if err != nil {
 		t.Fatal(err)
 	}
-	testAsset := models2.Asset{
+	reg := registry.NewPublicRegistryClient(conn)
+
+	prCfg := &protocols.ExecutorConfig{
+		Registry:  reg,
+		Protocols: []*xchangerModels.Protocol{protocol},
+	}
+	as, executor, clean := exTests.StartExecutor(t, &exchanges.ExecutorConfig{}, prCfg, &chains.ExecutorConfig{}, nil)
+	defer clean()
+
+	testAsset := xchangerModels.Asset{
 		ID:     275.,
 		Symbol: "BAYC",
 	}
@@ -119,21 +136,25 @@ func TestExecutor(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, resT := range response.Update {
-		if ok := find(resT, query.ERC721Contract.Transfers); !ok {
-			t.Fatal()
+		for _, transfer := range resT.Transfers {
+			if ok := find(transfer, query.ERC721Contract.Transfers); !ok {
+				t.Fatal()
+			}
 		}
 	}
 	//Run the transfers using the nft tracker
 	tracker := gorderbook.NewERC721Tracker()
 	for _, updt := range response.Update {
-		var from [20]byte
-		var to [20]byte
-		tokenID := big.NewInt(1)
-		copy(from[:], updt.Transfer.From)
-		copy(to[:], updt.Transfer.To)
-		tokenID.SetBytes(updt.Transfer.TokenId)
-		if err := tracker.TransferFrom(from, to, tokenID); err != nil {
-			t.Fatal(err)
+		for _, transfer := range updt.Transfers {
+			var from [20]byte
+			var to [20]byte
+			tokenID := big.NewInt(1)
+			copy(from[:], transfer.From)
+			copy(to[:], transfer.To)
+			tokenID.SetBytes(transfer.TokenId)
+			if err := tracker.TransferFrom(from, to, tokenID); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
@@ -163,9 +184,9 @@ func TestExecutor(t *testing.T) {
 	}
 }
 
-func find(t *models.ProtocolAssetUpdate, arr []*Transfer) bool {
-	from := big.NewInt(1).SetBytes(t.Transfer.From)
-	to := big.NewInt(1).SetBytes(t.Transfer.To)
+func find(t *gorderbookModels.AssetTransfer, arr []*Transfer) bool {
+	from := big.NewInt(1).SetBytes(t.From)
+	to := big.NewInt(1).SetBytes(t.To)
 	for _, tOther := range arr {
 		fromOther, _ := big.NewInt(1).SetString(tOther.From.Id[2:], 16)
 		toOther, _ := big.NewInt(1).SetString(tOther.To.Id[2:], 16)

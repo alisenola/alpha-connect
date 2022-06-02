@@ -4,12 +4,14 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"testing"
 )
 
 func TestMarketData(t *testing.T) {
+	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
 		SecurityID:        2195469462990134438,
 		Symbol:            "btcusdt",
@@ -27,6 +29,7 @@ func TestMarketData(t *testing.T) {
 }
 
 func TestSlowMarketData(t *testing.T) {
+	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
 		SecurityID:   4304365894942658747,
 		Symbol:       "kaneth",

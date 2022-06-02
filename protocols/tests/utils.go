@@ -2,10 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	"os"
 	"reflect"
-	"testing"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -13,37 +10,7 @@ import (
 
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	models2 "gitlab.com/alphaticks/xchanger/models"
-	"google.golang.org/grpc"
 )
-
-func StartExecutor(t *testing.T, protocol *models2.Protocol) (*actor.ActorSystem, *actor.PID, *actor.PID, func()) {
-	registryAddress := "127.0.0.1:8001"
-	if os.Getenv("REGISTRY_ADDRESS") != "" {
-		registryAddress = os.Getenv("REGISTRY_ADDRESS")
-	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg := registry.NewPublicRegistryClient(conn)
-
-	cfg := protocols.ExecutorConfig{
-		Registry:  reg,
-		Protocols: []*models2.Protocol{protocol},
-	}
-	config := actor.Config{DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
-	as := actor.NewActorSystemWithConfig(&config)
-	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(protocols.NewExecutorProducer(&cfg)), "executor")
-	if err != nil {
-		t.Fatal(err)
-	}
-	loader := as.Root.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(reg)))
-
-	return as, ex, loader, func() { as.Root.PoisonFuture(ex).Wait() }
-}
 
 type ERC721Checker struct {
 	asset   *models.ProtocolAsset
@@ -90,7 +57,7 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(state).String()),
 	)
 	executor := context.ActorSystem().NewLocalPID("executor")
-	res, err := context.RequestFuture(executor, &messages.ProtocolAssetTransferRequest{
+	res, err := context.RequestFuture(executor, &messages.ProtocolAssetDataRequest{
 		RequestID:       0,
 		ProtocolAssetID: state.asset.ProtocolAssetID,
 		Subscriber:      context.Self(),
@@ -99,7 +66,7 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error fetching the asset transfer %v", err)
 	}
-	updt, ok := res.(*messages.ProtocolAssetTransferResponse)
+	updt, ok := res.(*messages.ProtocolAssetDataResponse)
 	if !ok {
 		return fmt.Errorf("error for type assertion %v", err)
 	}
@@ -114,20 +81,13 @@ func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.
 	if res.Update == nil {
 		return nil
 	}
-	if state.seqNum > res.SeqNum {
+	if res.SeqNum <= state.seqNum {
 		return nil
 	}
-	state.seqNum = res.SeqNum
-	for _, check := range state.updates {
-		for _, up := range res.Update {
-			if up.Block <= check.Block {
-				return fmt.Errorf("incorrect block order, %d >= %d", check.Block, up.Block)
-			}
-			if up.Removed {
-				return fmt.Errorf("block should have been removed")
-			}
-		}
+	if res.SeqNum != state.seqNum+1 {
+
 	}
-	state.updates = append(state.updates, res.Update...)
+	state.seqNum = res.SeqNum
+
 	return nil
 }

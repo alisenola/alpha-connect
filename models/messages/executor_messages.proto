@@ -64,11 +64,12 @@ enum RejectionReason {
     GraphQLError = 27;
     ABIError = 28;
     EthRPCError = 29;
-    UnknowProtocol = 30;
+    UnknownProtocol = 30;
     MissingProtocolAsset = 31;
     UnknownProtocolAsset = 32;
     UnknownAsset = 33;
     EthRPCTimeout = 34;
+    UnknownChain = 35;
 }
 
 enum FeeType {

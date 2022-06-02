@@ -28,7 +28,7 @@ type Executor struct {
 	executors      map[uint32]*actor.PID // A map from exchange ID to executor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
-	dataManagers   map[uint32]*actor.PID // A map from asset ID to data manager
+	dataManagers   map[uint64]*actor.PID // A map from asset ID to data manager
 	logger         *log.Logger
 	strict         bool
 }
@@ -109,7 +109,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	state.executors = make(map[uint32]*actor.PID)
-	state.dataManagers = make(map[uint32]*actor.PID)
+	state.dataManagers = make(map[uint64]*actor.PID)
 
 	// Spawn all exchange executors
 	for _, protocol := range state.ExecutorConfig.Protocols {
@@ -137,9 +137,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		res, err := fut.Result()
 		if err != nil {
 			if state.strict {
-				return fmt.Errorf("error fetching assets for one venue: %v", err)
+				return fmt.Errorf("error fetching assets for one protocol: %v", err)
 			} else {
-				state.logger.Error("error fetching assets for one venue: %v", log.Error(err))
+				state.logger.Error("error fetching assets for one protocol: %v", log.Error(err))
+				continue
 			}
 		}
 		result, ok := res.(*messages.ProtocolAssetList)
@@ -222,13 +223,13 @@ func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	if pid, ok := state.dataManagers[a.Protocol.ID]; ok {
+	if pid, ok := state.dataManagers[a.ProtocolAssetID]; ok {
 		context.Forward(pid)
 	} else {
 		props := actor.PropsFromProducer(NewDataManagerProducer(a), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
-		state.dataManagers[a.Protocol.ID] = pid
+		state.dataManagers[a.ProtocolAssetID] = pid
 		context.Forward(pid)
 	}
 	return nil
@@ -249,7 +250,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	if !ok {
 		context.Respond(&messages.HistoricalProtocolAssetTransferResponse{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.RejectionReason_UnknowProtocol,
+			RejectionReason: messages.RejectionReason_UnknownProtocol,
 			Success:         false,
 		})
 	}
