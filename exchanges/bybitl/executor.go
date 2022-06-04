@@ -117,10 +117,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			pid:            context.Spawn(props),
-			sGetRateLimit:  exchanges.NewRateLimit(50*120, 2*time.Minute),
-			mGetRateLimit:  exchanges.NewRateLimit(70*5, 5*time.Second),
-			sPostRateLimit: exchanges.NewRateLimit(20*120, 2*time.Minute),
-			mPostRateLimit: exchanges.NewRateLimit(50*5, 5*time.Second),
+			sGetRateLimit:  exchanges.NewRateLimit(50*100, 2*time.Minute),
+			mGetRateLimit:  exchanges.NewRateLimit(70*4, 5*time.Second),
+			sPostRateLimit: exchanges.NewRateLimit(20*100, 2*time.Minute),
+			mPostRateLimit: exchanges.NewRateLimit(50*4, 5*time.Second),
 		})
 	}
 
