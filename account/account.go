@@ -797,9 +797,11 @@ func (accnt *Account) UpdateBalance(asset *xchangerModels.Asset, balance float64
 	}, nil
 }
 
-func (accnt *Account) settle() {
+func (accnt *Account) Settle() {
 	// Only for margin accounts
 	if accnt.MarginCurrency != nil {
+		accnt.Lock()
+		defer accnt.Unlock()
 		accnt.balances[accnt.MarginCurrency.ID] += accnt.margin
 		accnt.margin = 0
 	}
@@ -913,9 +915,9 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 }
 
 func (accnt *Account) GetBalances() []*models.Balance {
+	accnt.Settle()
 	accnt.RLock()
 	defer accnt.RUnlock()
-	accnt.settle()
 	var balances []*models.Balance
 	for k, b := range accnt.balances {
 		balances = append(balances, &models.Balance{
