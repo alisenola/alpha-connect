@@ -8,7 +8,7 @@ require (
 	github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408
 	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
 	github.com/satori/go.uuid v1.2.0
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220509142452-008a1a45e129
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220507064833-3bb45d8aa619
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20220513100305-54584c7c93aa

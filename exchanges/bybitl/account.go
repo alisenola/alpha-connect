@@ -9,6 +9,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
@@ -31,6 +32,7 @@ type AccountListener struct {
 	bybitlExecutor     *actor.PID
 	ws                 *bybitl.Websocket
 	logger             *log.Logger
+	registry           registry.PublicRegistryClient
 	checkAccountTicker *time.Ticker
 	checkSocketTicker  *time.Ticker
 	lastPingTime       time.Time
@@ -39,24 +41,24 @@ type AccountListener struct {
 	client             *http.Client
 	txs                *mongo.Collection
 	execs              *mongo.Collection
-	//TODO Needed?
-	//reconciler *actor.PID
+	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, txs, execs)
+		return NewAccountListener(account, registry, txs, execs)
 	}
 }
 
-func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Actor {
 	return &AccountListener{
-		account: account,
-		seqNum:  0,
-		ws:      nil,
-		logger:  nil,
-		txs:     txs,
-		execs:   execs,
+		account:  account,
+		seqNum:   0,
+		ws:       nil,
+		logger:   nil,
+		txs:      txs,
+		execs:    execs,
+		registry: registry,
 	}
 }
 
@@ -183,7 +185,11 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to account: %v", err)
 	}
-
+	if state.txs != nil {
+		// Start reconciliation child
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.txs))
+		state.reconciler = context.Spawn(props)
+	}
 	//Fetch the current balance
 	fmt.Println("Fetching the balance")
 	bal := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
@@ -256,6 +262,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 	state.securities = securityMap
 	state.seqNum = 0
+
+	if state.txs != nil {
+		// Start reconciliation child
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.txs))
+		state.reconciler = context.Spawn(props)
+	}
 
 	//Sync account
 	makerFee := 0.0001
@@ -361,6 +373,24 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 		Orders:     orders,
 		Success:    true,
 	})
+	return nil
+}
+
+func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.bybitlExecutor)
+	}
+	return nil
+}
+
+func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
+	if state.reconciler != nil {
+		context.Forward(state.reconciler)
+	} else {
+		context.Forward(state.bybitlExecutor)
+	}
 	return nil
 }
 

@@ -72,7 +72,7 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	case constants.DYDX.ID:
 		return func() actor.Actor { return dydx.NewAccountListener(account, txs, execs) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewAccountListener(account, txs, execs) }
+		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, txs, execs) }
 	default:
 		return nil
 	}

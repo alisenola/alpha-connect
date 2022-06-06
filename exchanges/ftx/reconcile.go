@@ -73,7 +73,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	// Request securities
 	res, err := state.registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
 		Filter: &registry.SecurityFilter{
-			Exchange: []string{constants.FTX.Name},
+			ExchangeId: []uint32{constants.FTX.ID},
 		},
 	})
 	if err != nil {
