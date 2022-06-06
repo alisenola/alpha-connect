@@ -2,6 +2,7 @@ package executor_test
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/chains"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"os"
 	"testing"
@@ -47,7 +48,8 @@ func TestMainExecutor(t *testing.T) {
 			},
 		},
 	}
-	prod := executor.NewExecutorProducer(&cfgEx, &cfgPr)
+	chPr := chains.ExecutorConfig{}
+	prod := executor.NewExecutorProducer(&cfgEx, &cfgPr, &chPr)
 	as := actor.NewActorSystem()
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(prod), "executor")
 	if err != nil {

@@ -8,6 +8,34 @@ import (
 	"time"
 )
 
+type BlockNumberRequest struct {
+	RequestID uint64
+	Chain     *models.Chain
+}
+
+type BlockNumberResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Success         bool
+	RejectionReason RejectionReason
+	BlockNumber     uint64
+}
+
+type EVMContractCallRequest struct {
+	RequestID   uint64
+	Chain       *models.Chain
+	Msg         ethereum.CallMsg
+	BlockNumber uint64
+}
+
+type EVMContractCallResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Out             []byte
+	Success         bool
+	RejectionReason RejectionReason
+}
+
 type EVMLogsQueryRequest struct {
 	RequestID uint64
 	Chain     *models.Chain

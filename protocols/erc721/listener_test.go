@@ -64,7 +64,7 @@ func TestListener(t *testing.T) {
 	}
 	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
 	checker := as.Root.Spawn(props)
-	time.Sleep(80 * time.Second)
+	time.Sleep(800 * time.Second)
 	as.Root.Poison(checker)
 	time.Sleep(10 * time.Second)
 	// TODO check if

@@ -20,6 +20,8 @@ import (
 	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
 )
 
+type checkTimeout struct{}
+
 type protoUpdates struct {
 	Transfer  *gorderbook_models.AssetTransfer
 	Timestamp *timestamppb.Timestamp
@@ -30,13 +32,14 @@ type protoUpdates struct {
 
 type Listener struct {
 	types.BaseListener
-	executor   *actor.PID
-	address    [20]byte
-	collection *models.ProtocolAsset
-	abi        *abi.ABI
-	requestID  uint64 // Stays the same after restart, so the log executor knows it is the same subscription
-	seqNum     uint64
-	logger     *log.Logger
+	executor        *actor.PID
+	address         [20]byte
+	collection      *models.ProtocolAsset
+	abi             *abi.ABI
+	seqNum          uint64
+	lastRefreshTime time.Time
+	logger          *log.Logger
+	timeoutTicker   *time.Ticker
 }
 
 func NewListenerProducer(collection *models.ProtocolAsset) actor.Producer {
@@ -49,7 +52,6 @@ func NewListener(collection *models.ProtocolAsset) actor.Actor {
 	return &Listener{
 		collection: collection,
 		logger:     nil,
-		requestID:  uint64(time.Now().UnixNano()),
 	}
 }
 
@@ -83,6 +85,13 @@ func (state *Listener) Receive(context actor.Context) {
 	case *messages.ProtocolAssetDataRequest:
 		if err := state.OnProtocolAssetDataRequest(context); err != nil {
 			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *checkTimeout:
+		if err := state.onCheckTimeout(context); err != nil {
+			state.logger.Error("error processing onCheckTimeout", log.Error(err))
+			panic(err)
 		}
 	}
 }
@@ -112,20 +121,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting abi: %v", err)
 	}
 	state.abi = eabi
-	state.seqNum = uint64(time.Now().UnixNano())
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-	if err := state.subscribeLogs(context); err != nil {
-		return fmt.Errorf("error subscribing to logs: %v", err)
-	}
 
-	return nil
-}
-
-func (state *Listener) Clean(context actor.Context) error {
-	return nil
-}
-
-func (state *Listener) subscribeLogs(context actor.Context) error {
 	topicsv := [][]interface{}{{
 		state.abi.Events["Transfer"].ID,
 	}}
@@ -139,7 +136,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	}
 
 	res, err := context.RequestFuture(state.executor, &messages.EVMLogsSubscribeRequest{
-		RequestID:  state.requestID,
+		RequestID:  state.collection.ProtocolAssetID,
 		Chain:      state.collection.Chain,
 		Query:      query,
 		Subscriber: context.Self(),
@@ -153,7 +150,31 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 		return fmt.Errorf("was expecting EVMLogsSubscribeResponse, got %s", reflect.TypeOf(subRes).String())
 	}
 	state.seqNum = subRes.SeqNum
+	state.lastRefreshTime = time.Now()
+	timeoutTicker := time.NewTicker(5 * time.Second)
+	state.timeoutTicker = timeoutTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case <-timeoutTicker.C:
+				context.Send(pid, &checkTimeout{})
+			case <-time.After(15 * time.Second):
+				if state.timeoutTicker != timeoutTicker {
+					// Only stop if socket ticker has changed
+					return
+				}
+			}
+		}
+	}(context.Self())
 
+	return nil
+}
+
+func (state *Listener) Clean(context actor.Context) error {
+	if state.timeoutTicker != nil {
+		state.timeoutTicker.Stop()
+		state.timeoutTicker = nil
+	}
 	return nil
 }
 
@@ -178,10 +199,11 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 	}
 
 	state.seqNum = refresh.SeqNum
+	state.lastRefreshTime = time.Now()
 	var update *models.ProtocolAssetUpdate
 	if refresh.Update != nil {
 		//fmt.Println("REFRESH", refresh.SeqNum, state.seqNum, len(refresh.Update.Logs))
-		update := &models.ProtocolAssetUpdate{
+		update = &models.ProtocolAssetUpdate{
 			BlockNumber: refresh.Update.BlockNumber,
 			BlockTime:   timestamppb.New(refresh.Update.BlockTime),
 		}
@@ -206,5 +228,12 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 		Update: update,
 	})
 
+	return nil
+}
+
+func (state *Listener) onCheckTimeout(context actor.Context) error {
+	if time.Since(state.lastRefreshTime) > 20*time.Second {
+		return fmt.Errorf("timed-out")
+	}
 	return nil
 }

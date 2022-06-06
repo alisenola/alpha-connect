@@ -13,6 +13,8 @@ type Executor interface {
 	GetLogger() *log.Logger
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
+	OnBlockNumberRequest(context actor.Context) error
+	OnEVMContractCallRequest(context actor.Context) error
 	OnEVMLogsQueryRequest(context actor.Context) error
 	OnEVMLogsSubscribeRequest(context actor.Context) error
 }
@@ -46,6 +48,18 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		}
 		state.GetLogger().Info("actor restarting")
 
+	case *messages.BlockNumberRequest:
+		if err := state.OnBlockNumberRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnBlockNumberRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.EVMContractCallRequest:
+		if err := state.OnEVMContractCallRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnEVMContractCallRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.EVMLogsQueryRequest:
 		if err := state.OnEVMLogsQueryRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnEVMLogsQueryRequest", log.Error(err))
@@ -58,6 +72,28 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			panic(err)
 		}
 	}
+}
+
+func (state *BaseExecutor) OnBlockNumberRequest(context actor.Context) error {
+	req := context.Message().(*messages.BlockNumberRequest)
+	context.Respond(&messages.BlockNumberResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnEVMContractCallRequest(context actor.Context) error {
+	req := context.Message().(*messages.EVMContractCallRequest)
+	context.Respond(&messages.EVMContractCallResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
 }
 
 func (state *BaseExecutor) OnEVMLogsQueryRequest(context actor.Context) error {

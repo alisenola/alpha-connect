@@ -635,6 +635,180 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
+	msg := context.Message().(*messages.TradeCaptureReportRequest)
+	response := &messages.TradeCaptureReport{
+		RequestID: msg.RequestID,
+		Success:   false,
+	}
+
+	symbol := ""
+	var from, to *uint64
+	if msg.Filter != nil {
+		if msg.Filter.Side != nil || msg.Filter.OrderID != nil || msg.Filter.ClientOrderID != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+			context.Respond(response)
+			return nil
+		}
+
+		if msg.Filter.Instrument != nil {
+			if msg.Filter.Instrument.Symbol != nil {
+				symbol = msg.Filter.Instrument.Symbol.Value
+			} else if msg.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				symbol = sec.Symbol
+			}
+		}
+
+		if msg.Filter.From != nil {
+			ts := utils.TimestampToMilli(msg.Filter.From)
+			from = &ts
+		}
+		if msg.Filter.To != nil {
+			ts := utils.TimestampToMilli(msg.Filter.To)
+			to = &ts
+		}
+		if msg.Filter.OrderID != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Respond(response)
+			return nil
+		}
+		if msg.Filter.FromID != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Respond(response)
+			return nil
+		}
+	}
+	params := bybitl.NewGetTradeRecordsParams(symbol)
+	if from != nil {
+		params.SetStartTime(*from)
+	}
+	if to != nil {
+		params.SetEndTime(*to)
+	}
+	request, weight, err := bybitl.GetTradeRecords(params, msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner(false)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+	qr.Get(weight)
+
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("request error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				fmt.Println(err)
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				fmt.Println(err)
+				context.Respond(response)
+			}
+			return
+		}
+		var trades bybitl.TradingRecordResponse
+		err = json.Unmarshal(queryResponse.Response, &trades)
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		if trades.RetCode != 0 {
+			state.logger.Info("error getting trades", log.Error(errors.New(trades.RetMsg)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		var mtrades []*models.TradeCapture
+		sort.Slice(trades.TradingRecords.Trades, func(i, j int) bool {
+			return trades.TradingRecords.Trades[i].TradeTimeMs < trades.TradingRecords.Trades[j].TradeTimeMs
+		})
+		for _, t := range trades.TradingRecords.Trades {
+			quantityMul := 1.
+			var instrument *models.Instrument
+			if _, ok := state.symbolToSec[t.Symbol]; ok {
+				sec := state.symbolToSec[t.Symbol]
+				instrument = &models.Instrument{
+					Exchange:   constants.FTX,
+					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+				}
+			} else {
+				instrument = &models.Instrument{
+					Exchange:   constants.FTX,
+					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
+					SecurityID: nil,
+				}
+			}
+
+			quantity := t.ExecQty * quantityMul
+			if t.Side == "sell" {
+				quantity *= -1
+			}
+			comAsset := constants.TETHER
+			ts := utils.MilliToTimestamp(uint64(t.TradeTimeMs))
+			trd := models.TradeCapture{
+				Type:            models.TradeType_Regular,
+				Price:           t.Price,
+				Quantity:        quantity,
+				Commission:      t.ExecFee,
+				CommissionAsset: comAsset,
+				TradeID:         t.ExecId,
+				Instrument:      instrument,
+				Trade_LinkID:    nil,
+				OrderID:         &wrapperspb.StringValue{Value: t.OrderId},
+				TransactionTime: ts,
+			}
+
+			if t.Side == "buy" {
+				trd.Side = models.Side_Buy
+			} else {
+				trd.Side = models.Side_Sell
+			}
+			mtrades = append(mtrades, &trd)
+		}
+		response.Success = true
+		response.Trades = mtrades
+		context.Respond(response)
+	})
+
+	return nil
+}
+
 func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	msg := context.Message().(*messages.OrderStatusRequest)
 	response := &messages.OrderList{

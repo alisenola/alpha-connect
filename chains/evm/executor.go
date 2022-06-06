@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger/exchanges"
 	"math/big"
 	"reflect"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	extype "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	xutils "gitlab.com/alphaticks/xchanger/protocols"
 )
 
 type flushLogs struct{}
@@ -44,15 +44,18 @@ type Executor struct {
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 	client         *ethclient.Client
+	rateLimit      *exchanges.RateLimit
 	subscriptions  map[uint64]*logsSubscription
 	flushTicker    *time.Ticker
+	rpc            string
 }
 
-func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(registry registry.PublicRegistryClient, rpc string) actor.Actor {
 	return &Executor{
 		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
+		rpc:            rpc,
 	}
 }
 
@@ -78,11 +81,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(xutils.ETH_CLIENT_WS_2)
+	client, err := ethclient.Dial(state.rpc)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
 	state.client = client
+	//state.rateLimit =
 	state.subscriptions = make(map[uint64]*logsSubscription)
 
 	flushTicker := time.NewTicker(5 * time.Second)
@@ -101,6 +105,51 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	return nil
+}
+
+func (state *Executor) OnBlockNumberRequest(context actor.Context) error {
+	req := context.Message().(*messages.BlockNumberRequest)
+	go func(sender *actor.PID) {
+		res := &messages.BlockNumberResponse{
+			RequestID:  req.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+		}
+
+		current, err := state.client.BlockNumber(goContext.Background())
+		if err != nil {
+			state.logger.Warn("error filtering logs", log.Error(err))
+			res.RejectionReason = messages.RejectionReason_EthRPCError
+			context.Send(sender, res)
+			return
+		}
+		res.BlockNumber = current
+		res.Success = true
+		context.Send(sender, res)
+	}(context.Sender())
+
+	return nil
+}
+
+func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
+	req := context.Message().(*messages.EVMContractCallRequest)
+	go func(sender *actor.PID) {
+		res := &messages.EVMContractCallResponse{
+			RequestID:  req.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+		}
+
+		out, err := state.client.CallContract(goContext.Background(), req.Msg, big.NewInt(int64(req.BlockNumber)))
+		if err != nil {
+			state.logger.Warn("error filtering logs", log.Error(err))
+			res.RejectionReason = messages.RejectionReason_EthRPCError
+			context.Send(sender, res)
+			return
+		}
+		res.Out = out
+		res.Success = true
+		context.Send(sender, res)
+	}(context.Sender())
 	return nil
 }
 
@@ -206,56 +255,66 @@ func (state *Executor) OnEVMLogsSubscribeRequest(context actor.Context) error {
 		context.Respond(res)
 		return nil
 	}
-	subs := &logsSubscription{
-		logs:         list.New(),
-		subscription: sub,
-		seqNum:       uint64(time.Now().UnixNano()),
-		subscriber:   req.Subscriber,
-		ch:           ch,
+	subs, ok := state.subscriptions[req.RequestID]
+	if !ok {
+		subs = &logsSubscription{
+			logs:         list.New(),
+			subscription: sub,
+			seqNum:       uint64(time.Now().UnixNano()),
+			subscriber:   req.Subscriber,
+			ch:           ch,
+		}
+		go func() {
+			for {
+				l, ok := <-ch
+				if !ok {
+					return
+				}
+				subs.Lock()
+				if l.Removed {
+					el := subs.logs.Front()
+					removed := false
+					for ; el != nil; el = el.Next() {
+						update := el.Value.(*types.Log)
+						if update.TxHash == l.TxHash {
+							subs.logs.Remove(el)
+							removed = true
+							break
+						}
+					}
+					if !removed {
+						// TODO restart subscription
+						fmt.Println("COULD NOT FIND REMOVED TX")
+					}
+				} else {
+					subs.logs.PushBack(&l)
+				}
+				subs.Unlock()
+			}
+		}()
+		state.subscriptions[req.RequestID] = subs
+		fmt.Println("NEW SUBSCRIPTION")
+	} else {
+		fmt.Println("REUSING SUB")
 	}
-	state.subscriptions[req.RequestID] = subs
+
 	res.Success = true
 	res.SeqNum = subs.seqNum
 	context.Respond(res)
 	context.Watch(req.Subscriber)
 
-	go func() {
-		for {
-			l, ok := <-ch
-			if !ok {
-				return
-			}
-			subs.Lock()
-			if l.Removed {
-				el := subs.logs.Front()
-				removed := false
-				for ; el != nil; el = el.Next() {
-					update := el.Value.(*types.Log)
-					if update.TxHash == l.TxHash {
-						subs.logs.Remove(el)
-						removed = true
-						break
-					}
-				}
-				if !removed {
-					// TODO restart subscription
-					fmt.Println("COULD NOT FIND REMOVED TX")
-				}
-			} else {
-				subs.logs.PushBack(&l)
-			}
-			subs.Unlock()
-		}
-	}()
 	return nil
 }
 
 func (state *Executor) onFlushLogs(context actor.Context) error {
-	current, err := state.client.BlockNumber(goContext.Background())
+	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	current, err := state.client.BlockNumber(ctx)
 	if err != nil {
-		return fmt.Errorf("error fetching block number: %v", err)
+		state.logger.Warn("error fetching block number", log.Error(err))
+		return nil
 	}
 	for k, subs := range state.subscriptions {
+		subs.RLock()
 		select {
 		case err := <-subs.subscription.Err():
 			// TODO restart subscription
@@ -279,9 +338,12 @@ func (state *Executor) onFlushLogs(context actor.Context) error {
 					})
 					subs.seqNum += 1
 				}
-				h, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(updt.BlockNumber)))
+				ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+				h, err := state.client.HeaderByNumber(ctx, big.NewInt(int64(updt.BlockNumber)))
 				if err != nil {
-					return fmt.Errorf("error getting block header: %v", err)
+					state.logger.Warn("error getting block header", log.Error(err))
+					subs.RUnlock()
+					return nil
 				}
 				logs = &messages.EVMLogs{
 					BlockNumber: updt.BlockNumber,
@@ -308,6 +370,7 @@ func (state *Executor) onFlushLogs(context actor.Context) error {
 			subs.seqNum += 1
 			subs.lastPingTime = time.Now()
 		}
+		subs.RUnlock()
 	}
 	return nil
 }

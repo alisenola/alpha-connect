@@ -12,12 +12,9 @@ import (
 func TestMarketData(t *testing.T) {
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		SecurityID:        11630614572540763252,
-		Symbol:            "BTC-USD",
+		Symbol:            "LINK-USD",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.COINBASEPRO,
-		BaseCurrency:      constants.BITCOIN,
-		QuoteCurrency:     constants.DOLLAR,
 		MinPriceIncrement: 0.01,
 		RoundLot:          1e-08,
 		HasMaturityDate:   false,

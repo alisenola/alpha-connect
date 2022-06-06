@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/chains"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/protocols"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	"math"
 	"reflect"
@@ -17,12 +19,9 @@ import (
 type MDTest struct {
 	IgnoreSizeResidue  bool
 	IgnorePriceResidue bool
-	SecurityID         uint64
 	Symbol             string
 	SecurityType       string
 	Exchange           *xchangerModels.Exchange
-	BaseCurrency       *xchangerModels.Asset
-	QuoteCurrency      *xchangerModels.Asset
 	MinPriceIncrement  float64
 	RoundLot           float64
 	HasMaturityDate    bool
@@ -43,20 +42,6 @@ func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 	}
 	if sec.Exchange.Name != test.Exchange.Name {
 		t.Fatalf("was expecting %s exchange, got %s", test.Exchange.Name, sec.Exchange.Name)
-	}
-	if sec.Underlying.ID != test.BaseCurrency.ID {
-		t.Fatalf("was expecting %d:%s base, got %d:%s",
-			test.BaseCurrency.ID,
-			test.BaseCurrency.Symbol,
-			sec.Underlying.ID,
-			sec.Underlying.Symbol)
-	}
-	if sec.QuoteCurrency.ID != test.QuoteCurrency.ID {
-		t.Fatalf("was expecting %d:%s quote, got %d:%s",
-			test.QuoteCurrency.ID,
-			test.QuoteCurrency.Symbol,
-			sec.QuoteCurrency.ID,
-			sec.QuoteCurrency.Symbol)
 	}
 	if sec.IsInverse != test.IsInverse {
 		t.Fatalf("was expecting different inverse")
@@ -80,7 +65,8 @@ func MarketData(t *testing.T, test MDTest) {
 
 	as, executor, clean := tests.StartExecutor(t, &exchanges.ExecutorConfig{
 		Exchanges: []*xchangerModels.Exchange{test.Exchange},
-	}, nil, nil, nil)
+	}, &protocols.ExecutorConfig{},
+		&chains.ExecutorConfig{}, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
@@ -103,10 +89,6 @@ func MarketData(t *testing.T, test MDTest) {
 
 	if sec == nil {
 		t.Fatalf("security not found")
-	}
-
-	if sec.SecurityID != test.SecurityID {
-		t.Fatalf("different security ID %d: %d", sec.SecurityID, test.SecurityID)
 	}
 
 	CheckSecurityDefinition(t, sec, test)

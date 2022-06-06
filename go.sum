@@ -750,6 +750,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220521184113-08e07937ed4c h1:WNnUQ23gjZJ
 gitlab.com/alphaticks/xchanger v0.0.0-20220521184113-08e07937ed4c/go.mod h1:d7IatYvAyI4EBlO8BhzSPI+F1wJ9O7O2HCF06Fv4KT0=
 gitlab.com/alphaticks/xchanger v0.0.0-20220521185009-7b27bcfa3e87 h1:yMIq270ORWNyk2QGoosTmIAieR2VIIcBMbKniDXgKoA=
 gitlab.com/alphaticks/xchanger v0.0.0-20220521185009-7b27bcfa3e87/go.mod h1:d7IatYvAyI4EBlO8BhzSPI+F1wJ9O7O2HCF06Fv4KT0=
+gitlab.com/alphaticks/xchanger v0.0.0-20220604110411-a07336cf8a72 h1:migMWHxgO3DXG/S52E+RFNzUMq1AXuKQFp5Ntkqjf7Q=
+gitlab.com/alphaticks/xchanger v0.0.0-20220604110411-a07336cf8a72/go.mod h1:d7IatYvAyI4EBlO8BhzSPI+F1wJ9O7O2HCF06Fv4KT0=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.5/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
