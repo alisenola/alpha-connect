@@ -68,6 +68,7 @@ message Order {
     repeated ExecutionInstruction execution_instructions = 11;
     string tag = 12;
     google.protobuf.Timestamp creation_time = 13;
+    google.protobuf.Timestamp last_event_time = 14;
 }
 
 message Position {

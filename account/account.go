@@ -295,6 +295,7 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	if order.CreationTime == nil {
 		order.CreationTime = timestamppb.New(time.Now())
 	}
+	order.LastEventTime = order.CreationTime
 	lotPrecision := sec.GetLotPrecision()
 	rawLeavesQuantity := lotPrecision * order.LeavesQuantity
 	if math.Abs(rawLeavesQuantity-math.Round(rawLeavesQuantity)) > 0.00001 {
@@ -343,6 +344,7 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.OrderID = ID
 	order.OrderStatus = models.OrderStatus_New
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
 	accnt.ordersID[ID] = order
 
 	sec, rej := accnt.getSec(order.Instrument)
@@ -417,6 +419,7 @@ func (accnt *Account) ReplaceOrder(ID string, price *wrapperspb.DoubleValue, qua
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.OrderStatus_PendingReplace
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -447,6 +450,7 @@ func (accnt *Account) ConfirmReplaceOrder(ID, newID string) (*messages.Execution
 	}
 	order.OrderStatus = order.previousStatus
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
 	if order.pendingAmendQty != nil {
 		order.LeavesQuantity = order.pendingAmendQty.Value
@@ -499,6 +503,7 @@ func (accnt *Account) RejectReplaceOrder(ID string, reason messages.RejectionRea
 	if order.OrderStatus == models.OrderStatus_PendingReplace {
 		order.OrderStatus = order.previousStatus
 		order.lastEventTime = time.Now()
+		order.LastEventTime = timestamppb.New(order.lastEventTime)
 	}
 
 	return &messages.ExecutionReport{
@@ -540,6 +545,7 @@ func (accnt *Account) CancelOrder(ID string) (*messages.ExecutionReport, *messag
 	order.previousStatus = order.OrderStatus
 	order.OrderStatus = models.OrderStatus_PendingCancel
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
@@ -571,6 +577,8 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 
 	order.OrderStatus = models.OrderStatus_Canceled
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
+
 	order.LeavesQuantity = 0.
 	if order.OrderType == models.OrderType_Limit {
 		if order.Side == models.Side_Buy {
@@ -610,6 +618,8 @@ func (accnt *Account) ConfirmExpiredOrder(ID string) (*messages.ExecutionReport,
 
 	order.OrderStatus = models.OrderStatus_Expired
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
+
 	order.LeavesQuantity = 0.
 	if order.OrderType == models.OrderType_Limit {
 		if order.Side == models.Side_Buy {
@@ -652,6 +662,7 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 		} else {
 			order.OrderStatus = order.previousStatus
 			order.lastEventTime = time.Now()
+			order.LastEventTime = timestamppb.New(order.lastEventTime)
 		}
 	}
 
@@ -701,6 +712,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		order.OrderStatus = models.OrderStatus_PartiallyFilled
 	}
 	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
 	if order.OrderType == models.OrderType_Limit {
 		if order.Side == models.Side_Buy {
