@@ -13,8 +13,8 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
-	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gorm.io/gorm"
 	"math"
 	"net"
 	"net/http"
@@ -39,25 +39,23 @@ type AccountListener struct {
 	securities         map[uint64]*models.Security
 	symbolToSec        map[string]*models.Security
 	client             *http.Client
-	txs                *mongo.Collection
-	execs              *mongo.Collection
+	db                 *gorm.DB
 	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, txs, execs)
+		return NewAccountListener(account, registry, db)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, txs, execs *mongo.Collection) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
 	return &AccountListener{
 		account:  account,
 		seqNum:   0,
 		ws:       nil,
 		logger:   nil,
-		txs:      txs,
-		execs:    execs,
+		db:       db,
 		registry: registry,
 	}
 }
@@ -185,11 +183,12 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to account: %v", err)
 	}
-	if state.txs != nil {
+	if state.db != nil {
 		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.txs))
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.db))
 		state.reconciler = context.Spawn(props)
 	}
+
 	//Fetch the current balance
 	fmt.Println("Fetching the balance")
 	bal := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
@@ -262,12 +261,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	}
 	state.securities = securityMap
 	state.seqNum = 0
-
-	if state.txs != nil {
-		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.txs))
-		state.reconciler = context.Spawn(props)
-	}
 
 	//Sync account
 	makerFee := 0.0001
@@ -878,7 +871,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		Account:    state.account.Account,
 	}, 10*time.Second).Result()
 	if err != nil {
-		return fmt.Errorf("error getting balances from executor: %v", err)
+		return fmt.Errorf("error getting positions from executor: %v", err)
 	}
 
 	positionList, ok := resp.(*messages.PositionList)
@@ -886,7 +879,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
 	}
 	if !positionList.Success {
-		return fmt.Errorf("error getting balances: %s", execBalanceList.RejectionReason.String())
+		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 	execBalances := execBalanceList.Balances
 	sort.Slice(accntBalances, func(i, j int) bool {

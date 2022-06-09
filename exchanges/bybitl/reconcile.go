@@ -12,23 +12,21 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gorm.io/gorm"
 	"reflect"
-	"strconv"
 	"time"
 )
 
 type AccountReconcile struct {
 	extypes.BaseReconcile
 	account          *models.Account
+	dbAccount        *extypes.Account
 	executor         *actor.PID
 	logger           *log.Logger
 	securities       map[uint64]*registry.Security
 	symbToSecs       map[string]*registry.Security
-	txs              *mongo.Collection
+	db               *gorm.DB
 	registry         registry.PublicRegistryClient
 	positions        map[uint64]*account.Position
 	lastDepositTs    uint64
@@ -37,16 +35,16 @@ type AccountReconcile struct {
 	lastTradeTs      map[uint64]uint64
 }
 
-func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, txs *mongo.Collection) actor.Producer {
+func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountReconcile(account, registry, txs)
+		return NewAccountReconcile(account, registry, db)
 	}
 }
 
-func NewAccountReconcile(account *models.Account, registry registry.PublicRegistryClient, txs *mongo.Collection) actor.Actor {
+func NewAccountReconcile(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
 	return &AccountReconcile{
 		account:  account,
-		txs:      txs,
+		db:       db,
 		registry: registry,
 	}
 }
@@ -55,8 +53,8 @@ func (state *AccountReconcile) GetLogger() *log.Logger {
 	return state.logger
 }
 
-func (state *AccountReconcile) GetTransactions() *mongo.Collection {
-	return state.txs
+func (state *AccountReconcile) GetTransactions() *gorm.DB {
+	return state.db
 }
 
 func (state *AccountReconcile) Receive(context actor.Context) {
@@ -85,6 +83,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	state.symbToSecs = make(map[string]*registry.Security)
 	securityMap := make(map[uint64]*registry.Security)
 	for _, sec := range res.Securities {
+		if sec.Symbol != "APEUSDT" {
+			continue
+		}
 		securityMap[sec.SecurityId] = sec
 		state.symbToSecs[sec.Symbol] = sec
 	}
@@ -99,43 +100,34 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
-	// First, calculate current positions from historical
-	cur, err := state.txs.Find(goContext.Background(), bson.D{
-		{Key: "account", Value: state.account.Name},
-	}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
-	if err != nil {
-		return fmt.Errorf("error reconcile trades: %v", err)
+
+	state.dbAccount = &extypes.Account{
+		Name:       state.account.Name,
+		ExchangeID: state.account.Exchange.ID,
 	}
-	balances := make(map[uint32]float64)
-	for cur.Next(goContext.Background()) {
-		var tx extypes.Transaction
-		if err := cur.Decode(&tx); err != nil {
-			return fmt.Errorf("error decoding transaction: %v", err)
-		}
-		switch tx.Type {
-		case "TRADE":
-			if tx.Fill.SecurityID != "" {
-				secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
-				sec, ok := state.securities[secID]
-				if ok && sec.SecurityType == "CRPERP" {
-					if tx.Fill.Quantity < 0 {
-						state.positions[secID].Sell(tx.Fill.Price, -tx.Fill.Quantity, false)
-					} else {
-						state.positions[secID].Buy(tx.Fill.Price, tx.Fill.Quantity, false)
-					}
-					state.lastTradeTs[sec.SecurityId] = uint64(tx.Time.UnixNano() / 1000000)
-				}
-			}
-		}
-		for _, m := range tx.Movements {
-			balances[m.AssetID] += m.Quantity
-		}
+	// Check if account exists
+	tx := state.db.Where("name=?", state.account.Name).FirstOrCreate(state.dbAccount)
+	if tx.Error != nil {
+		return fmt.Errorf("error creating account: %v", err)
 	}
 
-	for k, b := range balances {
-		a, _ := constants.GetAssetByID(k)
-		if a != nil {
-			fmt.Println(a.Symbol, b)
+	var transactions []extypes.Transaction
+	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`account_id=?`, state.dbAccount.ID).Order("time asc").Find(&transactions)
+	for _, tr := range transactions {
+		switch tr.Type {
+		case "TRADE":
+			if tr.Fill != nil {
+				secID := uint64(tr.Fill.SecurityID)
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
+					if tr.Fill.Quantity < 0 {
+						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
+					} else {
+						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
+					}
+					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
+				}
+			}
 		}
 	}
 
@@ -145,61 +137,121 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		}
 	}
 
-	sres := state.txs.FindOne(goContext.Background(), bson.D{
-		{Key: "account", Value: state.account.Name},
-		{Key: "type", Value: "FUNDING"},
-	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
-	if sres.Err() != nil {
-		if sres.Err() != mongo.ErrNoDocuments {
-			return fmt.Errorf("error getting last funding: %v", err)
+	// Find funding transaction
+	var cnt int64
+	tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "FUNDING").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting funding transaction count: %v", err)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "FUNDING").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last funding transaction: %v", tx.Error)
 		}
-	} else {
-		var tx extypes.Transaction
-		if err := sres.Decode(&tx); err != nil {
-			return fmt.Errorf("error decoding transaction: %v", err)
-		}
-		state.lastFundingTs = uint64(tx.Time.UnixNano() / 1000000)
+		state.lastFundingTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
-	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{Key: "account", Value: state.account.Name},
-		{Key: "type", Value: "DEPOSIT"},
-	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
-	if sres.Err() != nil {
-		if sres.Err() != mongo.ErrNoDocuments {
-			return fmt.Errorf("error getting last deposit: %v", err)
+	tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "DEPOSIT").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting deposit transaction count: %v", err)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "DEPOSIT").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last deposit transaction: %v", tx.Error)
 		}
-	} else {
-		var tx extypes.Transaction
-		if err := sres.Decode(&tx); err != nil {
-			return fmt.Errorf("error decoding transaction: %v", err)
-		}
-		state.lastDepositTs = uint64(tx.Time.UnixNano() / 1000000)
+		state.lastDepositTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
-	sres = state.txs.FindOne(goContext.Background(), bson.D{
-		{Key: "account", Value: state.account.Name},
-		{Key: "type", Value: "WITHDRAWAL"},
-	}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}))
-	if sres.Err() != nil {
-		if sres.Err() != mongo.ErrNoDocuments {
-			return fmt.Errorf("error getting last withdrawal: %v", err)
+	tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "WITHDRAWAL").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting withdrawal transaction count: %v", err)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "WITHDRAWAL").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last withdrawal transaction: %v", tx.Error)
 		}
-	} else {
-		var tx extypes.Transaction
-		if err := sres.Decode(&tx); err != nil {
-			return fmt.Errorf("error decoding transaction: %v", err)
-		}
-		state.lastWithdrawalTs = uint64(tx.Time.UnixNano() / 1000000)
+		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
 	if err := state.reconcileTrades(context); err != nil {
 		return fmt.Errorf("error reconcile trade: %v", err)
 	}
-	if err := state.reconcileMovements(context); err != nil {
-		return fmt.Errorf("error reconcile movements: %v", err)
+
+	// Fetch positions & compare
+
+	// Start reconciliation
+	state.positions = make(map[uint64]*account.Position)
+	for _, sec := range state.securities {
+		if sec.SecurityType == "CRPERP" {
+			state.positions[sec.SecurityId] = account.NewPosition(
+				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
+		}
+	}
+	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`account_id=?`, state.dbAccount.ID).Order("time asc").Find(&transactions)
+	for _, tr := range transactions {
+		switch tr.Type {
+		case "TRADE":
+			if tr.Fill != nil {
+				secID := uint64(tr.Fill.SecurityID)
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
+					if tr.Fill.Quantity < 0 {
+						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
+					} else {
+						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
+					}
+					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
+				}
+			}
+		}
 	}
 
+	for k, pos := range state.positions {
+		if ppos := pos.GetPosition(); ppos != nil {
+			fmt.Println(state.securities[k].Symbol, ppos.Quantity)
+		}
+	}
+
+	// Fetch positions
+	resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	positionList, ok := resp.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !positionList.Success {
+		return fmt.Errorf("error getting balances: %s", positionList.RejectionReason.String())
+	}
+
+	execPositions := make(map[uint64]*models.Position)
+	for _, pos := range positionList.Positions {
+		execPositions[pos.Instrument.SecurityID.Value] = pos
+	}
+
+	for k, p1 := range state.positions {
+		if p2, ok := execPositions[k]; ok {
+			fmt.Println("position", p1.GetPosition().Quantity, p2.Quantity)
+		} else {
+			fmt.Println("p1 not in exec")
+		}
+	}
+
+	/*
+		if err := state.reconcileMovements(context); err != nil {
+			return fmt.Errorf("error reconcile movements: %v", err)
+		}
+	*/
 	return nil
 }
 
@@ -215,7 +267,7 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	for _, sec := range state.securities {
-		fmt.Println("REQ", sec.Symbol)
+		fmt.Println("REQ", sec.Symbol, state.lastTradeTs[sec.SecurityId])
 		instrument := &models.Instrument{
 			SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 			Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
@@ -244,6 +296,16 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			progress := false
 			for _, trd := range trds.Trades {
 				fmt.Println(trd)
+				// check if trade exists
+				var cnt int64
+				tx := state.db.Model(&extypes.Transaction{}).Where("execution_id=?", trd.TradeID).Count(&cnt)
+				if tx.Error != nil {
+					return fmt.Errorf("error getting trade transaction count: %v", err)
+				}
+				if cnt > 0 {
+					fmt.Println("SKIP")
+					continue
+				}
 				ts := trd.TransactionTime.AsTime()
 				secID := trd.Instrument.SecurityID.Value
 				var realized int64
@@ -252,20 +314,20 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				} else {
 					_, realized = state.positions[secID].Buy(trd.Price, trd.Quantity, false)
 				}
-				tx := &extypes.Transaction{
-					Type:    "TRADE",
-					Time:    ts,
-					ID:      trd.TradeID,
-					Account: state.account.Name,
+				tr := &extypes.Transaction{
+					Type:        "TRADE",
+					Time:        ts,
+					ExecutionID: trd.TradeID,
+					AccountID:   state.dbAccount.ID,
 					Fill: &extypes.Fill{
-						SecurityID: fmt.Sprintf("%d", secID),
+						SecurityID: int64(secID),
 						Price:      trd.Price,
 						Quantity:   trd.Quantity,
 					},
 				}
 				// Realized PnL
 				if realized != 0 {
-					tx.Movements = append(tx.Movements, extypes.Movement{
+					tr.Movements = append(tr.Movements, extypes.Movement{
 						Reason:   int32(messages.AccountMovementType_RealizedPnl),
 						AssetID:  constants.TETHER.ID,
 						Quantity: -float64(realized) / 1e8,
@@ -273,20 +335,18 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				}
 				// Commission
 				if trd.Commission != 0 {
-					tx.Movements = append(tx.Movements, extypes.Movement{
+					tr.Movements = append(tr.Movements, extypes.Movement{
 						Reason:   int32(messages.AccountMovementType_Commission),
 						AssetID:  constants.TETHER.ID,
 						Quantity: -trd.Commission,
 					})
 				}
 
-				if _, err := state.txs.InsertOne(goContext.Background(), tx); err != nil {
-					// TODO
-					//return fmt.Errorf("error inserting: %v", err)
-				} else {
-					state.lastTradeTs[sec.SecurityId] = uint64(ts.UnixMilli())
-					progress = true
+				if tx := state.db.Create(tr); tx.Error != nil {
+					return fmt.Errorf("error inserting: %v", err)
 				}
+				state.lastTradeTs[sec.SecurityId] = uint64(ts.UnixMilli())
+				progress = true
 			}
 			if len(trds.Trades) == 0 || !progress {
 				done = true
@@ -297,7 +357,11 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	return nil
 }
 
+/*
 func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 
 	return nil
 }
+
+
+*/
