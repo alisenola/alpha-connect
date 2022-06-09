@@ -1,6 +1,8 @@
 package types
 
 import (
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -9,6 +11,11 @@ import (
 )
 
 type updateProtocolAssetList struct{}
+
+type ExecutorConfig struct {
+	Registry  registry.PublicRegistryClient
+	Protocols []*models2.Protocol
+}
 
 type Executor interface {
 	actor.Actor

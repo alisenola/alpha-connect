@@ -10,14 +10,14 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		SecurityID:        13112609607273681222,
 		Symbol:            "ETH-USD",
 		SecurityType:      enum.SecurityType_CRYPTO_PERP,
 		Exchange:          constants.DYDX,
-		BaseCurrency:      constants.ETHEREUM,
-		QuoteCurrency:     constants.USDC,
 		MinPriceIncrement: 0.1,
 		RoundLot:          0.001,
 		HasMaturityDate:   false,

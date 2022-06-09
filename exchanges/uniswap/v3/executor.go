@@ -29,7 +29,6 @@ import (
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 )
 
 type QueryRunner struct {
@@ -41,17 +40,13 @@ type Executor struct {
 	securities     []*models.Security
 	queryRunnerETH *QueryRunner
 	queryRunners   []*QueryRunner
-	dialerPool     *xutils.DialerPool
 	logger         *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		queryRunnerETH: nil,
-		queryRunners:   nil,
-		logger:         nil,
-		dialerPool:     dialerPool,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) getQueryRunner() *QueryRunner {
@@ -77,7 +72,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		httpClient := &http.Client{
 			Transport: &http.Transport{

@@ -30,6 +30,9 @@ var instrument = &models.Instrument{
 }
 
 func TestAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	tests.AccntTest(t, tests.AccountTest{
 		Account:    account,
 		Instrument: instrument,

@@ -8,12 +8,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"gitlab.com/alphaticks/xchanger/utils"
-	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gorm.io/gorm"
 	"math"
 	"net"
 	"net/http"
@@ -33,32 +34,32 @@ type AccountListener struct {
 	ws                 *fbinance.AuthWebsocket
 	executorManager    *actor.PID
 	logger             *log.Logger
+	registry           registry.PublicRegistryClient
 	checkAccountTicker *time.Ticker
 	checkSocketTicker  *time.Ticker
 	refreshKeyTicker   *time.Ticker
 	lastPingTime       time.Time
 	securities         map[uint64]*models.Security
 	client             *http.Client
-	txs                *mongo.Collection
-	execs              *mongo.Collection
+	db                 *gorm.DB
 	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, txs, execs *mongo.Collection) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, txs, execs)
+		return NewAccountListener(account, registry, db)
 	}
 }
 
-func NewAccountListener(account *account.Account, txs, execs *mongo.Collection) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
 	return &AccountListener{
 		account:         account,
+		registry:        registry,
 		seqNum:          0,
 		ws:              nil,
 		executorManager: nil,
 		logger:          nil,
-		txs:             txs,
-		execs:           execs,
+		db:              db,
 	}
 }
 
@@ -297,9 +298,9 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.securities = securityMap
 	state.seqNum = 0
 
-	if state.txs != nil {
+	if state.db != nil {
 		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.txs))
+		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.db))
 		state.reconciler = context.Spawn(props)
 	}
 

@@ -30,6 +30,9 @@ var bitmexAccount = &models.Account{
 }
 
 func TestAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	tests.AccntTest(t, tests.AccountTest{
 		Account:                 bitmexAccount,
 		Instrument:              instrument1,

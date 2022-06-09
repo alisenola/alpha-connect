@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
-	"gitlab.com/alphaticks/alpha-connect/chains"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/models"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"io/ioutil"
@@ -62,7 +63,7 @@ func LoadStatics(t *testing.T) {
 	}
 }
 
-func StartExecutor(t *testing.T, cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig, cfgCh *chains.ExecutorConfig, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
+func StartExecutor(t *testing.T, cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
 	LoadStatics(t)
 	if cfgEx != nil && acc != nil {
 		accnt, err := exchanges.NewAccount(acc)

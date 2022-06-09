@@ -11,8 +11,6 @@ import (
 	"sort"
 	"time"
 
-	xutils "gitlab.com/alphaticks/xchanger/utils"
-
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -35,14 +33,13 @@ type Executor struct {
 	extypes.BaseExecutor
 	securities   []*models.Security
 	queryRunners []*QueryRunner
-	dialerPool   *xutils.DialerPool
 	logger       *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		dialerPool: dialerPool,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) getQueryRunner() *QueryRunner {
@@ -73,7 +70,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

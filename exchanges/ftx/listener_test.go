@@ -10,14 +10,14 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		SecurityID:        4425198260936995601,
 		Symbol:            "BTC-PERP",
 		SecurityType:      enum.SecurityType_CRYPTO_PERP,
 		Exchange:          constants.FTX,
-		BaseCurrency:      constants.BITCOIN,
-		QuoteCurrency:     constants.DOLLAR,
 		MinPriceIncrement: 1,
 		RoundLot:          0.0001,
 		HasMaturityDate:   false,

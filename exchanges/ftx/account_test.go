@@ -25,6 +25,9 @@ var ftxAccount = &models.Account{
 }
 
 func TestAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	tests.AccntTest(t, tests.AccountTest{
 		Account:    ftxAccount,
 		Instrument: instrument,

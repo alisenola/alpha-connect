@@ -20,6 +20,9 @@ import (
 )
 
 func TestExecutor(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	as, executor, cancel := tests.StartExecutor(t, &models2.Exchange{ID: 0x23, Name: "opensea"}, nil)
 	defer cancel()
 	testAsset := models2.Asset{

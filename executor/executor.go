@@ -3,6 +3,9 @@ package executor
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/chains"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"reflect"
 	"time"
 
@@ -15,22 +18,22 @@ import (
 )
 
 type Executor struct {
-	cfgEx     *exchanges.ExecutorConfig
-	cfgPr     *protocols.ExecutorConfig
-	cfgCh     *chains.ExecutorConfig
+	cfgEx     *extypes.ExecutorConfig
+	cfgPr     *prtypes.ExecutorConfig
+	cfgCh     *chtypes.ExecutorConfig
 	exchanges *actor.PID
 	protocols *actor.PID
 	chains    *actor.PID
 	logger    *log.Logger
 }
 
-func NewExecutorProducer(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig, cfgCh *chains.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfgEx, cfgPr, cfgCh)
 	}
 }
 
-func NewExecutor(cfgEx *exchanges.ExecutorConfig, cfgPr *protocols.ExecutorConfig, cfgCh *chains.ExecutorConfig) actor.Actor {
+func NewExecutor(cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig) actor.Actor {
 	return &Executor{
 		cfgEx: cfgEx,
 		cfgPr: cfgPr,

@@ -4,9 +4,6 @@ import (
 	goContext "context"
 	"encoding/json"
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges"
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -17,15 +14,17 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	extype "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges"
 	opensea "gitlab.com/alphaticks/xchanger/exchanges/opensea"
 	models2 "gitlab.com/alphaticks/xchanger/models"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 )
 
 type QueryRunner struct {
@@ -34,21 +33,18 @@ type QueryRunner struct {
 }
 
 type Executor struct {
-	extype.BaseExecutor
+	extypes.BaseExecutor
 	queryRunners             []*QueryRunner
 	marketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
 	credentials              *models2.APICredentials
-	dialerPool               *xutils.DialerPool
 	logger                   *log.Logger
 	registry                 registry.PublicRegistryClient
 }
 
-func NewExecutor(registry registry.PublicRegistryClient, dialerPool *xutils.DialerPool, credentials *models2.APICredentials) actor.Actor {
-	return &Executor{
-		dialerPool:  dialerPool,
-		registry:    registry,
-		credentials: credentials,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) getQueryRunner() *QueryRunner {
@@ -59,7 +55,7 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 }
 
 func (state *Executor) Receive(context actor.Context) {
-	extype.ReceiveExecutor(state, context)
+	extypes.ReceiveExecutor(state, context)
 }
 
 func (state *Executor) Initialize(context actor.Context) error {
@@ -69,7 +65,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

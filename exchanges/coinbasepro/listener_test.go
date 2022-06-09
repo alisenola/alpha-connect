@@ -10,6 +10,9 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
 		Symbol:            "LINK-USD",

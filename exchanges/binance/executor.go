@@ -15,7 +15,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/binance"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -53,15 +52,13 @@ type Executor struct {
 	queryRunners         []*QueryRunner
 	secondOrderRateLimit *exchanges.RateLimit
 	dayOrderRateLimit    *exchanges.RateLimit
-	dialerPool           *xutils.DialerPool
 	logger               *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		queryRunners: nil,
-		dialerPool:   dialerPool,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) Receive(context actor.Context) {
@@ -95,7 +92,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

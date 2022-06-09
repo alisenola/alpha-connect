@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	uuid "github.com/satori/go.uuid"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/tests"
@@ -54,7 +54,7 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 }
 
 func AccntTest(t *testing.T, tc AccountTest) {
-	as, executor, cleaner := tests.StartExecutor(t, &exchanges.ExecutorConfig{
+	as, executor, cleaner := tests.StartExecutor(t, &extypes.ExecutorConfig{
 		Exchanges: []*xchangerModels.Exchange{tc.Account.Exchange},
 	}, nil, nil, tc.Account)
 	defer cleaner()

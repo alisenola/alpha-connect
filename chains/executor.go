@@ -1,6 +1,7 @@
 package chains
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"reflect"
 	"time"
@@ -9,29 +10,24 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
-type ExecutorConfig struct {
-	Registry registry.PublicRegistryClient
-	Chains   []*models2.Chain
-}
 
 type Executor struct {
-	*ExecutorConfig
+	*types.ExecutorConfig
 	executors map[uint32]*actor.PID // A map from exchange ID to executor
 	logger    *log.Logger
 	strict    bool
 }
 
-func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfg)
 	}
 }
 
-func NewExecutor(cfg *ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
 	return &Executor{
 		ExecutorConfig: cfg,
 	}

@@ -1,6 +1,7 @@
 package fbinance
 
 import (
+	goContext "context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,10 +13,10 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -48,23 +49,24 @@ type QueryRunner struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	client               *http.Client
-	securities           map[uint64]*models.Security
-	symbolToSec          map[string]*models.Security
-	queryRunners         []*QueryRunner
-	secondOrderRateLimit *exchanges.RateLimit
-	minuteOrderRateLimit *exchanges.RateLimit
-	dialerPool           *xutils.DialerPool
-	logger               *log.Logger
+	client                *http.Client
+	securities            map[uint64]*models.Security
+	historicalSecurities  map[uint64]*registry.Security
+	symbolToSec           map[string]*models.Security
+	symbolToHistoricalSec map[string]*registry.Security
+	queryRunners          []*QueryRunner
+	secondOrderRateLimit  *exchanges.RateLimit
+	minuteOrderRateLimit  *exchanges.RateLimit
+	logger                *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		client:       nil,
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	ex := &Executor{
 		queryRunners: nil,
-		dialerPool:   dialerPool,
 		logger:       nil,
 	}
+	ex.ExecutorConfig = config
+	return ex
 }
 
 func (state *Executor) Receive(context actor.Context) {
@@ -105,7 +107,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{
@@ -305,6 +307,23 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, s := range securities {
 		state.securities[s.SecurityID] = s
 		state.symbolToSec[s.Symbol] = s
+	}
+
+	state.historicalSecurities = make(map[uint64]*registry.Security)
+	state.symbolToHistoricalSec = make(map[string]*registry.Security)
+	if state.Registry != nil {
+		rres, err := state.Registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
+			Filter: &registry.SecurityFilter{
+				ExchangeId: []uint32{constants.FBINANCE.ID},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error fetching historical securities: %v", err)
+		}
+		for _, sec := range rres.Securities {
+			state.historicalSecurities[sec.SecurityId] = sec
+			state.symbolToHistoricalSec[sec.Symbol] = sec
+		}
 	}
 
 	context.Send(context.Parent(), &messages.SecurityList{
@@ -812,9 +831,9 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 
 		var mtrades []*models.TradeCapture
 		for _, t := range trades {
-			sec, ok := state.symbolToSec[t.Symbol]
+			sec, ok := state.symbolToHistoricalSec[t.Symbol]
 			if !ok {
-				state.logger.Info("http error", log.Error(err))
+				state.logger.Info("unknown symbol", log.String("symbol", t.Symbol))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
@@ -832,7 +851,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				Instrument: &models.Instrument{
 					Exchange:   constants.FBINANCE,
 					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
-					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 				},
 				Trade_LinkID:    nil,
 				OrderID:         &wrapperspb.StringValue{Value: fmt.Sprintf("%d", t.OrderID)},

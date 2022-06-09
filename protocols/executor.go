@@ -3,28 +3,22 @@ package protocols
 import (
 	"errors"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"reflect"
 	"time"
-
-	models2 "gitlab.com/alphaticks/xchanger/models"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
-type ExecutorConfig struct {
-	Registry  registry.PublicRegistryClient
-	Protocols []*models2.Protocol
-}
 
 type Executor struct {
-	*ExecutorConfig
+	*types.ExecutorConfig
 	executors      map[uint32]*actor.PID // A map from exchange ID to executor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
@@ -33,13 +27,13 @@ type Executor struct {
 	strict         bool
 }
 
-func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfg)
 	}
 }
 
-func NewExecutor(cfg *ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
 	return &Executor{
 		ExecutorConfig: cfg,
 	}

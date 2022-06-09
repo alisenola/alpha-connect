@@ -1,9 +1,9 @@
 package tests
 
 import (
-	"gitlab.com/alphaticks/alpha-connect/chains"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	"math"
 	"reflect"
@@ -63,10 +63,10 @@ func CheckSecurityDefinition(t *testing.T, sec *models.Security, test MDTest) {
 func MarketData(t *testing.T, test MDTest) {
 	t.Parallel()
 
-	as, executor, clean := tests.StartExecutor(t, &exchanges.ExecutorConfig{
+	as, executor, clean := tests.StartExecutor(t, &extypes.ExecutorConfig{
 		Exchanges: []*xchangerModels.Exchange{test.Exchange},
-	}, &protocols.ExecutorConfig{},
-		&chains.ExecutorConfig{}, nil)
+	}, &prtypes.ExecutorConfig{},
+		&chtypes.ExecutorConfig{}, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()

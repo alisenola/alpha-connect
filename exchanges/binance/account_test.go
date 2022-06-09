@@ -24,6 +24,9 @@ var binanceAccount = &models.Account{
 }
 
 func TestAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	binance.EnableTestNet()
 	tests.AccntTest(t, tests.AccountTest{
 		Account:            binanceAccount,

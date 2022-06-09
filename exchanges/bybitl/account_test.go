@@ -24,6 +24,9 @@ var bybitlAccount = &models.Account{
 }
 
 func TestNewAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	bybitl.EnableTestNet()
 	bybitl.EnableWebSocketTestNet()
 	tests.AccntTest(t, tests.AccountTest{

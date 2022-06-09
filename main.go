@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/chains"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/executor"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
 	"net"
 	"os"
 	"os/signal"
@@ -15,8 +14,9 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/data"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/rpc"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -96,7 +96,7 @@ func main() {
 		constants.OKEXP,
 	}
 	// EXECUTOR //
-	registryAddress := "registry.alphaticks.io:7001"
+	registryAddress := "registry.alphaticks.io:8001"
 	if os.Getenv("REGISTRY_ADDRESS") != "" {
 		registryAddress = os.Getenv("REGISTRY_ADDRESS")
 	}
@@ -112,16 +112,16 @@ func main() {
 		panic(err)
 	}
 	// TODO mongo env
-	cfgExch := &exchanges.ExecutorConfig{
+	cfgExch := &extypes.ExecutorConfig{
 		Exchanges:  exch,
 		DialerPool: xchangerUtils.DefaultDialerPool,
 		Strict:     true,
 	}
-	cfgPrt := &protocols.ExecutorConfig{
+	cfgPrt := &prtypes.ExecutorConfig{
 		Registry:  nil,
 		Protocols: nil,
 	}
-	cfgCh := &chains.ExecutorConfig{
+	cfgCh := &chtypes.ExecutorConfig{
 		Registry: nil,
 		Chains:   nil,
 	}

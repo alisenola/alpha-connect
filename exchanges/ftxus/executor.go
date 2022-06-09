@@ -14,7 +14,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftxus"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -52,18 +51,13 @@ type Executor struct {
 	symbolToSec    map[string]*models.Security
 	queryRunners   []*QueryRunner
 	orderRateLimit *exchanges.RateLimit
-	dialerPool     *xutils.DialerPool
 	logger         *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		client:         nil,
-		queryRunners:   nil,
-		dialerPool:     dialerPool,
-		orderRateLimit: nil,
-		logger:         nil,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) Receive(context actor.Context) {
@@ -106,7 +100,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.orderRateLimit = exchanges.NewRateLimit(30, time.Second)
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{

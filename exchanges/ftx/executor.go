@@ -15,7 +15,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/ftx"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -54,18 +53,13 @@ type Executor struct {
 	symbolToSec    map[string]*models.Security
 	queryRunners   []*QueryRunner
 	orderRateLimit *exchanges.RateLimit
-	dialerPool     *xutils.DialerPool
 	logger         *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		client:         nil,
-		queryRunners:   nil,
-		dialerPool:     dialerPool,
-		orderRateLimit: nil,
-		logger:         nil,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) getQueryRunner() *QueryRunner {
@@ -108,7 +102,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.orderRateLimit = exchanges.NewRateLimit(30, time.Second)
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{
@@ -1184,7 +1178,6 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && p.Future != symbol {
 				continue
 			}
-			fmt.Println("pos", p)
 			sec, ok := state.symbolToSec[p.Future]
 			if !ok {
 				err := fmt.Errorf("unknown symbol %s", p.Future)

@@ -15,7 +15,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
-	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math/rand"
@@ -36,16 +35,13 @@ type Executor struct {
 	client       *http.Client
 	securities   map[uint64]*models.Security
 	queryRunners []*QueryRunner
-	dialerPool   *xutils.DialerPool
 	logger       *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool) actor.Actor {
-	return &Executor{
-		client:     nil,
-		dialerPool: dialerPool,
-		logger:     nil,
-	}
+func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+	e := &Executor{}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) getQueryRunner() *QueryRunner {
@@ -87,7 +83,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
-	dialers := state.dialerPool.GetDialers()
+	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

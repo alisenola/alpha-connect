@@ -1,7 +1,12 @@
 package types
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"gorm.io/gorm"
 	"math/rand"
 	"time"
 
@@ -12,6 +17,16 @@ import (
 
 type updateSecurityList struct{}
 type updateMarketableProtocolAssetList struct{}
+
+type ExecutorConfig struct {
+	Exchanges          []*xchangerModels.Exchange
+	Accounts           []*account.Account
+	DialerPool         *xchangerUtils.DialerPool
+	Registry           registry.PublicRegistryClient
+	OpenseaCredentials *xchangerModels.APICredentials
+	Strict             bool
+	DB                 *gorm.DB
+}
 
 type Executor interface {
 	actor.Actor
@@ -44,6 +59,7 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
+	*ExecutorConfig
 	Securities               map[uint64]*models.Security
 	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
 	SymbolToSec              map[string]*models.Security

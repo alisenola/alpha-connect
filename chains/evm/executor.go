@@ -4,10 +4,7 @@ import (
 	"container/list"
 	goContext "context"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
-	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/exchanges"
+
 	"math/big"
 	"reflect"
 	"sync"
@@ -15,10 +12,13 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	extype "gitlab.com/alphaticks/alpha-connect/chains/types"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	"gitlab.com/alphaticks/xchanger/exchanges"
 )
 
 type flushLogs struct{}
@@ -39,10 +39,9 @@ type EVMLog struct {
 }
 
 type Executor struct {
-	extype.BaseExecutor
+	chtypes.BaseExecutor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	logger         *log.Logger
-	registry       registry.PublicRegistryClient
 	client         *ethclient.Client
 	rateLimit      *exchanges.RateLimit
 	subscriptions  map[uint64]*logsSubscription
@@ -50,13 +49,14 @@ type Executor struct {
 	rpc            string
 }
 
-func NewExecutor(registry registry.PublicRegistryClient, rpc string) actor.Actor {
-	return &Executor{
+func NewExecutor(config *chtypes.ExecutorConfig, rpc string) actor.Actor {
+	e := &Executor{
 		protocolAssets: nil,
 		logger:         nil,
-		registry:       registry,
 		rpc:            rpc,
 	}
+	e.ExecutorConfig = config
+	return e
 }
 
 func (state *Executor) Receive(context actor.Context) {
@@ -70,7 +70,7 @@ func (state *Executor) Receive(context actor.Context) {
 			panic(err)
 		}
 	default:
-		extype.ReceiveExecutor(state, context)
+		chtypes.ReceiveExecutor(state, context)
 	}
 }
 

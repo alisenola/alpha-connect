@@ -1,41 +1,26 @@
 package exchanges
 
 import (
-	goContext "context"
 	"errors"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"reflect"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
-type ExecutorConfig struct {
-	Db                 *mongo.Database
-	Exchanges          []*xchangerModels.Exchange
-	Accounts           []*account.Account
-	DialerPool         *xchangerUtils.DialerPool
-	Registry           registry.PublicRegistryClient
-	OpenseaCredentials *xchangerModels.APICredentials
-	Strict             bool
-}
 
 type Executor struct {
-	*ExecutorConfig
+	*types.ExecutorConfig
 	accountManagers          map[string]*actor.PID
 	executors                map[uint32]*actor.PID                      // A map from exchange ID to executor
 	securities               map[uint64]*models.Security                // A map from security ID to security
@@ -48,13 +33,13 @@ type Executor struct {
 	strict                   bool
 }
 
-func NewExecutorProducer(cfg *ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfg)
 	}
 }
 
-func NewExecutor(cfg *ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
 	return &Executor{
 		ExecutorConfig: cfg,
 	}
@@ -277,20 +262,19 @@ func (state *Executor) Initialize(context actor.Context) error {
 		state.DialerPool = xchangerUtils.DefaultDialerPool
 	}
 
-	if state.Db != nil {
-		unique := true
-		mod := mongo.IndexModel{
-			Keys: bson.M{
-				"id": 1, // index in ascending order
-			}, Options: &options.IndexOptions{Unique: &unique},
+	if state.DB != nil && false {
+		fmt.Println("MIGRATING")
+		if err := state.DB.AutoMigrate(&types.Account{}); err != nil {
+			return fmt.Errorf("error migrating account type: %v", err)
 		}
-		txs := state.Db.Collection("transactions")
-		execs := state.Db.Collection("executions")
-		if _, err := txs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
-			return fmt.Errorf("error creating index on transactions: %v", err)
+		if err := state.DB.AutoMigrate(&types.Transaction{}); err != nil {
+			return fmt.Errorf("error migrating transaction type: %v", err)
 		}
-		if _, err := execs.Indexes().CreateOne(goContext.Background(), mod); err != nil {
-			return fmt.Errorf("error creating index on executions: %v", err)
+		if err := state.DB.AutoMigrate(&types.Fill{}); err != nil {
+			return fmt.Errorf("error migrating transaction type: %v", err)
+		}
+		if err := state.DB.AutoMigrate(&types.Movement{}); err != nil {
+			return fmt.Errorf("error migrating transaction type: %v", err)
 		}
 	}
 
@@ -300,7 +284,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exch := range state.Exchanges {
 		fmt.Println("NEW EXCHANGE", exch.Name)
-		producer := NewExchangeExecutorProducer(exch, state.DialerPool, state.ExecutorConfig)
+		producer := NewExchangeExecutorProducer(exch, state.ExecutorConfig)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
@@ -394,7 +378,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.Accounts {
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -428,7 +412,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
 		if producer == nil {
 			context.Respond(&messages.AccountDataResponse{
 				RequestID:       request.RequestID,
@@ -1164,7 +1148,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.Db, false)
+		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}

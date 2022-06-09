@@ -10,14 +10,14 @@ import (
 )
 
 func TestMarketData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		SecurityID:        9281941173829172773,
 		Symbol:            "BTCUSDT",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.BINANCE,
-		BaseCurrency:      constants.BITCOIN,
-		QuoteCurrency:     constants.TETHER,
 		MinPriceIncrement: 0.01,
 		RoundLot:          0.000010,
 		HasMaturityDate:   false,

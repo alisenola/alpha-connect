@@ -2,18 +2,18 @@ package executor_test
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/chains"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
+	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/grpc"
@@ -30,7 +30,7 @@ func TestMainExecutor(t *testing.T) {
 	}
 	reg := registry.NewPublicRegistryClient(conn)
 
-	cfgEx := exchanges.ExecutorConfig{
+	cfgEx := extypes.ExecutorConfig{
 		Registry: reg,
 		Exchanges: []*xchangerModels.Exchange{
 			{
@@ -39,7 +39,7 @@ func TestMainExecutor(t *testing.T) {
 			},
 		},
 	}
-	cfgPr := protocols.ExecutorConfig{
+	cfgPr := prtypes.ExecutorConfig{
 		Registry: reg,
 		Protocols: []*xchangerModels.Protocol{
 			{
@@ -48,7 +48,7 @@ func TestMainExecutor(t *testing.T) {
 			},
 		},
 	}
-	chPr := chains.ExecutorConfig{}
+	chPr := chtypes.ExecutorConfig{}
 	prod := executor.NewExecutorProducer(&cfgEx, &cfgPr, &chPr)
 	as := actor.NewActorSystem()
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(prod), "executor")

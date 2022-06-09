@@ -10,6 +10,9 @@ import (
 )
 
 func TestExecutorPublic(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	exTests.LoadStatics(t)
 	tests.ExPub(t, tests.ExPubTest{
 		Instrument: &models.Instrument{

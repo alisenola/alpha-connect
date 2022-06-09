@@ -6,6 +6,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"testing"
 )
 
@@ -24,6 +25,9 @@ var fbinanceAccount = &models.Account{
 }
 
 func TestAccountListener(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	fbinance.EnableTestNet()
 	tests.AccntTest(t, tests.AccountTest{
 		Account:             fbinanceAccount,

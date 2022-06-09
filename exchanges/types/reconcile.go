@@ -1,20 +1,11 @@
 package types
 
 import (
-	goContext "context"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/constants"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"google.golang.org/protobuf/types/known/timestamppb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
 	"math/rand"
-	"strconv"
 	"time"
 )
 
@@ -65,64 +56,69 @@ func (state *BaseReconcile) OnTradeCaptureReportRequest(context actor.Context) e
 		Success:    true,
 	}
 	defer context.Respond(res)
-	filter := bson.D{
-		{Key: "account", Value: msg.Account.Name},
-		{Key: "type", Value: "TRADE"},
-	}
-	if msg.Filter.From != nil {
-		from := msg.Filter.From.AsTime()
-		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$gt", Value: from}}})
-	}
-	if msg.Filter.To != nil {
-		to := msg.Filter.To.AsTime()
-		filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$lt", Value: to}}})
-	}
-	cur, err := state.GetTransactions().Find(goContext.Background(), filter)
-	if err != nil {
-		res.Success = false
-		res.RejectionReason = messages.RejectionReason_Other
-		state.GetLogger().Error("error fetching trades", log.Error(err))
-		return nil
-	}
-	defer cur.Close(goContext.Background())
-	for cur.Next(goContext.Background()) {
-		var tx Transaction
-		if err := cur.Decode(tx); err != nil {
-			state.GetLogger().Error("error decoding tx", log.Error(err))
+	// TODO
+	return nil
+	/*
+		defer context.Respond(res)
+		filter := bson.D{
+			{Key: "account", Value: msg.Account.Name},
+			{Key: "type", Value: "TRADE"},
+		}
+		if msg.Filter.From != nil {
+			from := msg.Filter.From.AsTime()
+			filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$gt", Value: from}}})
+		}
+		if msg.Filter.To != nil {
+			to := msg.Filter.To.AsTime()
+			filter = append(filter, bson.E{Key: "time", Value: bson.D{{Key: "$lt", Value: to}}})
+		}
+		cur, err := state.GetTransactions().Find(goContext.Background(), filter)
+		if err != nil {
 			res.Success = false
 			res.RejectionReason = messages.RejectionReason_Other
+			state.GetLogger().Error("error fetching trades", log.Error(err))
 			return nil
 		}
-		side := models.Side_Buy
-		if tx.Fill.Quantity < 0 {
-			side = models.Side_Sell
-		}
-		secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
-		ts := timestamppb.New(tx.Time)
-		var commission float64
-		var commissionAsset *xchangerModels.Asset
-		for _, m := range tx.Movements {
-			if m.Reason == int32(messages.AccountMovementType_Commission) {
-				commission = m.Quantity
-				commissionAsset, _ = constants.GetAssetByID(m.AssetID)
+		defer cur.Close(goContext.Background())
+		for cur.Next(goContext.Background()) {
+			var tx Transaction
+			if err := cur.Decode(tx); err != nil {
+				state.GetLogger().Error("error decoding tx", log.Error(err))
+				res.Success = false
+				res.RejectionReason = messages.RejectionReason_Other
+				return nil
 			}
+			side := models.Side_Buy
+			if tx.Fill.Quantity < 0 {
+				side = models.Side_Sell
+			}
+			secID, _ := strconv.ParseUint(tx.Fill.SecurityID, 10, 64)
+			ts := timestamppb.New(tx.Time)
+			var commission float64
+			var commissionAsset *xchangerModels.Asset
+			for _, m := range tx.Movements {
+				if m.Reason == int32(messages.AccountMovementType_Commission) {
+					commission = m.Quantity
+					commissionAsset, _ = constants.GetAssetByID(m.AssetID)
+				}
+			}
+			res.Trades = append(res.Trades, &models.TradeCapture{
+				Side:            side,
+				Type:            models.TradeType_Regular,
+				Price:           tx.Fill.Price,
+				Quantity:        math.Abs(tx.Fill.Quantity),
+				Commission:      commission,
+				CommissionAsset: commissionAsset,
+				TradeID:         tx.ID,
+				Instrument:      &models.Instrument{SecurityID: &wrapperspb.UInt64Value{Value: secID}},
+				Trade_LinkID:    nil,
+				OrderID:         nil,
+				ClientOrderID:   nil,
+				TransactionTime: ts,
+			})
 		}
-		res.Trades = append(res.Trades, &models.TradeCapture{
-			Side:            side,
-			Type:            models.TradeType_Regular,
-			Price:           tx.Fill.Price,
-			Quantity:        math.Abs(tx.Fill.Quantity),
-			Commission:      commission,
-			CommissionAsset: commissionAsset,
-			TradeID:         tx.ID,
-			Instrument:      &models.Instrument{SecurityID: &wrapperspb.UInt64Value{Value: secID}},
-			Trade_LinkID:    nil,
-			OrderID:         nil,
-			ClientOrderID:   nil,
-			TransactionTime: ts,
-		})
-	}
-	return nil
+		return nil
+	*/
 }
 
 func ReconcileReceive(state Reconcile, context actor.Context) {

@@ -1,12 +1,19 @@
 package types
 
 import (
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
+
+type ExecutorConfig struct {
+	Registry registry.PublicRegistryClient
+	Chains   []*models2.Chain
+}
 
 type Executor interface {
 	actor.Actor
@@ -20,6 +27,7 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
+	*ExecutorConfig
 }
 
 func ReceiveExecutor(state Executor, context actor.Context) {
