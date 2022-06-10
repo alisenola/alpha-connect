@@ -294,8 +294,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		for _, filter := range symbol.Filters {
 			switch filter.FilterType {
 			case fbinance.LOT_SIZE:
+				security.MinLimitQuantity = &wrapperspb.DoubleValue{Value: filter.MinQty}
 				security.MaxLimitQuantity = &wrapperspb.DoubleValue{Value: filter.MaxQty}
 			case fbinance.MARKET_LOT_SIZE:
+				security.MinMarketQuantity = &wrapperspb.DoubleValue{Value: filter.MinQty}
 				security.MaxMarketQuantity = &wrapperspb.DoubleValue{Value: filter.MaxQty}
 			}
 		}

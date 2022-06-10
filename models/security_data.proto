@@ -47,7 +47,8 @@ message Security {
     google.protobuf.StringValue securitySubType = 17;
     google.protobuf.DoubleValue max_limit_quantity = 18;
     google.protobuf.DoubleValue max_market_quantity = 19;
-    google.protobuf.DoubleValue min_order_quantity = 24;
+    google.protobuf.DoubleValue min_limit_quantity = 24;
+    google.protobuf.DoubleValue min_market_quantity = 25;
     google.protobuf.Timestamp creation_date = 20;
     google.protobuf.UInt64Value creation_block = 21;
     models.Protocol protocol = 22;

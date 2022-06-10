@@ -247,7 +247,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.MakerFee = &wrapperspb.DoubleValue{Value: symbol.MakerFee}
 		security.TakerFee = &wrapperspb.DoubleValue{Value: symbol.TakerFee}
 		security.Multiplier = &wrapperspb.DoubleValue{Value: 1}
-		security.MinOrderQuantity = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.MinTradingQuantity}
+		security.MinLimitQuantity = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.MinTradingQuantity}
+		security.MinMarketQuantity = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.MinTradingQuantity}
+		security.MaxLimitQuantity = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.MaxTradingQuantity}
+		security.MaxMarketQuantity = &wrapperspb.DoubleValue{Value: symbol.LotSizeFilter.MaxTradingQuantity}
+
 		securities = append(securities, &security)
 	}
 
