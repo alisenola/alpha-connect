@@ -113,9 +113,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	fmt.Println("TXS", state.dbAccount.ID)
 	for _, tr := range transactions {
-		if tr.ExecutionID == "94992987-5344660163" {
-			fmt.Println("GOT ITTT")
-		}
 		if tr.Fill != nil {
 			secID := uint64(tr.Fill.SecurityID)
 			_, ok := state.securities[secID]
@@ -180,11 +177,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
-	/*
-		if err := state.reconcileTrades(context); err != nil {
-			return fmt.Errorf("error reconcile trade: %v", err)
-		}
-	*/
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
 	if err := state.reconcileMovements(context); err != nil {
 		return fmt.Errorf("error reconcile movements: %v", err)
 	}
@@ -421,9 +416,10 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				AccountID:   state.dbAccount.ID,
 				Fill:        nil,
 				Movements: []extypes.Movement{{
-					Reason:   int32(messages.AccountMovementType_Withdrawal),
-					AssetID:  m.Asset.ID,
-					Quantity: m.Change,
+					Reason:    int32(messages.AccountMovementType_Withdrawal),
+					AssetID:   m.Asset.ID,
+					Quantity:  m.Change,
+					AccountID: state.dbAccount.ID,
 				}},
 			}
 			if tx := state.db.Create(tr); tx.Error != nil {

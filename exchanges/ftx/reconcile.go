@@ -166,6 +166,18 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
+	var movements []extypes.Movement
+	state.db.Debug().Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
+	fpnl := 0.
+	balances := make(map[uint32]float64)
+	for _, m := range movements {
+		balances[m.AssetID] += m.Quantity
+		if m.Reason == 5 {
+			fpnl += m.Quantity
+		}
+	}
+	fmt.Println(balances)
+
 	if err := state.reconcileTrades(context); err != nil {
 		return fmt.Errorf("error reconcile trade: %v", err)
 	}
