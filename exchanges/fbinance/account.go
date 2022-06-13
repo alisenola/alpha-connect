@@ -835,8 +835,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
-		b, _ := json.Marshal(udata.Execution)
-		fmt.Println("EXECUTION UPDATE", string(b))
 		exec := udata.Execution
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
