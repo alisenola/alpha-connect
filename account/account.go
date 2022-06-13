@@ -910,6 +910,26 @@ func (accnt *Account) GetPositions() []*models.Position {
 	return positions
 }
 
+func (accnt *Account) GetAllPositions() []*models.Position {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	var positions []*models.Position
+	for k, pos := range accnt.positions {
+		p := &models.Position{
+			Account:    accnt.Name,
+			Instrument: accnt.securities[k].GetInstrument(),
+			Cross:      false,
+		}
+		if pp := pos.GetPosition(); pp != nil {
+			p.Quantity = pp.Quantity
+			p.Cost = pp.Cost
+		}
+		positions = append(positions, p)
+	}
+
+	return positions
+}
+
 func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 	accnt.RLock()
 	defer accnt.RUnlock()
