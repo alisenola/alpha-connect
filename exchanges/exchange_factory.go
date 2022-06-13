@@ -65,7 +65,7 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewAccountListener(account, nil, nil) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db) }
+		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, strict) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, strict) }
 	case constants.FTXUS.ID:
