@@ -72,45 +72,56 @@ type BuyTradeModel interface {
 	GetSampleMatchAsk(securityID uint64, time uint64, sampleSize int) []float64
 }
 
+type MarketMap struct {
+	sync.RWMutex
+	prices map[uint64]float64
+}
+
+func NewMarketMap() *MarketMap {
+	return &MarketMap{
+		prices: make(map[uint64]float64),
+	}
+}
+
+func (m *MarketMap) SetPrice(ID uint64, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	m.prices[ID] = p
+}
+
+func (m *MarketMap) SetPairPrice(base, quote uint32, p float64) {
+	m.Lock()
+	defer m.Unlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	m.prices[ID] = p
+}
+
+func (m *MarketMap) GetPrice(ID uint64) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
+func (m *MarketMap) GetPairPrice(base, quote uint32) (float64, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	ID := uint64(base)<<32 | uint64(quote)
+	p, ok := m.prices[ID]
+	return p, ok
+}
+
 type MarketAllocationModel struct {
 	sync.RWMutex
 	AllocationModel
-	prices map[uint64]float64
+	*MarketMap
 }
 
 func NewMarketAllocationModel(model AllocationModel) *MarketAllocationModel {
 	return &MarketAllocationModel{
 		AllocationModel: model,
-		prices:          make(map[uint64]float64),
+		MarketMap:       NewMarketMap(),
 	}
-}
-
-func (m *MarketAllocationModel) SetPrice(ID uint64, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	m.prices[ID] = p
-}
-
-func (m *MarketAllocationModel) SetPairPrice(base, quote uint32, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	m.prices[ID] = p
-}
-
-func (m *MarketAllocationModel) GetPrice(ID uint64) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	p, ok := m.prices[ID]
-	return p, ok
-}
-
-func (m *MarketAllocationModel) GetPairPrice(base, quote uint32) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	p, ok := m.prices[ID]
-	return p, ok
 }
 
 type MarketLongShortModel struct {

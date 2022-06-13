@@ -14,31 +14,41 @@ import (
 // The account manager spawns an account listener and multiplex its messages
 // to actors who subscribed
 
+type AccountManagerConfig struct {
+	Account      *account.Account
+	Registry     registry.PublicRegistryClient
+	DB           *gorm.DB
+	PaperTrading bool
+	Strict       bool
+}
+
+var DefaultAccountManagerConfig = AccountManagerConfig{
+	Account:      nil,
+	Registry:     nil,
+	DB:           nil,
+	PaperTrading: false,
+	Strict:       true,
+}
+
 type AccountManager struct {
+	*AccountManagerConfig
 	execSubscribers map[uint64]*actor.PID
 	trdSubscribers  map[uint64]*actor.PID
 	blcSubscribers  map[uint64]*actor.PID
 	listener        *actor.PID
-	account         *account.Account
-	registry        registry.PublicRegistryClient
-	db              *gorm.DB
 	logger          *log.Logger
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, paperTrading bool) actor.Producer {
+func NewAccountManagerProducer(config *AccountManagerConfig) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(account, registry, db, paperTrading)
+		return NewAccountManager(config)
 	}
 }
 
-func NewAccountManager(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, paperTrading bool) actor.Actor {
+func NewAccountManager(config *AccountManagerConfig) actor.Actor {
 	return &AccountManager{
-		account:      account,
-		registry:     registry,
-		logger:       nil,
-		db:           db,
-		paperTrading: paperTrading,
+		AccountManagerConfig: config,
 	}
 }
 
@@ -130,12 +140,12 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 	state.blcSubscribers = make(map[uint64]*actor.PID)
 	var producer actor.Producer
 	if state.paperTrading {
-		producer = NewPaperAccountListenerProducer(state.account)
+		producer = NewPaperAccountListenerProducer(state.Account)
 		if producer == nil {
 			return fmt.Errorf("error getting account listener")
 		}
 	} else {
-		producer = NewAccountListenerProducer(state.account, state.registry, state.db)
+		producer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.Strict)
 		if producer == nil {
 			return fmt.Errorf("error getting account listener")
 		}

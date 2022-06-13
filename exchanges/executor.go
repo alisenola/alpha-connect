@@ -378,7 +378,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.Accounts {
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
+		cfg := &AccountManagerConfig{
+			Account:      accnt,
+			Registry:     state.Registry,
+			DB:           state.DB,
+			PaperTrading: false,
+			Strict:       state.StrictAccount,
+		}
+		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}
@@ -412,7 +419,14 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
+		cfg := &AccountManagerConfig{
+			Account:      accnt,
+			Registry:     state.Registry,
+			DB:           state.DB,
+			PaperTrading: false,
+			Strict:       state.StrictAccount,
+		}
+		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
 			context.Respond(&messages.AccountDataResponse{
 				RequestID:       request.RequestID,
@@ -1148,7 +1162,14 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accnt, state.Registry, state.DB, false)
+		cfg := &AccountManagerConfig{
+			Account:      accnt,
+			Registry:     state.Registry,
+			DB:           state.DB,
+			PaperTrading: false,
+			Strict:       state.StrictAccount,
+		}
+		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
 		}

@@ -24,8 +24,9 @@ type ExecutorConfig struct {
 	DialerPool         *xchangerUtils.DialerPool
 	Registry           registry.PublicRegistryClient
 	OpenseaCredentials *xchangerModels.APICredentials
-	Strict             bool
 	DB                 *gorm.DB
+	StrictExchange     bool
+	StrictAccount      bool
 }
 
 type Executor interface {

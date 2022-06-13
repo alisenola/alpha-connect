@@ -53,6 +53,7 @@ message Security {
     google.protobuf.UInt64Value creation_block = 21;
     models.Protocol protocol = 22;
     models.Chain chain = 23;
+    google.protobuf.DoubleValue price = 26;
 }
 
 message Order {

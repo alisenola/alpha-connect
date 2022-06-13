@@ -191,6 +191,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security := models.Security{}
 		security.Symbol = market.Name
 		security.Exchange = constants.FTX
+		security.Price = wrapperspb.Double(market.Price)
 
 		if strings.Contains(market.BaseCurrency, "BEAR") ||
 			strings.Contains(market.BaseCurrency, "BULL") ||

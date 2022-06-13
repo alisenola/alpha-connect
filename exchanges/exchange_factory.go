@@ -58,7 +58,7 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
@@ -67,7 +67,7 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db) }
+		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, strict) }
 	case constants.FTXUS.ID:
 		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	case constants.DYDX.ID:

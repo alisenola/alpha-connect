@@ -28,6 +28,7 @@ type checkExpiration struct{}
 
 type AccountListener struct {
 	account               *account.Account
+	strict                bool
 	seqNum                uint64
 	ftxExecutor           *actor.PID
 	ws                    *ftx.Websocket
@@ -44,13 +45,13 @@ type AccountListener struct {
 	reconciler            *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db)
+		return NewAccountListener(account, registry, db, strict)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		registry:        registry,
@@ -965,7 +966,12 @@ func (state *AccountListener) onWSOrdersUpdate(context actor.Context) error {
 			}
 			return nil
 		}
+
 		orderID := fmt.Sprintf("%d", res.Order.ID)
+		if !state.strict && !state.account.HasOrder(orderID) {
+			// We got a cancel for an order we didn't fetch
+			return nil
+		}
 		report, err := state.account.ConfirmCancelOrder(orderID)
 		if err != nil {
 			return fmt.Errorf("error confirming cancel order: %v", err)
@@ -993,12 +999,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	case ftx.WSOrdersUpdate:
 		// Problem here, I will get the closed order notification before the fill
 		// therefore I will close the order
-		fmt.Println("WSORDER UPDATE", res)
 		switch res.Order.Status {
 		case ftx.NEW_ORDER:
 			// If we don't have the order, it was created by someone else, add it.
 			if res.Order.ClientID != nil && !state.account.HasOrder(*res.Order.ClientID) {
-				fmt.Println("INSERTING NEW !!!")
 				_, rej := state.account.NewOrder(WSOrderToModel(res.Order))
 				if rej != nil {
 					return fmt.Errorf("error creating new order: %s", rej.String())
@@ -1050,6 +1054,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 
 	case ftx.WSFillsUpdate:
 		orderID := fmt.Sprintf("%d", res.Fill.OrderID)
+		if !state.strict && !state.account.HasOrder(orderID) {
+			return nil
+		}
 		tradeID := fmt.Sprintf("%d", res.Fill.TradeID)
 		report, err := state.account.ConfirmFill(orderID, tradeID, res.Fill.Price, res.Fill.Size, res.Fill.Liquidity == "taker")
 		if err != nil {
