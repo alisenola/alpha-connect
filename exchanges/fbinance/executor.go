@@ -1119,9 +1119,10 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 					Symbol:     &wrapperspb.StringValue{Value: p.Symbol},
 					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
 				},
-				Quantity: p.PositionAmount,
-				Cost:     cost,
-				Cross:    false,
+				Quantity:  p.PositionAmount,
+				Cost:      cost,
+				Cross:     false,
+				MarkPrice: wrapperspb.Double(p.MarkPrice),
 			}
 			response.Positions = append(response.Positions, pos)
 		}

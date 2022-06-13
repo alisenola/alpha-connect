@@ -79,6 +79,7 @@ message Position {
     double quantity = 3;
     bool cross = 4;
     double cost = 5;
+    google.protobuf.DoubleValue mark_price = 6;
 }
 
 message Balance {
