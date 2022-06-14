@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"math"
 )
@@ -149,7 +150,7 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
-func (accnt *Account) GetNetMargin(model modeling.Market) float64 {
+func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
 	netMargin := accnt.GetMargin(model)
 	accnt.RLock()
 	defer accnt.RUnlock()
@@ -161,7 +162,7 @@ func (accnt *Account) GetNetMargin(model modeling.Market) float64 {
 		}
 		exitPrice, ok := model.GetPrice(k)
 		if !ok {
-			panic("no price for position")
+			return 0., fmt.Errorf("no price for position %d", k)
 		}
 		cost := float64(p.cost) / accnt.MarginPrecision
 
@@ -174,7 +175,7 @@ func (accnt *Account) GetNetMargin(model modeling.Market) float64 {
 		}
 	}
 
-	return math.Max(netMargin, 0.)
+	return math.Max(netMargin, 0.), nil
 }
 
 func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {

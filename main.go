@@ -113,9 +113,10 @@ func main() {
 	}
 	// TODO mongo env
 	cfgExch := &extypes.ExecutorConfig{
-		Exchanges:  exch,
-		DialerPool: xchangerUtils.DefaultDialerPool,
-		Strict:     true,
+		Exchanges:      exch,
+		DialerPool:     xchangerUtils.DefaultDialerPool,
+		StrictExchange: true,
+		StrictAccount:  true,
 	}
 	cfgPrt := &prtypes.ExecutorConfig{
 		Registry:  nil,
