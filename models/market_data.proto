@@ -18,6 +18,7 @@ enum StatType {
     TradeVolume = 8;
     OpenInterest = 9;
     FundingRate = 10;
+    MarkPrice = 11;
 }
 
 enum OrderBookAggregation {
@@ -126,6 +127,7 @@ message Stat {
     google.protobuf.Timestamp timestamp = 1;
     StatType stat_type = 2;
     double value = 3;
+    uint64 securityID = 4;
 }
 
 message Sale {

@@ -1,7 +1,6 @@
 package bybitl
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
@@ -28,6 +27,7 @@ type checkAccount struct{}
 
 type AccountListener struct {
 	account            *account.Account
+	strict             bool
 	seqNum             uint64
 	bybitlExecutor     *actor.PID
 	ws                 *bybitl.Websocket
@@ -43,15 +43,16 @@ type AccountListener struct {
 	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db)
+		return NewAccountListener(account, registry, db, strict)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Actor {
 	return &AccountListener{
 		account:  account,
+		strict:   strict,
 		seqNum:   0,
 		ws:       nil,
 		logger:   nil,
@@ -720,8 +721,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	if msg.Message == nil {
 		return fmt.Errorf("reveived nil message")
 	}
-	b, _ := json.Marshal(msg.Message)
-	fmt.Println(string(b))
 	switch s := msg.Message.(type) {
 	case bybitl.WSOrders:
 		for _, order := range s {
@@ -731,6 +730,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				if !state.account.HasOrder(order.OrderLinkId) {
 					o := wsOrderToModel(&order)
 					o.OrderStatus = models.OrderStatus_PendingNew
+					sec := state.symbolToSec[o.Instrument.Symbol.Value]
+					if !state.strict {
+						o.LeavesQuantity = math.Round(o.LeavesQuantity/sec.RoundLot.Value) * sec.RoundLot.Value
+					}
 					_, rej := state.account.NewOrder(o)
 					if rej != nil {
 						return fmt.Errorf("error creating new order: %s", rej.String())
@@ -746,6 +749,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					context.Send(context.Parent(), report)
 				}
 			case bybitl.OrderCancelled:
+				if !state.strict && !state.account.HasOrder(order.OrderLinkId) {
+					return nil
+				}
 				report, err := state.account.ConfirmCancelOrder(order.OrderLinkId)
 				if err != nil {
 					return fmt.Errorf("error confirming cancel order: %v", err)
@@ -781,6 +787,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		for _, exec := range s {
 			switch exec.ExecType {
 			case "Trade":
+				if !state.strict && !state.account.HasOrder(exec.OrderId) {
+					return nil
+				}
 				report, err := state.account.ConfirmFill(exec.OrderId, exec.ExecId, exec.Price, exec.ExecQty, !exec.IsMaker)
 				if err != nil {
 					return fmt.Errorf("error confirming filled order: %v", err)
