@@ -42,6 +42,31 @@ import (
 // The global rate limit is per IP and the orderRateLimit is per
 // account.
 
+var MakerFees = map[int]float64{
+	0: 0.0002,
+	1: 0.00016,
+	2: 0.00014,
+	3: 0.00012,
+	4: 0.0001,
+	5: 0.00008,
+	6: 0.00006,
+	7: 0.00004,
+	8: 0.00002,
+	9: 0,
+}
+var TakerFees = map[int]float64{
+	0: 0.0004,
+	1: 0.0004,
+	2: 0.00035,
+	3: 0.00032,
+	4: 0.0003,
+	5: 0.00027,
+	6: 0.00025,
+	7: 0.00022,
+	8: 0.0002,
+	9: 0.00017,
+}
+
 type QueryRunner struct {
 	pid             *actor.PID
 	globalRateLimit *exchanges.RateLimit
@@ -545,6 +570,94 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		response.Success = true
 		response.SnapshotL2 = snapshot
 		response.SeqNum = obData.LastUpdateID
+		context.Respond(response)
+	})
+
+	return nil
+}
+
+func (state *Executor) OnAccountInformationRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountInformationRequest)
+	response := &messages.AccountInformationResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	request, weight, err := fbinance.GetAccountInfo(msg.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.globalRateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_Other
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http error", log.Error(err))
+				response.Success = false
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+			}
+			return
+		}
+		var information fbinance.AccountInfo
+		err = json.Unmarshal(queryResponse.Response, &information)
+		if err != nil {
+			state.logger.Info("unmarshaling error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+		if information.Code != 0 {
+			err = fmt.Errorf("error getting orderbook: %d %s", information.Code, information.Message)
+			state.logger.Info("http client error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		if information.FeeTier < 0 || information.FeeTier > 9 {
+			state.logger.Info(fmt.Sprintf("invalid fee tier: %d", information.FeeTier))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		makerFee := MakerFees[information.FeeTier]
+		takerFee := TakerFees[information.FeeTier]
+
+		fmt.Println("FEES", makerFee, takerFee)
+		response.MakerFee = &wrapperspb.DoubleValue{Value: makerFee}
+		response.TakerFee = &wrapperspb.DoubleValue{Value: takerFee}
+		response.Success = true
 		context.Respond(response)
 	})
 

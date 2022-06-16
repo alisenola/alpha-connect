@@ -286,9 +286,27 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching orders: %s", orderList.RejectionReason.String())
 	}
 
+	// Then fetch fees
+	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.AccountInformationRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting account information from executor: %v", err)
+	}
+
+	information, ok := res.(*messages.AccountInformationResponse)
+	if !ok {
+		return fmt.Errorf("was expecting AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !information.Success {
+		return fmt.Errorf("error fetching account information: %s", information.RejectionReason.String())
+	}
+
 	// Sync account
-	makerFee := 0.0002
-	takerFee := 0.0004
+	makerFee := information.MakerFee.Value
+	takerFee := information.TakerFee.Value
 	if err := state.account.Sync(filteredSecurities, orderList.Orders, positionList.Positions, balanceList.Balances, &makerFee, &takerFee); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
