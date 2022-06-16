@@ -155,8 +155,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
 			if rateLimit.Interval == "MINUTE" {
+				fmt.Println("MINUTE RATE LIMIT", rateLimit.Limit)
 				state.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
 			} else if rateLimit.Interval == "SECOND" {
+				fmt.Println("SECOND RATE LIMIT", rateLimit.Limit)
 				state.secondOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Duration(rateLimit.IntervalNum)*time.Second)
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
@@ -239,7 +241,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, symbol := range exchangeInfo.Symbols {
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
-			state.logger.Info(fmt.Sprintf("unknown currency %s", symbol.BaseAsset))
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", symbol.BaseAsset))
 			continue
 		}
 		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
@@ -884,11 +886,10 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	symbol := ""
 	orderID := ""
 	clOrderID := ""
+	var orderStatus *models.OrderStatus
 	if msg.Filter != nil {
 		if msg.Filter.OrderStatus != nil {
-			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
-			context.Respond(response)
-			return nil
+			orderStatus = &msg.Filter.OrderStatus.Value
 		}
 		if msg.Filter.Side != nil {
 			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
@@ -1003,6 +1004,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				return
 			}
 			ord := orderToModel(&o)
+			if orderStatus != nil && ord.OrderStatus != *orderStatus {
+				continue
+			}
 			ord.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
 			morders = append(morders, ord)
 		}
@@ -1322,7 +1326,18 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		fmt.Println(order.Status, order.CumQuantity)
+		status := StatusToModel(order.Status)
+		if status == nil {
+			state.logger.Error(fmt.Sprintf("unknown status %s", order.Status))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		response.Success = true
+		response.OrderStatus = *status
+		response.CumQuantity = order.CumQuantity
+		response.LeavesQuantity = order.OriginalQuantity - order.CumQuantity
 		response.OrderID = fmt.Sprintf("%d", order.OrderID)
 		context.Respond(response)
 	})

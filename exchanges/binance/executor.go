@@ -214,7 +214,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
 			if symbol.Status == "TRADING" {
-				state.logger.Info(fmt.Sprintf("unknown base currency %s", symbol.BaseAsset))
+				//state.logger.Info(fmt.Sprintf("unknown base currency %s", symbol.BaseAsset))
 			}
 			continue
 		}

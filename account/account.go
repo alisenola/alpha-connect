@@ -16,6 +16,19 @@ import (
 	"time"
 )
 
+func IsPending(status models.OrderStatus) bool {
+	return status == models.OrderStatus_PendingFilled ||
+		status == models.OrderStatus_PendingCancel ||
+		status == models.OrderStatus_PendingNew ||
+		status == models.OrderStatus_PendingReplace
+}
+
+func IsClosed(status models.OrderStatus) bool {
+	return status == models.OrderStatus_Filled ||
+		status == models.OrderStatus_Canceled ||
+		status == models.OrderStatus_Expired
+}
+
 type Order struct {
 	*models.Order
 	lastEventTime          time.Time
@@ -237,6 +250,9 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	for _, b := range balances {
 		accnt.assets[b.Asset.ID] = b.Asset
 		accnt.balances[b.Asset.ID] = int64(math.Round(b.Quantity * accnt.MarginPrecision))
+	}
+	if accnt.MarginCurrency != nil {
+		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
 	}
 
 	return nil
@@ -680,6 +696,40 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	}, nil
 }
 
+func (accnt *Account) PendingFilled(ID string) (*messages.ExecutionReport, error) {
+	accnt.Lock()
+	defer accnt.Unlock()
+	var order *Order
+	order = accnt.ordersClID[ID]
+	if order == nil {
+		order = accnt.ordersID[ID]
+	}
+	if order == nil {
+		return nil, fmt.Errorf("unknown order %s", ID)
+	}
+	if order.OrderStatus == models.OrderStatus_Filled {
+		return nil, nil
+	}
+
+	// Save current order status in case filled gets rejected
+	order.previousStatus = order.OrderStatus
+	order.OrderStatus = models.OrderStatus_PendingFilled
+	order.lastEventTime = time.Now()
+	order.LastEventTime = timestamppb.New(order.lastEventTime)
+
+	return &messages.ExecutionReport{
+		OrderID:         order.OrderID,
+		ClientOrderID:   &wrapperspb.StringValue{Value: order.ClientOrderID},
+		ExecutionID:     "", // TODO
+		ExecutionType:   messages.ExecutionType_PendingFilled,
+		OrderStatus:     models.OrderStatus_PendingFilled,
+		Instrument:      order.Instrument,
+		LeavesQuantity:  order.LeavesQuantity,
+		CumQuantity:     order.CumQuantity,
+		TransactionTime: timestamppb.Now(),
+	}, nil
+}
+
 func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity float64, taker bool) (*messages.ExecutionReport, error) {
 	accnt.Lock()
 	defer accnt.Unlock()
@@ -1010,7 +1060,7 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 
 func (accnt *Account) CheckExpiration() error {
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.OrderStatus_PendingNew || o.OrderStatus == models.OrderStatus_PendingCancel || o.OrderStatus == models.OrderStatus_PendingReplace) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
+		if IsPending(o.OrderStatus) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
 			return fmt.Errorf("order %s in unknown state", k)
 		}
 	}
@@ -1021,7 +1071,7 @@ func (accnt *Account) CleanOrders() {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
-		if (o.OrderStatus == models.OrderStatus_Filled || o.OrderStatus == models.OrderStatus_Canceled) && (time.Since(o.lastEventTime) > time.Minute) {
+		if IsClosed(o.OrderStatus) && (time.Since(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
 			delete(accnt.ordersID, o.OrderID)
 		}

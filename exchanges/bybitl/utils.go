@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-func statusToBybitl(status models.OrderStatus) bybitl.OrderStatus {
+func StatusToBybitl(status models.OrderStatus) bybitl.OrderStatus {
 	switch status {
 	case models.OrderStatus_New:
 		return bybitl.OrderNew
@@ -30,7 +30,35 @@ func statusToBybitl(status models.OrderStatus) bybitl.OrderStatus {
 	}
 }
 
-func orderToModel(order *bybitl.ActiveOrder) *models.Order {
+func StatusToModel(status bybitl.OrderStatus) *models.OrderStatus {
+	switch status {
+	case bybitl.OrderCreated:
+		v := models.OrderStatus_Created
+		return &v
+	case bybitl.OrderRejected:
+		v := models.OrderStatus_Rejected
+		return &v
+	case bybitl.OrderNew:
+		v := models.OrderStatus_New
+		return &v
+	case bybitl.OrderPartiallyFilled:
+		v := models.OrderStatus_PartiallyFilled
+		return &v
+	case bybitl.OrderFilled:
+		v := models.OrderStatus_Filled
+		return &v
+	case bybitl.OrderCancelled:
+		v := models.OrderStatus_Canceled
+		return &v
+	case bybitl.OrderPendingCancel:
+		v := models.OrderStatus_PendingCancel
+		return &v
+	default:
+		return nil
+	}
+}
+
+func OrderToModel(order *bybitl.ActiveOrder) *models.Order {
 	o := &models.Order{
 		OrderID:       order.OrderId,
 		ClientOrderID: order.OrderLinkId,

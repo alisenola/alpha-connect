@@ -19,8 +19,8 @@ var instrument = &models.Instrument{
 var fbinanceAccount = &models.Account{
 	Exchange: constants.FBINANCE,
 	ApiCredentials: &xchangerModels.APICredentials{
-		APIKey:    "74f122652da74f6e1bcc34b8c23fc91e0239b502e68440632ae9a3cb7cefa18e",
-		APISecret: "c3e0d76ee014b597b93616478dc789e6bb6616ad59ddbe384d2554ace4a60f86",
+		APIKey:    "584ed906986e68940c1cdeba22be16cbe0a459678dcb58e4761c2899ce8a82af",
+		APISecret: "05fc33219ab552d416d8506b24276d9930af18cbbe93c0a45df23d4e11eaf3b8",
 	},
 }
 
@@ -33,8 +33,8 @@ func TestAccountListener(t *testing.T) {
 		Account:             fbinanceAccount,
 		Instrument:          instrument,
 		OrderStatusRequest:  true,
-		GetPositionsLimit:   true,
-		GetPositionsMarket:  true,
-		OrderReplaceRequest: true,
+		GetPositionsLimit:   false,
+		GetPositionsMarket:  false,
+		OrderReplaceRequest: false,
 	})
 }

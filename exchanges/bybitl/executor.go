@@ -69,12 +69,40 @@ func (qr *QueryRunner) Post(weight int) {
 	qr.mPostRateLimit.Request(weight)
 }
 
+type AccountRateLimit struct {
+	rateLimits map[string]*exchanges.RateLimit
+}
+
+func NewAccountRateLimit() *AccountRateLimit {
+	return &AccountRateLimit{
+		rateLimits: make(map[string]*exchanges.RateLimit),
+	}
+}
+
+func (rl *AccountRateLimit) Request(symbol string, weight int) {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = exchanges.NewRateLimit(100, time.Minute)
+		rl.rateLimits[symbol] = l
+	}
+	l.Request(weight)
+}
+
+func (rl *AccountRateLimit) IsRateLimited(symbol string) bool {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = exchanges.NewRateLimit(100, time.Minute)
+		rl.rateLimits[symbol] = l
+	}
+	return l.IsRateLimited()
+}
+
 type Executor struct {
 	extypes.BaseExecutor
 	historicalSecurities  map[uint64]*registry.Security
 	symbolToHistoricalSec map[string]*registry.Security
 	queryRunners          []*QueryRunner
-	accountRateLimits     map[string]*exchanges.RateLimit
+	accountRateLimits     map[string]*AccountRateLimit
 	logger                *log.Logger
 }
 
@@ -147,7 +175,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 	}
 
-	state.accountRateLimits = make(map[string]*exchanges.RateLimit)
+	state.accountRateLimits = make(map[string]*AccountRateLimit)
 
 	if err := state.UpdateSecurityList(context); err != nil {
 		state.logger.Warn("error updating security list: %v", log.Error(err))
@@ -216,7 +244,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseCurrency)
 		if !ok {
-			state.logger.Info(fmt.Sprintf("unknown currency %s", symbol.BaseCurrency))
+			//state.logger.Info(fmt.Sprintf("unknown currency %s", symbol.BaseCurrency))
 			continue
 		}
 		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteCurrency)
@@ -994,7 +1022,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			return nil
 		}
 		if msg.Filter.OrderStatus != nil {
-			orderStatus = statusToBybitl(msg.Filter.OrderStatus.Value)
+			orderStatus = StatusToBybitl(msg.Filter.OrderStatus.Value)
 		}
 		if msg.Filter.OrderID != nil {
 			orderId = msg.Filter.OrderID.Value
@@ -1075,7 +1103,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			o := orderToModel(&ord)
+			o := OrderToModel(&ord)
 			o.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
 			response.Orders = append(response.Orders, o)
 		}
@@ -1126,6 +1154,18 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		}
 	} else {
 		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+		context.Respond(response)
+		return nil
+	}
+
+	ar, ok := state.accountRateLimits[req.Account.Name]
+	if !ok {
+		ar = NewAccountRateLimit()
+		state.accountRateLimits[req.Account.Name] = ar
+	}
+
+	if ar.IsRateLimited(symbol) {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -1185,7 +1225,17 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+		status := StatusToModel(order.Order.OrderStatus)
+		if status == nil {
+			state.logger.Error(fmt.Sprintf("unknown status %s", order.Order.OrderStatus))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		response.Success = true
+		response.OrderStatus = *status
+		response.CumQuantity = order.Order.CumExecQty
+		response.LeavesQuantity = order.Order.Qty
 		response.OrderID = order.Order.OrderId
 		context.Respond(response)
 	})
@@ -1225,6 +1275,19 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
+
+	ar, ok := state.accountRateLimits[req.Account.Name]
+	if !ok {
+		ar = NewAccountRateLimit()
+		state.accountRateLimits[req.Account.Name] = ar
+	}
+
+	if ar.IsRateLimited(symbol) {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
 	params := bybitl.NewCancelActiveOrderParams(symbol)
 	if req.OrderID != nil {
 		params.SetOrderId(req.OrderID.Value)

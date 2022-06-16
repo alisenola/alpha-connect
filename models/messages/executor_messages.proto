@@ -31,6 +31,7 @@ enum ExecutionType {
     Trade = 12;
     OrderStatus = 13;
     Settlement = 14;
+    PendingFilled = 15;
 }
 
 enum RejectionReason {
@@ -70,6 +71,11 @@ enum RejectionReason {
     UnknownAsset = 33;
     EthRPCTimeout = 34;
     UnknownChain = 35;
+}
+
+enum ResponseType {
+    Ack = 0;
+    Result = 1;
 }
 
 enum FeeType {
@@ -472,6 +478,7 @@ message NewOrderSingleRequest {
     uint64 requestID = 1;
     models.Account account = 2;
     NewOrder order = 3;
+    ResponseType response_type = 4;
 }
 
 message NewOrderSingleResponse {
@@ -479,7 +486,10 @@ message NewOrderSingleResponse {
     uint64 responseID = 2;
     bool success = 3;
     string orderID = 4;
-    RejectionReason rejection_reason = 5;
+    models.OrderStatus order_status = 5;
+    double leaves_quantity = 6;
+    double cum_quantity = 7;
+    RejectionReason rejection_reason = 8;
 }
 
 message NewOrderBulkRequest {
@@ -538,6 +548,7 @@ message OrderCancelRequest {
     google.protobuf.StringValue client_orderID = 3;
     models.Instrument instrument = 4;
     models.Account account = 5;
+    ResponseType response_type = 6;
 }
 
 message OrderCancelResponse {

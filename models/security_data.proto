@@ -131,6 +131,7 @@ enum OrderStatus {
     Expired = 12;
     PendingReplace = 13;
     Created = 14;
+    PendingFilled = 15;
 }
 
 enum OrderType {

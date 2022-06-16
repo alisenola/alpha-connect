@@ -7,10 +7,31 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"strconv"
 )
 
-func wsOrderToModel(o *fbinance.WSExecution) *models.Order {
+func StatusToModel(status fbinance.OrderStatus) *models.OrderStatus {
+	switch status {
+	case fbinance.NEW_ORDER:
+		v := models.OrderStatus_New
+		return &v
+	case fbinance.CANCELED_ORDER:
+		v := models.OrderStatus_Canceled
+		return &v
+	case fbinance.PARTIALLY_FILLED:
+		v := models.OrderStatus_PartiallyFilled
+		return &v
+	case fbinance.FILLED:
+		v := models.OrderStatus_Filled
+		return &v
+	case fbinance.EXPIRED:
+		v := models.OrderStatus_Expired
+		return &v
+	default:
+		return nil
+	}
+}
+
+func WSOrderToModel(o *fbinance.WSExecution) *models.Order {
 	ord := &models.Order{
 		OrderID:       fmt.Sprintf("%d", o.OrderID),
 		ClientOrderID: o.ClientOrderID,
@@ -112,6 +133,10 @@ func orderToModel(o *fbinance.OrderData) *models.Order {
 		ord.OrderStatus = models.OrderStatus_Canceled
 	case fbinance.PARTIALLY_FILLED:
 		ord.OrderStatus = models.OrderStatus_PartiallyFilled
+	case fbinance.FILLED:
+		ord.OrderStatus = models.OrderStatus_Filled
+	case fbinance.EXPIRED:
+		ord.OrderStatus = models.OrderStatus_Expired
 	default:
 		fmt.Println("UNKNOWN ORDER STATUS", o.Status)
 	}
@@ -194,7 +219,6 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 
 	request := fbinance.NewNewOrderRequest(symbol, side, typ)
 
-	fmt.Println("SET QTY", order.Quantity, lotPrecision, strconv.FormatFloat(order.Quantity, 'f', int(lotPrecision), 64))
 	request.SetQuantity(order.Quantity, lotPrecision)
 	request.SetNewClientOrderID(order.ClientOrderID)
 
@@ -231,7 +255,7 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 			return nil, &rej
 		}
 	}
-	request.SetNewOrderResponseType(fbinance.ACK_RESPONSE_TYPE)
+	request.SetNewOrderResponseType(fbinance.RESULT_RESPONSE_TYPE)
 
 	return request, nil
 }
