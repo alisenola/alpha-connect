@@ -9,6 +9,32 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
+func OrderToStatus(o *ftx.Order) *models.OrderStatus {
+	switch o.Status {
+	case ftx.NEW_ORDER:
+		v := models.OrderStatus_PendingNew
+		return &v
+	case ftx.OPEN_ORDER:
+		if o.FilledSize > 0 {
+			v := models.OrderStatus_PartiallyFilled
+			return &v
+		} else {
+			v := models.OrderStatus_New
+			return &v
+		}
+	case ftx.CLOSED_ORDER:
+		if o.FilledSize == o.Size {
+			v := models.OrderStatus_Filled
+			return &v
+		} else {
+			v := models.OrderStatus_Canceled
+			return &v
+		}
+	default:
+		return nil
+	}
+}
+
 func WSOrderToModel(o ftx.WSOrder) *models.Order {
 	ord := &models.Order{
 		OrderID: fmt.Sprintf("%d", o.ID),
@@ -79,7 +105,8 @@ func WSOrderToModel(o ftx.WSOrder) *models.Order {
 
 func OrderToModel(o ftx.Order) *models.Order {
 	ord := &models.Order{
-		OrderID: fmt.Sprintf("%d", o.ID),
+		OrderID:       fmt.Sprintf("%d", o.ID),
+		ClientOrderID: o.ClientID,
 		Instrument: &models.Instrument{
 			Exchange: constants.FTX,
 			Symbol:   &wrapperspb.StringValue{Value: o.Market},
@@ -87,7 +114,6 @@ func OrderToModel(o ftx.Order) *models.Order {
 		LeavesQuantity: o.Size - o.FilledSize, // TODO check
 		CumQuantity:    o.FilledSize,
 	}
-	ord.ClientOrderID = o.ClientID
 
 	if o.ReduceOnly {
 		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)

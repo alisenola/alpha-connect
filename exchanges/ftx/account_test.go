@@ -29,13 +29,13 @@ func TestAccountListener(t *testing.T) {
 		t.SkipNow()
 	}
 	tests.AccntTest(t, tests.AccountTest{
-		Account:    ftxAccount,
-		Instrument: instrument,
-		//OrderStatusRequest:      true,
+		Account:            ftxAccount,
+		Instrument:         instrument,
+		OrderStatusRequest: true,
 		//OrderReplaceRequest:     true,
 		//OrderBulkReplaceRequest: true,
-		GetPositionsLimit: true,
-		SkipCheckBalance:  true,
+		//GetPositionsLimit: true,
+		SkipCheckBalance: true,
 		//GetPositionsMarket:      true,
 	})
 }

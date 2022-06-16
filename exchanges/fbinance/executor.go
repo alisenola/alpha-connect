@@ -155,10 +155,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, rateLimit := range exchangeInfo.RateLimits {
 		if rateLimit.RateLimitType == "ORDERS" {
 			if rateLimit.Interval == "MINUTE" {
-				fmt.Println("MINUTE RATE LIMIT", rateLimit.Limit)
 				state.minuteOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
 			} else if rateLimit.Interval == "SECOND" {
-				fmt.Println("SECOND RATE LIMIT", rateLimit.Limit)
 				state.secondOrderRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Duration(rateLimit.IntervalNum)*time.Second)
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {

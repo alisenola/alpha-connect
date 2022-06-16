@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	uuid "github.com/satori/go.uuid"
+	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -54,9 +56,11 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 }
 
 func AccntTest(t *testing.T, tc AccountTest) {
+	tests.LoadStatics(t)
 	as, executor, cleaner := tests.StartExecutor(t, &extypes.ExecutorConfig{
-		Exchanges: []*xchangerModels.Exchange{tc.Account.Exchange},
-	}, nil, nil, tc.Account)
+		Exchanges:     []*xchangerModels.Exchange{tc.Account.Exchange},
+		StrictAccount: true,
+	}, &prtypes.ExecutorConfig{}, &chtypes.ExecutorConfig{}, tc.Account)
 	defer cleaner()
 
 	ctx := AccountTestCtx{
@@ -85,7 +89,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
 		Account: tc.Account,
-	}, 10*time.Second).Result()
+	}, 15*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,9 +103,11 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 
 	var available float64
-	for _, bl := range bl.Balances {
-		if bl.Asset.ID == sec.QuoteCurrency.ID {
-			available = bl.Quantity
+	fmt.Println("BALANCES", bl.Balances, len(bl.Balances))
+	for _, bal := range bl.Balances {
+		fmt.Println(bal.Quantity)
+		if bal.Asset.ID == sec.QuoteCurrency.ID {
+			available = bal.Quantity
 		}
 	}
 	if available == 0. {
@@ -109,24 +115,28 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 
 	// Get market data
-	res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
-		RequestID:   0,
-		Instrument:  tc.Instrument,
-		Aggregation: models.OrderBookAggregation_L2,
-	}, 10*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
-	v, ok := res.(*messages.MarketDataResponse)
-	if !ok {
-		t.Fatalf("was expecting *messages.MarketDataResponse, got %s", reflect.TypeOf(res).String())
-	}
-	if !v.Success {
-		t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
-	}
+	/*
+		res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
+			RequestID:   0,
+			Instrument:  tc.Instrument,
+			Aggregation: models.OrderBookAggregation_L2,
+		}, 10*time.Second).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, ok := res.(*messages.MarketDataResponse)
+		if !ok {
+			t.Fatalf("was expecting *messages.MarketDataResponse, got %s", reflect.TypeOf(res).String())
+		}
+		if !v.Success {
+			t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+		}
+
+	*/
 
 	if tc.OrderStatusRequest {
-		OrderStatusRequest(t, ctx, tc)
+		OrderStatusRequest(t, ctx, tc, messages.ResponseType_Result)
+		OrderStatusRequest(t, ctx, tc, messages.ResponseType_Ack)
 	}
 	if tc.GetPositionsLimit {
 		GetPositionsLimitShort(t, ctx, tc)
@@ -148,7 +158,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 }
 
-func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
+func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType messages.ResponseType) {
 	// Test with no account
 	// TODO Finish testing
 	clean(t, ctx, tc)
@@ -229,14 +239,16 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		RequestID: 0,
 		Account:   tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: orderID,
-			Instrument:    tc.Instrument,
-			OrderType:     models.OrderType_Limit,
-			OrderSide:     models.Side_Buy,
-			TimeInForce:   models.TimeInForce_GoodTillCancel,
-			Quantity:      0.001,
-			Price:         &wrapperspb.DoubleValue{Value: 30000.},
+			ClientOrderID:         orderID,
+			Instrument:            tc.Instrument,
+			OrderType:             models.OrderType_Limit,
+			OrderSide:             models.Side_Buy,
+			TimeInForce:           models.TimeInForce_GoodTillCancel,
+			Quantity:              0.001,
+			Price:                 &wrapperspb.DoubleValue{Value: 20000.},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
+		ResponseType: respType,
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
@@ -299,10 +311,11 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	}
 
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderCancelRequest{
-		RequestID:  0,
-		Account:    tc.Account,
-		Instrument: tc.Instrument,
-		OrderID:    &wrapperspb.StringValue{Value: order.OrderID},
+		RequestID:    0,
+		Account:      tc.Account,
+		Instrument:   tc.Instrument,
+		OrderID:      &wrapperspb.StringValue{Value: order.OrderID},
+		ResponseType: respType,
 	}, 10*time.Second).Result()
 
 	if err != nil {

@@ -203,7 +203,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		case "spot":
 			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)
 			if !ok {
-				state.logger.Info(fmt.Sprintf("unknown currency %s", market.BaseCurrency))
+				//state.logger.Info(fmt.Sprintf("unknown currency %s", market.BaseCurrency))
 				continue
 			}
 			quoteCurrency, ok := constants.GetAssetBySymbol(market.QuoteCurrency)
@@ -873,11 +873,10 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	symbol := ""
 	orderID := ""
 	clOrderID := ""
+	var orderStatus *models.OrderStatus
 	if msg.Filter != nil {
 		if msg.Filter.OrderStatus != nil {
-			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
-			context.Respond(response)
-			return nil
+			orderStatus = &msg.Filter.OrderStatus.Value
 		}
 		if msg.Filter.Side != nil {
 			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
@@ -1016,70 +1015,12 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
-			ord := models.Order{
-				OrderID:       fmt.Sprintf("%d", o.ID),
-				ClientOrderID: o.ClientID,
-				Instrument: &models.Instrument{
-					Exchange:   constants.FTX,
-					Symbol:     &wrapperspb.StringValue{Value: o.Market},
-					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
-				},
-				LeavesQuantity: o.Size - o.FilledSize, // TODO check
-				CumQuantity:    o.FilledSize,
+			ord := OrderToModel(o)
+			ord.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
+			if orderStatus != nil && ord.OrderStatus != *orderStatus {
+				continue
 			}
-
-			if o.ReduceOnly {
-				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
-			}
-			if o.PostOnly {
-				ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ParticipateDoNotInitiate)
-			}
-
-			switch o.Status {
-			case ftx.NEW_ORDER:
-				ord.OrderStatus = models.OrderStatus_PendingNew
-			case ftx.OPEN_ORDER:
-				if o.FilledSize > 0 {
-					ord.OrderStatus = models.OrderStatus_PartiallyFilled
-				} else {
-					ord.OrderStatus = models.OrderStatus_New
-				}
-			case ftx.CLOSED_ORDER:
-				if o.FilledSize == o.Size {
-					ord.OrderStatus = models.OrderStatus_Filled
-				} else {
-					ord.OrderStatus = models.OrderStatus_Canceled
-				}
-			default:
-				fmt.Println("unknown ORDER STATUS", o.Status)
-			}
-
-			switch o.Type {
-			case ftx.LIMIT_ORDER:
-				ord.OrderType = models.OrderType_Limit
-			case ftx.MARKET_ORDER:
-				ord.OrderType = models.OrderType_Market
-			default:
-				fmt.Println("UNKNOWN ORDER TYPE", o.Type)
-			}
-
-			switch o.Side {
-			case ftx.BUY:
-				ord.Side = models.Side_Buy
-			case ftx.SELL:
-				ord.Side = models.Side_Sell
-			default:
-				fmt.Println("UNKNOWN ORDER SIDE", o.Side)
-			}
-
-			if o.Ioc {
-				ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
-			} else {
-				ord.TimeInForce = models.TimeInForce_GoodTillCancel
-			}
-			ord.Price = &wrapperspb.DoubleValue{Value: o.Price}
-
-			morders = append(morders, &ord)
+			morders = append(morders, ord)
 		}
 		response.Success = true
 		response.Orders = morders
@@ -1269,6 +1210,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			return
 		}
 		if !balances.Success {
+			state.logger.Info("error unmarshalling", log.Error(errors.New(balances.Error)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Respond(response)
 			return
@@ -1393,7 +1335,18 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Respond(response)
 			return
 		}
+
+		status := OrderToStatus(&order.Result)
+		if status == nil {
+			state.logger.Error(fmt.Sprintf("unknown status %s", order.Result.Status))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
 		response.Success = true
+		response.OrderStatus = *status
+		response.CumQuantity = order.Result.FilledSize
+		response.LeavesQuantity = order.Result.RemainingSize
 		response.OrderID = fmt.Sprintf("%d", order.Result.ID)
 		context.Respond(response)
 	})
@@ -1553,6 +1506,110 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 				context.Respond(response)
 				return
 			}
+		}
+		response.Success = true
+		context.Respond(response)
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	response := &messages.OrderMassCancelResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	symbol := ""
+	if req.Filter != nil {
+		if req.Filter.Instrument != nil {
+			if req.Filter.Instrument.Symbol != nil {
+				if _, ok := state.symbolToSec[req.Filter.Instrument.Symbol.Value]; !ok {
+					response.RejectionReason = messages.RejectionReason_UnknownSymbol
+					context.Respond(response)
+					return nil
+				}
+				symbol = req.Filter.Instrument.Symbol.Value
+			} else if req.Filter.Instrument.SecurityID != nil {
+				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
+				if !ok {
+					fmt.Println(state.securities, req.Filter.Instrument.SecurityID.Value)
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+					context.Respond(response)
+					return nil
+				}
+				symbol = sec.Symbol
+			}
+		}
+		if req.Filter.Side != nil || req.Filter.OrderStatus != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+			context.Respond(response)
+			return nil
+		}
+	}
+	if symbol == "" {
+		response.RejectionReason = messages.RejectionReason_UnknownSymbol
+		context.Respond(response)
+		return nil
+	}
+
+	request, weight, err := ftx.CancelAllOrders(ftx.CancelAllOrdersRequest{
+		Market: symbol,
+	}, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Respond(response)
+		return nil
+	}
+
+	qr.rateLimit.Request(weight)
+	future := context.RequestFuture(qr.pid, &jobs.PerformHTTPQueryRequest{Request: request}, 10*time.Second)
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Info("http error", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Respond(response)
+			return
+		}
+		queryResponse := res.(*jobs.PerformQueryResponse)
+		if queryResponse.StatusCode != 200 {
+			if queryResponse.StatusCode >= 400 && queryResponse.StatusCode < 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http client error", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Respond(response)
+			} else if queryResponse.StatusCode >= 500 {
+				err := fmt.Errorf(
+					"%d %s",
+					queryResponse.StatusCode,
+					string(queryResponse.Response))
+				state.logger.Info("http server error", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Respond(response)
+			}
+			return
+		}
+		var fres ftx.CancelAllOrdersResponse
+		err = json.Unmarshal(queryResponse.Response, &fres)
+		if err != nil {
+			state.logger.Info("error unmarshalling", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
+		}
+
+		if !fres.Success {
+			state.logger.Info("error unmarshalling", log.Error(errors.New(fres.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Respond(response)
+			return
 		}
 		response.Success = true
 		context.Respond(response)
