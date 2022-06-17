@@ -1171,6 +1171,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
+	ar.Request(symbol, 1)
 
 	params, rej := buildPostOrderRequest(symbol, req.Order, tickPrecision, lotPrecision)
 	if rej != nil {
@@ -1289,6 +1290,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Respond(response)
 		return nil
 	}
+	ar.Request(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
 	if req.OrderID != nil {
