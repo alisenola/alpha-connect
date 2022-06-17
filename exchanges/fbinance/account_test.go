@@ -11,9 +11,9 @@ import (
 )
 
 var instrument = &models.Instrument{
-	SecurityID: &wrapperspb.UInt64Value{Value: 5485975358912730733},
+	SecurityID: wrapperspb.UInt64(5485975358912730733),
 	Exchange:   constants.FBINANCE,
-	Symbol:     &wrapperspb.StringValue{Value: "BTCUSDT"},
+	Symbol:     wrapperspb.String("BTCUSDT"),
 }
 
 var fbinanceAccount = &models.Account{

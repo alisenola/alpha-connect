@@ -1099,12 +1099,14 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			}
 			sec, ok := state.SymbolToSec[ord.Symbol]
 			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSymbol
+				state.logger.Info("got order with unknown symbol: " + ord.Symbol)
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
 			}
 			o := OrderToModel(&ord)
-			o.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
+			o.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
+			o.Instrument.Symbol = wrapperspb.String(sec.Symbol)
 			response.Orders = append(response.Orders, o)
 		}
 		response.Success = true

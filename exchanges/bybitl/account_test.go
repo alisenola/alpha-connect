@@ -11,8 +11,9 @@ import (
 )
 
 var instrument = &models.Instrument{
-	Exchange: constants.BYBITL,
-	Symbol:   &wrapperspb.StringValue{Value: "BTCUSDT"},
+	Exchange:   constants.BYBITL,
+	Symbol:     wrapperspb.String("BTCUSDT"),
+	SecurityID: wrapperspb.UInt64(6789757764526280996),
 }
 
 var bybitlAccount = &models.Account{
@@ -32,7 +33,7 @@ func TestNewAccountListener(t *testing.T) {
 	tests.AccntTest(t, tests.AccountTest{
 		Account:                bybitlAccount,
 		Instrument:             instrument,
-		OrderStatusRequest:     true,
+		ExpiredOrder:           true,
 		GetPositionsLimit:      false,
 		GetPositionsMarket:     false,
 		OrderReplaceRequest:    false,

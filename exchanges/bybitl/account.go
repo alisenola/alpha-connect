@@ -99,7 +99,7 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 	case *messages.OrderStatusRequest:
 		if err := state.OnOrderStatusRequest(context); err != nil {
-			state.logger.Error("error processing OnOrderStatusRequset", log.Error(err))
+			state.logger.Error("error processing OnOrderStatusRequest", log.Error(err))
 			panic(err)
 		}
 	case *messages.NewOrderSingleRequest:

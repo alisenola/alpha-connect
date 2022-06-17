@@ -22,6 +22,7 @@ type AccountTest struct {
 	Instrument              *models.Instrument
 	SkipCheckBalance        bool
 	OrderStatusRequest      bool
+	ExpiredOrder            bool
 	NewOrderBulkRequest     bool
 	GetPositionsLimit       bool
 	OrderReplaceRequest     bool
@@ -89,7 +90,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
 		Account: tc.Account,
-	}, 15*time.Second).Result()
+	}, 25*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,6 +138,10 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderStatusRequest {
 		OrderStatusRequest(t, ctx, tc, messages.ResponseType_Result)
 		OrderStatusRequest(t, ctx, tc, messages.ResponseType_Ack)
+	}
+	if tc.ExpiredOrder {
+		ExpiredOrder(t, ctx, tc, messages.ResponseType_Result)
+		ExpiredOrder(t, ctx, tc, messages.ResponseType_Ack)
 	}
 	if tc.GetPositionsLimit {
 		GetPositionsLimitShort(t, ctx, tc)
@@ -368,6 +373,66 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	}
 
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+}
+
+func ExpiredOrder(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType messages.ResponseType) {
+	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
+	// Test with one order
+	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+		RequestID: 0,
+		Account:   tc.Account,
+		Order: &messages.NewOrder{
+			ClientOrderID:         orderID,
+			Instrument:            tc.Instrument,
+			OrderType:             models.OrderType_Limit,
+			OrderSide:             models.Side_Buy,
+			TimeInForce:           models.TimeInForce_GoodTillCancel,
+			Quantity:              0.001,
+			Price:                 &wrapperspb.DoubleValue{Value: 30000.},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
+		},
+		ResponseType: respType,
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok := res.(*messages.NewOrderSingleResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderSingleResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !response.Success {
+		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
+	}
+
+	time.Sleep(3 * time.Second)
+	filter := &messages.OrderFilter{
+		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
+		Instrument:  tc.Instrument,
+	}
+	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+
+	// Test with instrument and order status
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
+		RequestID: 0,
+		Subscribe: false,
+		Account:   tc.Account,
+		Filter:    filter,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderList, ok := res.(*messages.OrderList)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+	}
+	if !orderList.Success {
+		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
+	}
+	if len(orderList.Orders) != 0 {
+		t.Fatalf("was expecting 0 open order, got %d", len(orderList.Orders))
+	}
 }
 
 func NewOrderBulkRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
