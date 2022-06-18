@@ -595,7 +595,7 @@ func (accnt *Account) ConfirmCancelOrder(ID string) (*messages.ExecutionReport, 
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
-	order.LeavesQuantity = 0.
+	//order.LeavesQuantity = 0.
 	if order.OrderType == models.OrderType_Limit {
 		if order.Side == models.Side_Buy {
 			accnt.securities[order.Instrument.SecurityID.Value].RemoveBidOrder(order.ClientOrderID)
@@ -754,13 +754,17 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	leavesQuantity := float64(rawLeavesQuantity-rawFillQuantity) / lotPrecision
 	order.LeavesQuantity = leavesQuantity
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
-	if rawFillQuantity == rawLeavesQuantity {
-		order.OrderStatus = models.OrderStatus_Filled
-	} else if order.OrderStatus == models.OrderStatus_New {
-		// Only set it to partially filled if its in new status
-		// otherwise, will overwrite pending state
-		order.OrderStatus = models.OrderStatus_PartiallyFilled
+
+	if order.OrderStatus != models.OrderStatus_Canceled && order.OrderStatus != models.OrderStatus_PendingCancel {
+		if rawFillQuantity == rawLeavesQuantity {
+			order.OrderStatus = models.OrderStatus_Filled
+		} else if order.OrderStatus == models.OrderStatus_New {
+			// Only set it to partially filled if its in new status
+			// otherwise, will overwrite pending state
+			order.OrderStatus = models.OrderStatus_PartiallyFilled
+		}
 	}
+
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
 
