@@ -26,7 +26,6 @@ import (
 type Executor struct {
 	extypes.BaseExecutor
 	client      *http.Client
-	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -158,24 +157,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		securities = append(securities, &security)
 	}
-	state.securities = securities
+
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
-
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	msg := context.Message().(*messages.SecurityListRequest)
-
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }

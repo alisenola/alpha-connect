@@ -17,9 +17,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: constants.DYDX,
 			Symbol:   &wrapperspb.StringValue{Value: "BTC-USD"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		OpenInterestRequest:           true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

@@ -15,11 +15,9 @@ func TestExecutorPublic(t *testing.T) {
 	tests.ExPub(t, tests.ExPubTest{
 		Instrument: &models.Instrument{
 			Exchange: constants.HUOBIF,
-			Symbol:   &wrapperspb.StringValue{Value: "BTC210625"},
+			Symbol:   &wrapperspb.StringValue{Value: "ETH220624"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		OpenInterestRequest:           true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

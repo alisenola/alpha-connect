@@ -153,8 +153,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	var securities []*models.Security
-	state.Securities = make(map[uint64]*models.Security)
-	state.SymbolToSec = make(map[string]*models.Security)
 	for _, symbol := range data.Data {
 		splits := strings.Split(symbol.ContractCode, "-")
 		baseStr := strings.ToUpper(splits[0])
@@ -193,9 +191,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.RoundLot = &wrapperspb.DoubleValue{Value: 1}
 		security.Multiplier = &wrapperspb.DoubleValue{Value: symbol.ContractSize}
 		securities = append(securities, &security)
-		state.Securities[security.SecurityID] = &security
-		state.SymbolToSec[security.Symbol] = &security
 	}
+
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),

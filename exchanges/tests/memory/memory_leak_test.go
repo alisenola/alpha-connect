@@ -68,12 +68,9 @@ func TestMemoryLeak(t *testing.T) {
 
 	test := tests.MDTest{
 		IgnoreSizeResidue: true,
-		SecurityID:        11630614572540763252,
 		Symbol:            "BTC_USDT",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.GATE,
-		BaseCurrency:      constants.BITCOIN,
-		QuoteCurrency:     constants.TETHER,
 		MinPriceIncrement: 0.01,
 		RoundLot:          1e-04,
 		HasMaturityDate:   false,

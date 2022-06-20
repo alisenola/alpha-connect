@@ -177,25 +177,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.RoundLot = &wrapperspb.DoubleValue{Value: 1. / math.Pow10(int(symbol.AmountPrecision))}
 		securities = append(securities, &security)
 	}
-	state.securities = securities
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
-		Securities: state.securities})
-
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
-
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: state.securities})
+		Securities: securities})
 
 	return nil
 }

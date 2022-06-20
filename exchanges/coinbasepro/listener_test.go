@@ -18,7 +18,7 @@ func TestMarketData(t *testing.T) {
 		Symbol:            "LINK-USD",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.COINBASEPRO,
-		MinPriceIncrement: 0.01,
+		MinPriceIncrement: 0.001,
 		RoundLot:          1e-08,
 		HasMaturityDate:   false,
 		IsInverse:         false,

@@ -95,7 +95,7 @@ func MarketData(t *testing.T, test MDTest) {
 	obChecker := as.Root.Spawn(actor.PropsFromProducer(NewMDCheckerProducer(sec, test)))
 	defer as.Root.PoisonFuture(obChecker)
 
-	time.Sleep(80 * time.Second)
+	time.Sleep(20 * time.Second)
 	res, err = as.Root.RequestFuture(obChecker, &GetStat{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

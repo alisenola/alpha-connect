@@ -212,11 +212,15 @@ func (state *MDChecker) OnMarketDataIncrementalRefresh(context actor.Context) er
 		for _, t := range aggT.Trades {
 			rawPrice := t.Price * float64(state.tickPrecision)
 			rawQty := t.Quantity * float64(state.lotPrecision)
-			if (math.Round(rawPrice) - rawPrice) > 0.00001 {
-				return fmt.Errorf("residue in trade price: %f %f", rawPrice, math.Round(rawPrice))
+			if !state.test.IgnorePriceResidue {
+				if (math.Round(rawPrice) - rawPrice) > 0.00001 {
+					return fmt.Errorf("residue in trade price: %f %f", rawPrice, math.Round(rawPrice))
+				}
 			}
-			if (math.Round(rawQty) - rawQty) > 0.0001 {
-				return fmt.Errorf("residue in trade qty: %f %f", rawQty, math.Round(rawQty))
+			if !state.test.IgnoreSizeResidue {
+				if (math.Round(rawQty) - rawQty) > 0.0001 {
+					return fmt.Errorf("residue in trade qty: %f %f", rawQty, math.Round(rawQty))
+				}
 			}
 			state.trades += 1
 		}

@@ -19,7 +19,7 @@ func TestExecutorPublic(t *testing.T) {
 		},
 		SecurityListRequest:           true,
 		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		OpenInterestRequest:           true,
+		HistoricalLiquidationsRequest: false, // TODO
+		OpenInterestRequest:           false, // TODO
 	})
 }

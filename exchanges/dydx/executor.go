@@ -36,8 +36,6 @@ type AccountRateLimit struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	securities        map[uint64]*models.Security
-	symbolToSec       map[string]*models.Security
 	accountRateLimits map[string]*AccountRateLimit
 	queryRunners      []*QueryRunner
 	logger            *log.Logger
@@ -163,7 +161,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		return err
 	}
 
-	state.securities = nil
 	var securities []*models.Security
 	for _, m := range markets.Markets {
 		security := models.Security{}
@@ -208,36 +205,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.securities = make(map[uint64]*models.Security)
-	state.symbolToSec = make(map[string]*models.Security)
-	for _, s := range securities {
-		state.securities[s.SecurityID] = s
-		state.symbolToSec[s.Symbol] = s
-	}
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})
-
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
-	securities := make([]*models.Security, len(state.securities))
-	i := 0
-	for _, v := range state.securities {
-		securities[i] = v
-		i += 1
-	}
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: securities,
-	})
 
 	return nil
 }
@@ -288,17 +261,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				params.SetSide(side)
 			}
 			if msg.Filter.Instrument != nil {
-				if msg.Filter.Instrument.Symbol != nil {
-					params.SetMarket(msg.Filter.Instrument.Symbol.Value)
-				} else if msg.Filter.Instrument.SecurityID != nil {
-					sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
-					if !ok {
-						response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-						context.Respond(response)
-						return nil
-					}
-					params.SetMarket(sec.Symbol)
+				symbol, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+				if rej != nil {
+					response.RejectionReason = *rej
+					context.Respond(response)
+					return nil
 				}
+				params.SetMarket(symbol)
 			}
 			request, weight, err = dydx.GetOrders(params, msg.Account.ApiCredentials)
 			if err != nil {
@@ -392,8 +361,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 		var morders []*models.Order
 		for _, o := range orders {
-			sec, ok := state.symbolToSec[o.Market]
-			if !ok {
+			sec := state.SymbolToSecurity(o.Market)
+			if sec == nil {
 				state.logger.Info("http error", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
@@ -422,17 +391,13 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	symbol := ""
 	if msg.Instrument != nil {
-		if msg.Instrument.Symbol != nil {
-			symbol = msg.Instrument.Symbol.Value
-		} else if msg.Instrument.SecurityID != nil {
-			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
-			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-				context.Respond(response)
-				return nil
-			}
-			symbol = sec.Symbol
+		s, rej := state.InstrumentToSymbol(msg.Instrument)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Respond(response)
+			return nil
 		}
+		symbol = s
 	}
 
 	params := dydx.NewGetPositionsParams()
@@ -503,10 +468,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if p.Size == 0 {
 				continue
 			}
-			sec, ok := state.symbolToSec[p.Market]
-			if !ok {
-				err := fmt.Errorf("unknown symbol %s", p.Market)
-				state.logger.Info("unmarshalling error", log.Error(err))
+			sec := state.SymbolToSecurity(p.Market)
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unknown symbol: %s", p.Market))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
@@ -648,26 +612,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	symbol := ""
-	if req.Order.Instrument != nil {
-		if req.Order.Instrument.Symbol != nil {
-			symbol = req.Order.Instrument.Symbol.Value
-		} else if req.Order.Instrument.SecurityID != nil {
-			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
-			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-				context.Respond(response)
-				return nil
-			}
-			symbol = sec.Symbol
-		}
-	} else {
-		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+	sec, rej := state.InstrumentToSecurity(req.Order.Instrument)
+	if rej != nil {
+		response.RejectionReason = *rej
 		context.Respond(response)
 		return nil
 	}
 
-	params := buildCreateOrderParams(symbol, req.Order)
+	params := buildCreateOrderParams(sec.Symbol, req.Order)
 	request, weight, err := dydx.CreateOrder(params, req.Account.StarkCredentials, req.Account.ApiCredentials)
 	if err != nil {
 		return err

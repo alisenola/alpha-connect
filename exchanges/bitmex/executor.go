@@ -36,8 +36,6 @@ import (
 type Executor struct {
 	extypes.BaseExecutor
 	client      *http.Client
-	securities  map[uint64]*models.Security
-	symbolToSec map[string]*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
 	logger      *log.Logger
@@ -46,8 +44,6 @@ type Executor struct {
 func NewExecutor() actor.Actor {
 	return &Executor{
 		client:      nil,
-		securities:  nil,
-		symbolToSec: nil,
 		rateLimit:   nil,
 		queryRunner: nil,
 		logger:      nil,
@@ -75,7 +71,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	state.rateLimit = exchanges.NewRateLimit(1, time.Second)
 	// Launch an APIQuery actor with the given request and target
@@ -197,34 +193,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 
 	}
-	state.securities = make(map[uint64]*models.Security)
-	state.symbolToSec = make(map[string]*models.Security)
-	for _, s := range securities {
-		state.securities[s.SecurityID] = s
-		state.symbolToSec[s.Symbol] = s
-	}
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	msg := context.Message().(*messages.SecurityListRequest)
-	securities := make([]*models.Security, len(state.securities))
-	i := 0
-	for _, v := range state.securities {
-		securities[i] = v
-		i += 1
-	}
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: securities})
-
 	return nil
 }
 
@@ -241,8 +215,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			if msg.Filter.Instrument.Symbol != nil {
 				params.SetSymbol(msg.Filter.Instrument.Symbol.Value)
 			} else if msg.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
-				if !ok {
+				sec := state.IDToSecurity(msg.Filter.Instrument.SecurityID.Value)
+				if sec == nil {
 					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 					context.Respond(response)
 					return nil
@@ -318,9 +292,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 		var morders []*models.Order
 		for _, o := range orders {
-			sec, ok := state.symbolToSec[o.Symbol]
-			if !ok {
-				state.logger.Info("http error", log.Error(err))
+			sec := state.SymbolToSecurity(o.Symbol)
+			if sec == nil {
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
@@ -419,8 +392,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		if msg.Instrument.Symbol != nil {
 			filters["symbol"] = msg.Instrument.Symbol.Value
 		} else if msg.Instrument.SecurityID != nil {
-			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
-			if !ok {
+			sec := state.IDToSecurity(msg.Instrument.SecurityID.Value)
+			if sec == nil {
 				positionList.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Respond(positionList)
 				return nil
@@ -488,8 +461,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if p.CurrentQty == 0 {
 				continue
 			}
-			sec, ok := state.symbolToSec[p.Symbol]
-			if !ok {
+			sec := state.SymbolToSecurity(p.Symbol)
+			if sec == nil {
 				positionList.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(positionList)
 				return
@@ -823,16 +796,16 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	if req.Filter != nil {
 		if req.Filter.Instrument != nil {
 			if req.Filter.Instrument.Symbol != nil {
-				if _, ok := state.symbolToSec[req.Filter.Instrument.Symbol.Value]; !ok {
+				if sec := state.SymbolToSecurity(req.Filter.Instrument.Symbol.Value); sec == nil {
 					response.RejectionReason = messages.RejectionReason_UnknownSymbol
 					context.Respond(response)
 					return nil
 				}
 				params.SetSymbol(req.Filter.Instrument.Symbol.Value)
 			} else if req.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
-				if !ok {
-					response.RejectionReason = messages.RejectionReason_UnknownSymbol
+				sec := state.IDToSecurity(req.Filter.Instrument.SecurityID.Value)
+				if sec == nil {
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 					context.Respond(response)
 					return nil
 				}

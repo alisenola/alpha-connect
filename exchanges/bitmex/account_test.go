@@ -4,6 +4,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges/bitmex"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"testing"
@@ -33,6 +34,9 @@ func TestAccountListener(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	bitmex.EnableTestNet()
+	// TODO add money
+	return
 	tests.AccntTest(t, tests.AccountTest{
 		Account:                 bitmexAccount,
 		Instrument:              instrument1,

@@ -34,7 +34,6 @@ import (
 type PublicExecutor struct {
 	extypes.BaseExecutor
 	client       *http.Client
-	securities   map[uint64]*models.Security
 	rateLimit    *exchanges.RateLimit
 	queryRunners []*actor.PID
 	qrIdx        int
@@ -44,7 +43,6 @@ type PublicExecutor struct {
 func NewPublicExecutor() actor.Actor {
 	return &PublicExecutor{
 		client:       nil,
-		securities:   nil,
 		rateLimit:    nil,
 		queryRunners: nil,
 		logger:       nil,
@@ -96,7 +94,7 @@ func (state *PublicExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *PublicExecutor) OnUpdateSecurityList(context actor.Context) error {
+func (state *PublicExecutor) UpdateSecurityList(context actor.Context) error {
 	request, weight, err := coinbasepro.GetProducts()
 	if err != nil {
 		return err
@@ -172,30 +170,10 @@ func (state *PublicExecutor) OnUpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.securities = make(map[uint64]*models.Security)
-	for _, s := range securities {
-		state.securities[s.SecurityID] = s
-	}
+	fmt.Println("SYNC", len(securities))
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: securities})
-
-	return nil
-}
-
-func (state *PublicExecutor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
-	securities := make([]*models.Security, len(state.securities))
-	i := 0
-	for _, v := range state.securities {
-		securities[i] = v
-		i += 1
-	}
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})
@@ -249,12 +227,7 @@ func (state *PublicExecutor) OnMarketDataRequest(context actor.Context) error {
 	if msg.Instrument.Symbol != nil {
 		symbol = msg.Instrument.Symbol.Value
 	} else if msg.Instrument.SecurityID != nil {
-		sec, ok := state.securities[msg.Instrument.SecurityID.Value]
-		if !ok {
-			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-			context.Respond(response)
-			return nil
-		}
+		sec := state.IDToSecurity(msg.Instrument.SecurityID.Value)
 		symbol = sec.Symbol
 	}
 	if symbol == "" {

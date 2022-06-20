@@ -17,9 +17,7 @@ func TestExecutorPublic(t *testing.T) {
 			Exchange: constants.BYBITL,
 			Symbol:   &wrapperspb.StringValue{Value: "BTCUSDT"},
 		},
-		SecurityListRequest:           true,
-		MarketDataRequest:             true,
-		HistoricalLiquidationsRequest: true,
-		OpenInterestRequest:           true,
+		SecurityListRequest: true,
+		MarketDataRequest:   true,
 	})
 }

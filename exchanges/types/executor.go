@@ -66,6 +66,8 @@ type BaseExecutor struct {
 	Securities               map[uint64]*models.Security
 	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
 	SymbolToSec              map[string]*models.Security
+	HistoricalSecurities     map[uint64]*registry.Security
+	SymbolToHistoricalSec    map[string]*registry.Security
 }
 
 func (state *BaseExecutor) GetSecurity(instr *models.Instrument) *models.Security {
@@ -533,4 +535,92 @@ func (state *BaseExecutor) Initialize(context actor.Context) error {
 
 func (state *BaseExecutor) Clean(context actor.Context) error {
 	return nil
+}
+
+func (state *BaseExecutor) SyncSecurities(live []*models.Security, historical []*registry.Security) {
+	state.SecuritiesLock.Lock()
+	defer state.SecuritiesLock.Unlock()
+	state.Securities = make(map[uint64]*models.Security)
+	state.SymbolToSec = make(map[string]*models.Security)
+	for _, s := range live {
+		state.Securities[s.SecurityID] = s
+		state.SymbolToSec[s.Symbol] = s
+	}
+
+	state.HistoricalSecurities = make(map[uint64]*registry.Security)
+	state.SymbolToHistoricalSec = make(map[string]*registry.Security)
+	for _, sec := range historical {
+		state.HistoricalSecurities[sec.SecurityId] = sec
+		state.SymbolToHistoricalSec[sec.Symbol] = sec
+	}
+
+	return
+}
+
+func (state *BaseExecutor) SymbolToSecurity(symbol string) *models.Security {
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+	return state.SymbolToSec[symbol]
+}
+
+func (state *BaseExecutor) SymbolToHistoricalSecurity(symbol string) *registry.Security {
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+	return state.SymbolToHistoricalSec[symbol]
+}
+
+func (state *BaseExecutor) IDToSecurity(ID uint64) *models.Security {
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+	return state.Securities[ID]
+}
+
+func (state *BaseExecutor) InstrumentToSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
+	if instrument == nil {
+		v := messages.RejectionReason_MissingInstrument
+		return "", &v
+	}
+	if instrument.Symbol != nil {
+		sec := state.SymbolToSecurity(instrument.Symbol.Value)
+		if sec == nil {
+			v := messages.RejectionReason_UnknownSymbol
+			return "", &v
+		}
+		return sec.Symbol, nil
+	} else if instrument.SecurityID != nil {
+		sec := state.IDToSecurity(instrument.SecurityID.Value)
+		if sec == nil {
+			v := messages.RejectionReason_UnknownSecurityID
+			return "", &v
+		}
+		return sec.Symbol, nil
+	} else {
+		v := messages.RejectionReason_MissingInstrument
+		return "", &v
+	}
+}
+
+func (state *BaseExecutor) InstrumentToSecurity(instrument *models.Instrument) (*models.Security, *messages.RejectionReason) {
+	if instrument == nil {
+		v := messages.RejectionReason_MissingInstrument
+		return nil, &v
+	}
+	if instrument.Symbol != nil {
+		sec := state.SymbolToSecurity(instrument.Symbol.Value)
+		if sec == nil {
+			v := messages.RejectionReason_UnknownSymbol
+			return nil, &v
+		}
+		return sec, nil
+	} else if instrument.SecurityID != nil {
+		sec := state.IDToSecurity(instrument.SecurityID.Value)
+		if sec == nil {
+			v := messages.RejectionReason_UnknownSecurityID
+			return nil, &v
+		}
+		return sec, nil
+	} else {
+		v := messages.RejectionReason_MissingInstrument
+		return nil, &v
+	}
 }

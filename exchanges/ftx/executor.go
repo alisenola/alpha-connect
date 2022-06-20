@@ -49,8 +49,6 @@ type QueryRunner struct {
 type Executor struct {
 	extypes.BaseExecutor
 	client         *http.Client
-	securities     map[uint64]*models.Security
-	symbolToSec    map[string]*models.Security
 	queryRunners   []*QueryRunner
 	orderRateLimit *exchanges.RateLimit
 	logger         *log.Logger
@@ -98,7 +96,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	state.orderRateLimit = exchanges.NewRateLimit(30, time.Second)
 
@@ -254,32 +252,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
 		securities = append(securities, &security)
 	}
-	state.securities = make(map[uint64]*models.Security)
-	state.symbolToSec = make(map[string]*models.Security)
 
-	for _, sec := range securities {
-		state.securities[sec.SecurityID] = sec
-		state.symbolToSec[sec.Symbol] = sec
-	}
+	state.SyncSecurities(securities, nil)
+
 	context.Send(context.Parent(), &messages.SecurityList{
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: securities})
-
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
-	securities := make([]*models.Security, len(state.securities))
-	i := 0
-	for _, v := range state.securities {
-		securities[i] = v
-		i += 1
-	}
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})
@@ -382,7 +358,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				StatType:  models.StatType_OpenInterest,
 				Value:     fstat.Result.OpenInterest,
 			})
-			if state.symbolToSec[symbol].SecurityType == enum.SecurityType_CRYPTO_PERP {
+			if state.SymbolToSecurity(symbol).SecurityType == enum.SecurityType_CRYPTO_PERP {
 				response.Statistics = append(response.Statistics, &models.Stat{
 					Timestamp: utils.MilliToTimestamp(uint64(fstat.Result.NextFundingTime.UnixNano() / 1000000)),
 					StatType:  models.StatType_FundingRate,
@@ -485,17 +461,13 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	var symbol string
 	if msg.Filter != nil {
 		if msg.Filter.Instrument != nil {
-			if msg.Filter.Instrument.Symbol != nil {
-				symbol = msg.Filter.Instrument.Symbol.Value
-			} else if msg.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
-				if !ok {
-					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-					context.Respond(response)
-					return nil
-				}
-				symbol = sec.Symbol
+			s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Respond(response)
+				return nil
 			}
+			symbol = s
 		}
 
 		if msg.Filter.From != nil {
@@ -685,6 +657,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 
 func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
 	msg := context.Message().(*messages.TradeCaptureReportRequest)
+	sender := context.Sender()
 	response := &messages.TradeCaptureReport{
 		RequestID: msg.RequestID,
 		Success:   false,
@@ -696,22 +669,18 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if msg.Filter != nil {
 		if msg.Filter.Side != nil || msg.Filter.OrderID != nil || msg.Filter.ClientOrderID != nil {
 			response.RejectionReason = messages.RejectionReason_UnsupportedFilter
-			context.Respond(response)
+			context.Send(sender, response)
 			return nil
 		}
 
 		if msg.Filter.Instrument != nil {
-			if msg.Filter.Instrument.Symbol != nil {
-				symbol = msg.Filter.Instrument.Symbol.Value
-			} else if msg.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
-				if !ok {
-					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-					context.Respond(response)
-					return nil
-				}
-				symbol = sec.Symbol
+			s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Send(sender, response)
+				return nil
 			}
+			symbol = s
 		}
 
 		if msg.Filter.From != nil {
@@ -809,19 +778,18 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			if market == "USTC-PERP" {
 				market = "UST-PERP"
 			}
-			if _, ok := state.symbolToSec[market]; ok {
-				sec := state.symbolToSec[market]
-				instrument = &models.Instrument{
-					Exchange:   constants.FTX,
-					Symbol:     &wrapperspb.StringValue{Value: market},
-					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
-				}
-			} else {
-				instrument = &models.Instrument{
-					Exchange:   constants.FTX,
-					Symbol:     &wrapperspb.StringValue{Value: market},
-					SecurityID: nil,
-				}
+			sec := state.SymbolToHistoricalSecurity(market)
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unknown security: %s", market))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Respond(response)
+				return
+			}
+
+			instrument = &models.Instrument{
+				Exchange:   constants.FTX,
+				Symbol:     &wrapperspb.StringValue{Value: market},
+				SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 			}
 
 			quantity := t.Size * quantityMul
@@ -866,6 +834,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 
 func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	msg := context.Message().(*messages.OrderStatusRequest)
+	sender := context.Sender()
 	response := &messages.OrderList{
 		RequestID: msg.RequestID,
 		Success:   false,
@@ -884,17 +853,13 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			return nil
 		}
 		if msg.Filter.Instrument != nil {
-			if msg.Filter.Instrument.Symbol != nil {
-				symbol = msg.Filter.Instrument.Symbol.Value
-			} else if msg.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[msg.Filter.Instrument.SecurityID.Value]
-				if !ok {
-					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-					context.Respond(response)
-					return nil
-				}
-				symbol = sec.Symbol
+			s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Send(sender, response)
+				return nil
 			}
+			symbol = s
 		}
 		if msg.Filter.OrderID != nil {
 			orderID = msg.Filter.OrderID.Value
@@ -1008,9 +973,9 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 		var morders []*models.Order
 		for _, o := range orders {
-			sec, ok := state.symbolToSec[o.Market]
-			if !ok {
-				state.logger.Info("http error", log.Error(err))
+			sec := state.SymbolToSecurity(o.Market)
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unknown symbol: %s", o.Market))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
@@ -1032,7 +997,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.PositionsRequest)
-
+	sender := context.Sender()
 	response := &messages.PositionList{
 		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
@@ -1042,17 +1007,13 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	symbol := ""
 	if msg.Instrument != nil {
-		if msg.Instrument.Symbol != nil {
-			symbol = msg.Instrument.Symbol.Value
-		} else if msg.Instrument.SecurityID != nil {
-			sec, ok := state.securities[msg.Instrument.SecurityID.Value]
-			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-				context.Respond(response)
-				return nil
-			}
-			symbol = sec.Symbol
+		s, rej := state.InstrumentToSymbol(msg.Instrument)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Send(sender, response)
+			return nil
 		}
+		symbol = s
 	}
 
 	request, weight, err := ftx.GetPositions(true, msg.Account.ApiCredentials)
@@ -1120,10 +1081,9 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && p.Future != symbol {
 				continue
 			}
-			sec, ok := state.symbolToSec[p.Future]
-			if !ok {
-				err := fmt.Errorf("unknown symbol %s", p.Future)
-				state.logger.Info("unmarshaling error", log.Error(err))
+			sec := state.SymbolToSec[p.Future]
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unkown symbol %s", p.Future))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Respond(response)
 				return
@@ -1241,42 +1201,24 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
+	sender := context.Sender()
 	response := &messages.NewOrderSingleResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	symbol := ""
 	var tickPrecision, lotPrecision int
-	if req.Order.Instrument != nil {
-		if req.Order.Instrument.Symbol != nil {
-			symbol = req.Order.Instrument.Symbol.Value
-			sec, ok := state.symbolToSec[symbol]
-			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSymbol
-				context.Respond(response)
-				return nil
-			}
-			tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
-			lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
-		} else if req.Order.Instrument.SecurityID != nil {
-			sec, ok := state.securities[req.Order.Instrument.SecurityID.Value]
-			if !ok {
-				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-				context.Respond(response)
-				return nil
-			}
-			symbol = sec.Symbol
-			tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
-			lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
-		}
-	} else {
-		response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-		context.Respond(response)
+	sec, rej := state.InstrumentToSecurity(req.Order.Instrument)
+	if rej != nil {
+		response.RejectionReason = *rej
+		context.Send(sender, response)
 		return nil
 	}
 
-	params, rej := buildPlaceOrderRequest(symbol, req.Order, tickPrecision, lotPrecision)
+	tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
+	lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
+
+	params, rej := buildPlaceOrderRequest(sec.Symbol, req.Order, tickPrecision, lotPrecision)
 	if rej != nil {
 		response.RejectionReason = *rej
 		context.Respond(response)
@@ -1515,6 +1457,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
+	sender := context.Sender()
 	response := &messages.OrderMassCancelResponse{
 		RequestID:  req.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
@@ -1523,23 +1466,13 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	symbol := ""
 	if req.Filter != nil {
 		if req.Filter.Instrument != nil {
-			if req.Filter.Instrument.Symbol != nil {
-				if _, ok := state.symbolToSec[req.Filter.Instrument.Symbol.Value]; !ok {
-					response.RejectionReason = messages.RejectionReason_UnknownSymbol
-					context.Respond(response)
-					return nil
-				}
-				symbol = req.Filter.Instrument.Symbol.Value
-			} else if req.Filter.Instrument.SecurityID != nil {
-				sec, ok := state.securities[req.Filter.Instrument.SecurityID.Value]
-				if !ok {
-					fmt.Println(state.securities, req.Filter.Instrument.SecurityID.Value)
-					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
-					context.Respond(response)
-					return nil
-				}
-				symbol = sec.Symbol
+			s, rej := state.InstrumentToSymbol(req.Filter.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Send(sender, response)
+				return nil
 			}
+			symbol = s
 		}
 		if req.Filter.Side != nil || req.Filter.OrderStatus != nil {
 			response.RejectionReason = messages.RejectionReason_UnsupportedFilter

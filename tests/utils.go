@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 )
 
 func LoadStatics(t *testing.T) {
@@ -72,7 +73,7 @@ func StartExecutor(t *testing.T, cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.E
 		}
 		cfgEx.Accounts = []*account.Account{accnt}
 	}
-	config := actor.Config{DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
+	config := actor.Config{DeadLetterThrottleInterval: time.Second, DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
 	as := actor.NewActorSystemWithConfig(&config)
 	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgEx, cfgPr, cfgCh)), "executor")
 	return as, exec, func() { _ = as.Root.PoisonFuture(exec).Wait() }

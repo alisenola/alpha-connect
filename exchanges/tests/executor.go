@@ -41,6 +41,9 @@ func ExPub(t *testing.T, tc ExPubTest) {
 			if !ok {
 				t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
 			}
+			for _, s := range v.Securities {
+				fmt.Println(s)
+			}
 			if !v.Success {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
 			}

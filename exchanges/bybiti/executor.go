@@ -30,7 +30,6 @@ type QueryRunner struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	securities   map[uint64]*models.Security
 	queryRunners []*QueryRunner
 	logger       *log.Logger
 }
@@ -205,30 +204,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.securities = make(map[uint64]*models.Security)
-	for _, s := range securities {
-		state.securities[s.SecurityID] = s
-	}
+	state.SyncSecurities(securities, nil)
 
 	context.Send(context.Parent(), &messages.SecurityList{
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    true,
-		Securities: securities})
-
-	return nil
-}
-
-func (state *Executor) OnSecurityListRequest(context actor.Context) error {
-	// Get http request and the expected response
-	msg := context.Message().(*messages.SecurityListRequest)
-	securities := make([]*models.Security, len(state.securities))
-	i := 0
-	for _, v := range state.securities {
-		securities[i] = v
-		i += 1
-	}
-	context.Respond(&messages.SecurityList{
-		RequestID:  msg.RequestID,
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})

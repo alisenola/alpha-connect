@@ -3,7 +3,7 @@ module gitlab.com/alphaticks/alpha-connect
 go 1.18
 
 require (
-	github.com/asynkron/protoactor-go v0.0.0-20220508141221-685ce4205646
+	github.com/asynkron/protoactor-go v0.0.0-20220616142548-afd2d973a1d1
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408
 	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
@@ -18,7 +18,7 @@ require (
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
 	gitlab.com/alphaticks/xchanger v0.0.0-20220616103204-7d38f0c6cd7b
 	go.mongodb.org/mongo-driver v1.9.1
-	google.golang.org/grpc v1.46.0
+	google.golang.org/grpc v1.46.2
 	google.golang.org/protobuf v1.28.0
 	gorm.io/gorm v1.23.5
 )
@@ -57,15 +57,15 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/melaurent/gotickfile v0.0.0-20220210143804-428af9922408 // indirect
-	github.com/orcaman/concurrent-map v0.0.0-20190107190726-7ed82d9cb717 // indirect
+	github.com/orcaman/concurrent-map v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.12.1 // indirect
+	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.32.1 // indirect
+	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
-	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
+	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/wangjia184/sortedset v0.0.0-20210325043434-64dd27e173e2 // indirect
@@ -76,27 +76,26 @@ require (
 	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	go.opentelemetry.io/otel v1.7.0 // indirect
-	go.opentelemetry.io/otel/exporters/prometheus v0.27.0 // indirect
-	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
-	go.opentelemetry.io/otel/metric v0.27.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.4.0 // indirect
-	go.opentelemetry.io/otel/sdk/export/metric v0.27.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v0.27.0 // indirect
+	go.opentelemetry.io/otel/exporters/prometheus v0.30.0 // indirect
+	go.opentelemetry.io/otel/metric v0.30.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.7.0 // indirect
+	go.opentelemetry.io/otel/sdk/export/metric v0.28.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v0.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.7.0 // indirect
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/exp v0.0.0-20220328175248-053ad81199eb // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
+	golang.org/x/net v0.0.0-20220526153639-5463443f8c37 // indirect
+	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
+	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023 // indirect
+	golang.org/x/tools v0.1.10 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/api v0.36.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
+	google.golang.org/genproto v0.0.0-20220526192754-51939a95c655 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )

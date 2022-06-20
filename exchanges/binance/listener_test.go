@@ -19,7 +19,7 @@ func TestMarketData(t *testing.T) {
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.BINANCE,
 		MinPriceIncrement: 0.01,
-		RoundLot:          0.000010,
+		RoundLot:          1e-6,
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.InstrumentStatus_Trading,

@@ -29,8 +29,7 @@ func TestAccountListener(t *testing.T) {
 	}
 	binance.EnableTestNet()
 	tests.AccntTest(t, tests.AccountTest{
-		Account:            binanceAccount,
-		Instrument:         binanceInstrument,
-		OrderStatusRequest: true,
+		Account:    binanceAccount,
+		Instrument: binanceInstrument,
 	})
 }

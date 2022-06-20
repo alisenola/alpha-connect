@@ -15,13 +15,14 @@ func TestMarketData(t *testing.T) {
 	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		Symbol:            "BTCUSD",
-		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-		Exchange:          constants.HITBTC,
-		MinPriceIncrement: 0.01,
-		RoundLot:          1e-5,
-		HasMaturityDate:   false,
-		IsInverse:         false,
-		Status:            models.InstrumentStatus_Trading,
+		Symbol:             "BTCUSD",
+		SecurityType:       enum.SecurityType_CRYPTO_SPOT,
+		Exchange:           constants.HITBTC,
+		MinPriceIncrement:  0.01,
+		RoundLot:           1e-5,
+		HasMaturityDate:    false,
+		IsInverse:          false,
+		Status:             models.InstrumentStatus_Trading,
+		IgnorePriceResidue: true,
 	})
 }

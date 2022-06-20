@@ -26,18 +26,3 @@ func TestMarketData(t *testing.T) {
 		IgnoreSizeResidue: true,
 	})
 }
-
-func TestSlowMarketData(t *testing.T) {
-	exTests.LoadStatics(t)
-	tests.MarketData(t, tests.MDTest{
-		Symbol:            "kaneth",
-		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-		Exchange:          constants.HUOBI,
-		MinPriceIncrement: 1e-10,
-		RoundLot:          0.01,
-		HasMaturityDate:   false,
-		IsInverse:         false,
-		Status:            models.InstrumentStatus_Trading,
-		IgnoreSizeResidue: true,
-	})
-}
