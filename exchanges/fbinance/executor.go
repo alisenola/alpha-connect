@@ -1184,10 +1184,17 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		}
 		if data.Code != 0 {
 			state.logger.Warn("error cancelling order", log.Error(errors.New(data.Message)))
-			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			if data.Code == -1020 {
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			} else if data.Code < -1100 && data.Code > -1199 {
+				response.RejectionReason = messages.RejectionReason_InvalidRequest
+			} else if data.Code == -2011 && data.Message == "Unknown order sent." {
+				response.RejectionReason = messages.RejectionReason_UnknownOrder
+			}
 			context.Send(sender, response)
 			return
 		}
+
 		response.Success = true
 		context.Send(sender, response)
 	}()
