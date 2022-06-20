@@ -96,7 +96,7 @@ func (state *PublicExecutor) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *PublicExecutor) UpdateSecurityList(context actor.Context) error {
+func (state *PublicExecutor) OnUpdateSecurityList(context actor.Context) error {
 	request, weight, err := coinbasepro.GetProducts()
 	if err != nil {
 		return err

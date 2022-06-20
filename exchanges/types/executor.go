@@ -8,6 +8,7 @@ import (
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -61,6 +62,7 @@ type Executor interface {
 
 type BaseExecutor struct {
 	*ExecutorConfig
+	SecuritiesLock           sync.RWMutex
 	Securities               map[uint64]*models.Security
 	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
 	SymbolToSec              map[string]*models.Security
@@ -70,6 +72,8 @@ func (state *BaseExecutor) GetSecurity(instr *models.Instrument) *models.Securit
 	if instr == nil {
 		return nil
 	}
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
 	if instr.SecurityID != nil {
 		if sec, ok := state.Securities[instr.SecurityID.Value]; ok {
 			return sec
@@ -240,18 +244,22 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 		}
 
 	case *updateSecurityList:
-		if err := state.UpdateSecurityList(context); err != nil {
-			state.GetLogger().Info("error updating security list", log.Error(err))
-		}
+		go func() {
+			if err := state.UpdateSecurityList(context); err != nil {
+				state.GetLogger().Error("error fetching historical securities", log.Error(err))
+			}
+		}()
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
 			context.Send(pid, &updateSecurityList{})
 		}(context.Self())
 
 	case *updateMarketableProtocolAssetList:
-		if err := state.UpdateMarketableProtocolAssetList(context); err != nil {
-			state.GetLogger().Info("error updating asset list", log.Error(err))
-		}
+		go func() {
+			if err := state.UpdateMarketableProtocolAssetList(context); err != nil {
+				state.GetLogger().Info("error updating asset list", log.Error(err))
+			}
+		}()
 		go func(pid *actor.PID) {
 			time.Sleep(time.Minute)
 			context.Send(pid, &updateMarketableProtocolAssetList{})
@@ -263,6 +271,9 @@ func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {
 	// Get http request and the expected response
 	msg := context.Message().(*messages.SecurityListRequest)
 	securities := make([]*models.Security, len(state.Securities))
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+
 	i := 0
 	for _, v := range state.Securities {
 		securities[i] = v

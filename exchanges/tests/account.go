@@ -161,13 +161,12 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderMassCancelRequest {
 		OrderMassCancelRequest(t, ctx, tc)
 	}
+	clean(t, ctx, tc)
 }
 
 func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType messages.ResponseType) {
 	// Test with no account
 	// TODO Finish testing
-	clean(t, ctx, tc)
-	defer clean(t, ctx, tc)
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Subscribe: false,
@@ -315,6 +314,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatalf("was expecting buy side order")
 	}
 
+	fmt.Println("CANCELLING")
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderCancelRequest{
 		RequestID:    0,
 		Account:      tc.Account,
