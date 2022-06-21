@@ -83,9 +83,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	state.symbToSecs = make(map[string]*registry.Security)
 	securityMap := make(map[uint64]*registry.Security)
 	for _, sec := range res.Securities {
-		if sec.Symbol != "APEUSDT" {
-			continue
-		}
 		securityMap[sec.SecurityId] = sec
 		state.symbToSecs[sec.Symbol] = sec
 	}
@@ -112,7 +109,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	}
 
 	var transactions []extypes.Transaction
-	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`account_id=?`, state.dbAccount.ID).Order("time asc").Find(&transactions)
+	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
 		switch tr.Type {
 		case "TRADE":
@@ -192,7 +189,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
-	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`account_id=?`, state.dbAccount.ID).Order("time asc").Find(&transactions)
+	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
 		switch tr.Type {
 		case "TRADE":
@@ -320,6 +317,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					ExecutionID: trd.TradeID,
 					AccountID:   state.dbAccount.ID,
 					Fill: &extypes.Fill{
+						AccountID:  state.dbAccount.ID,
 						SecurityID: int64(secID),
 						Price:      trd.Price,
 						Quantity:   trd.Quantity,
@@ -328,17 +326,19 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				// Realized PnL
 				if realized != 0 {
 					tr.Movements = append(tr.Movements, extypes.Movement{
-						Reason:   int32(messages.AccountMovementType_RealizedPnl),
-						AssetID:  constants.TETHER.ID,
-						Quantity: -float64(realized) / 1e8,
+						AccountID: state.dbAccount.ID,
+						Reason:    int32(messages.AccountMovementType_RealizedPnl),
+						AssetID:   constants.TETHER.ID,
+						Quantity:  -float64(realized) / 1e8,
 					})
 				}
 				// Commission
 				if trd.Commission != 0 {
 					tr.Movements = append(tr.Movements, extypes.Movement{
-						Reason:   int32(messages.AccountMovementType_Commission),
-						AssetID:  constants.TETHER.ID,
-						Quantity: -trd.Commission,
+						AccountID: state.dbAccount.ID,
+						Reason:    int32(messages.AccountMovementType_Commission),
+						AssetID:   constants.TETHER.ID,
+						Quantity:  -trd.Commission,
 					})
 				}
 

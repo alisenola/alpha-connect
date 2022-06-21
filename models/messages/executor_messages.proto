@@ -412,6 +412,7 @@ message OrderFilter {
     models.Instrument instrument = 3;
     SideValue side = 4;
     OrderStatusValue order_status = 5;
+    google.protobuf.BoolValue open = 6;
 }
 
 message OrderStatusRequest {

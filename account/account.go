@@ -29,6 +29,12 @@ func IsClosed(status models.OrderStatus) bool {
 		status == models.OrderStatus_Expired
 }
 
+func IsOpen(status models.OrderStatus) bool {
+	return status == models.OrderStatus_New ||
+		status == models.OrderStatus_Created ||
+		status == models.OrderStatus_PartiallyFilled
+}
+
 type Order struct {
 	*models.Order
 	lastEventTime          time.Time
@@ -922,6 +928,9 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 				continue
 			}
 			if filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
+				continue
+			}
+			if filter.Open != nil && IsOpen(o.OrderStatus) != filter.Open.Value {
 				continue
 			}
 		}

@@ -133,7 +133,7 @@ func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.
 	case constants.BYBITI.ID:
 		return func() actor.Actor { return bybiti.NewListener(security, dialerPool) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bybitl.NewListener(security.SecurityID, dialerPool) }
 	case constants.BYBITS.ID:
 		return func() actor.Actor { return bybits.NewListener(security, dialerPool) }
 	case constants.UPBIT.ID:
