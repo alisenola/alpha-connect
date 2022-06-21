@@ -207,9 +207,9 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			state.logger.Warn("error at eth rpc server", log.Error(err))
 			switch err.Error() {
 			case "future: timeout":
-				msg.RejectionReason = messages.RejectionReason_EthRPCTimeout
+				msg.RejectionReason = messages.RejectionReason_RPCTimeout
 			default:
-				msg.RejectionReason = messages.RejectionReason_EthRPCError
+				msg.RejectionReason = messages.RejectionReason_RPCError
 			}
 			context.Respond(msg)
 			return
@@ -218,7 +218,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		resp := res.(*messages.EVMLogsQueryResponse)
 		if !resp.Success {
 			state.logger.Warn("error at eth rpc server: " + resp.RejectionReason.String())
-			msg.RejectionReason = messages.RejectionReason_EthRPCError
+			msg.RejectionReason = messages.RejectionReason_RPCError
 			context.Respond(msg)
 			return
 		}
@@ -237,7 +237,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				event := nft.ERC721Transfer{}
 				if err := eth.UnpackLog(state.abi, &event, "Transfer", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					msg.RejectionReason = messages.RejectionReason_EthRPCError
+					msg.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(msg)
 					return
 				}
