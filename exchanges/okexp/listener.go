@@ -43,6 +43,7 @@ type Listener struct {
 	obWs               *okex.Websocket
 	tradeWs            *okex.Websocket
 	security           *models.Security
+	securityID         uint64
 	dialerPool         *xchangerUtils.DialerPool
 	instrumentData     *InstrumentData
 	executor           *actor.PID
@@ -53,21 +54,16 @@ type Listener struct {
 	liquidationsTicker *time.Ticker
 }
 
-func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security, dialerPool)
+		return NewListener(securityID, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		obWs:           nil,
-		tradeWs:        nil,
-		security:       security,
-		dialerPool:     dialerPool,
-		instrumentData: nil,
-		logger:         nil,
-		socketTicker:   nil,
+		securityID: securityID,
+		dialerPool: dialerPool,
 	}
 }
 
@@ -132,13 +128,32 @@ func (state *Listener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.OKEXP.Name+"_executor")
+
+	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
+		RequestID:  0,
+		Instrument: &models.Instrument{SecurityID: wrapperspb.UInt64(state.securityID)},
+	}, 5*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error fetching security definition: %v", err)
+	}
+	def := res.(*messages.SecurityDefinitionResponse)
+	if !def.Success {
+		return fmt.Errorf("error fetching security definition: %s", def.RejectionReason.String())
+	}
+	state.security = def.Security
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)),
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
-
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 	}
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.OKEXP.Name+"_executor")
 
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()

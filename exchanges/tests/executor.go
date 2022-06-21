@@ -56,7 +56,7 @@ func ExPub(t *testing.T, tc ExPubTest) {
 				RequestID:   0,
 				Instrument:  tc.Instrument,
 				Aggregation: models.OrderBookAggregation_L2,
-			}, 10*time.Second).Result()
+			}, 20*time.Second).Result()
 			if err != nil {
 				t.Fatal(err)
 			}

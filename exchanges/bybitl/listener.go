@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -42,7 +43,6 @@ type Listener struct {
 	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	executor       *actor.PID
-	mediator       *actor.PID
 	logger         *log.Logger
 	lastPingTime   time.Time
 	socketTicker   *time.Ticker
@@ -115,8 +115,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
 
-	state.mediator = actor.NewPID(context.ActorSystem().Address(), "data_broker")
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BYBITL.Name+"_executor")
 
 	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
 		RequestID:  0,
@@ -126,6 +125,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error fetching security definition: %v", err)
 	}
 	def := res.(*messages.SecurityDefinitionResponse)
+	if !def.Success {
+		return fmt.Errorf("error fetching security definition: %s", def.RejectionReason.String())
+	}
 	state.security = def.Security
 
 	state.logger = log.New(

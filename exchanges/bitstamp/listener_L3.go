@@ -36,32 +36,28 @@ type InstrumentDataL3 struct {
 // OBType: OBL3
 
 type ListenerL3 struct {
-	ws               *bitstamp.Websocket
-	security         *models.Security
-	dialerPool       *xchangerUtils.DialerPool
-	instrumentData   *InstrumentDataL3
-	bitstampExecutor *actor.PID
-	logger           *log.Logger
-	lastPingTime     time.Time
-	stashedTrades    *list.List
-	socketTicker     *time.Ticker
+	ws             *bitstamp.Websocket
+	security       *models.Security
+	securityID     uint64
+	executor       *actor.PID
+	dialerPool     *xchangerUtils.DialerPool
+	instrumentData *InstrumentDataL3
+	logger         *log.Logger
+	lastPingTime   time.Time
+	stashedTrades  *list.List
+	socketTicker   *time.Ticker
 }
 
-func NewListenerL3Producer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerL3Producer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListenerL3(security, dialerPool)
+		return NewListenerL3(securityID, dialerPool)
 	}
 }
 
-func NewListenerL3(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListenerL3(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &ListenerL3{
-		ws:               nil,
-		security:         security,
-		dialerPool:       dialerPool,
-		instrumentData:   nil,
-		bitstampExecutor: nil,
-		logger:           nil,
-		stashedTrades:    nil,
+		securityID: securityID,
+		dialerPool: dialerPool,
 	}
 }
 
@@ -120,12 +116,32 @@ func (state *ListenerL3) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITSTAMP.Name+"_executor")
+
+	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
+		RequestID:  0,
+		Instrument: &models.Instrument{SecurityID: wrapperspb.UInt64(state.securityID)},
+	}, 5*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error fetching security definition: %v", err)
+	}
+	def := res.(*messages.SecurityDefinitionResponse)
+	if !def.Success {
+		return fmt.Errorf("error fetching security definition: %s", def.RejectionReason.String())
+	}
+	state.security = def.Security
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)),
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
 	state.lastPingTime = time.Now()
 	state.stashedTrades = list.New()
-	state.bitstampExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITSTAMP.Name+"_executor")
 
 	if state.security.MinPriceIncrement == nil || state.security.RoundLot == nil {
 		return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
@@ -205,7 +221,7 @@ func (state *ListenerL3) subscribeInstrument(context actor.Context) error {
 
 	time.Sleep(5 * time.Second)
 	fut := context.RequestFuture(
-		state.bitstampExecutor,
+		state.executor,
 		&messages.MarketDataRequest{
 			RequestID: uint64(time.Now().UnixNano()),
 			Subscribe: false,

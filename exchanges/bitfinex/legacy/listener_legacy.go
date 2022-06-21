@@ -36,14 +36,14 @@ type Listener struct {
 	stashedTrades  *list.List
 }
 
-func NewListenerProducer(security *models.Security) actor.Producer {
+func NewListenerProducer(securityID uint64) actor.Producer {
 	return func() actor.Actor {
 		return NewListener(security)
 	}
 }
 
 // Limit of 30 subscription
-func NewListener(security *models.Security) actor.Actor {
+func NewListener(securityID uint64) actor.Actor {
 	return &Listener{
 		obWs:           nil,
 		tradeWs:        nil,
