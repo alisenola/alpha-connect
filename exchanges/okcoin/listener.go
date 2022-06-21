@@ -113,7 +113,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITZ.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.OKCOIN.Name+"_executor")
 
 	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
 		RequestID:  0,
