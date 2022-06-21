@@ -75,6 +75,16 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnEVMContractCallRequest", log.Error(err))
 			panic(err)
 		}
+	case *messages.SVMEventsQueryRequest:
+		if err := state.OnSVMEventsQueryRequest(context); err != nil {
+			state.logger.Error("error processing OnSVMEventsQueryRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.SVMBlockQueryRequest:
+		if err := state.OnSVMBlockQueryRequest(context); err != nil {
+			state.logger.Error("error processing OnSVMBlockQueryRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -170,6 +180,50 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 	}
 	if rej := state.forward(context, req.Chain); rej != nil {
 		context.Respond(&messages.EVMContractCallResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
+func (state *Executor) OnSVMEventsQueryRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMEventsQueryRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.SVMEventsQueryResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.SVMEventsQueryResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
+func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMBlockQueryRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.SVMBlockQueryResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.SVMBlockQueryResponse{
 			RequestID:       req.RequestID,
 			Success:         false,
 			RejectionReason: *rej,

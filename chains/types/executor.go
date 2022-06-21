@@ -24,6 +24,8 @@ type Executor interface {
 	OnEVMContractCallRequest(context actor.Context) error
 	OnEVMLogsQueryRequest(context actor.Context) error
 	OnEVMLogsSubscribeRequest(context actor.Context) error
+	OnSVMEventsQueryRequest(context actor.Context) error
+	OnSVMBlockQueryRequest(context actor.Context) error
 }
 
 type BaseExecutor struct {
@@ -79,6 +81,18 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			state.GetLogger().Error("error processing OnEVMLogsSubscribeRequest", log.Error(err))
 			panic(err)
 		}
+
+	case *messages.SVMEventsQueryRequest:
+		if err := state.OnSVMEventsQueryRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnSVMEventsQueryRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.SVMBlockQueryRequest:
+		if err := state.OnSVMBlockQueryRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnSVMBlockQueryRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -118,6 +132,28 @@ func (state *BaseExecutor) OnEVMLogsQueryRequest(context actor.Context) error {
 func (state *BaseExecutor) OnEVMLogsSubscribeRequest(context actor.Context) error {
 	req := context.Message().(*messages.EVMLogsSubscribeRequest)
 	context.Respond(&messages.EVMLogsSubscribeResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnSVMEventsQueryRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMEventsQueryRequest)
+	context.Respond(&messages.SVMEventsQueryResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnSVMBlockQueryRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMBlockQueryRequest)
+	context.Respond(&messages.SVMBlockQueryResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
