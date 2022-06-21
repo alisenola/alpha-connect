@@ -131,3 +131,22 @@ func TestExecutorSVMBlockQueryRequest(t *testing.T) {
 		assert.Nil(t, err, "Validate struct err: %v", err)
 	}
 }
+
+func TestExecutorSVMTransactionByHashRequest(t *testing.T) {
+	v := validator.New()
+	hash := common.HexToHash("0x65f171da62b350b4dbb5a56161cddb1ce0bd12130cd767cc03f2f65e4d5a23f")
+
+	resp, err := as.Root.RequestFuture(ex, &messages.SVMTransactionByHashRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Hash:      hash,
+		Chain:     chain,
+	}, 10*time.Second).Result()
+	assert.Nil(t, err, "SVMTransactionByHashRequest err: %v", err)
+	tx, ok := resp.(*messages.SVMTransactionByHashResponse)
+	assert.True(t, ok, "expected SVMTransactionByHashResponse, got %s", reflect.TypeOf(resp).String())
+	assert.True(t, tx.Success, "failed SVMTransactionByHashResponse, got: %s", tx.RejectionReason.String())
+	assert.Equal(t, tx.Transaction.TxnHash.String(), "0x65f171da62b350b4dbb5a56161cddb1ce0bd12130cd767cc03f2f65e4d5a23f", "mismatched hash")
+
+	err = v.Struct(tx.Transaction)
+	assert.Nil(t, err, "Validate struct err: %v", err)
+}
