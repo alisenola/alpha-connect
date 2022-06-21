@@ -85,6 +85,11 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnSVMBlockQueryRequest", log.Error(err))
 			panic(err)
 		}
+	case *messages.SVMTransactionByHashRequest:
+		if err := state.OnSVMTransactionByHashRequest(context); err != nil {
+			state.logger.Error("error processing OnSVMTransactionByHashRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -224,6 +229,28 @@ func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 
 	if rej := state.forward(context, req.Chain); rej != nil {
 		context.Respond(&messages.SVMBlockQueryResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
+func (state *Executor) OnSVMTransactionByHashRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMTransactionByHashRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.SVMTransactionByHashResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.SVMTransactionByHashResponse{
 			RequestID:       req.RequestID,
 			Success:         false,
 			RejectionReason: *rej,

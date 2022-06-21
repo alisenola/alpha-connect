@@ -3,6 +3,7 @@ package messages
 import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/alphaticks/xchanger/chains/starknet"
 	"gitlab.com/alphaticks/xchanger/models"
@@ -103,6 +104,20 @@ type SVMBlockQueryResponse struct {
 	RequestID       uint64
 	ResponseID      uint64
 	Block           *starknet.Block
+	Success         bool
+	RejectionReason RejectionReason
+}
+
+type SVMTransactionByHashRequest struct {
+	RequestID uint64
+	Hash      common.Hash
+	Chain     *models.Chain
+}
+
+type SVMTransactionByHashResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Transaction     *starknet.Transaction
 	Success         bool
 	RejectionReason RejectionReason
 }

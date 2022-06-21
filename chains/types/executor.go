@@ -26,6 +26,7 @@ type Executor interface {
 	OnEVMLogsSubscribeRequest(context actor.Context) error
 	OnSVMEventsQueryRequest(context actor.Context) error
 	OnSVMBlockQueryRequest(context actor.Context) error
+	OnSVMTransactionByHashRequest(context actor.Context) error
 }
 
 type BaseExecutor struct {
@@ -93,6 +94,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			state.GetLogger().Error("error processing OnSVMBlockQueryRequest", log.Error(err))
 			panic(err)
 		}
+
+	case *messages.SVMTransactionByHashRequest:
+		if err := state.OnSVMTransactionByHashRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnSVMTransactionByHashRequest", log.Error(err))
+			panic(err)
+		}
 	}
 }
 
@@ -154,6 +161,17 @@ func (state *BaseExecutor) OnSVMEventsQueryRequest(context actor.Context) error 
 func (state *BaseExecutor) OnSVMBlockQueryRequest(context actor.Context) error {
 	req := context.Message().(*messages.SVMBlockQueryRequest)
 	context.Respond(&messages.SVMBlockQueryResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnSVMTransactionByHashRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMTransactionByHashRequest)
+	context.Respond(&messages.SVMTransactionByHashResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,

@@ -12,30 +12,19 @@ import (
 	"time"
 )
 
-type clientCkeck struct{}
-
-type EventsSubscription struct {
-	subscriber   *actor.PID
-	query        *starknet.EventQuery
-	seqNum       uint64
-	lastPingTime time.Time
-}
-
+//TODO subscription to events
 type Executor struct {
 	chtypes.BaseExecutor
-	logger        *log.Logger
-	client        *starknet.Client
-	subscriptions map[uint64]*EventsSubscription
-	clientTicker  *time.Ticker
-	rpc           string
+	logger *log.Logger
+	client *starknet.Client
+	rpc    string
 }
 
 func NewExecutor(config *chtypes.ExecutorConfig, rpc string) actor.Actor {
 	e := Executor{
-		rpc:          rpc,
-		logger:       nil,
-		client:       nil,
-		clientTicker: nil,
+		rpc:    rpc,
+		logger: nil,
+		client: nil,
 	}
 	e.ExecutorConfig = config
 	return &e
@@ -60,23 +49,6 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error dialing rpc url: %v", err)
 	}
 	state.client = cl
-
-	state.subscriptions = make(map[uint64]*EventsSubscription)
-
-	ticker := time.NewTicker(20 * time.Second)
-	state.clientTicker = ticker
-	go func(pid *actor.PID) {
-		for {
-			select {
-			case <-ticker.C:
-				context.Send(pid, &clientCkeck{})
-			case <-time.After(40 * time.Second):
-				if state.clientTicker != ticker {
-					return
-				}
-			}
-		}
-	}(context.Self())
 	return nil
 }
 
@@ -152,15 +124,31 @@ func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnTick(context actor.Context) error {
+func (state *Executor) OnSVMTransactionByHashRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMTransactionByHashRequest)
+	msg := &messages.SVMTransactionByHashResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func(pid *actor.PID) {
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 20*time.Second)
+		defer cancel()
+		tx, err := state.client.TransactionReceipt(ctx, req.Hash)
+		if err != nil {
+			state.logger.Error("error getting svm transaction by hash", log.Error(err))
+			msg.RejectionReason = messages.RejectionReason_RPCError
+			context.Send(pid, msg)
+			return
+		}
+		msg.Transaction = tx
+		msg.Success = true
+		context.Send(pid, msg)
+	}(context.Sender())
 	return nil
 }
 
 func (state *Executor) Clean(context actor.Context) error {
-	if state.clientTicker != nil {
-		state.clientTicker.Stop()
-		state.clientTicker = nil
-	}
 	if state.client != nil {
 		state.client.Close()
 		state.client = nil
