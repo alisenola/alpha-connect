@@ -107,7 +107,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	if tx.Error != nil {
 		return fmt.Errorf("error creating account: %v", err)
 	}
-
 	var transactions []extypes.Transaction
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
@@ -238,7 +237,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 
 	for k, p1 := range state.positions {
 		if p2, ok := execPositions[k]; ok {
-			fmt.Println("position", p1.GetPosition().Quantity, p2.Quantity)
+			if p1.GetPosition() != nil {
+				fmt.Println("position", p1.GetPosition().Quantity, p2.Quantity)
+			}
 		} else {
 			fmt.Println("p1 not in exec")
 		}

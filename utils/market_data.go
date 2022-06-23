@@ -17,6 +17,7 @@ type MarketDataContext struct {
 	ctx      actor.Context
 	receiver *actor.PID
 	OBL2     *gorderbook.OrderBookL2
+	Stats    map[models.StatType]float64
 }
 
 func (s *MarketDataContext) Close() {
@@ -40,7 +41,8 @@ type checkTimeout struct{}
 
 func NewMarketDataContext(parent actor.Context, executor *actor.PID, securityID uint64) *MarketDataContext {
 	ctx := &MarketDataContext{
-		ctx: parent,
+		ctx:   parent,
+		Stats: make(map[models.StatType]float64),
 	}
 	ctx.receiver = parent.Spawn(actor.PropsFromProducer(NewMarketDataProducer(executor, securityID, ctx)))
 	return ctx
@@ -163,6 +165,9 @@ func (state *MarketData) OnMarketDataIncrementalRefresh(context actor.Context) e
 			state.ctx.OBL2.UpdateOrderBookLevel(l)
 		}
 		crossed = state.ctx.OBL2.Crossed()
+	}
+	for _, s := range refresh.Stats {
+		state.ctx.Stats[s.StatType] = s.Value
 	}
 	state.ctx.Unlock()
 	if crossed {

@@ -288,7 +288,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
-		props := actor.PropsFromProducer(producer, actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
+		props := actor.PropsFromProducer(
+			producer,
+			actor.WithMailbox(actor.UnboundedPriority()),
+			actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 
 		state.executors[exch.ID], _ = context.SpawnNamed(props, exch.Name+"_executor")
 	}

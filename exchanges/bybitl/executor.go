@@ -717,7 +717,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if to != nil {
 		params.SetEndTime(*to)
 	}
-
+	params.SetExecType(bybitl.ExecTrade)
 	request, weight, err := bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
@@ -770,14 +770,14 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				}
 
 				quantity := t.ExecQty * quantityMul
-				if t.Side == "sell" {
+				if t.Side == "Sell" {
 					quantity *= -1
 				}
 				comAsset := constants.TETHER
 				ts := utils.MilliToTimestamp(uint64(t.TradeTimeMs))
 				trd := models.TradeCapture{
 					Type:            models.TradeType_Regular,
-					Price:           t.Price,
+					Price:           t.ExecPrice,
 					Quantity:        quantity,
 					Commission:      t.ExecFee,
 					CommissionAsset: comAsset,
@@ -788,7 +788,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					TransactionTime: ts,
 				}
 
-				if t.Side == "buy" {
+				if t.Side == "Buy" {
 					trd.Side = models.Side_Buy
 				} else {
 					trd.Side = models.Side_Sell
