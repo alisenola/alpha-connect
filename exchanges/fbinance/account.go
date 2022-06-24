@@ -1126,10 +1126,6 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
-	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
-	}
-
 	// Fetch positions
 	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -1149,10 +1145,20 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 
-	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
-	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
-	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+	balanceMap1 := make(map[uint32]float64)
+	balanceMap2 := make(map[uint32]float64)
+	for _, b := range balanceList.Balances {
+		balanceMap1[b.Asset.ID] = b.Quantity
+	}
+	for _, b := range state.account.GetBalances() {
+		balanceMap2[b.Asset.ID] = b.Quantity
+	}
+
+	for k, b1 := range balanceMap1 {
+		b2 := balanceMap2[k]
+		if math.Abs(b1/b2-1) > 0.01 {
+			return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+		}
 	}
 
 	pos1 := state.account.GetPositions()
