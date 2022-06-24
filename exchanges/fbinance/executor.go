@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -87,6 +88,16 @@ func (rl *AccountRateLimit) IsRateLimited() bool {
 	return rl.second.IsRateLimited() || rl.minute.IsRateLimited()
 }
 
+func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration {
+	dur1 := rl.second.DurationBeforeNextRequest(weight)
+	dur2 := rl.minute.DurationBeforeNextRequest(weight)
+	if dur1 > dur2 {
+		return dur1
+	} else {
+		return dur2
+	}
+}
+
 type QueryRunner struct {
 	client          *http.Client
 	globalRateLimit *exchanges.RateLimit
@@ -127,6 +138,18 @@ func (state *Executor) getQueryRunner() *QueryRunner {
 	}
 
 	return qr
+}
+
+func (state *Executor) durationBeforeNextRequest(weight int) time.Duration {
+	var minDur time.Duration
+	for _, q := range state.queryRunners {
+		dur := q.globalRateLimit.DurationBeforeNextRequest(weight)
+		if dur < minDur {
+			minDur = dur
+		}
+	}
+
+	return minDur
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -1043,18 +1066,12 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	if ar.IsRateLimited() {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(1))
 		context.Send(sender, response)
 		return nil
 	}
 
 	go func() {
-		qr := state.getQueryRunner()
-		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-			context.Send(sender, response)
-			return
-		}
-
 		var tickPrecision, lotPrecision int
 		sec, rej := state.InstrumentToSecurity(req.Order.Instrument)
 		if rej != nil {
@@ -1077,6 +1094,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		if err != nil {
 			state.logger.Warn("error building request", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		qr := state.getQueryRunner()
+		if qr == nil {
+			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
 			context.Send(sender, response)
 			return
 		}
@@ -1170,6 +1195,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		qr := state.getQueryRunner()
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
 			context.Send(sender, response)
 			return
 		}
