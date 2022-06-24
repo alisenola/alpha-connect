@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -134,6 +135,35 @@ func (state *Executor) getQueryRunner(post bool) *QueryRunner {
 	}
 
 	return qr
+}
+
+func (state *Executor) durationBeforeNextRequest(post bool, weight int) time.Duration {
+	var minDur time.Duration
+	for _, q := range state.queryRunners {
+		var dur time.Duration
+		if post {
+			dur1 := q.sPostRateLimit.DurationBeforeNextRequest(weight)
+			dur2 := q.mPostRateLimit.DurationBeforeNextRequest(weight)
+			if dur1 > dur2 {
+				dur = dur1
+			} else {
+				dur = dur2
+			}
+		} else {
+			dur1 := q.sGetRateLimit.DurationBeforeNextRequest(weight)
+			dur2 := q.mGetRateLimit.DurationBeforeNextRequest(weight)
+			if dur1 > dur2 {
+				dur = dur1
+			} else {
+				dur = dur2
+			}
+		}
+		if dur < minDur {
+			minDur = dur
+		}
+	}
+
+	return minDur
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -933,12 +963,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	qr := state.getQueryRunner(true)
-	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
 
 	symbol := ""
 	var tickPrecision, lotPrecision int
@@ -995,6 +1019,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return err
 	}
 
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(false, weight))
+		context.Send(sender, response)
+		return nil
+	}
+
 	qr.Post(weight)
 	go func() {
 		var data bybitl.PostOrderResponse
@@ -1037,13 +1069,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	qr := state.getQueryRunner(true)
-	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
-
 	symbol := ""
 	if req.Instrument != nil {
 		if req.Instrument.Symbol != nil {
@@ -1069,7 +1094,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		state.accountRateLimits[req.Account.Name] = ar
 	}
 
-	// We ignore rate limits on cancel
 	ar.Request(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
@@ -1085,11 +1109,22 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 	request, weight, err := bybitl.CancelActiveOrder(params, req.Account.ApiCredentials)
 	if err != nil {
-		return err
+		response.RejectionReason = messages.RejectionReason_InvalidRequest
+		context.Send(sender, response)
+		return nil
+	}
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(true, weight))
+		context.Send(sender, response)
+		return nil
 	}
 	qr.Post(weight)
 
 	go func() {
+		// We ignore rate limits on cancel
+
 		var data bybitl.CancelOrderResponse
 		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error cancelling order", log.Error(err))

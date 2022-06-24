@@ -3,6 +3,7 @@ package messages;
 
 option go_package = "gitlab.com/alphaticks/alpha-connect/models/messages";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -491,6 +492,7 @@ message NewOrderSingleResponse {
     double leaves_quantity = 6;
     double cum_quantity = 7;
     RejectionReason rejection_reason = 8;
+    google.protobuf.Duration rate_limit_delay = 9;
 }
 
 message NewOrderBulkRequest {
@@ -557,6 +559,7 @@ message OrderCancelResponse {
     uint64 responseID = 2;
     bool success = 3;
     RejectionReason rejection_reason = 4;
+    google.protobuf.Duration rate_limit_delay = 5;
 }
 
 message OrderMassCancelRequest {
