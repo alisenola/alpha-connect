@@ -80,7 +80,7 @@ func NewAccountRateLimit() *AccountRateLimit {
 func (rl *AccountRateLimit) Request(symbol string, weight int) {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(100, time.Minute)
+		l = exchanges.NewRateLimit(95, time.Minute)
 		rl.rateLimits[symbol] = l
 	}
 	l.Request(weight)
@@ -89,7 +89,7 @@ func (rl *AccountRateLimit) Request(symbol string, weight int) {
 func (rl *AccountRateLimit) IsRateLimited(symbol string) bool {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(100, time.Minute)
+		l = exchanges.NewRateLimit(95, time.Minute)
 		rl.rateLimits[symbol] = l
 	}
 	return l.IsRateLimited()
@@ -1069,11 +1069,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		state.accountRateLimits[req.Account.Name] = ar
 	}
 
-	if ar.IsRateLimited(symbol) {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
+	// We ignore rate limits on cancel
 	ar.Request(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
