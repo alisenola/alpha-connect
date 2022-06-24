@@ -245,11 +245,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		}
 	}
 
-	/*
-		if err := state.reconcileMovements(context); err != nil {
-			return fmt.Errorf("error reconcile movements: %v", err)
-		}
-	*/
+	if err := state.reconcileMovements(context); err != nil {
+		return fmt.Errorf("error reconcile movements: %v", err)
+	}
 	return nil
 }
 
@@ -358,11 +356,56 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	return nil
 }
 
-/*
 func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
-
+	// Get last account movement
+	done := false
+	for !done {
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
+			RequestID: 0,
+			Type:      messages.AccountMovementType_FundingFee,
+			Filter: &messages.AccountMovementFilter{
+				From: utils.MilliToTimestamp(state.lastFundingTs + 1),
+				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
+			},
+			Account: state.account,
+		}, 20*time.Second).Result()
+		if err != nil {
+			fmt.Println("error getting movement", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		mvts := res.(*messages.AccountMovementResponse)
+		if !mvts.Success {
+			fmt.Println("error getting account movements", mvts.RejectionReason.String())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		progress := false
+		for _, m := range mvts.Movements {
+			ts := m.Time.AsTime()
+			tr := &extypes.Transaction{
+				Type:        "FUNDING",
+				SubType:     m.Subtype,
+				Time:        ts,
+				ExecutionID: m.MovementID,
+				AccountID:   state.dbAccount.ID,
+				Fill:        nil,
+				Movements: []extypes.Movement{{
+					Reason:    int32(messages.AccountMovementType_FundingFee),
+					AssetID:   m.Asset.ID,
+					Quantity:  m.Change,
+					AccountID: state.dbAccount.ID,
+				}},
+			}
+			if tx := state.db.Create(tr); tx.Error != nil {
+				return fmt.Errorf("error inserting: %v", err)
+			}
+			state.lastFundingTs = uint64(ts.UnixNano() / 1000000)
+			progress = true
+		}
+		if len(mvts.Movements) == 0 || !progress {
+			done = true
+		}
+	}
 	return nil
 }
-
-
-*/
