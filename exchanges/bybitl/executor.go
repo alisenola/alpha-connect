@@ -96,6 +96,15 @@ func (rl *AccountRateLimit) IsRateLimited(symbol string) bool {
 	return l.IsRateLimited()
 }
 
+func (rl *AccountRateLimit) DurationBeforeNextRequest(symbol string, weight int) time.Duration {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = exchanges.NewRateLimit(95, time.Minute)
+		rl.rateLimits[symbol] = l
+	}
+	return l.DurationBeforeNextRequest(weight)
+}
+
 type Executor struct {
 	extypes.BaseExecutor
 	historicalSecurities  map[uint64]*registry.Security
@@ -1002,6 +1011,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	if ar.IsRateLimited(symbol) {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(symbol, 1))
 		context.Send(sender, response)
 		return nil
 	}
@@ -1093,7 +1103,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		ar = NewAccountRateLimit()
 		state.accountRateLimits[req.Account.Name] = ar
 	}
-
 	ar.Request(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
