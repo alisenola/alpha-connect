@@ -718,6 +718,11 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 				to = &ts
 			}
 		}
+		if symbol == "" {
+			response.RejectionReason = messages.RejectionReason_UnknownSymbol
+			context.Send(sender, response)
+			return nil
+		}
 		params := bybitl.NewGetTradeRecordsParams(symbol)
 		if from != nil {
 			params.SetStartTime(*from)
@@ -1124,7 +1129,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	if ar.IsRateLimited(symbol) {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(symbol, 1))
-		fmt.Println("DURATION", ar.DurationBeforeNextRequest(symbol, 1))
 		context.Send(sender, response)
 		return nil
 	}
@@ -1139,7 +1143,9 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	request, weight, err := bybitl.PostActiveOrder(params, req.Account.ApiCredentials)
 	if err != nil {
-		return err
+		response.RejectionReason = messages.RejectionReason_InvalidRequest
+		context.Send(sender, response)
+		return nil
 	}
 
 	qr := state.getQueryRunner(true)

@@ -579,6 +579,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 							context.Send(context.Parent(), nReport)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
@@ -806,6 +807,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 							context.Send(context.Parent(), report)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
