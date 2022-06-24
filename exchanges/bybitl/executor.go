@@ -511,9 +511,9 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			if symbol != "" && t.Symbol != symbol {
 				continue
 			}
-			sec := state.SymbolToSecurity(symbol)
+			sec := state.SymbolToSecurity(t.Symbol)
 			if sec == nil {
-				state.logger.Warn("error fetching tickers", log.Error(errors.New(data.RetMsg)))
+				state.logger.Warn("error fetching tickers", log.Error(fmt.Errorf("unknown symbol %s", t.Symbol)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -799,7 +799,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 					}
 					mvt := &messages.AccountMovement{
 						Asset:      constants.TETHER,
-						Change:     t.ExecQty,
+						Change:     -t.ExecFee,
 						MovementID: t.ExecId,
 						Subtype:    t.Symbol,
 						Time:       utils.MilliToTimestamp(uint64(t.TradeTimeMs)),
