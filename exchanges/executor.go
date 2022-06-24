@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	models2 "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"time"
 
@@ -482,6 +483,42 @@ func (state *Executor) getSecurity(instr *models.Instrument) (*models.Security, 
 	}
 }
 
+func (state *Executor) getExchange(instr *models.Instrument) (*models2.Exchange, *messages.RejectionReason) {
+	if instr == nil {
+		rej := messages.RejectionReason_MissingInstrument
+		return nil, &rej
+	}
+	if instr.SecurityID != nil {
+		if sec, ok := state.securities[instr.SecurityID.Value]; ok {
+			return sec.Exchange, nil
+		} else {
+			rej := messages.RejectionReason_UnknownSecurityID
+			return nil, &rej
+		}
+	} else if instr.Symbol != nil {
+		if instr.Exchange == nil {
+			rej := messages.RejectionReason_UnknownExchange
+			return nil, &rej
+		}
+		symbolsToSecs, ok := state.symbToSecs[instr.Exchange.ID]
+		if !ok {
+			rej := messages.RejectionReason_UnknownExchange
+			return nil, &rej
+		}
+		sec, ok := symbolsToSecs[instr.Symbol.Value]
+		if !ok {
+			rej := messages.RejectionReason_UnknownSymbol
+			return nil, &rej
+		}
+		return sec.Exchange, nil
+	} else if instr.Exchange != nil {
+		return instr.Exchange, nil
+	} else {
+		rej := messages.RejectionReason_MissingInstrument
+		return nil, &rej
+	}
+}
+
 func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketDataRequest)
 	sec, rej := state.getSecurity(request.Instrument)
@@ -556,7 +593,7 @@ func (state *Executor) OnHistoricalUnipoolV3EventRequest(context actor.Context) 
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	request := context.Message().(*messages.MarketStatisticsRequest)
-	sec, rej := state.getSecurity(request.Instrument)
+	ex, rej := state.getExchange(request.Instrument)
 	if rej != nil {
 		context.Respond(&messages.MarketStatisticsResponse{
 			RequestID:       request.RequestID,
@@ -565,7 +602,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		})
 		return nil
 	}
-	exchange, ok := state.executors[sec.Exchange.ID]
+	exchange, ok := state.executors[ex.ID]
 	if !ok {
 		context.Respond(&messages.MarketStatisticsResponse{
 			RequestID:       request.RequestID,

@@ -475,12 +475,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	symbol, rej := state.getSymbol(msg.Instrument)
-	if rej != nil {
-		response.RejectionReason = *rej
-		context.Send(sender, response)
-		return nil
-	}
+	symbol, _ := state.getSymbol(msg.Instrument)
 
 	req, w, err := bybitl.GetTickers()
 	if err != nil {
@@ -511,19 +506,16 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			if symbol != "" && t.Symbol != symbol {
 				continue
 			}
+
 			sec := state.SymbolToSecurity(t.Symbol)
-			if sec == nil {
-				state.logger.Warn("error fetching tickers", log.Error(fmt.Errorf("unknown symbol %s", t.Symbol)))
-				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
-				context.Send(sender, response)
-				return
+			if sec != nil {
+				response.Statistics = append(response.Statistics, &models.Stat{
+					Timestamp:  timestamppb.Now(),
+					SecurityID: sec.SecurityID,
+					Value:      t.MarkPrice,
+					StatType:   models.StatType_MarkPrice,
+				})
 			}
-			response.Statistics = append(response.Statistics, &models.Stat{
-				Timestamp:  timestamppb.Now(),
-				SecurityID: sec.SecurityID,
-				Value:      t.MarkPrice,
-				StatType:   models.StatType_MarkPrice,
-			})
 		}
 		response.Success = true
 		context.Send(sender, response)
@@ -789,7 +781,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 					return data.TradingRecords.Trades[i].TradeTimeMs < data.TradingRecords.Trades[j].TradeTimeMs
 				})
 				for _, t := range data.TradingRecords.Trades {
-					fmt.Println(t)
+					fmt.Println(t.ExecQty, t.ExecFee, t.ExecType, t.ExecValue)
 					sec := state.SymbolToHistoricalSecurity(t.Symbol)
 					if sec == nil {
 						state.logger.Warn("error fetching trade records", log.Error(errors.New("unknown symbol")))
