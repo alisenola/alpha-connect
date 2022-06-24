@@ -107,11 +107,9 @@ func (rl *AccountRateLimit) DurationBeforeNextRequest(symbol string, weight int)
 
 type Executor struct {
 	extypes.BaseExecutor
-	historicalSecurities  map[uint64]*registry.Security
-	symbolToHistoricalSec map[string]*registry.Security
-	queryRunners          []*QueryRunner
-	accountRateLimits     map[string]*AccountRateLimit
-	logger                *log.Logger
+	queryRunners      []*QueryRunner
+	accountRateLimits map[string]*AccountRateLimit
+	logger            *log.Logger
 }
 
 func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
@@ -303,16 +301,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.SecuritiesLock.Lock()
-	defer state.SecuritiesLock.Unlock()
-	state.Securities = make(map[uint64]*models.Security)
-	state.SymbolToSec = make(map[string]*models.Security)
-	for _, s := range securities {
-		state.Securities[s.SecurityID] = s
-		state.SymbolToSec[s.Symbol] = s
-	}
-	state.historicalSecurities = make(map[uint64]*registry.Security)
-	state.symbolToHistoricalSec = make(map[string]*registry.Security)
+	var historicalSecurities []*registry.Security
 	if state.Registry != nil {
 		rres, err := state.Registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
 			Filter: &registry.SecurityFilter{
@@ -322,11 +311,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if err != nil {
 			return err
 		}
-		for _, sec := range rres.Securities {
-			state.historicalSecurities[sec.SecurityId] = sec
-			state.symbolToHistoricalSec[sec.Symbol] = sec
-		}
+		historicalSecurities = rres.Securities
 	}
+
+	state.SyncSecurities(securities, historicalSecurities)
+
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
@@ -519,27 +508,22 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			return
 		}
 		for _, t := range data.Result {
-			if symbol != "" {
-				if t.Symbol == symbol {
-					sec := state.SymbolToSec[symbol]
-					response.Statistics = append(response.Statistics, &models.Stat{
-						Timestamp:  timestamppb.Now(),
-						SecurityID: sec.SecurityID,
-						Value:      t.MarkPrice,
-						StatType:   models.StatType_MarkPrice,
-					})
-				}
-			} else {
-				sec, ok := state.SymbolToSec[t.Symbol]
-				if ok {
-					response.Statistics = append(response.Statistics, &models.Stat{
-						Timestamp:  timestamppb.Now(),
-						SecurityID: sec.SecurityID,
-						Value:      t.MarkPrice,
-						StatType:   models.StatType_MarkPrice,
-					})
-				}
+			if symbol != "" && t.Symbol != symbol {
+				continue
 			}
+			sec := state.SymbolToSecurity(symbol)
+			if sec == nil {
+				state.logger.Warn("error fetching tickers", log.Error(errors.New(data.RetMsg)))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+			response.Statistics = append(response.Statistics, &models.Stat{
+				Timestamp:  timestamppb.Now(),
+				SecurityID: sec.SecurityID,
+				Value:      t.MarkPrice,
+				StatType:   models.StatType_MarkPrice,
+			})
 		}
 		response.Success = true
 		context.Send(sender, response)
@@ -673,8 +657,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && symbol != pos.Position.Symbol {
 				continue
 			}
-			sec, ok := state.SymbolToSec[pos.Position.Symbol]
-			if !ok {
+			sec := state.SymbolToSecurity(pos.Position.Symbol)
+			if sec == nil {
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -793,19 +777,17 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			for _, t := range data.TradingRecords.Trades {
 				quantityMul := 1.
 				var instrument *models.Instrument
-				if _, ok := state.symbolToHistoricalSec[t.Symbol]; ok {
-					sec := state.symbolToHistoricalSec[t.Symbol]
-					instrument = &models.Instrument{
-						Exchange:   constants.BYBITL,
-						Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
-						SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
-					}
-				} else {
-					instrument = &models.Instrument{
-						Exchange:   constants.BYBITL,
-						Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
-						SecurityID: nil,
-					}
+				sec := state.SymbolToHistoricalSecurity(t.Symbol)
+				if sec == nil {
+					state.logger.Warn("error fetching trade records", log.Error(errors.New("unknown symbol")))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				instrument = &models.Instrument{
+					Exchange:   constants.BYBITL,
+					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 				}
 
 				quantity := t.ExecQty * quantityMul
@@ -943,10 +925,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			if orderStatus != "" && ord.OrderStatus != orderStatus {
 				continue
 			}
-			state.SecuritiesLock.RLock()
-			sec, ok := state.SymbolToSec[ord.Symbol]
-			state.SecuritiesLock.RUnlock()
-			if !ok {
+			sec := state.SymbolToSecurity(ord.Symbol)
+			if sec == nil {
 				state.logger.Info("got order with unknown symbol: " + ord.Symbol)
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
@@ -978,8 +958,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	if req.Order.Instrument != nil {
 		if req.Order.Instrument.Symbol != nil {
 			symbol = req.Order.Instrument.Symbol.Value
-			sec, ok := state.SymbolToSec[symbol]
-			if !ok {
+			sec := state.SymbolToSecurity(symbol)
+			if sec == nil {
 				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Send(sender, response)
 				return nil
