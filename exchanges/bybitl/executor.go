@@ -30,16 +30,16 @@ import (
 
 var MakerFees = map[string]float64{
 	"No VIP": 0.01 / 100,
-	"VIP 1":  0.006 / 100,
-	"VIP 2":  0.004 / 100,
-	"VIP 3":  0.002 / 100,
+	"VIP-1":  0.006 / 100,
+	"VIP-2":  0.004 / 100,
+	"VIP-3":  0.002 / 100,
 }
 
 var TakerFees = map[string]float64{
 	"No VIP": 0.06 / 100,
-	"VIP 1":  0.05 / 100,
-	"VIP 2":  0.045 / 100,
-	"VIP 3":  0.0425 / 100,
+	"VIP-1":  0.05 / 100,
+	"VIP-2":  0.045 / 100,
+	"VIP-3":  0.0425 / 100,
 }
 
 func (state *Executor) getSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
