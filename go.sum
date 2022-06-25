@@ -619,6 +619,8 @@ gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d h1:ADKl
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
 gitlab.com/alphaticks/xchanger v0.0.0-20220625071241-675014078642 h1:pz/RPGUhzEG04KT3S7LxpF+fkx6NhIAQfxYTtuWcaCY=
 gitlab.com/alphaticks/xchanger v0.0.0-20220625071241-675014078642/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
+gitlab.com/alphaticks/xchanger v0.0.0-20220625073922-c4181418cfea h1:jbrFUtfojPdocirL04AoOsLcscs2MQZlwZUaWVIKZF4=
+gitlab.com/alphaticks/xchanger v0.0.0-20220625073922-c4181418cfea/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
