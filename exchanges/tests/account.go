@@ -68,6 +68,24 @@ func AccntTest(t *testing.T, tc AccountTest) {
 		as:       as,
 		executor: executor,
 	}
+
+	t.Run("AccountInformationRequest", func(t *testing.T) {
+		res, err := as.Root.RequestFuture(executor, &messages.AccountInformationRequest{
+			RequestID: 0,
+			Account:   tc.Account,
+		}, 10*time.Second).Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, ok := res.(*messages.AccountInformationResponse)
+		if !ok {
+			t.Fatalf("was expecting *messages.AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+		}
+		if !v.Success {
+			t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+		}
+	})
+
 	// Get security def
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityDefinitionRequest{
 		Instrument: tc.Instrument,

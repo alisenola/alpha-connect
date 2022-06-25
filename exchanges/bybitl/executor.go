@@ -28,6 +28,20 @@ import (
 	"unicode"
 )
 
+var MakerFees = map[string]float64{
+	"No VIP": 0.01 / 100,
+	"VIP 1":  0.006 / 100,
+	"VIP 2":  0.004 / 100,
+	"VIP 3":  0.002 / 100,
+}
+
+var TakerFees = map[string]float64{
+	"No VIP": 0.06 / 100,
+	"VIP 1":  0.05 / 100,
+	"VIP 2":  0.045 / 100,
+	"VIP 3":  0.0425 / 100,
+}
+
 func (state *Executor) getSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
 	symbol := ""
 	if instrument != nil {
@@ -673,6 +687,69 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				Cross:    false,
 			})
 		}
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) OnAccountInformationRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountInformationRequest)
+	sender := context.Sender()
+	response := &messages.AccountInformationResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		request, weight, err := bybitl.GetAPIKeyInfo(msg.Account.ApiCredentials)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		qr := state.getQueryRunner(false)
+		if qr == nil {
+			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		qr.Get(weight)
+		var data bybitl.APIKeyInfoResponse
+		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			state.logger.Warn("error fetching account information", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.RetCode != 0 {
+			state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		makerFee, ok := MakerFees[data.Info[0].VipLevel]
+		if !ok {
+			state.logger.Warn(fmt.Sprintf("unknown VIP level %s", data.Info[0].VipLevel))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+		takerFee, ok := TakerFees[data.Info[0].VipLevel]
+		if !ok {
+			state.logger.Warn(fmt.Sprintf("unknown VIP level %s", data.Info[0].VipLevel))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		response.MakerFee = &wrapperspb.DoubleValue{Value: makerFee}
+		response.TakerFee = &wrapperspb.DoubleValue{Value: takerFee}
 		response.Success = true
 		context.Send(sender, response)
 	}()

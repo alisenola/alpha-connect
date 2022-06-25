@@ -156,10 +156,30 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
+	// Then fetch fees
+	res, err := context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting account information from executor: %v", err)
+	}
+
+	information, ok := res.(*messages.AccountInformationResponse)
+	if !ok {
+		return fmt.Errorf("was expecting AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !information.Success {
+		return fmt.Errorf("error fetching account information: %s", information.RejectionReason.String())
+	}
+
+	fmt.Println(information.MakerFee, information.TakerFee)
+
 	//Fetch the securities
 	fmt.Println("Fetching the securities")
 	ex := actor.NewPID(context.ActorSystem().Address(), "executor")
-	res, err := context.RequestFuture(ex, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err = context.RequestFuture(ex, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error getting securities: %v", err)
 	}
@@ -264,9 +284,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.seqNum = 0
 
 	//Sync account
-	makerFee := 0.0001
-	takerFee := 0.0006
-	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &makerFee, &takerFee); err != nil {
+	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &information.MakerFee.Value, &information.TakerFee.Value); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
