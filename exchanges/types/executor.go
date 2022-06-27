@@ -614,17 +614,28 @@ func (state *BaseExecutor) InstrumentToSymbol(instrument *models.Instrument) (st
 		return "", &v
 	}
 	if instrument.Symbol != nil {
-		sec := state.SymbolToHistoricalSecurity(instrument.Symbol.Value)
+		sec := state.SymbolToSecurity(instrument.Symbol.Value)
 		if sec == nil {
-			v := messages.RejectionReason_UnknownSymbol
-			return "", &v
+			hsec := state.SymbolToHistoricalSecurity(instrument.Symbol.Value)
+			if hsec == nil {
+				v := messages.RejectionReason_UnknownSymbol
+				return "", &v
+			} else {
+				return hsec.Symbol, nil
+			}
+		} else {
+			return sec.Symbol, nil
 		}
-		return sec.Symbol, nil
 	} else if instrument.SecurityID != nil {
-		sec := state.IDToHistoricalSecurity(instrument.SecurityID.Value)
+		sec := state.IDToSecurity(instrument.SecurityID.Value)
 		if sec == nil {
-			v := messages.RejectionReason_UnknownSecurityID
-			return "", &v
+			hsec := state.IDToHistoricalSecurity(instrument.SecurityID.Value)
+			if hsec == nil {
+				v := messages.RejectionReason_UnknownSecurityID
+				return "", &v
+			} else {
+				return hsec.Symbol, nil
+			}
 		}
 		return sec.Symbol, nil
 	} else {
