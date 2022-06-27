@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
+	"math"
 	"reflect"
 	"time"
 )
@@ -125,17 +126,14 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 				}
 			}
 		case "FUNDING":
-			secID := uint64(tr.Fill.SecurityID)
-			sec, ok := state.securities[secID]
-			if ok && sec.SecurityType == "CRPERP" {
+			symbol := tr.SubType
+			sec := state.symbToSecs[symbol]
+			if sec == nil {
+				return fmt.Errorf("unknown symbol %s", symbol)
+			}
+			if sec.SecurityType == "CRPERP" {
 				state.lastFundingTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
 			}
-		}
-	}
-
-	for k, pos := range state.positions {
-		if ppos := pos.GetPosition(); ppos != nil {
-			fmt.Println(state.securities[k].Symbol, ppos.Quantity)
 		}
 	}
 
@@ -166,79 +164,10 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
-	/*
-		if err := state.reconcileTrades(context); err != nil {
-			return fmt.Errorf("error reconcile trade: %v", err)
-		}
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
 
-		// Fetch positions & compare
-
-		// Start reconciliation
-		state.positions = make(map[uint64]*account.Position)
-		for _, sec := range state.securities {
-			if sec.SecurityType == "CRPERP" {
-				state.positions[sec.SecurityId] = account.NewPosition(
-					sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
-			}
-		}
-		state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
-		for _, tr := range transactions {
-			switch tr.Type {
-			case "TRADE":
-				if tr.Fill != nil {
-					secID := uint64(tr.Fill.SecurityID)
-					sec, ok := state.securities[secID]
-					if ok && sec.SecurityType == "CRPERP" {
-						if tr.Fill.Quantity < 0 {
-							state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
-						} else {
-							state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
-						}
-						state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
-					}
-				}
-			}
-		}
-
-		for k, pos := range state.positions {
-			if ppos := pos.GetPosition(); ppos != nil {
-				fmt.Println(state.securities[k].Symbol, ppos.Quantity)
-			}
-		}
-
-		// Fetch positions
-		resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
-			Instrument: nil,
-			Account:    state.account,
-		}, 10*time.Second).Result()
-		if err != nil {
-			return fmt.Errorf("error getting positions from executor: %v", err)
-		}
-
-		positionList, ok := resp.(*messages.PositionList)
-		if !ok {
-			return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
-		}
-		if !positionList.Success {
-			return fmt.Errorf("error getting balances: %s", positionList.RejectionReason.String())
-		}
-
-		execPositions := make(map[uint64]*models.Position)
-		for _, pos := range positionList.Positions {
-			execPositions[pos.Instrument.SecurityID.Value] = pos
-		}
-
-		for k, p1 := range state.positions {
-			if p2, ok := execPositions[k]; ok {
-				if p1.GetPosition() != nil {
-					fmt.Println("position", p1.GetPosition().Quantity, p2.Quantity)
-				}
-			} else if p1.GetPosition() != nil {
-				fmt.Println("p1 not in exec")
-			}
-		}
-
-	*/
 	if err := state.reconcileMovements(context); err != nil {
 		return fmt.Errorf("error reconcile movements: %v", err)
 	}
@@ -256,6 +185,23 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 }
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
+	// Fetch positions
+	resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	positionList, ok := resp.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !positionList.Success {
+		return fmt.Errorf("error getting balances: %s", positionList.RejectionReason.String())
+	}
+
 	for _, sec := range state.securities {
 		fmt.Println("REQ", sec.Symbol, state.lastTradeTs[sec.SecurityId])
 		instrument := &models.Instrument{
@@ -347,6 +293,58 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 	}
 
+	state.positions = make(map[uint64]*account.Position)
+	for _, sec := range state.securities {
+		if sec.SecurityType == "CRPERP" {
+			state.positions[sec.SecurityId] = account.NewPosition(
+				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
+		}
+	}
+	var transactions []extypes.Transaction
+	state.db.Debug().
+		Model(&extypes.Transaction{}).
+		Joins("Fill").
+		Where(`"transactions"."account_id"=?`, state.dbAccount.ID).
+		Where(`"transactions"."time" < ?`, positionList.Time.AsTime()).
+		Order("time asc, execution_id asc").
+		Find(&transactions)
+	for _, tr := range transactions {
+		switch tr.Type {
+		case "TRADE":
+			if tr.Fill != nil {
+				secID := uint64(tr.Fill.SecurityID)
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
+					if tr.Fill.Quantity < 0 {
+						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
+					} else {
+						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
+					}
+					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
+				}
+			}
+		}
+	}
+
+	execPositions := make(map[uint64]*models.Position)
+	for _, pos := range positionList.Positions {
+		execPositions[pos.Instrument.SecurityID.Value] = pos
+	}
+
+	for k, p1 := range state.positions {
+		if p2, ok := execPositions[k]; ok {
+			if p1.GetPosition() != nil {
+				q1 := int(math.Round(1e8 * p1.GetPosition().Quantity))
+				q2 := int(math.Round(1e8 * p2.Quantity))
+				if q1 != q2 {
+					return fmt.Errorf("different position quantity")
+				}
+			}
+		} else if p1.GetPosition() != nil {
+			return fmt.Errorf("%s not in exec", p1.GetPosition().Instrument.Symbol)
+		}
+	}
+
 	return nil
 }
 
@@ -382,6 +380,15 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			}
 			progress := false
 			for _, m := range mvts.Movements {
+				var cnt int64
+				tx := state.db.Model(&extypes.Transaction{}).Where("execution_id=?", m.MovementID).Count(&cnt)
+				if tx.Error != nil {
+					return fmt.Errorf("error getting funding transaction count: %v", err)
+				}
+				if cnt > 0 {
+					fmt.Println("SKIP")
+					continue
+				}
 				ts := m.Time.AsTime()
 				tr := &extypes.Transaction{
 					Type:        "FUNDING",
@@ -408,5 +415,124 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			}
 		}
 	}
+
+	done := false
+	for !done {
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
+			RequestID: 0,
+			Type:      messages.AccountMovementType_Deposit,
+			Filter: &messages.AccountMovementFilter{
+				From: utils.MilliToTimestamp(state.lastDepositTs),
+				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
+			},
+			Account: state.account,
+		}, 20*time.Second).Result()
+		if err != nil {
+			fmt.Println("error getting movement", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		mvts := res.(*messages.AccountMovementResponse)
+		if !mvts.Success {
+			fmt.Println("error getting account movements", mvts.RejectionReason.String())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		progress := false
+		for _, m := range mvts.Movements {
+			var cnt int64
+			tx := state.db.Model(&extypes.Transaction{}).Where("execution_id=?", m.MovementID).Count(&cnt)
+			if tx.Error != nil {
+				return fmt.Errorf("error getting transaction count: %v", err)
+			}
+			if cnt > 0 {
+				fmt.Println("SKIP")
+				continue
+			}
+			ts := m.Time.AsTime()
+			tr := &extypes.Transaction{
+				Type:        "DEPOSIT",
+				SubType:     m.Subtype,
+				Time:        ts,
+				ExecutionID: m.MovementID,
+				AccountID:   state.dbAccount.ID,
+				Fill:        nil,
+				Movements: []extypes.Movement{{
+					Reason:    int32(messages.AccountMovementType_Deposit),
+					AssetID:   m.Asset.ID,
+					Quantity:  m.Change,
+					AccountID: state.dbAccount.ID,
+				}},
+			}
+			if tx := state.db.Create(tr); tx.Error != nil {
+				return fmt.Errorf("error inserting: %v", err)
+			}
+			progress = true
+			state.lastDepositTs = uint64(ts.UnixNano() / 1000000)
+		}
+		if len(mvts.Movements) == 0 || !progress {
+			done = true
+		}
+	}
+
+	done = false
+	for !done {
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
+			RequestID: 0,
+			Type:      messages.AccountMovementType_Withdrawal,
+			Filter: &messages.AccountMovementFilter{
+				From: utils.MilliToTimestamp(state.lastWithdrawalTs),
+				To:   utils.MilliToTimestamp(uint64(time.Now().UnixNano() / 1000000)),
+			},
+			Account: state.account,
+		}, 20*time.Second).Result()
+		if err != nil {
+			fmt.Println("error getting movement", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		mvts := res.(*messages.AccountMovementResponse)
+		if !mvts.Success {
+			fmt.Println("error getting account movements", mvts.RejectionReason.String())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		progress := false
+		for _, m := range mvts.Movements {
+			var cnt int64
+			tx := state.db.Model(&extypes.Transaction{}).Where("execution_id=?", m.MovementID).Count(&cnt)
+			if tx.Error != nil {
+				return fmt.Errorf("error getting transaction count: %v", err)
+			}
+			if cnt > 0 {
+				fmt.Println("SKIP")
+				continue
+			}
+			ts := m.Time.AsTime()
+			tr := &extypes.Transaction{
+				Type:        "WITHDRAWAL",
+				SubType:     m.Subtype,
+				Time:        ts,
+				ExecutionID: m.MovementID,
+				AccountID:   state.dbAccount.ID,
+				Fill:        nil,
+				Movements: []extypes.Movement{{
+					Reason:    int32(messages.AccountMovementType_Withdrawal),
+					AssetID:   m.Asset.ID,
+					Quantity:  m.Change,
+					AccountID: state.dbAccount.ID,
+				}},
+			}
+			if tx := state.db.Create(tr); tx.Error != nil {
+				return fmt.Errorf("error inserting: %v", err)
+			}
+			progress = true
+			state.lastWithdrawalTs = uint64(ts.UnixNano() / 1000000)
+		}
+		if len(mvts.Movements) == 0 || !progress {
+			done = true
+		}
+	}
+
 	return nil
 }

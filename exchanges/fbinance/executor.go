@@ -20,10 +20,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
-	"math/rand"
 	"net/http"
 	"reflect"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -124,16 +122,22 @@ func (state *Executor) Receive(context actor.Context) {
 	extypes.ReceiveExecutor(state, context)
 }
 
-func (state *Executor) getQueryRunner() *QueryRunner {
-	sort.Slice(state.queryRunners, func(i, j int) bool {
-		return rand.Uint64()%2 == 0
-	})
-
+func (state *Executor) getQueryRunner(force bool) *QueryRunner {
 	var qr *QueryRunner
 	for _, q := range state.queryRunners {
 		if !q.globalRateLimit.IsRateLimited() {
 			qr = q
 			break
+		}
+	}
+	if qr == nil && force {
+		min := time.Duration(math.MaxInt64)
+		for _, q := range state.queryRunners {
+			dur := q.globalRateLimit.DurationBeforeNextRequest(1)
+			if dur < min {
+				min = dur
+				qr = q
+			}
 		}
 	}
 
@@ -210,7 +214,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 					secondOrderLimit = rateLimit.Limit
 				}
 			} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
-				qr.globalRateLimit = exchanges.NewRateLimit(rateLimit.Limit, time.Minute)
+				qr.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
 				qr.globalRateLimit.Request(weight)
 			}
@@ -231,7 +235,7 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	qr := state.getQueryRunner()
+	qr := state.getQueryRunner(false)
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
@@ -373,7 +377,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 					return
 				}
 
-				qr := state.getQueryRunner()
+				qr := state.getQueryRunner(false)
 				if qr == nil {
 					response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 					context.Send(sender, response)
@@ -438,7 +442,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
@@ -500,7 +504,7 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -598,7 +602,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -739,7 +743,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -871,7 +875,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 				return
 			}
 		}
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -937,7 +941,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -1010,7 +1014,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -1098,7 +1102,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
@@ -1192,13 +1196,15 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 
-		qr := state.getQueryRunner()
-		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
-			context.Send(sender, response)
-			return
-		}
+		qr := state.getQueryRunner(true)
+		/*
+			if qr == nil {
+				response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+				response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
+				context.Send(sender, response)
+				return
+			}
+		*/
 
 		qr.globalRateLimit.Request(weight)
 		var data fbinance.OrderData
@@ -1277,7 +1283,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		qr := state.getQueryRunner()
+		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)

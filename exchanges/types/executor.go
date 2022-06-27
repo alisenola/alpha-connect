@@ -602,20 +602,26 @@ func (state *BaseExecutor) IDToSecurity(ID uint64) *models.Security {
 	return state.Securities[ID]
 }
 
+func (state *BaseExecutor) IDToHistoricalSecurity(ID uint64) *registry.Security {
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+	return state.HistoricalSecurities[ID]
+}
+
 func (state *BaseExecutor) InstrumentToSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
 	if instrument == nil {
 		v := messages.RejectionReason_MissingInstrument
 		return "", &v
 	}
 	if instrument.Symbol != nil {
-		sec := state.SymbolToSecurity(instrument.Symbol.Value)
+		sec := state.SymbolToHistoricalSecurity(instrument.Symbol.Value)
 		if sec == nil {
 			v := messages.RejectionReason_UnknownSymbol
 			return "", &v
 		}
 		return sec.Symbol, nil
 	} else if instrument.SecurityID != nil {
-		sec := state.IDToSecurity(instrument.SecurityID.Value)
+		sec := state.IDToHistoricalSecurity(instrument.SecurityID.Value)
 		if sec == nil {
 			v := messages.RejectionReason_UnknownSecurityID
 			return "", &v

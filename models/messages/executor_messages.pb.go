@@ -3804,11 +3804,12 @@ type PositionList struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RequestID       uint64             `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
-	ResponseID      uint64             `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
-	Positions       []*models.Position `protobuf:"bytes,3,rep,name=positions,proto3" json:"positions,omitempty"`
-	Success         bool               `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
-	RejectionReason RejectionReason    `protobuf:"varint,5,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
+	RequestID       uint64                 `protobuf:"varint,1,opt,name=requestID,proto3" json:"requestID,omitempty"`
+	ResponseID      uint64                 `protobuf:"varint,2,opt,name=responseID,proto3" json:"responseID,omitempty"`
+	Positions       []*models.Position     `protobuf:"bytes,3,rep,name=positions,proto3" json:"positions,omitempty"`
+	Time            *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=time,proto3" json:"time,omitempty"`
+	Success         bool                   `protobuf:"varint,5,opt,name=success,proto3" json:"success,omitempty"`
+	RejectionReason RejectionReason        `protobuf:"varint,6,opt,name=rejection_reason,json=rejectionReason,proto3,enum=messages.RejectionReason" json:"rejection_reason,omitempty"`
 }
 
 func (x *PositionList) Reset() {
@@ -3860,6 +3861,13 @@ func (x *PositionList) GetResponseID() uint64 {
 func (x *PositionList) GetPositions() []*models.Position {
 	if x != nil {
 		return x.Positions
+	}
+	return nil
+}
+
+func (x *PositionList) GetTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Time
 	}
 	return nil
 }
@@ -6728,7 +6736,7 @@ var file_executor_messages_proto_rawDesc = []byte{
 	0x6e, 0x74, 0x52, 0x0a, 0x69, 0x6e, 0x73, 0x74, 0x72, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x12, 0x29,
 	0x0a, 0x07, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32,
 	0x0f, 0x2e, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x73, 0x2e, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74,
-	0x52, 0x07, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0xdc, 0x01, 0x0a, 0x0c, 0x50, 0x6f,
+	0x52, 0x07, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0x8c, 0x02, 0x0a, 0x0c, 0x50, 0x6f,
 	0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x72,
 	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x44, 0x12, 0x1e, 0x0a, 0x0a, 0x72, 0x65, 0x73, 0x70,
@@ -6736,10 +6744,13 @@ var file_executor_messages_proto_rawDesc = []byte{
 	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x49, 0x44, 0x12, 0x2e, 0x0a, 0x09, 0x70, 0x6f, 0x73, 0x69,
 	0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x6d, 0x6f,
 	0x64, 0x65, 0x6c, 0x73, 0x2e, 0x50, 0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x09, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63,
-	0x65, 0x73, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65,
+	0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x2e, 0x0a, 0x04, 0x74, 0x69, 0x6d, 0x65,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61,
+	0x6d, 0x70, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63,
+	0x65, 0x73, 0x73, 0x18, 0x05, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65,
 	0x73, 0x73, 0x12, 0x44, 0x0a, 0x10, 0x72, 0x65, 0x6a, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
-	0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x19, 0x2e, 0x6d,
+	0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x19, 0x2e, 0x6d,
 	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x2e, 0x52, 0x65, 0x6a, 0x65, 0x63, 0x74, 0x69, 0x6f,
 	0x6e, 0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x52, 0x0f, 0x72, 0x65, 0x6a, 0x65, 0x63, 0x74, 0x69,
 	0x6f, 0x6e, 0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x22, 0xc9, 0x01, 0x0a, 0x0f, 0x42, 0x61, 0x6c,
@@ -7552,95 +7563,96 @@ var file_executor_messages_proto_depIdxs = []int32{
 	78,  // 117: messages.PositionsRequest.instrument:type_name -> models.Instrument
 	94,  // 118: messages.PositionsRequest.account:type_name -> models.Account
 	97,  // 119: messages.PositionList.positions:type_name -> models.Position
-	1,   // 120: messages.PositionList.rejection_reason:type_name -> messages.RejectionReason
-	85,  // 121: messages.BalancesRequest.subscriber:type_name -> actor.PID
-	100, // 122: messages.BalancesRequest.asset:type_name -> models.Asset
-	94,  // 123: messages.BalancesRequest.account:type_name -> models.Account
-	98,  // 124: messages.BalanceList.balances:type_name -> models.Balance
-	1,   // 125: messages.BalanceList.rejection_reason:type_name -> messages.RejectionReason
-	78,  // 126: messages.NewOrder.instrument:type_name -> models.Instrument
-	106, // 127: messages.NewOrder.order_type:type_name -> models.OrderType
-	104, // 128: messages.NewOrder.order_side:type_name -> models.Side
-	107, // 129: messages.NewOrder.time_in_force:type_name -> models.TimeInForce
-	99,  // 130: messages.NewOrder.price:type_name -> google.protobuf.DoubleValue
-	108, // 131: messages.NewOrder.execution_instructions:type_name -> models.ExecutionInstruction
-	94,  // 132: messages.NewOrderSingleRequest.account:type_name -> models.Account
-	51,  // 133: messages.NewOrderSingleRequest.order:type_name -> messages.NewOrder
-	2,   // 134: messages.NewOrderSingleRequest.response_type:type_name -> messages.ResponseType
-	103, // 135: messages.NewOrderSingleResponse.order_status:type_name -> models.OrderStatus
-	1,   // 136: messages.NewOrderSingleResponse.rejection_reason:type_name -> messages.RejectionReason
-	109, // 137: messages.NewOrderSingleResponse.rate_limit_delay:type_name -> google.protobuf.Duration
-	94,  // 138: messages.NewOrderBulkRequest.account:type_name -> models.Account
-	51,  // 139: messages.NewOrderBulkRequest.orders:type_name -> messages.NewOrder
-	1,   // 140: messages.NewOrderBulkResponse.rejection_reason:type_name -> messages.RejectionReason
-	101, // 141: messages.OrderUpdate.orderID:type_name -> google.protobuf.StringValue
-	101, // 142: messages.OrderUpdate.orig_client_orderID:type_name -> google.protobuf.StringValue
-	99,  // 143: messages.OrderUpdate.quantity:type_name -> google.protobuf.DoubleValue
-	99,  // 144: messages.OrderUpdate.price:type_name -> google.protobuf.DoubleValue
-	78,  // 145: messages.OrderReplaceRequest.instrument:type_name -> models.Instrument
-	94,  // 146: messages.OrderReplaceRequest.account:type_name -> models.Account
-	56,  // 147: messages.OrderReplaceRequest.update:type_name -> messages.OrderUpdate
-	1,   // 148: messages.OrderReplaceResponse.rejection_reason:type_name -> messages.RejectionReason
-	78,  // 149: messages.OrderBulkReplaceRequest.instrument:type_name -> models.Instrument
-	94,  // 150: messages.OrderBulkReplaceRequest.account:type_name -> models.Account
-	56,  // 151: messages.OrderBulkReplaceRequest.updates:type_name -> messages.OrderUpdate
-	1,   // 152: messages.OrderBulkReplaceResponse.rejection_reason:type_name -> messages.RejectionReason
-	101, // 153: messages.OrderCancelRequest.orderID:type_name -> google.protobuf.StringValue
-	101, // 154: messages.OrderCancelRequest.client_orderID:type_name -> google.protobuf.StringValue
-	78,  // 155: messages.OrderCancelRequest.instrument:type_name -> models.Instrument
-	94,  // 156: messages.OrderCancelRequest.account:type_name -> models.Account
-	2,   // 157: messages.OrderCancelRequest.response_type:type_name -> messages.ResponseType
-	1,   // 158: messages.OrderCancelResponse.rejection_reason:type_name -> messages.RejectionReason
-	109, // 159: messages.OrderCancelResponse.rate_limit_delay:type_name -> google.protobuf.Duration
-	94,  // 160: messages.OrderMassCancelRequest.account:type_name -> models.Account
-	44,  // 161: messages.OrderMassCancelRequest.filter:type_name -> messages.OrderFilter
-	1,   // 162: messages.OrderMassCancelResponse.rejection_reason:type_name -> messages.RejectionReason
-	110, // 163: messages.HistoricalProtocolAssetTransferResponse.update:type_name -> models.ProtocolAssetUpdate
-	1,   // 164: messages.HistoricalProtocolAssetTransferResponse.rejection_reason:type_name -> messages.RejectionReason
-	85,  // 165: messages.ProtocolAssetDataRequest.subscriber:type_name -> actor.PID
-	1,   // 166: messages.ProtocolAssetDataResponse.rejection_reason:type_name -> messages.RejectionReason
-	110, // 167: messages.ProtocolAssetDataIncrementalRefresh.update:type_name -> models.ProtocolAssetUpdate
-	111, // 168: messages.ProtocolAssetDefinitionResponse.protocol_asset:type_name -> models.ProtocolAsset
-	1,   // 169: messages.ProtocolAssetDefinitionResponse.rejection_reason:type_name -> messages.RejectionReason
-	85,  // 170: messages.ProtocolAssetListRequest.subscriber:type_name -> actor.PID
-	111, // 171: messages.ProtocolAssetList.protocol_assets:type_name -> models.ProtocolAsset
-	1,   // 172: messages.ProtocolAssetList.rejection_reason:type_name -> messages.RejectionReason
-	85,  // 173: messages.MarketableProtocolAssetListRequest.subscriber:type_name -> actor.PID
-	112, // 174: messages.MarketableProtocolAssetList.marketable_protocol_assets:type_name -> models.MarketableProtocolAsset
-	1,   // 175: messages.MarketableProtocolAssetList.rejection_reason:type_name -> messages.RejectionReason
-	112, // 176: messages.MarketableProtocolAssetDefinitionResponse.marketable_protocol_asset:type_name -> models.MarketableProtocolAsset
-	1,   // 177: messages.MarketableProtocolAssetDefinitionResponse.rejection_reason:type_name -> messages.RejectionReason
-	18,  // 178: messages.ExchangeExecutor.MarketData:input_type -> messages.MarketDataRequest
-	24,  // 179: messages.ExchangeExecutor.AccountData:input_type -> messages.AccountDataRequest
-	36,  // 180: messages.ExchangeExecutor.SecurityDefinition:input_type -> messages.SecurityDefinitionRequest
-	38,  // 181: messages.ExchangeExecutor.Securities:input_type -> messages.SecurityListRequest
-	45,  // 182: messages.ExchangeExecutor.Orders:input_type -> messages.OrderStatusRequest
-	47,  // 183: messages.ExchangeExecutor.Positions:input_type -> messages.PositionsRequest
-	49,  // 184: messages.ExchangeExecutor.Balances:input_type -> messages.BalancesRequest
-	52,  // 185: messages.ExchangeExecutor.NewOrderSingle:input_type -> messages.NewOrderSingleRequest
-	54,  // 186: messages.ExchangeExecutor.NewOrderBulk:input_type -> messages.NewOrderBulkRequest
-	57,  // 187: messages.ExchangeExecutor.OrderReplace:input_type -> messages.OrderReplaceRequest
-	59,  // 188: messages.ExchangeExecutor.OrderBulkReplace:input_type -> messages.OrderBulkReplaceRequest
-	61,  // 189: messages.ExchangeExecutor.OrderCancel:input_type -> messages.OrderCancelRequest
-	63,  // 190: messages.ExchangeExecutor.OrderMassCancel:input_type -> messages.OrderMassCancelRequest
-	20,  // 191: messages.ExchangeExecutor.MarketData:output_type -> messages.MarketDataIncrementalRefresh
-	26,  // 192: messages.ExchangeExecutor.AccountData:output_type -> messages.AccountDataIncrementalRefresh
-	37,  // 193: messages.ExchangeExecutor.SecurityDefinition:output_type -> messages.SecurityDefinitionResponse
-	39,  // 194: messages.ExchangeExecutor.Securities:output_type -> messages.SecurityList
-	46,  // 195: messages.ExchangeExecutor.Orders:output_type -> messages.OrderList
-	48,  // 196: messages.ExchangeExecutor.Positions:output_type -> messages.PositionList
-	50,  // 197: messages.ExchangeExecutor.Balances:output_type -> messages.BalanceList
-	53,  // 198: messages.ExchangeExecutor.NewOrderSingle:output_type -> messages.NewOrderSingleResponse
-	55,  // 199: messages.ExchangeExecutor.NewOrderBulk:output_type -> messages.NewOrderBulkResponse
-	58,  // 200: messages.ExchangeExecutor.OrderReplace:output_type -> messages.OrderReplaceResponse
-	60,  // 201: messages.ExchangeExecutor.OrderBulkReplace:output_type -> messages.OrderBulkReplaceResponse
-	62,  // 202: messages.ExchangeExecutor.OrderCancel:output_type -> messages.OrderCancelResponse
-	64,  // 203: messages.ExchangeExecutor.OrderMassCancel:output_type -> messages.OrderMassCancelResponse
-	191, // [191:204] is the sub-list for method output_type
-	178, // [178:191] is the sub-list for method input_type
-	178, // [178:178] is the sub-list for extension type_name
-	178, // [178:178] is the sub-list for extension extendee
-	0,   // [0:178] is the sub-list for field type_name
+	79,  // 120: messages.PositionList.time:type_name -> google.protobuf.Timestamp
+	1,   // 121: messages.PositionList.rejection_reason:type_name -> messages.RejectionReason
+	85,  // 122: messages.BalancesRequest.subscriber:type_name -> actor.PID
+	100, // 123: messages.BalancesRequest.asset:type_name -> models.Asset
+	94,  // 124: messages.BalancesRequest.account:type_name -> models.Account
+	98,  // 125: messages.BalanceList.balances:type_name -> models.Balance
+	1,   // 126: messages.BalanceList.rejection_reason:type_name -> messages.RejectionReason
+	78,  // 127: messages.NewOrder.instrument:type_name -> models.Instrument
+	106, // 128: messages.NewOrder.order_type:type_name -> models.OrderType
+	104, // 129: messages.NewOrder.order_side:type_name -> models.Side
+	107, // 130: messages.NewOrder.time_in_force:type_name -> models.TimeInForce
+	99,  // 131: messages.NewOrder.price:type_name -> google.protobuf.DoubleValue
+	108, // 132: messages.NewOrder.execution_instructions:type_name -> models.ExecutionInstruction
+	94,  // 133: messages.NewOrderSingleRequest.account:type_name -> models.Account
+	51,  // 134: messages.NewOrderSingleRequest.order:type_name -> messages.NewOrder
+	2,   // 135: messages.NewOrderSingleRequest.response_type:type_name -> messages.ResponseType
+	103, // 136: messages.NewOrderSingleResponse.order_status:type_name -> models.OrderStatus
+	1,   // 137: messages.NewOrderSingleResponse.rejection_reason:type_name -> messages.RejectionReason
+	109, // 138: messages.NewOrderSingleResponse.rate_limit_delay:type_name -> google.protobuf.Duration
+	94,  // 139: messages.NewOrderBulkRequest.account:type_name -> models.Account
+	51,  // 140: messages.NewOrderBulkRequest.orders:type_name -> messages.NewOrder
+	1,   // 141: messages.NewOrderBulkResponse.rejection_reason:type_name -> messages.RejectionReason
+	101, // 142: messages.OrderUpdate.orderID:type_name -> google.protobuf.StringValue
+	101, // 143: messages.OrderUpdate.orig_client_orderID:type_name -> google.protobuf.StringValue
+	99,  // 144: messages.OrderUpdate.quantity:type_name -> google.protobuf.DoubleValue
+	99,  // 145: messages.OrderUpdate.price:type_name -> google.protobuf.DoubleValue
+	78,  // 146: messages.OrderReplaceRequest.instrument:type_name -> models.Instrument
+	94,  // 147: messages.OrderReplaceRequest.account:type_name -> models.Account
+	56,  // 148: messages.OrderReplaceRequest.update:type_name -> messages.OrderUpdate
+	1,   // 149: messages.OrderReplaceResponse.rejection_reason:type_name -> messages.RejectionReason
+	78,  // 150: messages.OrderBulkReplaceRequest.instrument:type_name -> models.Instrument
+	94,  // 151: messages.OrderBulkReplaceRequest.account:type_name -> models.Account
+	56,  // 152: messages.OrderBulkReplaceRequest.updates:type_name -> messages.OrderUpdate
+	1,   // 153: messages.OrderBulkReplaceResponse.rejection_reason:type_name -> messages.RejectionReason
+	101, // 154: messages.OrderCancelRequest.orderID:type_name -> google.protobuf.StringValue
+	101, // 155: messages.OrderCancelRequest.client_orderID:type_name -> google.protobuf.StringValue
+	78,  // 156: messages.OrderCancelRequest.instrument:type_name -> models.Instrument
+	94,  // 157: messages.OrderCancelRequest.account:type_name -> models.Account
+	2,   // 158: messages.OrderCancelRequest.response_type:type_name -> messages.ResponseType
+	1,   // 159: messages.OrderCancelResponse.rejection_reason:type_name -> messages.RejectionReason
+	109, // 160: messages.OrderCancelResponse.rate_limit_delay:type_name -> google.protobuf.Duration
+	94,  // 161: messages.OrderMassCancelRequest.account:type_name -> models.Account
+	44,  // 162: messages.OrderMassCancelRequest.filter:type_name -> messages.OrderFilter
+	1,   // 163: messages.OrderMassCancelResponse.rejection_reason:type_name -> messages.RejectionReason
+	110, // 164: messages.HistoricalProtocolAssetTransferResponse.update:type_name -> models.ProtocolAssetUpdate
+	1,   // 165: messages.HistoricalProtocolAssetTransferResponse.rejection_reason:type_name -> messages.RejectionReason
+	85,  // 166: messages.ProtocolAssetDataRequest.subscriber:type_name -> actor.PID
+	1,   // 167: messages.ProtocolAssetDataResponse.rejection_reason:type_name -> messages.RejectionReason
+	110, // 168: messages.ProtocolAssetDataIncrementalRefresh.update:type_name -> models.ProtocolAssetUpdate
+	111, // 169: messages.ProtocolAssetDefinitionResponse.protocol_asset:type_name -> models.ProtocolAsset
+	1,   // 170: messages.ProtocolAssetDefinitionResponse.rejection_reason:type_name -> messages.RejectionReason
+	85,  // 171: messages.ProtocolAssetListRequest.subscriber:type_name -> actor.PID
+	111, // 172: messages.ProtocolAssetList.protocol_assets:type_name -> models.ProtocolAsset
+	1,   // 173: messages.ProtocolAssetList.rejection_reason:type_name -> messages.RejectionReason
+	85,  // 174: messages.MarketableProtocolAssetListRequest.subscriber:type_name -> actor.PID
+	112, // 175: messages.MarketableProtocolAssetList.marketable_protocol_assets:type_name -> models.MarketableProtocolAsset
+	1,   // 176: messages.MarketableProtocolAssetList.rejection_reason:type_name -> messages.RejectionReason
+	112, // 177: messages.MarketableProtocolAssetDefinitionResponse.marketable_protocol_asset:type_name -> models.MarketableProtocolAsset
+	1,   // 178: messages.MarketableProtocolAssetDefinitionResponse.rejection_reason:type_name -> messages.RejectionReason
+	18,  // 179: messages.ExchangeExecutor.MarketData:input_type -> messages.MarketDataRequest
+	24,  // 180: messages.ExchangeExecutor.AccountData:input_type -> messages.AccountDataRequest
+	36,  // 181: messages.ExchangeExecutor.SecurityDefinition:input_type -> messages.SecurityDefinitionRequest
+	38,  // 182: messages.ExchangeExecutor.Securities:input_type -> messages.SecurityListRequest
+	45,  // 183: messages.ExchangeExecutor.Orders:input_type -> messages.OrderStatusRequest
+	47,  // 184: messages.ExchangeExecutor.Positions:input_type -> messages.PositionsRequest
+	49,  // 185: messages.ExchangeExecutor.Balances:input_type -> messages.BalancesRequest
+	52,  // 186: messages.ExchangeExecutor.NewOrderSingle:input_type -> messages.NewOrderSingleRequest
+	54,  // 187: messages.ExchangeExecutor.NewOrderBulk:input_type -> messages.NewOrderBulkRequest
+	57,  // 188: messages.ExchangeExecutor.OrderReplace:input_type -> messages.OrderReplaceRequest
+	59,  // 189: messages.ExchangeExecutor.OrderBulkReplace:input_type -> messages.OrderBulkReplaceRequest
+	61,  // 190: messages.ExchangeExecutor.OrderCancel:input_type -> messages.OrderCancelRequest
+	63,  // 191: messages.ExchangeExecutor.OrderMassCancel:input_type -> messages.OrderMassCancelRequest
+	20,  // 192: messages.ExchangeExecutor.MarketData:output_type -> messages.MarketDataIncrementalRefresh
+	26,  // 193: messages.ExchangeExecutor.AccountData:output_type -> messages.AccountDataIncrementalRefresh
+	37,  // 194: messages.ExchangeExecutor.SecurityDefinition:output_type -> messages.SecurityDefinitionResponse
+	39,  // 195: messages.ExchangeExecutor.Securities:output_type -> messages.SecurityList
+	46,  // 196: messages.ExchangeExecutor.Orders:output_type -> messages.OrderList
+	48,  // 197: messages.ExchangeExecutor.Positions:output_type -> messages.PositionList
+	50,  // 198: messages.ExchangeExecutor.Balances:output_type -> messages.BalanceList
+	53,  // 199: messages.ExchangeExecutor.NewOrderSingle:output_type -> messages.NewOrderSingleResponse
+	55,  // 200: messages.ExchangeExecutor.NewOrderBulk:output_type -> messages.NewOrderBulkResponse
+	58,  // 201: messages.ExchangeExecutor.OrderReplace:output_type -> messages.OrderReplaceResponse
+	60,  // 202: messages.ExchangeExecutor.OrderBulkReplace:output_type -> messages.OrderBulkReplaceResponse
+	62,  // 203: messages.ExchangeExecutor.OrderCancel:output_type -> messages.OrderCancelResponse
+	64,  // 204: messages.ExchangeExecutor.OrderMassCancel:output_type -> messages.OrderMassCancelResponse
+	192, // [192:205] is the sub-list for method output_type
+	179, // [179:192] is the sub-list for method input_type
+	179, // [179:179] is the sub-list for extension type_name
+	179, // [179:179] is the sub-list for extension extendee
+	0,   // [0:179] is the sub-list for field type_name
 }
 
 func init() { file_executor_messages_proto_init() }

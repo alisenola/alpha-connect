@@ -12,6 +12,10 @@ func TimestampToMilli(ts *timestamppb.Timestamp) uint64 {
 	return uint64(ts.Seconds)*1000 + uint64(ts.Nanos/1000000)
 }
 
+func TimestampToSeconds(ts *timestamppb.Timestamp) uint64 {
+	return uint64(ts.Seconds)
+}
+
 func SecondToTimestamp(ts uint64) *timestamppb.Timestamp {
 	seconds := int64(ts)
 
