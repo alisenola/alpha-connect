@@ -768,9 +768,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	} else if IsOpen(order.OrderStatus) {
 		if rawFillQuantity == rawLeavesQuantity {
 			order.OrderStatus = models.OrderStatus_Filled
-		} else if order.OrderStatus == models.OrderStatus_New {
-			// Only set it to partially filled if its in new status
-			// otherwise, will overwrite pending state
+		} else {
 			order.OrderStatus = models.OrderStatus_PartiallyFilled
 		}
 	}
