@@ -1186,10 +1186,8 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
 			return fmt.Errorf("position have different quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
-		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
-		if rawCost1 != rawCost2 {
-			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
+		if math.Abs(pos1[i].Cost/pos2[i].Cost-1) > 0.01 {
+			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
 	return nil
