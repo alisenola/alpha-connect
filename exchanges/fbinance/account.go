@@ -324,7 +324,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		state.reconciler = context.Spawn(props)
 	}
 
-	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	checkAccountTicker := time.NewTicker(1 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
 		for {
@@ -1108,6 +1108,11 @@ func (state *AccountListener) refreshKey(context actor.Context) error {
 
 func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT !")
+	state.account.CleanOrders()
+
+	if err := state.account.CheckExpiration(); err != nil {
+		return fmt.Errorf("error checking expired orders: %v", err)
+	}
 	// Fetch balances
 	res, err := context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,

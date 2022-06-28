@@ -293,7 +293,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	fmt.Println("MARGIN", state.account.GetMargin(m))
 
-	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	checkAccountTicker := time.NewTicker(1 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
 		for {
@@ -924,6 +924,11 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 
 func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT")
+	state.account.CleanOrders()
+
+	if err := state.account.CheckExpiration(); err != nil {
+		return fmt.Errorf("error checking expired orders: %v", err)
+	}
 
 	// Fetch balances
 	resp, err := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{

@@ -1072,6 +1072,8 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 }
 
 func (accnt *Account) CheckExpiration() error {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
 		if IsPending(o.OrderStatus) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
 			return fmt.Errorf("order %s in unknown state", k)
@@ -1081,8 +1083,8 @@ func (accnt *Account) CheckExpiration() error {
 }
 
 func (accnt *Account) CleanOrders() {
-	accnt.RLock()
-	defer accnt.RUnlock()
+	accnt.Lock()
+	defer accnt.Unlock()
 	for k, o := range accnt.ordersClID {
 		if IsClosed(o.OrderStatus) && (time.Since(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)
