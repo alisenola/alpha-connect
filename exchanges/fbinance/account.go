@@ -737,6 +737,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	} else if req.OrderID != nil {
 		ID = req.OrderID.Value
 	}
+	fmt.Println("CANCELING ", ID)
 	report, res := state.account.CancelOrder(ID)
 	if res != nil {
 		context.Respond(&messages.OrderCancelResponse{
@@ -757,68 +758,63 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			context.Send(sender, reqResponse)
 		}
 
-		if report != nil {
-			report.SeqNum = state.seqNum + 1
-			state.seqNum += 1
-			context.Send(context.Parent(), report)
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
 
-			if report.ExecutionType == messages.ExecutionType_PendingCancel {
-
-				fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
-				context.ReenterAfter(fut, func(res interface{}, err error) {
-					if req.ResponseType == messages.ResponseType_Result {
-						defer context.Send(sender, reqResponse)
-					}
-
-					if err != nil {
-						report, err := state.account.RejectCancelOrder(ID, messages.RejectionReason_Other)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-						reqResponse.RejectionReason = messages.RejectionReason_Other
-						return
-					}
-					response := res.(*messages.OrderCancelResponse)
-
-					if response.Success {
-						report, err := state.account.ConfirmCancelOrder(ID)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-						reqResponse.Success = true
-					} else {
-						report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
-						if err != nil {
-							panic(err)
-						}
-						if report != nil {
-							report.SeqNum = state.seqNum + 1
-							state.seqNum += 1
-							context.Send(context.Parent(), report)
-						}
-						reqResponse.RejectionReason = response.RejectionReason
-						reqResponse.RateLimitDelay = response.RateLimitDelay
-					}
-				})
-			} else {
-				// Result, we are responsible for sending the response
+		if report.ExecutionType == messages.ExecutionType_PendingCancel {
+			fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
+			context.ReenterAfter(fut, func(res interface{}, err error) {
 				if req.ResponseType == messages.ResponseType_Result {
-					reqResponse.Success = true
-					context.Send(sender, reqResponse)
+					defer context.Send(sender, reqResponse)
 				}
-			}
+
+				if err != nil {
+					fmt.Println("REJECT CANCEL", ID)
+					report, err := state.account.RejectCancelOrder(ID, messages.RejectionReason_Other)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					reqResponse.RejectionReason = messages.RejectionReason_Other
+					return
+				}
+				response := res.(*messages.OrderCancelResponse)
+
+				if response.Success {
+					fmt.Println("CONFIRM CANCEL", ID)
+					report, err := state.account.ConfirmCancelOrder(ID)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					reqResponse.Success = true
+				} else {
+					fmt.Println("REJECT CANCEL", ID)
+					report, err := state.account.RejectCancelOrder(ID, response.RejectionReason)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					reqResponse.RejectionReason = response.RejectionReason
+					reqResponse.RateLimitDelay = response.RateLimitDelay
+				}
+			})
 		} else {
 			// Result, we are responsible for sending the response
+			fmt.Println("UNEXPECTED REPORT TYPE", report.ExecutionType.String())
 			if req.ResponseType == messages.ResponseType_Result {
 				reqResponse.Success = true
 				context.Send(sender, reqResponse)
