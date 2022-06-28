@@ -681,11 +681,10 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 			if order.unknownOrderErrorCount > 3 {
 				return nil, fmt.Errorf("unknown order %s, missed a fill", ID)
 			}
-		} else {
-			order.OrderStatus = order.previousStatus
-			order.lastEventTime = time.Now()
-			order.LastEventTime = timestamppb.New(order.lastEventTime)
 		}
+		order.OrderStatus = order.previousStatus
+		order.lastEventTime = time.Now()
+		order.LastEventTime = timestamppb.New(order.lastEventTime)
 	}
 
 	return &messages.ExecutionReport{
