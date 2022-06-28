@@ -1156,7 +1156,8 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	for k, b1 := range balanceMap1 {
 		b2 := balanceMap2[k]
-		if math.Abs(b1/b2-1) > 0.01 {
+		diff := math.Abs(b1-b2) / math.Abs(b1+b2)
+		if diff > 0.01 {
 			return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
 		}
 	}
@@ -1186,7 +1187,8 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
 			return fmt.Errorf("position have different quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		if math.Abs(pos1[i].Cost/pos2[i].Cost-1) > 0.01 {
+		diff := math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
+		if diff > 0.01 {
 			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
