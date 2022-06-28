@@ -1135,7 +1135,7 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 				OrderSide:     models.Side_Buy,
 				TimeInForce:   models.TimeInForce_GoodTillCancel,
 				Quantity:      0.001 * float64(1+i),
-				Price:         &wrapperspb.DoubleValue{Value: 30000.},
+				Price:         &wrapperspb.DoubleValue{Value: 20000.},
 			},
 		}, 10*time.Second).Result()
 		if err != nil {
@@ -1150,10 +1150,10 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			t.Fatal(singleOrder.RejectionReason.String())
 		}
 	}
-	time.Sleep(30 * time.Second)
+	time.Sleep(5 * time.Second)
 	filter := &messages.OrderFilter{
-		Instrument:  tc.Instrument,
-		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
+		Instrument: tc.Instrument,
+		//OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
 	//Cancel all the orders
@@ -1174,36 +1174,10 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if !cancel.Success {
 		t.Fatal(cancel.RejectionReason.String())
 	}
-	time.Sleep(20 * time.Second)
+	time.Sleep(5 * time.Second)
 	filter = &messages.OrderFilter{
 		Instrument:  tc.Instrument,
 		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
 	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
-	// Fetch all orders
-	for i := 0; i < 3; i++ {
-		resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
-			Account: tc.Account,
-			Filter: &messages.OrderFilter{
-				ClientOrderID: &wrapperspb.StringValue{Value: id[i]},
-			},
-		}, 10*time.Second).Result()
-		if err != nil {
-			t.Fatal(err)
-		}
-		order, ok := resp.(*messages.OrderList)
-		if !ok {
-			t.Fatalf("expecting *messasges.OrderList, got %s", reflect.TypeOf(resp).String())
-		}
-		if !order.Success {
-			t.Fatal(cancel.RejectionReason.String())
-		}
-		fmt.Println(order)
-		if len(order.Orders) != 1 {
-			t.Fatalf("was expecting 1 order got %d", len(order.Orders))
-		}
-		if order.Orders[0].OrderStatus.String() != "Canceled" {
-			t.Fatalf("expecting Canceled, got %s", order.Orders[0].OrderStatus.String())
-		}
-	}
 }

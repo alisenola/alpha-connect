@@ -1600,7 +1600,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	qr.Post(1)
 
 	go func() {
-		var data bybitl.CancelOrderResponse
+		var data bybitl.CancelOrdersResponse
 		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error canceling orders", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
