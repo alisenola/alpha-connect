@@ -972,7 +972,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		b2 := accntBalances[i]
 		//rawB1 := int(math.Round(b1.Quantity * state.account.MarginPrecision))
 		//rawB2 := int(math.Round(b2.Quantity * state.account.MarginPrecision))
-		diff := math.Abs(1 - b1.Quantity/b2.Quantity)
+		diff := math.Abs(b1.Quantity-b2.Quantity) / math.Abs(b1.Quantity+b2.Quantity)
 		if diff > 0.01 {
 			return fmt.Errorf("different margin amount: %f %f", b1.Quantity, b2.Quantity)
 		}
@@ -1003,10 +1003,9 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
 			return fmt.Errorf("positions have different quantities: %f vs %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
-		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
-		if rawCost1 != rawCost2 {
-			return fmt.Errorf("positions have different costs: %f vs %f", pos1[i].Cost, pos2[i].Cost)
+		diff := math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
+		if diff > 0.01 {
+			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
 

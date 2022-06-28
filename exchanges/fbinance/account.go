@@ -1185,7 +1185,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	for i := range pos1 {
 		lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
-			return fmt.Errorf("position have different quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
+			return fmt.Errorf("different position quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
 		diff := math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
 		if diff > 0.01 {
