@@ -1074,9 +1074,9 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 func (accnt *Account) CheckExpiration() error {
 	accnt.RLock()
 	defer accnt.RUnlock()
-	for k, o := range accnt.ordersClID {
+	for _, o := range accnt.ordersClID {
 		if IsPending(o.OrderStatus) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
-			return fmt.Errorf("order %s in unknown state %s", k, o.OrderStatus.String())
+			return fmt.Errorf("order %s in unknown state %s", o.OrderID, o.OrderStatus.String())
 		}
 	}
 	return nil
