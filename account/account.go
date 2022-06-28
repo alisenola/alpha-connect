@@ -368,7 +368,7 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
 	accnt.ordersID[ID] = order
-
+	fmt.Println("CONFIRM NEW", order.OrderID)
 	sec, rej := accnt.getSec(order.Instrument)
 	if rej != nil {
 		return nil, fmt.Errorf("unknown instrument: %s", rej.String())
@@ -678,8 +678,8 @@ func (accnt *Account) RejectCancelOrder(ID string, reason messages.RejectionReas
 	if order.OrderStatus == models.OrderStatus_PendingCancel {
 		if reason == messages.RejectionReason_UnknownOrder {
 			order.unknownOrderErrorCount += 1
-			if order.unknownOrderErrorCount > 3 {
-				return nil, fmt.Errorf("unknown order %s, missed a fill", ID)
+			if order.unknownOrderErrorCount > 6 {
+				return nil, fmt.Errorf("unknown order %s, missed a fill %s", ID, order.previousStatus)
 			}
 		}
 		order.OrderStatus = order.previousStatus
@@ -749,7 +749,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
-	fmt.Println("FILL", price, quantity, order.LeavesQuantity, lotPrecision)
+	fmt.Println("FILL", order.OrderID, price, quantity, order.LeavesQuantity, lotPrecision)
 	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
 	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {
