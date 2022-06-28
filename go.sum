@@ -623,6 +623,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220625073922-c4181418cfea h1:jbrFUtfojPd
 gitlab.com/alphaticks/xchanger v0.0.0-20220625073922-c4181418cfea/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
 gitlab.com/alphaticks/xchanger v0.0.0-20220627125717-7530f94d87ca h1:qvnu9Fo4r64TnLXmxyl9guMwefm31dJ0cJ2WE4Abayo=
 gitlab.com/alphaticks/xchanger v0.0.0-20220627125717-7530f94d87ca/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
+gitlab.com/alphaticks/xchanger v0.0.0-20220628133819-5184e369eb4c h1:hwGHwfluT+KhCyXBLi1AzfNCHIDhCtf0CcQGE7JDvQI=
+gitlab.com/alphaticks/xchanger v0.0.0-20220628133819-5184e369eb4c/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

@@ -205,6 +205,39 @@ func wsOrderToModel(order *bybitl.WSOrder) *models.Order {
 	return ord
 }
 
+func wsExecToModel(order *bybitl.WSExecution) *models.Order {
+	ord := &models.Order{
+		OrderID:       order.OrderId,
+		ClientOrderID: order.OrderLinkId,
+		Instrument: &models.Instrument{
+			Exchange: constants.BYBITL,
+			Symbol:   &wrapperspb.StringValue{Value: order.Symbol},
+		},
+		LeavesQuantity: order.LeavesQty,
+		CumQuantity:    order.ExecQty,
+		Price:          &wrapperspb.DoubleValue{Value: order.Price},
+	}
+
+	if order.LeavesQty == 0 {
+		ord.OrderStatus = models.OrderStatus_Filled
+	} else {
+		ord.OrderStatus = models.OrderStatus_PartiallyFilled
+	}
+
+	ord.OrderType = models.OrderType_Limit
+
+	switch order.Side {
+	case string(bybitl.Buy):
+		ord.Side = models.Side_Buy
+	case string(bybitl.Sell):
+		ord.Side = models.Side_Sell
+	default:
+		fmt.Println("UNKNOWN ORDER SIDE", order.Side)
+	}
+
+	return ord
+}
+
 func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (bybitl.PostActiveOrderParams, *messages.RejectionReason) {
 	var side bybitl.Side
 	var typ bybitl.OrderType

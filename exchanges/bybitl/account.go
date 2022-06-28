@@ -27,7 +27,7 @@ type checkAccount struct{}
 
 type AccountListener struct {
 	account            *account.Account
-	strict             bool
+	readOnly           bool
 	seqNum             uint64
 	bybitlExecutor     *actor.PID
 	ws                 *bybitl.Websocket
@@ -43,16 +43,16 @@ type AccountListener struct {
 	reconciler         *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db, strict)
+		return NewAccountListener(account, registry, db, readOnly)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:  account,
-		strict:   strict,
+		readOnly: readOnly,
 		seqNum:   0,
 		ws:       nil,
 		logger:   nil,
@@ -156,15 +156,8 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
-	res, err := context.RequestFuture(state.bybitlExecutor, &messages.OrderMassCancelRequest{
-		Account: state.account.Account,
-	}, 5*time.Second).Result()
-	if err != nil {
-		return fmt.Errorf("error mass cancelling orders: %v", err)
-	}
-
 	// Then fetch fees
-	res, err = context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
+	res, err := context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -253,13 +246,10 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting positions: %s", positions.RejectionReason.String())
 	}
 
-	//Fetch the orders
-	fmt.Println("Fetching the orders")
 	securityMap := make(map[uint64]*models.Security)
 	for _, fs := range filteredSecurities {
 		securityMap[fs.SecurityID] = fs
 	}
-
 	state.securities = securityMap
 	state.seqNum = 0
 
@@ -782,7 +772,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					o := wsOrderToModel(&order)
 					o.OrderStatus = models.OrderStatus_PendingNew
 					sec := state.symbolToSec[o.Instrument.Symbol.Value]
-					if !state.strict {
+					if state.readOnly {
 						o.LeavesQuantity = math.Round(o.LeavesQuantity/sec.RoundLot.Value) * sec.RoundLot.Value
 					}
 					_, rej := state.account.NewOrder(o)
@@ -800,7 +790,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					context.Send(context.Parent(), report)
 				}
 			case bybitl.OrderCancelled:
-				if !state.strict && !state.account.HasOrder(order.OrderLinkId) {
+				if state.readOnly && !state.account.HasOrder(order.OrderLinkId) {
 					return nil
 				}
 				report, err := state.account.ConfirmCancelOrder(order.OrderLinkId)
@@ -813,6 +803,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					context.Send(context.Parent(), report)
 				}
 			case bybitl.OrderFilled:
+				if state.readOnly && !state.account.HasOrder(order.OrderLinkId) {
+					return nil
+				}
 				ord := state.account.GetOrder(order.OrderLinkId)
 				if ord == nil {
 					return fmt.Errorf("order %s does not exists", order.OrderLinkId)
@@ -838,7 +831,10 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		for _, exec := range s {
 			switch exec.ExecType {
 			case "Trade":
-				if !state.strict && !state.account.HasOrder(exec.OrderId) {
+				if state.readOnly && !state.account.HasOrder(exec.OrderId) {
+					//o := wsExecToModel(&exec)
+					//state.account.NewOrder(o)
+					//state.account
 					return nil
 				}
 				report, err := state.account.ConfirmFill(exec.OrderId, exec.ExecId, exec.Price, exec.ExecQty, !exec.IsMaker)
@@ -879,6 +875,21 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.checkSocketTicker != nil {
 		state.checkSocketTicker.Stop()
 		state.checkSocketTicker = nil
+	}
+
+	if !state.readOnly {
+		for _, sec := range state.securities {
+			context.Request(state.bybitlExecutor, &messages.OrderMassCancelRequest{
+				Account: state.account.Account,
+				Filter: &messages.OrderFilter{
+					Instrument: &models.Instrument{
+						SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+						Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
+						Exchange:   sec.Exchange,
+					},
+				},
+			})
+		}
 	}
 
 	return nil

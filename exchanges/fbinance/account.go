@@ -29,7 +29,7 @@ type refreshKey struct{}
 
 type AccountListener struct {
 	account            *account.Account
-	strict             bool
+	readOnly           bool
 	seqNum             uint64
 	fbinanceExecutor   *actor.PID
 	ws                 *fbinance.AuthWebsocket
@@ -52,10 +52,10 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
-		strict:          strict,
+		readOnly:        readOnly,
 		registry:        registry,
 		seqNum:          0,
 		ws:              nil,
@@ -968,7 +968,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 
 		case fbinance.ET_CANCELED:
-			if !state.strict && !state.account.HasOrder(exec.ClientOrderID) {
+			if state.readOnly && !state.account.HasOrder(exec.ClientOrderID) {
 				return nil
 			}
 			report, err := state.account.ConfirmCancelOrder(exec.ClientOrderID)

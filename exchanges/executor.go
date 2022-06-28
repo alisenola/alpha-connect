@@ -387,7 +387,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			Registry:     state.Registry,
 			DB:           state.DB,
 			PaperTrading: false,
-			Strict:       state.StrictAccount,
+			ReadOnly:     state.ReadOnlyAccount,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
@@ -428,7 +428,7 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 			Registry:     state.Registry,
 			DB:           state.DB,
 			PaperTrading: false,
-			Strict:       state.StrictAccount,
+			ReadOnly:     state.ReadOnlyAccount,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
@@ -1207,7 +1207,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			Registry:     state.Registry,
 			DB:           state.DB,
 			PaperTrading: false,
-			Strict:       state.StrictAccount,
+			ReadOnly:     state.ReadOnlyAccount,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {

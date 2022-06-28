@@ -27,7 +27,7 @@ type ExecutorConfig struct {
 	OpenseaCredentials *xchangerModels.APICredentials
 	DB                 *gorm.DB
 	StrictExchange     bool
-	StrictAccount      bool
+	ReadOnlyAccount    bool
 }
 
 type Executor interface {

@@ -139,7 +139,7 @@ func (state *Executor) Receive(context actor.Context) {
 	extypes.ReceiveExecutor(state, context)
 }
 
-func (state *Executor) getQueryRunner(post bool) *QueryRunner {
+func (state *Executor) getQueryRunner(post bool, force bool) *QueryRunner {
 	var qr *QueryRunner
 	for _, q := range state.queryRunners {
 		if post {
@@ -151,6 +151,25 @@ func (state *Executor) getQueryRunner(post bool) *QueryRunner {
 			if !q.sGetRateLimit.IsRateLimited() && !q.mGetRateLimit.IsRateLimited() {
 				qr = q
 				break
+			}
+		}
+	}
+
+	if qr == nil && force {
+		min := time.Duration(math.MaxInt64)
+		for _, q := range state.queryRunners {
+			if post {
+				dur := q.sPostRateLimit.DurationBeforeNextRequest(1)
+				if dur < min {
+					min = dur
+					qr = q
+				}
+			} else {
+				dur := q.sGetRateLimit.DurationBeforeNextRequest(1)
+				if dur < min {
+					min = dur
+					qr = q
+				}
 			}
 		}
 	}
@@ -231,7 +250,7 @@ func (state *Executor) Clean(context actor.Context) error {
 }
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		return fmt.Errorf("rate limited")
 	}
@@ -495,7 +514,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error building request: %v", err)
 	}
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -557,7 +576,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		return err
 	}
 
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -627,7 +646,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		return err
 	}
 
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -710,7 +729,7 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 			return
 		}
 
-		qr := state.getQueryRunner(false)
+		qr := state.getQueryRunner(false, false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 			context.Send(sender, response)
@@ -802,7 +821,7 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -901,7 +920,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -999,7 +1018,7 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 	if err != nil {
 		return err
 	}
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -1137,7 +1156,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if err != nil {
 		return err
 	}
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -1291,7 +1310,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		return err
 	}
 
-	qr := state.getQueryRunner(false)
+	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
@@ -1403,7 +1422,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		return nil
 	}
 
-	qr := state.getQueryRunner(true)
+	qr := state.getQueryRunner(true, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(false, weight))
@@ -1496,7 +1515,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Send(sender, response)
 		return nil
 	}
-	qr := state.getQueryRunner(true)
+	qr := state.getQueryRunner(true, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(true, weight))
@@ -1541,12 +1560,6 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	qr := state.getQueryRunner(true)
-	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
 	symbol := ""
 	if req.Filter != nil {
 		if req.Filter.Instrument != nil {
@@ -1576,6 +1589,13 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	request, _, err := bybitl.CancelAllActiveOrders(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
+	}
+
+	qr := state.getQueryRunner(true, true)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Send(sender, response)
+		return nil
 	}
 	qr.Post(1)
 
@@ -1608,7 +1628,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	qr := state.getQueryRunner(true)
+	qr := state.getQueryRunner(true, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)

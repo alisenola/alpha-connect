@@ -28,7 +28,7 @@ type checkExpiration struct{}
 
 type AccountListener struct {
 	account               *account.Account
-	strict                bool
+	readOnly              bool
 	seqNum                uint64
 	ftxExecutor           *actor.PID
 	ws                    *ftx.Websocket
@@ -45,13 +45,13 @@ type AccountListener struct {
 	reconciler            *actor.PID
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db, strict)
+		return NewAccountListener(account, registry, db, readOnly)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		registry:        registry,
@@ -1026,7 +1026,7 @@ func (state *AccountListener) onWSOrdersUpdate(context actor.Context) error {
 		}
 
 		orderID := fmt.Sprintf("%d", res.Order.ID)
-		if !state.strict && !state.account.HasOrder(orderID) {
+		if state.readOnly && !state.account.HasOrder(orderID) {
 			// We got a cancel for an order we didn't fetch
 			return nil
 		}
@@ -1112,7 +1112,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 
 	case ftx.WSFillsUpdate:
 		orderID := fmt.Sprintf("%d", res.Fill.OrderID)
-		if !state.strict && !state.account.HasOrder(orderID) {
+		if state.readOnly && !state.account.HasOrder(orderID) {
 			return nil
 		}
 		tradeID := fmt.Sprintf("%d", res.Fill.TradeID)

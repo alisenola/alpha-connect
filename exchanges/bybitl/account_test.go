@@ -37,6 +37,6 @@ func TestNewAccountListener(t *testing.T) {
 		GetPositionsLimit:      false,
 		GetPositionsMarket:     false,
 		OrderReplaceRequest:    false,
-		OrderMassCancelRequest: false,
+		OrderMassCancelRequest: true,
 	})
 }

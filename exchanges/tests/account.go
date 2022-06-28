@@ -59,8 +59,8 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 func AccntTest(t *testing.T, tc AccountTest) {
 	tests.LoadStatics(t)
 	as, executor, cleaner := tests.StartExecutor(t, &extypes.ExecutorConfig{
-		Exchanges:     []*xchangerModels.Exchange{tc.Account.Exchange},
-		StrictAccount: true,
+		Exchanges:       []*xchangerModels.Exchange{tc.Account.Exchange},
+		ReadOnlyAccount: false,
 	}, &prtypes.ExecutorConfig{}, &chtypes.ExecutorConfig{}, tc.Account)
 	defer cleaner()
 

@@ -19,7 +19,7 @@ type AccountManagerConfig struct {
 	Registry     registry.PublicRegistryClient
 	DB           *gorm.DB
 	PaperTrading bool
-	Strict       bool
+	ReadOnly     bool
 }
 
 var DefaultAccountManagerConfig = AccountManagerConfig{
@@ -27,7 +27,7 @@ var DefaultAccountManagerConfig = AccountManagerConfig{
 	Registry:     nil,
 	DB:           nil,
 	PaperTrading: false,
-	Strict:       true,
+	ReadOnly:     true,
 }
 
 type AccountManager struct {
@@ -145,7 +145,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 			return fmt.Errorf("error getting account listener")
 		}
 	} else {
-		producer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.Strict)
+		producer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.ReadOnly)
 		if producer == nil {
 			return fmt.Errorf("error getting account listener")
 		}

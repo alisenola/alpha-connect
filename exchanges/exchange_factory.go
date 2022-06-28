@@ -58,22 +58,22 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewAccountListener(account, nil, nil) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, strict) }
+		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, readOnly) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, strict) }
+		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, readOnly) }
 	case constants.FTXUS.ID:
 		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	case constants.DYDX.ID:
 		return func() actor.Actor { return dydx.NewAccountListener(account, nil, nil) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, strict) }
+		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, readOnly) }
 	default:
 		return nil
 	}

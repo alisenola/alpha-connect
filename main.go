@@ -116,7 +116,6 @@ func main() {
 		Exchanges:      exch,
 		DialerPool:     xchangerUtils.DefaultDialerPool,
 		StrictExchange: true,
-		StrictAccount:  true,
 	}
 	cfgPrt := &prtypes.ExecutorConfig{
 		Registry:  nil,
