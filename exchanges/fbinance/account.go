@@ -1109,26 +1109,9 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	if err := state.account.CheckExpiration(); err != nil {
 		return fmt.Errorf("error checking expired orders: %v", err)
 	}
-	// Fetch balances
-	res, err := context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
-		Account: state.account.Account,
-	}, 10*time.Second).Result()
-
-	if err != nil {
-		return fmt.Errorf("error getting balances from executor: %v", err)
-	}
-
-	balanceList, ok := res.(*messages.BalanceList)
-	if !ok {
-		return fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
-	}
-
-	if !balanceList.Success {
-		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
-	}
 
 	// Fetch positions
-	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
+	res, err := context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
 		Account:    state.account.Account,
 	}, 10*time.Second).Result()
@@ -1144,6 +1127,24 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	if !positionList.Success {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
+	}
+
+	// Fetch balances
+	res, err = context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting balances from executor: %v", err)
+	}
+
+	balanceList, ok := res.(*messages.BalanceList)
+	if !ok {
+		return fmt.Errorf("was expecting BalanceList, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !balanceList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
 	}
 
 	balanceMap1 := make(map[uint32]float64)

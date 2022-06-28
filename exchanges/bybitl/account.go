@@ -156,8 +156,15 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
+	res, err := context.RequestFuture(state.bybitlExecutor, &messages.OrderMassCancelRequest{
+		Account: state.account.Account,
+	}, 5*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error mass cancelling orders: %v", err)
+	}
+
 	// Then fetch fees
-	res, err := context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
+	res, err = context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
 		Account: state.account.Account,
 	}, 10*time.Second).Result()
 
@@ -248,43 +255,16 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 
 	//Fetch the orders
 	fmt.Println("Fetching the orders")
-	var ords []*models.Order
 	securityMap := make(map[uint64]*models.Security)
-	var futs []*actor.Future
 	for _, fs := range filteredSecurities {
-		f := context.RequestFuture(state.bybitlExecutor, &messages.OrderStatusRequest{
-			Account: state.account.Account,
-			Filter: &messages.OrderFilter{
-				Instrument: &models.Instrument{
-					SecurityID: &wrapperspb.UInt64Value{Value: fs.SecurityID},
-					Symbol:     &wrapperspb.StringValue{Value: fs.Symbol},
-					Exchange:   fs.Exchange,
-				},
-			},
-		}, 10*time.Second)
-		futs = append(futs, f)
-		time.Sleep(100 * time.Millisecond)
 		securityMap[fs.SecurityID] = fs
 	}
-	for _, f := range futs {
-		res, err := f.Result()
-		if err != nil {
-			return fmt.Errorf("error getting orders from executor: %v", err)
-		}
-		orders, ok := res.(*messages.OrderList)
-		if !ok {
-			return fmt.Errorf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
-		}
-		if !orders.Success {
-			return fmt.Errorf("error getting orders: %s", orders.RejectionReason.String())
-		}
-		ords = append(ords, orders.Orders...)
-	}
+
 	state.securities = securityMap
 	state.seqNum = 0
 
 	//Sync account
-	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &information.MakerFee.Value, &information.TakerFee.Value); err != nil {
+	if err := state.account.Sync(filteredSecurities, nil, positions.Positions, balances.Balances, &information.MakerFee.Value, &information.TakerFee.Value); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 

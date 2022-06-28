@@ -772,6 +772,8 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 			order.OrderStatus = models.OrderStatus_PartiallyFilled
 		}
 	}
+	// If order is closed, the fill came after the close event, not a big deal
+	// we let the fill go through, we just don't update the status
 
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
