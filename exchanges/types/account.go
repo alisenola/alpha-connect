@@ -15,8 +15,8 @@ type Transaction struct {
 	Type        string
 	SubType     string
 	Time        time.Time
-	ExecutionID string `gorm:"unique"`
-	AccountID   uint
+	ExecutionID string     `gorm:"unique"`
+	AccountID   uint       `gorm:"index"`
 	Account     Account    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Fill        *Fill      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Movements   []Movement `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
@@ -25,9 +25,9 @@ type Transaction struct {
 type Fill struct {
 	ID            uint `gorm:"primarykey"`
 	Transaction   Transaction
-	TransactionID uint    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	TransactionID uint    `gorm:"index"`
 	Account       Account `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	AccountID     uint
+	AccountID     uint    `gorm:"index"`
 	SecurityID    int64
 	Price         float64
 	Quantity      float64
@@ -36,9 +36,9 @@ type Fill struct {
 type Movement struct {
 	ID            uint        `gorm:"primarykey"`
 	Transaction   Transaction `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	TransactionID uint
-	Account       Account `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	AccountID     uint
+	TransactionID uint        `gorm:"index"`
+	Account       Account     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	AccountID     uint        `gorm:"index"`
 	Reason        int32
 	AssetID       uint32
 	Quantity      float64

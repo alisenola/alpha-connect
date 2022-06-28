@@ -33,6 +33,7 @@ type ExecutorConfig struct {
 type Executor interface {
 	actor.Actor
 	OnSecurityListRequest(context actor.Context) error
+	OnSecurityDefinitionRequest(context actor.Context) error
 	OnMarketableProtocolAssetListRequest(context actor.Context) error
 	OnHistoricalOpenInterestsRequest(context actor.Context) error
 	OnHistoricalFundingRatesRequest(context actor.Context) error
@@ -121,7 +122,13 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 
 	case *messages.SecurityListRequest:
 		if err := state.OnSecurityListRequest(context); err != nil {
-			state.GetLogger().Error("error processing SecurityListRequest", log.Error(err))
+			state.GetLogger().Error("error processing OnSecurityListRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.SecurityDefinitionRequest:
+		if err := state.OnSecurityDefinitionRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnSecurityDefinitionRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -286,6 +293,26 @@ func (state *BaseExecutor) OnSecurityListRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
 		Securities: securities})
+
+	return nil
+}
+
+func (state *BaseExecutor) OnSecurityDefinitionRequest(context actor.Context) error {
+	msg := context.Message().(*messages.SecurityDefinitionRequest)
+	sec := state.GetSecurity(msg.Instrument)
+	if sec != nil {
+		context.Respond(&messages.SecurityDefinitionResponse{
+			RequestID:  msg.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+			Success:    true,
+			Security:   sec})
+	} else {
+		context.Respond(&messages.SecurityDefinitionResponse{
+			RequestID:       msg.RequestID,
+			ResponseID:      uint64(time.Now().UnixNano()),
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownSecurityID})
+	}
 
 	return nil
 }
@@ -575,6 +602,12 @@ func (state *BaseExecutor) IDToSecurity(ID uint64) *models.Security {
 	return state.Securities[ID]
 }
 
+func (state *BaseExecutor) IDToHistoricalSecurity(ID uint64) *registry.Security {
+	state.SecuritiesLock.RLock()
+	defer state.SecuritiesLock.RUnlock()
+	return state.HistoricalSecurities[ID]
+}
+
 func (state *BaseExecutor) InstrumentToSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
 	if instrument == nil {
 		v := messages.RejectionReason_MissingInstrument
@@ -583,15 +616,26 @@ func (state *BaseExecutor) InstrumentToSymbol(instrument *models.Instrument) (st
 	if instrument.Symbol != nil {
 		sec := state.SymbolToSecurity(instrument.Symbol.Value)
 		if sec == nil {
-			v := messages.RejectionReason_UnknownSymbol
-			return "", &v
+			hsec := state.SymbolToHistoricalSecurity(instrument.Symbol.Value)
+			if hsec == nil {
+				v := messages.RejectionReason_UnknownSymbol
+				return "", &v
+			} else {
+				return hsec.Symbol, nil
+			}
+		} else {
+			return sec.Symbol, nil
 		}
-		return sec.Symbol, nil
 	} else if instrument.SecurityID != nil {
 		sec := state.IDToSecurity(instrument.SecurityID.Value)
 		if sec == nil {
-			v := messages.RejectionReason_UnknownSecurityID
-			return "", &v
+			hsec := state.IDToHistoricalSecurity(instrument.SecurityID.Value)
+			if hsec == nil {
+				v := messages.RejectionReason_UnknownSecurityID
+				return "", &v
+			} else {
+				return hsec.Symbol, nil
+			}
 		}
 		return sec.Symbol, nil
 	} else {

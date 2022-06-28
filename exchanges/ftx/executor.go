@@ -1081,7 +1081,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && p.Future != symbol {
 				continue
 			}
-			sec := state.SymbolToSec[p.Future]
+			sec := state.SymbolToSecurity(p.Future)
 			if sec == nil {
 				state.logger.Warn(fmt.Sprintf("unkown symbol %s", p.Future))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError

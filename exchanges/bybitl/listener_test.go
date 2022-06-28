@@ -15,11 +15,11 @@ func TestMarketData(t *testing.T) {
 	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		Symbol:            "BTCUSDT",
+		Symbol:            "RNDRUSDT",
 		SecurityType:      enum.SecurityType_CRYPTO_PERP,
 		Exchange:          constants.BYBITL,
-		MinPriceIncrement: 0.5,
-		RoundLot:          0.001,
+		MinPriceIncrement: 0.001,
+		RoundLot:          0.1,
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.InstrumentStatus_Trading,

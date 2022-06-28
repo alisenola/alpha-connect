@@ -1,4 +1,4 @@
-package kraken_test
+package okcoin_test
 
 import (
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -15,11 +15,11 @@ func TestMarketData(t *testing.T) {
 	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		Symbol:             "BTCUSD",
+		Symbol:             "BTC-USD",
 		SecurityType:       enum.SecurityType_CRYPTO_SPOT,
-		Exchange:           constants.KRAKEN,
+		Exchange:           constants.OKCOIN,
 		MinPriceIncrement:  0.01,
-		RoundLot:           1e-5,
+		RoundLot:           0.0001,
 		HasMaturityDate:    false,
 		IsInverse:          false,
 		Status:             models.InstrumentStatus_Trading,

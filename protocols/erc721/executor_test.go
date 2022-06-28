@@ -3,9 +3,9 @@ package erc721_test
 import (
 	"context"
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/chains"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
+	ctypes "gitlab.com/alphaticks/alpha-connect/chains/types"
+	xtypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"gitlab.com/alphaticks/alpha-connect/protocols/types"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -61,11 +61,11 @@ func TestExecutor(t *testing.T) {
 	}
 	reg := registry.NewPublicRegistryClient(conn)
 
-	prCfg := &protocols.ExecutorConfig{
+	prCfg := &types.ExecutorConfig{
 		Registry:  reg,
 		Protocols: []*xchangerModels.Protocol{protocol},
 	}
-	as, executor, clean := exTests.StartExecutor(t, &exchanges.ExecutorConfig{}, prCfg, &chains.ExecutorConfig{}, nil)
+	as, executor, clean := exTests.StartExecutor(t, &xtypes.ExecutorConfig{}, prCfg, &ctypes.ExecutorConfig{}, nil)
 	defer clean()
 
 	testAsset := xchangerModels.Asset{

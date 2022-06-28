@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
+	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"testing"
@@ -20,6 +21,7 @@ type ExPubTest struct {
 	HistoricalLiquidationsRequest bool
 	OpenInterestRequest           bool
 	MarketDataRequest             bool
+	MarketStatisticsRequest       bool
 }
 
 func ExPub(t *testing.T, tc ExPubTest) {
@@ -56,13 +58,33 @@ func ExPub(t *testing.T, tc ExPubTest) {
 				RequestID:   0,
 				Instrument:  tc.Instrument,
 				Aggregation: models.OrderBookAggregation_L2,
-			}, 10*time.Second).Result()
+			}, 20*time.Second).Result()
 			if err != nil {
 				t.Fatal(err)
 			}
 			v, ok := res.(*messages.MarketDataResponse)
 			if !ok {
 				t.Fatalf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+		})
+	}
+
+	if tc.MarketStatisticsRequest {
+		t.Run("MarketStatisticsRequest", func(t *testing.T) {
+			res, err := as.Root.RequestFuture(executor, &messages.MarketStatisticsRequest{
+				RequestID:  0,
+				Instrument: &models.Instrument{Exchange: constants.BYBITL},
+				Statistics: []models.StatType{models.StatType_MarkPrice},
+			}, 20*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := res.(*messages.MarketStatisticsResponse)
+			if !ok {
+				t.Fatalf("was expecting *messages.MarketStatisticsResponse, got %s", reflect.TypeOf(res).String())
 			}
 			if !v.Success {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())

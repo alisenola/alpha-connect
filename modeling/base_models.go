@@ -59,7 +59,7 @@ type ShortModel interface {
 
 type PriceModel interface {
 	Model
-	GetPrice(feedID uint64) float64
+	GetPrice(feedID uint64) (float64, bool)
 	GetSamplePrices(feedID uint64, time uint64, sampleSize int) []float64
 }
 
@@ -115,55 +115,46 @@ func (m *MarketMap) GetPairPrice(base, quote uint32) (float64, bool) {
 type MarketAllocationModel struct {
 	sync.RWMutex
 	AllocationModel
+	PriceModel
 	*MarketMap
 }
 
-func NewMarketAllocationModel(model AllocationModel) *MarketAllocationModel {
+func NewMarketAllocationModel(al AllocationModel, price PriceModel) *MarketAllocationModel {
 	return &MarketAllocationModel{
-		AllocationModel: model,
+		AllocationModel: al,
+		PriceModel:      price,
 		MarketMap:       NewMarketMap(),
 	}
 }
 
+func (m *MarketAllocationModel) GetPrice(ID uint64) (float64, bool) {
+	if m.PriceModel != nil {
+		p, ok := m.PriceModel.GetPrice(ID)
+		if ok {
+			return p, ok
+		} else {
+			return m.MarketMap.GetPrice(ID)
+		}
+	} else {
+		return m.MarketMap.GetPrice(ID)
+	}
+}
+
+func (m *MarketAllocationModel) GetPairPrice(base, quote uint32) (float64, bool) {
+	ID := uint64(base)<<32 | uint64(quote)
+	return m.GetPrice(ID)
+}
+
 type MarketLongShortModel struct {
 	sync.RWMutex
-	model  LongShortModel
-	prices map[uint64]float64
+	model LongShortModel
+	*MarketMap
 }
 
 func NewMarketLongShortModel(model LongShortModel) *MarketLongShortModel {
 	return &MarketLongShortModel{
-		model:  model,
-		prices: make(map[uint64]float64),
+		model: model,
 	}
-}
-
-func (m *MarketLongShortModel) SetPrice(ID uint64, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	m.prices[ID] = p
-}
-
-func (m *MarketLongShortModel) SetPairPrice(base, quote uint32, p float64) {
-	m.Lock()
-	defer m.Unlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	m.prices[ID] = p
-}
-
-func (m *MarketLongShortModel) GetPrice(ID uint64) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	p, ok := m.prices[ID]
-	return p, ok
-}
-
-func (m *MarketLongShortModel) GetPairPrice(base, quote uint32) (float64, bool) {
-	m.RLock()
-	defer m.RUnlock()
-	ID := uint64(base)<<32 | uint64(quote)
-	p, ok := m.prices[ID]
-	return p, ok
 }
 
 func (m *MarketLongShortModel) GetPenalty(fee float64) float64 {
@@ -207,7 +198,7 @@ func NewMapMarketModel() *MapMarketModel {
 
 func (m *MapMarketModel) GetPrice(ID uint64) (float64, bool) {
 	if pm, ok := m.priceModels[ID]; ok {
-		return pm.GetPrice(ID), true
+		return pm.GetPrice(ID)
 	} else {
 		return 0., false
 	}
@@ -216,7 +207,7 @@ func (m *MapMarketModel) GetPrice(ID uint64) (float64, bool) {
 func (m *MapMarketModel) GetPairPrice(base uint32, quote uint32) (float64, bool) {
 	ID := uint64(base)<<32 | uint64(quote)
 	if pm, ok := m.priceModels[ID]; ok {
-		return pm.GetPrice(ID), true
+		return pm.GetPrice(ID)
 	} else {
 		return 0., false
 	}
@@ -334,8 +325,8 @@ func (m *ConstantPriceModel) GetSamplePrices(ID uint64, time uint64, sampleSize 
 	return m.samplePrices
 }
 
-func (m *ConstantPriceModel) GetPrice(ID uint64) float64 {
-	return m.price
+func (m *ConstantPriceModel) GetPrice(ID uint64) (float64, bool) {
+	return m.price, true
 }
 
 type GBMPriceModel struct {

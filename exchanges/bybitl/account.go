@@ -156,10 +156,30 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
+	// Then fetch fees
+	res, err := context.RequestFuture(state.bybitlExecutor, &messages.AccountInformationRequest{
+		Account: state.account.Account,
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error getting account information from executor: %v", err)
+	}
+
+	information, ok := res.(*messages.AccountInformationResponse)
+	if !ok {
+		return fmt.Errorf("was expecting AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+	}
+
+	if !information.Success {
+		return fmt.Errorf("error fetching account information: %s", information.RejectionReason.String())
+	}
+
+	fmt.Println(information.MakerFee, information.TakerFee)
+
 	//Fetch the securities
 	fmt.Println("Fetching the securities")
 	ex := actor.NewPID(context.ActorSystem().Address(), "executor")
-	res, err := context.RequestFuture(ex, &messages.SecurityListRequest{}, 10*time.Second).Result()
+	res, err = context.RequestFuture(ex, &messages.SecurityListRequest{}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error getting securities: %v", err)
 	}
@@ -264,9 +284,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.seqNum = 0
 
 	//Sync account
-	makerFee := 0.0001
-	takerFee := 0.0006
-	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &makerFee, &takerFee); err != nil {
+	if err := state.account.Sync(filteredSecurities, ords, positions.Positions, balances.Balances, &information.MakerFee.Value, &information.TakerFee.Value); err != nil {
 		return fmt.Errorf("error syncing account: %v", err)
 	}
 
@@ -275,7 +293,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	fmt.Println("MARGIN", state.account.GetMargin(nil))
 	fmt.Println("MARGIN", state.account.GetMargin(m))
 
-	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	checkAccountTicker := time.NewTicker(1 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
 		for {
@@ -468,6 +486,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 							context.Send(context.Parent(), nReport)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
@@ -558,6 +577,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 							context.Send(context.Parent(), report)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
@@ -904,6 +924,11 @@ func (state *AccountListener) checkSocket(context actor.Context) error {
 
 func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT")
+	state.account.CleanOrders()
+
+	if err := state.account.CheckExpiration(); err != nil {
+		return fmt.Errorf("error checking expired orders: %v", err)
+	}
 
 	// Fetch balances
 	resp, err := context.RequestFuture(state.bybitlExecutor, &messages.BalancesRequest{
@@ -952,7 +977,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		b2 := accntBalances[i]
 		//rawB1 := int(math.Round(b1.Quantity * state.account.MarginPrecision))
 		//rawB2 := int(math.Round(b2.Quantity * state.account.MarginPrecision))
-		diff := math.Abs(1 - b1.Quantity/b2.Quantity)
+		diff := math.Abs(b1.Quantity-b2.Quantity) / math.Abs(b1.Quantity+b2.Quantity)
 		if diff > 0.01 {
 			return fmt.Errorf("different margin amount: %f %f", b1.Quantity, b2.Quantity)
 		}
@@ -983,10 +1008,9 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
 			return fmt.Errorf("positions have different quantities: %f vs %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
-		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
-		if rawCost1 != rawCost2 {
-			return fmt.Errorf("positions have different costs: %f vs %f", pos1[i].Cost, pos2[i].Cost)
+		diff := math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
+		if diff > 0.01 {
+			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
 

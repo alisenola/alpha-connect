@@ -29,6 +29,12 @@ func IsClosed(status models.OrderStatus) bool {
 		status == models.OrderStatus_Expired
 }
 
+func IsOpen(status models.OrderStatus) bool {
+	return status == models.OrderStatus_New ||
+		status == models.OrderStatus_Created ||
+		status == models.OrderStatus_PartiallyFilled
+}
+
 type Order struct {
 	*models.Order
 	lastEventTime          time.Time
@@ -98,7 +104,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		assets:          make(map[uint32]*xchangerModels.Asset),
 		margin:          0,
 		quoteCurrency:   quoteCurrency,
-		expirationLimit: 5 * time.Second,
+		expirationLimit: 1 * time.Minute,
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
@@ -924,6 +930,9 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 			if filter.OrderStatus != nil && o.OrderStatus != filter.OrderStatus.Value {
 				continue
 			}
+			if filter.Open != nil && IsOpen(o.OrderStatus) != filter.Open.Value {
+				continue
+			}
 		}
 
 		orders = append(orders, o.Order)
@@ -1063,17 +1072,19 @@ func (accnt *Account) GetMargin(model modeling.Market) float64 {
 }
 
 func (accnt *Account) CheckExpiration() error {
+	accnt.RLock()
+	defer accnt.RUnlock()
 	for k, o := range accnt.ordersClID {
 		if IsPending(o.OrderStatus) && (time.Since(o.lastEventTime) > accnt.expirationLimit) {
-			return fmt.Errorf("order %s in unknown state", k)
+			return fmt.Errorf("order %s in unknown state %s", k, o.OrderStatus.String())
 		}
 	}
 	return nil
 }
 
 func (accnt *Account) CleanOrders() {
-	accnt.RLock()
-	defer accnt.RUnlock()
+	accnt.Lock()
+	defer accnt.Unlock()
 	for k, o := range accnt.ordersClID {
 		if IsClosed(o.OrderStatus) && (time.Since(o.lastEventTime) > time.Minute) {
 			delete(accnt.ordersClID, k)

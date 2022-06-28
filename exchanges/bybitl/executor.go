@@ -16,6 +16,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/bybitl"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -26,6 +27,20 @@ import (
 	"time"
 	"unicode"
 )
+
+var MakerFees = map[string]float64{
+	"No VIP": 0.01 / 100,
+	"VIP-1":  0.006 / 100,
+	"VIP-2":  0.004 / 100,
+	"VIP-3":  0.002 / 100,
+}
+
+var TakerFees = map[string]float64{
+	"No VIP": 0.06 / 100,
+	"VIP-1":  0.05 / 100,
+	"VIP-2":  0.045 / 100,
+	"VIP-3":  0.0425 / 100,
+}
 
 func (state *Executor) getSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
 	symbol := ""
@@ -80,7 +95,7 @@ func NewAccountRateLimit() *AccountRateLimit {
 func (rl *AccountRateLimit) Request(symbol string, weight int) {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(100, time.Minute)
+		l = exchanges.NewRateLimit(95, time.Minute)
 		rl.rateLimits[symbol] = l
 	}
 	l.Request(weight)
@@ -89,19 +104,26 @@ func (rl *AccountRateLimit) Request(symbol string, weight int) {
 func (rl *AccountRateLimit) IsRateLimited(symbol string) bool {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(100, time.Minute)
+		l = exchanges.NewRateLimit(95, time.Minute)
 		rl.rateLimits[symbol] = l
 	}
 	return l.IsRateLimited()
 }
 
+func (rl *AccountRateLimit) DurationBeforeNextRequest(symbol string, weight int) time.Duration {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = exchanges.NewRateLimit(95, time.Minute)
+		rl.rateLimits[symbol] = l
+	}
+	return l.DurationBeforeNextRequest(weight)
+}
+
 type Executor struct {
 	extypes.BaseExecutor
-	historicalSecurities  map[uint64]*registry.Security
-	symbolToHistoricalSec map[string]*registry.Security
-	queryRunners          []*QueryRunner
-	accountRateLimits     map[string]*AccountRateLimit
-	logger                *log.Logger
+	queryRunners      []*QueryRunner
+	accountRateLimits map[string]*AccountRateLimit
+	logger            *log.Logger
 }
 
 func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
@@ -134,6 +156,35 @@ func (state *Executor) getQueryRunner(post bool) *QueryRunner {
 	}
 
 	return qr
+}
+
+func (state *Executor) durationBeforeNextRequest(post bool, weight int) time.Duration {
+	var minDur time.Duration
+	for _, q := range state.queryRunners {
+		var dur time.Duration
+		if post {
+			dur1 := q.sPostRateLimit.DurationBeforeNextRequest(weight)
+			dur2 := q.mPostRateLimit.DurationBeforeNextRequest(weight)
+			if dur1 > dur2 {
+				dur = dur1
+			} else {
+				dur = dur2
+			}
+		} else {
+			dur1 := q.sGetRateLimit.DurationBeforeNextRequest(weight)
+			dur2 := q.mGetRateLimit.DurationBeforeNextRequest(weight)
+			if dur1 > dur2 {
+				dur = dur1
+			} else {
+				dur = dur2
+			}
+		}
+		if dur < minDur {
+			minDur = dur
+		}
+	}
+
+	return minDur
 }
 
 func (state *Executor) GetLogger() *log.Logger {
@@ -264,16 +315,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.SecuritiesLock.Lock()
-	defer state.SecuritiesLock.Unlock()
-	state.Securities = make(map[uint64]*models.Security)
-	state.SymbolToSec = make(map[string]*models.Security)
-	for _, s := range securities {
-		state.Securities[s.SecurityID] = s
-		state.SymbolToSec[s.Symbol] = s
-	}
-	state.historicalSecurities = make(map[uint64]*registry.Security)
-	state.symbolToHistoricalSec = make(map[string]*registry.Security)
+	var historicalSecurities []*registry.Security
 	if state.Registry != nil {
 		rres, err := state.Registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
 			Filter: &registry.SecurityFilter{
@@ -283,11 +325,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		if err != nil {
 			return err
 		}
-		for _, sec := range rres.Securities {
-			state.historicalSecurities[sec.SecurityId] = sec
-			state.symbolToHistoricalSec[sec.Symbol] = sec
-		}
+		historicalSecurities = rres.Securities
 	}
+
+	state.SyncSecurities(securities, historicalSecurities)
+
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    true,
@@ -447,12 +489,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	symbol, rej := state.getSymbol(msg.Instrument)
-	if rej != nil {
-		response.RejectionReason = *rej
-		context.Send(sender, response)
-		return nil
-	}
+	symbol, _ := state.getSymbol(msg.Instrument)
 
 	req, w, err := bybitl.GetTickers()
 	if err != nil {
@@ -480,26 +517,18 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			return
 		}
 		for _, t := range data.Result {
-			if symbol != "" {
-				if t.Symbol == symbol {
-					sec := state.SymbolToSec[symbol]
-					response.Statistics = append(response.Statistics, &models.Stat{
-						Timestamp:  timestamppb.Now(),
-						SecurityID: sec.SecurityID,
-						Value:      t.MarkPrice,
-						StatType:   models.StatType_MarkPrice,
-					})
-				}
-			} else {
-				sec, ok := state.SymbolToSec[t.Symbol]
-				if ok {
-					response.Statistics = append(response.Statistics, &models.Stat{
-						Timestamp:  timestamppb.Now(),
-						SecurityID: sec.SecurityID,
-						Value:      t.MarkPrice,
-						StatType:   models.StatType_MarkPrice,
-					})
-				}
+			if symbol != "" && t.Symbol != symbol {
+				continue
+			}
+
+			sec := state.SymbolToSecurity(t.Symbol)
+			if sec != nil {
+				response.Statistics = append(response.Statistics, &models.Stat{
+					Timestamp:  timestamppb.Now(),
+					SecurityID: sec.SecurityID,
+					Value:      t.MarkPrice,
+					StatType:   models.StatType_MarkPrice,
+				})
 			}
 		}
 		response.Success = true
@@ -549,15 +578,13 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		value := reflect.ValueOf(data.Balance)
-		for i := 0; i < value.NumField(); i++ {
-			coin := value.Field(i).Interface().(bybitl.Coin)
+		for symbol, coin := range data.Balance {
 			if coin.WalletBalance == 0 {
 				continue
 			}
-			asset, ok := constants.GetAssetBySymbol(value.Type().Field(i).Name)
+			asset, ok := constants.GetAssetBySymbol(symbol)
 			if !ok {
-				state.logger.Error("got balance for unknown asset", log.String("asset", value.Type().Field(i).Name))
+				state.logger.Error("got balance for unknown asset", log.String("asset", symbol))
 				continue
 			}
 			response.Balances = append(response.Balances, &models.Balance{
@@ -634,8 +661,8 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			if symbol != "" && symbol != pos.Position.Symbol {
 				continue
 			}
-			sec, ok := state.SymbolToSec[pos.Position.Symbol]
-			if !ok {
+			sec := state.SymbolToSecurity(pos.Position.Symbol)
+			if sec == nil {
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -658,9 +685,397 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 				Cross:    false,
 			})
 		}
+		response.Time = utils.MilliToTimestamp(uint64(data.TimeNow * 1000))
 		response.Success = true
 		context.Send(sender, response)
 	}()
+
+	return nil
+}
+
+func (state *Executor) OnAccountInformationRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountInformationRequest)
+	sender := context.Sender()
+	response := &messages.AccountInformationResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		request, weight, err := bybitl.GetAPIKeyInfo(msg.Account.ApiCredentials)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		qr := state.getQueryRunner(false)
+		if qr == nil {
+			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		qr.Get(weight)
+		var data bybitl.APIKeyInfoResponse
+		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			state.logger.Warn("error fetching account information", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.RetCode != 0 {
+			state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		makerFee, ok := MakerFees[data.Info[0].VipLevel]
+		if !ok {
+			state.logger.Warn(fmt.Sprintf("unknown VIP level %s", data.Info[0].VipLevel))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+		takerFee, ok := TakerFees[data.Info[0].VipLevel]
+		if !ok {
+			state.logger.Warn(fmt.Sprintf("unknown VIP level %s", data.Info[0].VipLevel))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		response.MakerFee = &wrapperspb.DoubleValue{Value: makerFee}
+		response.TakerFee = &wrapperspb.DoubleValue{Value: takerFee}
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) onFundingMovementRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountMovementRequest)
+
+	sender := context.Sender()
+	response := &messages.AccountMovementResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	symbol := ""
+	var from, to *uint64
+	if req.Filter != nil {
+		var rej *messages.RejectionReason
+		symbol, rej = state.getSymbol(req.Filter.Instrument)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Send(sender, response)
+			return nil
+		}
+
+		if req.Filter.From != nil {
+			ts := utils.TimestampToMilli(req.Filter.From)
+			from = &ts
+		}
+		if req.Filter.To != nil {
+			ts := utils.TimestampToMilli(req.Filter.To)
+			to = &ts
+		}
+	}
+	if symbol == "" {
+		response.RejectionReason = messages.RejectionReason_UnknownSymbol
+		context.Send(sender, response)
+		return nil
+	}
+	params := bybitl.NewGetTradeRecordsParams(symbol)
+	if from != nil {
+		params.SetStartTime(*from)
+	}
+	if to != nil {
+		params.SetEndTime(*to)
+	}
+	params.SetExecType(bybitl.ExecFunding)
+	request, weight, err := bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+	qr := state.getQueryRunner(false)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+	qr.Get(weight)
+
+	go func() {
+		var movements []*messages.AccountMovement
+		done := false
+		for !done {
+			var data bybitl.TradingRecordResponse
+			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching trade records", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+			if data.RetCode != 0 {
+				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+
+			sort.Slice(data.TradingRecords.Trades, func(i, j int) bool {
+				return data.TradingRecords.Trades[i].TradeTimeMs < data.TradingRecords.Trades[j].TradeTimeMs
+			})
+			for _, t := range data.TradingRecords.Trades {
+				fmt.Println(t.ExecQty, t.ExecFee, t.ExecType, t.ExecValue)
+				sec := state.SymbolToHistoricalSecurity(t.Symbol)
+				if sec == nil {
+					state.logger.Warn("error fetching trade records", log.Error(errors.New("unknown symbol")))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				mvt := &messages.AccountMovement{
+					Asset:      constants.TETHER,
+					Change:     -t.ExecFee,
+					MovementID: t.ExecId,
+					Type:       messages.AccountMovementType_FundingFee,
+					Subtype:    t.Symbol,
+					Time:       utils.MilliToTimestamp(uint64(t.TradeTimeMs)),
+				}
+				movements = append(movements, mvt)
+			}
+			done = len(data.TradingRecords.Trades) == 0
+			if !done {
+				params.SetPage(int(data.TradingRecords.CurrentPage + 1))
+				request, weight, err = bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
+				if err != nil {
+					panic(err)
+				}
+				qr.WaitGet(weight)
+			}
+		}
+		response.Success = true
+		response.Movements = movements
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) onDepositMovementRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountMovementRequest)
+
+	sender := context.Sender()
+	response := &messages.AccountMovementResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	var from, to *uint64
+	if req.Filter != nil {
+		if req.Filter.From != nil {
+			ts := utils.TimestampToSeconds(req.Filter.From)
+			from = &ts
+		}
+		if req.Filter.To != nil {
+			ts := utils.TimestampToSeconds(req.Filter.To)
+			to = &ts
+		}
+	}
+	params := bybitl.NewQueryDepositRecordsParams()
+	if from != nil {
+		params.SetStartTime(*from)
+		fmt.Println("FROM", *from)
+	}
+	if to != nil {
+		params.SetEndTime(*to)
+	}
+	params.SetDirection(bybitl.NextPage)
+	request, weight, err := bybitl.QueryDepositRecords(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+	qr := state.getQueryRunner(false)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+	qr.Get(weight)
+
+	go func() {
+		var movements []*messages.AccountMovement
+		done := false
+		for !done {
+			var data bybitl.QueryDepositRecordsResponse
+			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching trade records", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+			if data.RetCode != 0 {
+				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+
+			sort.Slice(data.DepositRecords.Rows, func(i, j int) bool {
+				return data.DepositRecords.Rows[i].SuccessAt < data.DepositRecords.Rows[j].SuccessAt
+			})
+			for _, t := range data.DepositRecords.Rows {
+				fmt.Println(t)
+				asset, ok := constants.GetAssetBySymbol(t.Coin)
+				if !ok {
+					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				mvt := &messages.AccountMovement{
+					Asset:      asset,
+					Change:     t.Amount,
+					MovementID: t.TxId,
+					Type:       messages.AccountMovementType_Deposit,
+					Time:       utils.SecondToTimestamp(t.SuccessAt),
+				}
+				movements = append(movements, mvt)
+			}
+			done = len(data.DepositRecords.Rows) == 0
+			if !done {
+				params.SetCursor(data.DepositRecords.Cursor)
+				request, weight, err = bybitl.QueryDepositRecords(params, req.Account.ApiCredentials)
+				if err != nil {
+					panic(err)
+				}
+				qr.WaitGet(weight)
+			}
+		}
+		response.Success = true
+		response.Movements = movements
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error {
+	req := context.Message().(*messages.AccountMovementRequest)
+
+	sender := context.Sender()
+	response := &messages.AccountMovementResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	var from, to *uint64
+	if req.Filter != nil {
+		if req.Filter.From != nil {
+			ts := utils.TimestampToSeconds(req.Filter.From)
+			from = &ts
+		}
+		if req.Filter.To != nil {
+			ts := utils.TimestampToSeconds(req.Filter.To)
+			to = &ts
+		}
+	}
+	params := bybitl.NewQueryWithdrawRecordsParams()
+	if from != nil {
+		params.SetStartTime(*from)
+		fmt.Println("FROM", *from)
+	}
+	if to != nil {
+		params.SetEndTime(*to)
+	}
+	params.SetDirection(bybitl.NextPage)
+	request, weight, err := bybitl.QueryWithdrawRecords(params, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+	qr := state.getQueryRunner(false)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+	qr.Get(weight)
+
+	go func() {
+		var movements []*messages.AccountMovement
+		done := false
+		for !done {
+			var data bybitl.QueryWithdrawRecordsResponse
+			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching trade records", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+			if data.RetCode != 0 {
+				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+
+			sort.Slice(data.WithdrawRecords.Rows, func(i, j int) bool {
+				return data.WithdrawRecords.Rows[i].CreateTime < data.WithdrawRecords.Rows[j].CreateTime
+			})
+			for _, t := range data.WithdrawRecords.Rows {
+				fmt.Println(t)
+				asset, ok := constants.GetAssetBySymbol(t.Coin)
+				if !ok {
+					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				mvt := &messages.AccountMovement{
+					Asset:      asset,
+					Change:     t.Amount,
+					MovementID: t.TxId,
+					Type:       messages.AccountMovementType_Withdrawal,
+					Time:       utils.SecondToTimestamp(t.CreateTime),
+				}
+				movements = append(movements, mvt)
+			}
+			done = len(data.WithdrawRecords.Rows) == 0
+			if !done {
+				params.SetCursor(data.WithdrawRecords.Cursor)
+				request, weight, err = bybitl.QueryWithdrawRecords(params, req.Account.ApiCredentials)
+				if err != nil {
+					panic(err)
+				}
+				qr.WaitGet(weight)
+			}
+		}
+		response.Success = true
+		response.Movements = movements
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
+	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
+	req := context.Message().(*messages.AccountMovementRequest)
+
+	switch req.Type {
+	case messages.AccountMovementType_FundingFee:
+		return state.onFundingMovementRequest(context)
+	case messages.AccountMovementType_Deposit:
+		return state.onDepositMovementRequest(context)
+	case messages.AccountMovementType_Withdrawal:
+		return state.onDepositMovementRequest(context)
+	}
 
 	return nil
 }
@@ -717,7 +1132,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	if to != nil {
 		params.SetEndTime(*to)
 	}
-
+	params.SetExecType(bybitl.ExecTrade)
 	request, weight, err := bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
@@ -754,30 +1169,28 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			for _, t := range data.TradingRecords.Trades {
 				quantityMul := 1.
 				var instrument *models.Instrument
-				if _, ok := state.symbolToHistoricalSec[t.Symbol]; ok {
-					sec := state.symbolToHistoricalSec[t.Symbol]
-					instrument = &models.Instrument{
-						Exchange:   constants.BYBITL,
-						Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
-						SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
-					}
-				} else {
-					instrument = &models.Instrument{
-						Exchange:   constants.BYBITL,
-						Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
-						SecurityID: nil,
-					}
+				sec := state.SymbolToHistoricalSecurity(t.Symbol)
+				if sec == nil {
+					state.logger.Warn("error fetching trade records", log.Error(errors.New("unknown symbol")))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				instrument = &models.Instrument{
+					Exchange:   constants.BYBITL,
+					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 				}
 
 				quantity := t.ExecQty * quantityMul
-				if t.Side == "sell" {
+				if t.Side == "Sell" {
 					quantity *= -1
 				}
 				comAsset := constants.TETHER
 				ts := utils.MilliToTimestamp(uint64(t.TradeTimeMs))
 				trd := models.TradeCapture{
 					Type:            models.TradeType_Regular,
-					Price:           t.Price,
+					Price:           t.ExecPrice,
 					Quantity:        quantity,
 					Commission:      t.ExecFee,
 					CommissionAsset: comAsset,
@@ -788,7 +1201,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 					TransactionTime: ts,
 				}
 
-				if t.Side == "buy" {
+				if t.Side == "Buy" {
 					trd.Side = models.Side_Buy
 				} else {
 					trd.Side = models.Side_Sell
@@ -904,10 +1317,8 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			if orderStatus != "" && ord.OrderStatus != orderStatus {
 				continue
 			}
-			state.SecuritiesLock.RLock()
-			sec, ok := state.SymbolToSec[ord.Symbol]
-			state.SecuritiesLock.RUnlock()
-			if !ok {
+			sec := state.SymbolToSecurity(ord.Symbol)
+			if sec == nil {
 				state.logger.Info("got order with unknown symbol: " + ord.Symbol)
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
@@ -933,20 +1344,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	qr := state.getQueryRunner(true)
-	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
 
 	symbol := ""
 	var tickPrecision, lotPrecision int
 	if req.Order.Instrument != nil {
 		if req.Order.Instrument.Symbol != nil {
 			symbol = req.Order.Instrument.Symbol.Value
-			sec, ok := state.SymbolToSec[symbol]
-			if !ok {
+			sec := state.SymbolToSecurity(symbol)
+			if sec == nil {
 				response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 				context.Send(sender, response)
 				return nil
@@ -978,6 +1383,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	if ar.IsRateLimited(symbol) {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(symbol, 1))
 		context.Send(sender, response)
 		return nil
 	}
@@ -992,7 +1398,17 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	request, weight, err := bybitl.PostActiveOrder(params, req.Account.ApiCredentials)
 	if err != nil {
-		return err
+		response.RejectionReason = messages.RejectionReason_InvalidRequest
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(false, weight))
+		context.Send(sender, response)
+		return nil
 	}
 
 	qr.Post(weight)
@@ -1037,13 +1453,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	qr := state.getQueryRunner(true)
-	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
-
 	symbol := ""
 	if req.Instrument != nil {
 		if req.Instrument.Symbol != nil {
@@ -1068,12 +1477,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		ar = NewAccountRateLimit()
 		state.accountRateLimits[req.Account.Name] = ar
 	}
-
-	if ar.IsRateLimited(symbol) {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		context.Send(sender, response)
-		return nil
-	}
 	ar.Request(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
@@ -1089,11 +1492,22 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 	request, weight, err := bybitl.CancelActiveOrder(params, req.Account.ApiCredentials)
 	if err != nil {
-		return err
+		response.RejectionReason = messages.RejectionReason_InvalidRequest
+		context.Send(sender, response)
+		return nil
+	}
+	qr := state.getQueryRunner(true)
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(true, weight))
+		context.Send(sender, response)
+		return nil
 	}
 	qr.Post(weight)
 
 	go func() {
+		// We ignore rate limits on cancel
+
 		var data bybitl.CancelOrderResponse
 		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error cancelling order", log.Error(err))

@@ -51,8 +51,9 @@ type InstrumentData struct {
 
 type Listener struct {
 	ws             *bitfinex.Websocket
-	dialerPool     *xchangerUtils.DialerPool
+	securityID     uint64
 	security       *models.Security
+	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	stashedTrades  *list.List
@@ -61,21 +62,17 @@ type Listener struct {
 	executor       *actor.PID
 }
 
-func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security, dialerPool)
+		return NewListener(securityID, dialerPool)
 	}
 }
 
 // Limit of 30 subscription
-func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		ws:             nil,
-		security:       security,
-		dialerPool:     dialerPool,
-		instrumentData: nil,
-		logger:         nil,
-		stashedTrades:  nil,
+		securityID: securityID,
+		dialerPool: dialerPool,
 	}
 }
 
@@ -145,10 +142,30 @@ func (state *Listener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
+
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITFINEX.Name+"_executor")
+	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
+		RequestID:  0,
+		Instrument: &models.Instrument{SecurityID: wrapperspb.UInt64(state.securityID)},
+	}, 5*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error fetching security definition: %v", err)
+	}
+	def := res.(*messages.SecurityDefinitionResponse)
+	if !def.Success {
+		return fmt.Errorf("error fetching security definition: %s", def.RejectionReason.String())
+	}
+	state.security = def.Security
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)),
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
 
-	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITFINEX.Name+"_executor")
 	state.stashedTrades = list.New()
 
 	if state.security.RoundLot == nil {

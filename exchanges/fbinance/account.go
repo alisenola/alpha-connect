@@ -324,7 +324,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		state.reconciler = context.Spawn(props)
 	}
 
-	checkAccountTicker := time.NewTicker(5 * time.Minute)
+	checkAccountTicker := time.NewTicker(1 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
 		for {
@@ -579,6 +579,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 							context.Send(context.Parent(), nReport)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
@@ -806,6 +807,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 							context.Send(context.Parent(), report)
 						}
 						reqResponse.RejectionReason = response.RejectionReason
+						reqResponse.RateLimitDelay = response.RateLimitDelay
 					}
 				})
 			} else {
@@ -1106,6 +1108,11 @@ func (state *AccountListener) refreshKey(context actor.Context) error {
 
 func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT !")
+	state.account.CleanOrders()
+
+	if err := state.account.CheckExpiration(); err != nil {
+		return fmt.Errorf("error checking expired orders: %v", err)
+	}
 	// Fetch balances
 	res, err := context.RequestFuture(state.fbinanceExecutor, &messages.BalancesRequest{
 		Account: state.account.Account,
@@ -1122,10 +1129,6 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	if !balanceList.Success {
 		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
-	}
-
-	if len(balanceList.Balances) != 1 {
-		return fmt.Errorf("was expecting 1 balance, got %d", len(balanceList.Balances))
 	}
 
 	// Fetch positions
@@ -1147,10 +1150,21 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 
-	rawMargin1 := int(math.Round(state.account.GetMargin(nil) * state.account.MarginPrecision))
-	rawMargin2 := int(math.Round(balanceList.Balances[0].Quantity * state.account.MarginPrecision))
-	if rawMargin1 != rawMargin2 {
-		return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+	balanceMap1 := make(map[uint32]float64)
+	balanceMap2 := make(map[uint32]float64)
+	for _, b := range balanceList.Balances {
+		balanceMap1[b.Asset.ID] = b.Quantity
+	}
+	for _, b := range state.account.GetBalances() {
+		balanceMap2[b.Asset.ID] = b.Quantity
+	}
+
+	for k, b1 := range balanceMap1 {
+		b2 := balanceMap2[k]
+		diff := math.Abs(b1-b2) / math.Abs(b1+b2)
+		if diff > 0.01 {
+			return fmt.Errorf("different margin amount: %f %f", state.account.GetMargin(nil), balanceList.Balances[0].Quantity)
+		}
 	}
 
 	pos1 := state.account.GetPositions()
@@ -1176,12 +1190,11 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	for i := range pos1 {
 		lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
 		if int(math.Round(pos1[i].Quantity*lp)) != int(math.Round(pos2[i].Quantity*lp)) {
-			return fmt.Errorf("position have different quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
+			return fmt.Errorf("different position quantity: %f %f", pos1[i].Quantity, pos2[i].Quantity)
 		}
-		rawCost1 := int(math.Round(pos1[i].Cost * state.account.MarginPrecision))
-		rawCost2 := int(math.Round(pos2[i].Cost * state.account.MarginPrecision))
-		if rawCost1 != rawCost2 {
-			return fmt.Errorf("position have different cost: %f %f %d %d", pos1[i].Cost, pos2[i].Cost, rawCost1, rawCost2)
+		diff := math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
+		if diff > 0.01 {
+			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
 		}
 	}
 	return nil

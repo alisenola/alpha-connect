@@ -88,68 +88,68 @@ func NewPaperAccountListenerProducer(account *account.Account) actor.Producer {
 	}
 }
 
-func NewInstrumentListenerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
-	switch security.Exchange.ID {
+func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerPool *utils.DialerPool) actor.Producer {
+	switch exchangeID {
 	case constants.BINANCE.ID:
-		return func() actor.Actor { return binance.NewListener(security, dialerPool) }
+		return func() actor.Actor { return binance.NewListener(securityID, dialerPool) }
 	case constants.BITFINEX.ID:
-		return func() actor.Actor { return bitfinex.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bitfinex.NewListener(securityID, dialerPool) }
 	case constants.BITMEX.ID:
-		return func() actor.Actor { return bitmex.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bitmex.NewListener(securityID, dialerPool) }
 	case constants.BITSTAMP.ID:
-		return func() actor.Actor { return bitstamp.NewListenerL3(security, dialerPool) }
+		return func() actor.Actor { return bitstamp.NewListenerL3(securityID, dialerPool) }
 	case constants.BITZ.ID:
-		return func() actor.Actor { return bitz.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bitz.NewListener(securityID, dialerPool) }
 	case constants.COINBASEPRO.ID:
-		return func() actor.Actor { return coinbasepro.NewListener(security, dialerPool) }
+		return func() actor.Actor { return coinbasepro.NewListener(securityID, dialerPool) }
 	case constants.CRYPTOFACILITIES.ID:
-		return func() actor.Actor { return cryptofacilities.NewListener(security, dialerPool) }
+		return func() actor.Actor { return cryptofacilities.NewListener(securityID, dialerPool) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewListener(security, dialerPool) }
+		return func() actor.Actor { return fbinance.NewListener(securityID, dialerPool) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewListener(security, dialerPool) }
+		return func() actor.Actor { return ftx.NewListener(securityID, dialerPool) }
 	case constants.FTXUS.ID:
-		return func() actor.Actor { return ftxus.NewListener(security, dialerPool) }
+		return func() actor.Actor { return ftxus.NewListener(securityID, dialerPool) }
 	case constants.GEMINI.ID:
-		return func() actor.Actor { return gemini.NewListener(security, dialerPool) }
+		return func() actor.Actor { return gemini.NewListener(securityID, dialerPool) }
 	case constants.HITBTC.ID:
-		return func() actor.Actor { return hitbtc.NewListener(security, dialerPool) }
+		return func() actor.Actor { return hitbtc.NewListener(securityID, dialerPool) }
 	case constants.KRAKEN.ID:
-		return func() actor.Actor { return kraken.NewListener(security, dialerPool) }
+		return func() actor.Actor { return kraken.NewListener(securityID, dialerPool) }
 	case constants.OKCOIN.ID:
-		return func() actor.Actor { return okcoin.NewListener(security, dialerPool) }
+		return func() actor.Actor { return okcoin.NewListener(securityID, dialerPool) }
 	case constants.OKEX.ID:
-		return func() actor.Actor { return okex.NewListener(security, dialerPool) }
+		return func() actor.Actor { return okex.NewListener(securityID, dialerPool) }
 	case constants.DERIBIT.ID:
-		return func() actor.Actor { return deribit.NewListener(security, dialerPool) }
+		return func() actor.Actor { return deribit.NewListener(securityID, dialerPool) }
 	case constants.HUOBI.ID:
-		return func() actor.Actor { return huobi.NewListener(security, dialerPool) }
+		return func() actor.Actor { return huobi.NewListener(securityID, dialerPool) }
 	case constants.HUOBIP.ID:
-		return func() actor.Actor { return huobip.NewListener(security, dialerPool) }
+		return func() actor.Actor { return huobip.NewListener(securityID, dialerPool) }
 	case constants.HUOBIF.ID:
-		return func() actor.Actor { return huobif.NewListener(security, dialerPool) }
+		return func() actor.Actor { return huobif.NewListener(securityID, dialerPool) }
 	case constants.HUOBIL.ID:
-		return func() actor.Actor { return huobil.NewListener(security, dialerPool) }
+		return func() actor.Actor { return huobil.NewListener(securityID, dialerPool) }
 	case constants.BYBITI.ID:
-		return func() actor.Actor { return bybiti.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bybiti.NewListener(securityID, dialerPool) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bybitl.NewListener(securityID, dialerPool) }
 	case constants.BYBITS.ID:
-		return func() actor.Actor { return bybits.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bybits.NewListener(securityID, dialerPool) }
 	case constants.UPBIT.ID:
-		return func() actor.Actor { return upbit.NewListener(security, dialerPool) }
+		return func() actor.Actor { return upbit.NewListener(securityID, dialerPool) }
 	case constants.BITHUMB.ID:
-		return func() actor.Actor { return bithumb.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bithumb.NewListener(securityID, dialerPool) }
 	case constants.BITHUMBG.ID:
-		return func() actor.Actor { return bithumbg.NewListener(security, dialerPool) }
+		return func() actor.Actor { return bithumbg.NewListener(securityID, dialerPool) }
 	case constants.DYDX.ID:
-		return func() actor.Actor { return dydx.NewListener(security, dialerPool) }
+		return func() actor.Actor { return dydx.NewListener(securityID, dialerPool) }
 	case constants.OKEXP.ID:
-		return func() actor.Actor { return okexp.NewListener(security, dialerPool) }
+		return func() actor.Actor { return okexp.NewListener(securityID, dialerPool) }
 	case constants.GATE.ID:
-		return func() actor.Actor { return gate.NewListener(security, dialerPool) }
+		return func() actor.Actor { return gate.NewListener(securityID, dialerPool) }
 	case constants.UNISWAPV3.ID:
-		return func() actor.Actor { return v3.NewListener(security, dialerPool) }
+		return func() actor.Actor { return v3.NewListener(securityID, dialerPool) }
 		/*
 			case constants.BITTREX:
 			return func() actor.Actor { return bittrex.NewListener(instrument) }

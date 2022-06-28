@@ -15,13 +15,13 @@ func TestMarketData(t *testing.T) {
 	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		Symbol:            "BTC210625",
+		Symbol:            "FIL220701",
 		SecurityType:      enum.SecurityType_CRYPTO_FUT,
 		Exchange:          constants.HUOBIF,
-		MinPriceIncrement: 0.01,
+		MinPriceIncrement: 0.001,
 		RoundLot:          1.,
 		HasMaturityDate:   true,
-		IsInverse:         false,
+		IsInverse:         true,
 		Status:            models.InstrumentStatus_Trading,
 	})
 }

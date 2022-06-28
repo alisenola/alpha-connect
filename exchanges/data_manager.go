@@ -115,7 +115,7 @@ func (state *DataManager) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	state.subscribers = make(map[uint64]*actor.PID)
-	producer := NewInstrumentListenerProducer(state.security, state.dialerPool)
+	producer := NewInstrumentListenerProducer(state.security.SecurityID, state.security.Exchange.ID, state.dialerPool)
 	if producer == nil {
 		return fmt.Errorf("error getting instrument listener")
 	}

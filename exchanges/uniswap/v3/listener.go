@@ -5,6 +5,8 @@ import (
 	goContext "context"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	"gitlab.com/alphaticks/xchanger/constants"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
 	"reflect"
 	"time"
@@ -37,7 +39,9 @@ type Listener struct {
 	extypes.Listener
 	client         *ethclient.Client
 	iterator       *eth.LogIterator
+	securityID     uint64
 	security       *models.Security
+	executor       *actor.PID
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	socketTicker   *time.Ticker
@@ -46,20 +50,15 @@ type Listener struct {
 	updates        *list.List
 }
 
-func NewListenerProducer(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(security, dialerPool)
+		return NewListener(securityID, dialerPool)
 	}
 }
 
-func NewListener(security *models.Security, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
 	return &Listener{
-		client:         nil,
-		iterator:       nil,
-		security:       security,
-		instrumentData: nil,
-		logger:         nil,
-		socketTicker:   nil,
+		securityID: securityID,
 	}
 }
 
@@ -121,9 +120,29 @@ func (state *Listener) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)))
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BITZ.Name+"_executor")
+
+	res, err := context.RequestFuture(state.executor, &messages.SecurityDefinitionRequest{
+		RequestID:  0,
+		Instrument: &models.Instrument{SecurityID: wrapperspb.UInt64(state.securityID)},
+	}, 5*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error fetching security definition: %v", err)
+	}
+	def := res.(*messages.SecurityDefinitionResponse)
+	if !def.Success {
+		return fmt.Errorf("error fetching security definition: %s", def.RejectionReason.String())
+	}
+	state.security = def.Security
+	state.logger = log.New(
+		log.InfoLevel,
+		"",
+		log.String("ID", context.Self().Id),
+		log.String("type", reflect.TypeOf(*state).String()),
+		log.String("security-id", fmt.Sprintf("%d", state.securityID)),
 		log.String("exchange", state.security.Exchange.Name),
 		log.String("symbol", state.security.Symbol))
-
 	state.instrumentData = &InstrumentData{
 		seqNum: uint64(time.Now().UnixNano()),
 	}

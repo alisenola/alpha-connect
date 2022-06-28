@@ -43,6 +43,7 @@ func (state *Executor) Receive(context actor.Context) {
 		context.Forward(context.Parent())
 
 	case *messages.SecurityListRequest,
+		*messages.SecurityDefinitionRequest,
 		*messages.MarketableProtocolAssetListRequest,
 		*messages.HistoricalLiquidationsRequest,
 		*messages.MarketDataRequest:
