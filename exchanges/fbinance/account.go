@@ -738,11 +738,11 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 		ID = req.OrderID.Value
 	}
 	fmt.Println("CANCELING ", ID)
-	report, res := state.account.CancelOrder(ID)
-	if res != nil {
+	report, rej := state.account.CancelOrder(ID)
+	if rej != nil {
 		context.Respond(&messages.OrderCancelResponse{
 			RequestID:       req.RequestID,
-			RejectionReason: *res,
+			RejectionReason: *rej,
 			Success:         false,
 		})
 	} else {

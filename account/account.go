@@ -760,7 +760,12 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	order.LeavesQuantity = leavesQuantity
 	order.CumQuantity = float64(rawCumQuantity+rawFillQuantity) / lotPrecision
 
-	if order.OrderStatus != models.OrderStatus_Canceled && order.OrderStatus != models.OrderStatus_PendingCancel {
+	if IsPending(order.OrderStatus) {
+		// Pending, only set it to filled
+		if rawFillQuantity == rawLeavesQuantity {
+			order.OrderStatus = models.OrderStatus_Filled
+		}
+	} else if IsOpen(order.OrderStatus) {
 		if rawFillQuantity == rawLeavesQuantity {
 			order.OrderStatus = models.OrderStatus_Filled
 		} else if order.OrderStatus == models.OrderStatus_New {
