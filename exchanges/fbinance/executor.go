@@ -187,45 +187,46 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.accountRateLimits = make(map[string]*AccountRateLimit)
 
-	for _, qr := range state.queryRunners {
-		request, weight, err := fbinance.GetExchangeInfo()
-		if err != nil {
-			return err
-		}
-		var data fbinance.ExchangeInfoResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
-			err := fmt.Errorf("error updating security list: %v", err)
-			return err
-		}
-		if data.Code != 0 {
-			err := fmt.Errorf("error updating security list: %v", errors.New(data.Message))
-			return err
-		}
+	request, weight, err := fbinance.GetExchangeInfo()
+	if err != nil {
+		return err
+	}
+	qr := state.getQueryRunner(true)
+	var data fbinance.ExchangeInfoResponse
+	if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		err := fmt.Errorf("error updating security list: %v", err)
+		return err
+	}
+	if data.Code != 0 {
+		err := fmt.Errorf("error updating security list: %v", errors.New(data.Message))
+		return err
+	}
 
-		// Initialize rate limit
-		var secondOrderInterval, minuteOrderInterval time.Duration
-		var secondOrderLimit, minuteOrderLimit int
-		for _, rateLimit := range data.RateLimits {
-			if rateLimit.RateLimitType == "ORDERS" {
-				if rateLimit.Interval == "MINUTE" {
-					minuteOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Minute
-					minuteOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
-				} else if rateLimit.Interval == "SECOND" {
-					secondOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Second
-					secondOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
-				}
-			} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
-				qr.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
+	// Initialize rate limit
+	var secondOrderInterval, minuteOrderInterval time.Duration
+	var secondOrderLimit, minuteOrderLimit int
+	for _, rateLimit := range data.RateLimits {
+		if rateLimit.RateLimitType == "ORDERS" {
+			if rateLimit.Interval == "MINUTE" {
+				minuteOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Minute
+				minuteOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
+			} else if rateLimit.Interval == "SECOND" {
+				secondOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Second
+				secondOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
+			}
+		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
+			for _, q := range state.queryRunners {
+				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
-				qr.globalRateLimit.Request(weight)
+				q.globalRateLimit.Request(weight)
 			}
 		}
-		state.newAccountRateLimit = func() *AccountRateLimit {
-			return NewAccountRateLimit(exchanges.NewRateLimit(secondOrderLimit, secondOrderInterval), exchanges.NewRateLimit(minuteOrderLimit, minuteOrderInterval))
-		}
-		if qr.globalRateLimit == nil {
-			return fmt.Errorf("unable to set rate limit")
-		}
+	}
+	state.newAccountRateLimit = func() *AccountRateLimit {
+		return NewAccountRateLimit(exchanges.NewRateLimit(secondOrderLimit, secondOrderInterval), exchanges.NewRateLimit(minuteOrderLimit, minuteOrderInterval))
+	}
+	if qr.globalRateLimit == nil {
+		return fmt.Errorf("unable to set rate limit")
 	}
 
 	return state.UpdateSecurityList(context)
@@ -1115,12 +1116,14 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		qr.globalRateLimit.Request(weight)
 
 		var data fbinance.OrderData
+		start := time.Now()
 		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
 			return
 		}
+		fmt.Println("PERFORM", time.Since(start))
 		if data.Code != 0 {
 			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError

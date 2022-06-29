@@ -851,7 +851,6 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 				return data.TradingRecords.Trades[i].TradeTimeMs < data.TradingRecords.Trades[j].TradeTimeMs
 			})
 			for _, t := range data.TradingRecords.Trades {
-				fmt.Println(t.ExecQty, t.ExecFee, t.ExecType, t.ExecValue)
 				sec := state.SymbolToHistoricalSecurity(t.Symbol)
 				if sec == nil {
 					state.logger.Warn("error fetching trade records", log.Error(errors.New("unknown symbol")))
