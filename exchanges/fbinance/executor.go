@@ -191,7 +191,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	if err != nil {
 		return err
 	}
-	qr := state.getQueryRunner(true)
+	qr := state.queryRunners[0]
 	var data fbinance.ExchangeInfoResponse
 	if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 		err := fmt.Errorf("error updating security list: %v", err)
