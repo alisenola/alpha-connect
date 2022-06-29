@@ -1138,6 +1138,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		response.CumQuantity = data.CumQuantity
 		response.LeavesQuantity = data.OriginalQuantity - data.CumQuantity
 		response.OrderID = fmt.Sprintf("%d", data.OrderID)
+		fmt.Println("NEW SUCCESS", response.OrderID, response.OrderStatus.String())
 		context.Send(sender, response)
 	}()
 

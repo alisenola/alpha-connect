@@ -556,14 +556,20 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 						switch response.OrderStatus {
 						case models.OrderStatus_Expired:
 							// Fill or kill or other.
-							cancelReport, _ := state.account.ConfirmExpiredOrder(response.OrderID)
+							cancelReport, err := state.account.ConfirmExpiredOrder(response.OrderID)
+							if err != nil {
+								fmt.Println("ERROR CONFIRMING EXPIRED", err)
+							}
 							if cancelReport != nil {
 								cancelReport.SeqNum = state.seqNum + 1
 								state.seqNum += 1
 								context.Send(context.Parent(), cancelReport)
 							}
 						case models.OrderStatus_Filled:
-							filledReport, _ := state.account.PendingFilled(response.OrderID)
+							filledReport, err := state.account.PendingFilled(response.OrderID)
+							if err != nil {
+								fmt.Println("ERROR PENDING FILLED", err)
+							}
 							if filledReport != nil {
 								filledReport.SeqNum = state.seqNum + 1
 								state.seqNum += 1
@@ -930,6 +936,8 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
+		b, _ := json.Marshal(udata.Execution)
+		fmt.Println("ORDER_TRADE_UPDATE", string(b))
 		exec := udata.Execution
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
