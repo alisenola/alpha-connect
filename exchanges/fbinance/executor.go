@@ -1131,9 +1131,9 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 				re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
 				match := re.FindStringSubmatch(data.Message)
 				if len(match) == 3 {
-					switch match[1] {
+					switch match[2] {
 					case "MINUTE":
-						limit, err := strconv.ParseInt(match[2], 10, 64)
+						limit, err := strconv.ParseInt(match[1], 10, 64)
 						if err != nil {
 							state.logger.Warn("error parsing rate limit " + match[2])
 						} else {
@@ -1141,7 +1141,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 							ar.minute.SetLimit(int(limit))
 						}
 					case "TEN_SECONDS":
-						limit, err := strconv.ParseInt(match[2], 10, 64)
+						limit, err := strconv.ParseInt(match[1], 10, 64)
 						if err != nil {
 							state.logger.Warn("error parsing rate limit " + match[2])
 						} else {
