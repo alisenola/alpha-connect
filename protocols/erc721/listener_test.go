@@ -2,9 +2,9 @@ package erc721_test
 
 import (
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/chains"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
+	ctypes "gitlab.com/alphaticks/alpha-connect/chains/types"
+	xtypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"gitlab.com/alphaticks/alpha-connect/protocols/types"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -29,11 +29,11 @@ func TestListener(t *testing.T) {
 	}
 	reg := registry.NewPublicRegistryClient(conn)
 
-	prCfg := &protocols.ExecutorConfig{
+	prCfg := &types.ExecutorConfig{
 		Registry:  reg,
 		Protocols: []*xchangerModels.Protocol{protocol},
 	}
-	as, ex, clean := exTests.StartExecutor(t, &exchanges.ExecutorConfig{}, prCfg, &chains.ExecutorConfig{}, nil)
+	as, ex, clean := exTests.StartExecutor(t, &xtypes.ExecutorConfig{}, prCfg, &ctypes.ExecutorConfig{}, nil)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
@@ -67,5 +67,4 @@ func TestListener(t *testing.T) {
 	time.Sleep(800 * time.Second)
 	as.Root.Poison(checker)
 	time.Sleep(10 * time.Second)
-	// TODO check if
 }

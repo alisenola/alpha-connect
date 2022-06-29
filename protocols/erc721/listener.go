@@ -17,7 +17,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/protocols/types"
 	gorderbook_models "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	xutils "gitlab.com/alphaticks/xchanger/eth"
-	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
+	nft "gitlab.com/alphaticks/xchanger/protocols/erc721/evm"
 )
 
 type checkTimeout struct{}

@@ -70,7 +70,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
@@ -285,14 +285,14 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 	context.ReenterAfter(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_EthRPCError
+			response.RejectionReason = messages.RejectionReason_RPCError
 			context.Respond(response)
 			return
 		}
 		queryResponse := resp.(*jobs.PerformLogsQueryResponse)
 		if queryResponse.Error != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(queryResponse.Error))
-			response.RejectionReason = messages.RejectionReason_EthRPCError
+			response.RejectionReason = messages.RejectionReason_RPCError
 			context.Respond(response)
 			return
 		}
@@ -303,7 +303,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapInitialize{}
 				if err := eth.UnpackLog(uabi, &event, "Initialize", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -320,7 +320,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapMint{}
 				if err := eth.UnpackLog(uabi, &event, "Mint", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -341,7 +341,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapBurn{}
 				if err := eth.UnpackLog(uabi, &event, "Burn", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -362,7 +362,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapSwap{}
 				if err := eth.UnpackLog(uabi, &event, "Swap", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -382,7 +382,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapCollect{}
 				if err := eth.UnpackLog(uabi, &event, "Collect", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -402,7 +402,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapFlash{}
 				if err := eth.UnpackLog(uabi, &event, "Flash", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -419,7 +419,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapSetFeeProtocol{}
 				if err := eth.UnpackLog(uabi, &event, "SetFeeProtocol", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
@@ -435,7 +435,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 				event := uniswap.UniswapCollectProtocol{}
 				if err := eth.UnpackLog(uabi, &event, "CollectProtocol", l); err != nil {
 					state.logger.Warn("error unpacking log", log.Error(err))
-					response.RejectionReason = messages.RejectionReason_EthRPCError
+					response.RejectionReason = messages.RejectionReason_RPCError
 					context.Respond(response)
 					return
 				}
