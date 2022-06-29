@@ -7,16 +7,16 @@ import (
 	"github.com/asynkron/protoactor-go/log"
 	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/chains/starknet"
+	"gitlab.com/alphaticks/xchanger/chains/svm"
+	"math/big"
 	"reflect"
 	"time"
 )
 
-//TODO subscription to events
 type Executor struct {
 	chtypes.BaseExecutor
 	logger *log.Logger
-	client *starknet.Client
+	client *svm.Client
 	rpc    string
 }
 
@@ -44,7 +44,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("Type", reflect.TypeOf(*state).String()))
 
-	cl, err := starknet.Dial(state.rpc)
+	cl, err := svm.Dial(state.rpc)
 	if err != nil {
 		return fmt.Errorf("error dialing rpc url: %v", err)
 	}
@@ -86,14 +86,46 @@ func (state *Executor) OnSVMEventsQueryRequest(context actor.Context) error {
 	go func(pid *actor.PID) {
 		ctx, cancel := goContext.WithTimeout(goContext.Background(), 30*time.Second)
 		defer cancel()
-		events, err := state.client.GetEvents(ctx, *req.Query)
-		if err != nil {
-			state.logger.Error("error getting svm events", log.Error(err))
-			msg.RejectionReason = messages.RejectionReason_RPCError
-			context.Send(pid, msg)
-			return
+		done := false
+		q := req.Query
+		var events []*svm.Event
+		for !done {
+			evs, err := state.client.GetEvents(ctx, q)
+			if err != nil {
+				state.logger.Error("error getting svm events", log.Error(err))
+				msg.RejectionReason = messages.RejectionReason_RPCError
+				context.Send(pid, msg)
+				return
+			}
+			events = append(events, evs.Events...)
+			q.PageNumber += 1
+			done = evs.IsLastPage
+		}
+		lastBlock := 0
+		var times []uint64
+		var bl *svm.Block
+		for _, ev := range events {
+			if ev.BlockNumber != lastBlock {
+				ctx, cancel := goContext.WithTimeout(goContext.Background(), 5*time.Second)
+				qB := svm.BlockQuery{
+					BlockNumber: big.NewInt(int64(ev.BlockNumber)),
+				}
+				var err error
+				bl, err = state.client.BlockInfo(ctx, qB)
+				if err != nil {
+					state.logger.Error("error getting svm block times", log.Error(err))
+					msg.RejectionReason = messages.RejectionReason_RPCError
+					context.Send(pid, msg)
+					cancel()
+					return
+				}
+				cancel()
+			}
+			lastBlock = ev.BlockNumber
+			times = append(times, bl.AcceptedTime)
 		}
 		msg.Events = events
+		msg.Times = times
 		msg.Success = true
 		context.Send(pid, msg)
 	}(context.Sender())
