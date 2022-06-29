@@ -1116,13 +1116,13 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 		var data fbinance.OrderData
 		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error posting order", log.Error(err))
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
 			return
 		}
 		if data.Code != 0 {
-			state.logger.Warn("error posting order", log.Error(errors.New(data.Message)))
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
 
