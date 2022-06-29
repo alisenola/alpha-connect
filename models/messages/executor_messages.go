@@ -5,7 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"gitlab.com/alphaticks/xchanger/chains/starknet"
+	"gitlab.com/alphaticks/xchanger/chains/svm"
 	"gitlab.com/alphaticks/xchanger/models"
 	"time"
 )
@@ -82,28 +82,29 @@ type EVMLogs struct {
 
 type SVMEventsQueryRequest struct {
 	RequestID uint64
-	Query     *starknet.EventQuery
+	Query     svm.EventQuery
 	Chain     *models.Chain
 }
 
 type SVMEventsQueryResponse struct {
 	RequestID       uint64
 	ResponseID      uint64
-	Events          *starknet.Events
+	Events          []*svm.Event
+	Times           []uint64
 	Success         bool
 	RejectionReason RejectionReason
 }
 
 type SVMBlockQueryRequest struct {
 	RequestID uint64
-	Query     *starknet.BlockQuery
+	Query     *svm.BlockQuery
 	Chain     *models.Chain
 }
 
 type SVMBlockQueryResponse struct {
 	RequestID       uint64
 	ResponseID      uint64
-	Block           *starknet.Block
+	Block           *svm.Block
 	Success         bool
 	RejectionReason RejectionReason
 }
@@ -117,7 +118,7 @@ type SVMTransactionByHashRequest struct {
 type SVMTransactionByHashResponse struct {
 	RequestID       uint64
 	ResponseID      uint64
-	Transaction     *starknet.Transaction
+	Transaction     *svm.Transaction
 	Success         bool
 	RejectionReason RejectionReason
 }

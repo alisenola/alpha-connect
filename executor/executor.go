@@ -109,6 +109,9 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.EVMLogsQueryRequest,
 		*messages.EVMLogsSubscribeRequest,
 		*messages.EVMContractCallRequest,
+		*messages.SVMEventsQueryRequest,
+		*messages.SVMBlockQueryRequest,
+		*messages.SVMTransactionByHashRequest,
 		*messages.BlockNumberRequest:
 		if err := state.OnChainsMessage(context); err != nil {
 			state.logger.Error("error processing OnChainsMessage", log.Error(err))
