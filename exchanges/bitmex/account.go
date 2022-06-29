@@ -103,8 +103,8 @@ func (state *AccountListener) Receive(context actor.Context) {
 		}
 
 	case *messages.NewOrderSingleRequest:
-		if err := state.OnNewOrderSingle(context); err != nil {
-			state.logger.Error("error processing OnNewOrderSingle", log.Error(err))
+		if err := state.NewOrderSingleRequest(context); err != nil {
+			state.logger.Error("error processing NewOrderSingleRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -390,8 +390,16 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 	return nil
 }
 
-func (state *AccountListener) OnNewOrderSingle(context actor.Context) error {
+func (state *AccountListener) NewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
+	if req.Expire != nil && req.Expire.AsTime().Before(time.Now()) {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_RequestExpired,
+		})
+		return nil
+	}
 	req.Account = state.account.Account
 	// Check order quantity
 	order := &models.Order{

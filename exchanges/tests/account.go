@@ -11,6 +11,7 @@ import (
 	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"testing"
@@ -255,6 +256,34 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
 	}
 
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
+		RequestID: 0,
+		Account:   tc.Account,
+		Order: &messages.NewOrder{
+			ClientOrderID:         fmt.Sprintf("%d", time.Now().UnixNano()),
+			Instrument:            tc.Instrument,
+			OrderType:             models.OrderType_Limit,
+			OrderSide:             models.Side_Buy,
+			TimeInForce:           models.TimeInForce_GoodTillCancel,
+			Quantity:              0.001,
+			Price:                 &wrapperspb.DoubleValue{Value: 20000.},
+			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
+		},
+		ResponseType: respType,
+		Expire:       timestamppb.New(time.Now().Add(-10 * time.Millisecond)),
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, ok := res.(*messages.NewOrderSingleResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.NewOrderSingleResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if response.Success {
+		t.Fatalf("was expecting unsucessful request")
+	}
+	fmt.Println(response.RejectionReason.String())
+
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
@@ -271,11 +300,12 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
 		ResponseType: respType,
+		Expire:       timestamppb.New(time.Now().Add(10 * time.Millisecond)),
 	}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, ok := res.(*messages.NewOrderSingleResponse)
+	response, ok = res.(*messages.NewOrderSingleResponse)
 	if !ok {
 		t.Fatalf("was expecting *messages.NewOrderSingleResponse, got %s", reflect.TypeOf(res).String())
 	}

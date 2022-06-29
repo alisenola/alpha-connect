@@ -1137,7 +1137,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 						if err != nil {
 							state.logger.Warn("error parsing rate limit " + match[2])
 						} else {
-							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[1], limit))
+							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
 							ar.minute.SetLimit(int(limit))
 						}
 					case "TEN_SECONDS":
@@ -1145,7 +1145,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 						if err != nil {
 							state.logger.Warn("error parsing rate limit " + match[2])
 						} else {
-							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[1], limit))
+							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
 							ar.second.SetLimit(int(limit))
 						}
 					default:

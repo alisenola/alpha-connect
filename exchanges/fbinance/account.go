@@ -115,6 +115,12 @@ func (state *AccountListener) Receive(context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.AccountInformationRequest:
+		if err := state.OnAccountInformationRequest(context); err != nil {
+			state.logger.Error("error processing OnAccountInformationRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.AccountMovementRequest:
 		if err := state.OnAccountMovementRequest(context); err != nil {
 			state.logger.Error("error processing OnAccountMovementRequest", log.Error(err))
@@ -395,6 +401,21 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		state.refreshKeyTicker = nil
 	}
 
+	if !state.readOnly {
+		for _, sec := range state.securities {
+			context.Request(state.fbinanceExecutor, &messages.OrderMassCancelRequest{
+				Account: state.account.Account,
+				Filter: &messages.OrderFilter{
+					Instrument: &models.Instrument{
+						SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+						Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
+						Exchange:   sec.Exchange,
+					},
+				},
+			})
+		}
+	}
+
 	return nil
 }
 
@@ -462,6 +483,11 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 	return nil
 }
 
+func (state *AccountListener) OnAccountInformationRequest(context actor.Context) error {
+	context.Forward(state.fbinanceExecutor)
+	return nil
+}
+
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
 	if state.reconciler != nil {
 		context.Forward(state.reconciler)
@@ -483,6 +509,14 @@ func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context)
 func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	req.Account = state.account.Account
+	if req.Expire != nil && req.Expire.AsTime().Before(time.Now()) {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_RequestExpired,
+		})
+		return nil
+	}
 	// Check order quantity
 	order := &models.Order{
 		OrderID:               "",

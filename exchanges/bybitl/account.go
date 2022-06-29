@@ -379,6 +379,14 @@ func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context)
 func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
 	req.Account = state.account.Account
+	if req.Expire != nil && req.Expire.AsTime().Before(time.Now()) {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_RequestExpired,
+		})
+		return nil
+	}
 	// Check order quantity
 	order := &models.Order{
 		OrderID:               "",
