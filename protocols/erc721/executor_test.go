@@ -51,7 +51,7 @@ type ERC721Contract struct {
 	ERC721Contract ERC721Data `graphql:"erc721Contract(block:{number:$number} id:$id)"`
 }
 
-func TestExecutor(t *testing.T) {
+func TestExecutorEVM(t *testing.T) {
 	exTests.LoadStatics(t)
 	protocol := constants.ERC721
 	registryAddress := "registry.alphaticks.io:8001"
@@ -181,6 +181,87 @@ func TestExecutor(t *testing.T) {
 		if ownersCheck[k] != v {
 			fmt.Println("error with", common.Bytes2Hex(k[:]))
 		}
+	}
+}
+
+func TestExecutorSVM(t *testing.T) {
+	exTests.LoadStatics(t)
+	protocol := constants.ERC721
+	registryAddress := "127.0.0.1:8001"
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := registry.NewPublicRegistryClient(conn)
+
+	prCfg := &types.ExecutorConfig{
+		Registry:  reg,
+		Protocols: []*xchangerModels.Protocol{protocol},
+	}
+	as, executor, clean := exTests.StartExecutor(t, &xtypes.ExecutorConfig{}, prCfg, &ctypes.ExecutorConfig{}, nil)
+	defer clean()
+
+	testAsset := xchangerModels.Asset{
+		ID:     275.,
+		Symbol: "BAYC",
+	}
+	chain, ok := constants.GetChainByID(5)
+	if !ok {
+		t.Fatal("missing svm")
+	}
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets, ok := res.(*messages.ProtocolAssetList)
+	if !ok {
+		t.Fatal("incorrect for type assertion")
+	}
+	var coll *models.ProtocolAsset
+	for _, asset := range assets.ProtocolAssets {
+		if asset.Asset.Symbol == testAsset.Symbol && asset.Chain.ID == chain.ID {
+			fmt.Printf("asset %+v \n", asset)
+			coll = asset
+		}
+	}
+	if coll == nil {
+		t.Fatal("missing collection")
+	}
+	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
+		RequestID:       uint64(time.Now().UnixNano()),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.StarnetMainnet),
+	}, 15*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
+	if !ok {
+		t.Fatalf("was expecting ProtocolAssetDefinitionResponse got %s", reflect.TypeOf(r).String())
+	}
+	if !def.Success {
+		t.Fatal(def.RejectionReason)
+	}
+	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
+	//Execute the future request for the NFT historical data
+	resp, err := as.Root.RequestFuture(
+		executor,
+		&messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:       uint64(time.Now().UnixNano()),
+			ProtocolAssetID: coll.ProtocolAssetID,
+			Start:           0,
+			Stop:            3000,
+		},
+		30*time.Second,
+	).Result()
+	if err != nil {
+		t.Fatal()
+	}
+	response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+	if !ok {
+		t.Fatalf("expected *messages.HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if !response.Success {
+		t.Fatal("error in the transfers request", response.RejectionReason)
 	}
 }
 
