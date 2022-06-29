@@ -22,6 +22,7 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -208,10 +209,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 			if rateLimit.RateLimitType == "ORDERS" {
 				if rateLimit.Interval == "MINUTE" {
 					minuteOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Minute
-					minuteOrderLimit = rateLimit.Limit
+					minuteOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
 				} else if rateLimit.Interval == "SECOND" {
 					secondOrderInterval = time.Duration(rateLimit.IntervalNum) * time.Second
-					secondOrderLimit = rateLimit.Limit
+					secondOrderLimit = rateLimit.Limit * 10 // Adaptive rate limit, wait for an error to update
 				}
 			} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 				qr.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
@@ -1124,6 +1125,33 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			state.logger.Warn("error posting order", log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
+
+			if data.Code == -1015 {
+				// Order rate limit, find
+				re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z]+)\.`)
+				match := re.FindStringSubmatch(data.Message)
+				if len(match) == 3 {
+					switch match[1] {
+					case "MINUTE":
+						limit, err := strconv.ParseInt(match[2], 10, 64)
+						if err != nil {
+							state.logger.Warn("error parsing rate limit " + match[2])
+						} else {
+							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[1], limit))
+							ar.minute.SetLimit(int(limit))
+						}
+					case "TEN_SECONDS":
+						limit, err := strconv.ParseInt(match[2], 10, 64)
+						if err != nil {
+							state.logger.Warn("error parsing rate limit " + match[2])
+						} else {
+							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[1], limit))
+							ar.second.SetLimit(int(limit))
+						}
+					}
+				}
+			}
+
 			return
 		}
 		status := StatusToModel(data.Status)

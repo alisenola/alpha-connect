@@ -627,6 +627,10 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220628133819-5184e369eb4c h1:hwGHwfluT+K
 gitlab.com/alphaticks/xchanger v0.0.0-20220628133819-5184e369eb4c/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
 gitlab.com/alphaticks/xchanger v0.0.0-20220628140839-5066b54e000f h1:xMI+JJPW8LimuVHn7tKvgiB6S2fLs++bDhXGpOFeQvo=
 gitlab.com/alphaticks/xchanger v0.0.0-20220628140839-5066b54e000f/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
+gitlab.com/alphaticks/xchanger v0.0.0-20220629095243-b5514a81666c h1:nkfKhFj6D75k931/qZtcZvm0UUeaSTWQgZNGZYk48Ww=
+gitlab.com/alphaticks/xchanger v0.0.0-20220629095243-b5514a81666c/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
+gitlab.com/alphaticks/xchanger v0.0.0-20220629102515-8242643bd618 h1:7WwRooaBHtc7dAYmbTXxHVd5kaddPWJjygEfxSzei20=
+gitlab.com/alphaticks/xchanger v0.0.0-20220629102515-8242643bd618/go.mod h1:gXPlZaXdWkpMMcg3Kw4PmGgKW7T34NMLWThGsXQ7TXw=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
