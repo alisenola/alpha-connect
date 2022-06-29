@@ -278,7 +278,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			times = resp.Times
 		case *messages.SVMEventsQueryResponse:
 			if !resp.Success {
-				state.logger.Warn("error at eth rpc server", log.String("rejection reason", resp.RejectionReason.String()))
+				state.logger.Warn("error at stark rpc server", log.String("rejection reason", resp.RejectionReason.String()))
 				msg.RejectionReason = messages.RejectionReason_RPCError
 				context.Respond(msg)
 				return
@@ -310,7 +310,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				case state.eabi.Events["Transfer"].ID:
 					event := nft.ERC721Transfer{}
 					if err := eth.UnpackLog(state.eabi, &event, "Transfer", l); err != nil {
-						state.logger.Warn("error unpacking log", log.Error(err))
+						state.logger.Warn("error unpacking eth log", log.Error(err))
 						msg.RejectionReason = messages.RejectionReason_RPCError
 						context.Respond(msg)
 						return
@@ -327,7 +327,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				case id:
 					event := snft.ERC721Transfer{}
 					if err := stark.UnpackLog(state.sabi, &event, "Transfer", l); err != nil {
-						state.logger.Warn("error unpacking log", log.Error(err))
+						state.logger.Warn("error unpacking stark event", log.Error(err))
 						msg.RejectionReason = messages.RejectionReason_RPCError
 						context.Respond(msg)
 						return
