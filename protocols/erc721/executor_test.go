@@ -198,7 +198,7 @@ func TestExecutorSVM(t *testing.T) {
 	assert.NotNil(t, coll, "missing collection")
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.StarnetMainnet),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.StarknetMainnet),
 	}, 15*time.Second).Result()
 	assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err)
 	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
