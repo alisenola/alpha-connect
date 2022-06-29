@@ -1128,7 +1128,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 			if data.Code == -1015 {
 				// Order rate limit, find
-				re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z]+)\.`)
+				re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
 				match := re.FindStringSubmatch(data.Message)
 				if len(match) == 3 {
 					switch match[1] {
