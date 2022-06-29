@@ -1148,7 +1148,11 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[1], limit))
 							ar.second.SetLimit(int(limit))
 						}
+					default:
+						state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
 					}
+				} else {
+					state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
 				}
 			}
 
