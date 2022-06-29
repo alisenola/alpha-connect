@@ -68,7 +68,7 @@ func TestExecutorSVMEventsQueryRequest(t *testing.T) {
 	events, ok := resp.(*messages.SVMEventsQueryResponse)
 	assert.True(t, ok, "expected SVMEventsQueryRequest, got %s", reflect.TypeOf(resp).String())
 	assert.True(t, events.Success, "failed SVMEventsQueryRequest, got: %s", events.RejectionReason.String())
-	assert.Equal(t, len(events.Events), 6, "expected more than 5 events")
+	assert.GreaterOrEqual(t, len(events.Events), 6, "expected at least 6 events")
 
 	for _, ev := range events.Events {
 		err = v.Struct(ev)
@@ -93,7 +93,7 @@ func TestExecutorSVMEventsQueryRequestTransfer(t *testing.T) {
 	events, ok := resp.(*messages.SVMEventsQueryResponse)
 	assert.True(t, ok, "expected SVMEventsQueryRequest, got %s", reflect.TypeOf(resp).String())
 	assert.True(t, events.Success, "failed SVMEventsQueryRequest, got: %s", events.RejectionReason.String())
-	assert.Equal(t, 1057, len(events.Events), "expected more than 5 events")
+	assert.GreaterOrEqual(t, len(events.Events), 1057, "expected at least 1057 events")
 
 	for _, ev := range events.Events {
 		err = v.Struct(ev)
@@ -119,7 +119,7 @@ func TestExecutorSVMBlockQueryRequest(t *testing.T) {
 	block, ok := resp.(*messages.SVMBlockQueryResponse)
 	assert.True(t, ok, "expected SVMBlockQueryResponse, got %s", reflect.TypeOf(resp).String())
 	assert.True(t, block.Success, "failed SVMBlockQueryResponse, got: %s", block.RejectionReason.String())
-	assert.Equal(t, len(block.Block.Transactions), 265, "expected more than 5 events")
+	assert.GreaterOrEqual(t, len(block.Block.Transactions), 265, "expected at least 265 transactions")
 
 	err = v.Struct(block.Block)
 	assert.Nil(t, err, "Validate struct err: %v", err)
@@ -141,7 +141,7 @@ func TestExecutorSVMBlockQueryRequest(t *testing.T) {
 	block, ok = resp.(*messages.SVMBlockQueryResponse)
 	assert.True(t, ok, "expected SVMBlockQueryResponse, got %s", reflect.TypeOf(resp).String())
 	assert.True(t, block.Success, "failed SVMBlockQueryResponse, got: %s", block.RejectionReason.String())
-	assert.Equal(t, len(block.Block.Transactions), 92, "expected more than 5 events")
+	assert.Equal(t, len(block.Block.Transactions), 92, "expected at least 92 transactions")
 
 	err = v.Struct(block.Block)
 	assert.Nil(t, err, "Validate struct err: %v", err)
