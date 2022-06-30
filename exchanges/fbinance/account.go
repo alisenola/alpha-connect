@@ -833,6 +833,17 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 						state.seqNum += 1
 						context.Send(context.Parent(), report)
 					}
+					if response.RejectionReason == messages.RejectionReason_UnknownOrder {
+						report, err := state.account.PendingFilled(ID)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					}
 					reqResponse.RejectionReason = response.RejectionReason
 					reqResponse.RateLimitDelay = response.RateLimitDelay
 				}
