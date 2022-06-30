@@ -263,7 +263,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		state.DialerPool = xchangerUtils.DefaultDialerPool
 	}
 
-	if state.DB != nil && false {
+	if state.DB != nil {
 		fmt.Println("MIGRATING")
 		if err := state.DB.AutoMigrate(&types.Account{}); err != nil {
 			return fmt.Errorf("error migrating account type: %v", err)
