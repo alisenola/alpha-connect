@@ -40,7 +40,6 @@ type AccountListener struct {
 	symbolToSec        map[string]*models.Security
 	client             *http.Client
 	db                 *gorm.DB
-	reconciler         *actor.PID
 }
 
 func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
@@ -204,11 +203,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	if err := state.subscribeAccount(context); err != nil {
 		return fmt.Errorf("error subscribing to account: %v", err)
 	}
-	if state.db != nil {
-		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.db))
-		state.reconciler = context.Spawn(props)
-	}
 
 	//Fetch the current balance
 	fmt.Println("Fetching the balance")
@@ -359,20 +353,12 @@ func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error 
 }
 
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
-	if state.reconciler != nil {
-		context.Forward(state.reconciler)
-	} else {
-		context.Forward(state.bybitlExecutor)
-	}
+	context.Forward(state.bybitlExecutor)
 	return nil
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	if state.reconciler != nil {
-		context.Forward(state.reconciler)
-	} else {
-		context.Forward(state.bybitlExecutor)
-	}
+	context.Forward(state.bybitlExecutor)
 	return nil
 }
 

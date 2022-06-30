@@ -73,6 +73,7 @@ enum RejectionReason {
     EthRPCTimeout = 34;
     UnknownChain = 35;
     RequestExpired = 36;
+    AccountListenerDisabled = 37;
 }
 
 enum ResponseType {

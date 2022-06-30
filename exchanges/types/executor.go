@@ -20,14 +20,16 @@ type updateSecurityList struct{}
 type updateMarketableProtocolAssetList struct{}
 
 type ExecutorConfig struct {
-	Exchanges          []*xchangerModels.Exchange
-	Accounts           []*account.Account
-	DialerPool         *xchangerUtils.DialerPool
-	Registry           registry.PublicRegistryClient
-	OpenseaCredentials *xchangerModels.APICredentials
-	DB                 *gorm.DB
-	StrictExchange     bool
-	ReadOnlyAccount    bool
+	Exchanges               []*xchangerModels.Exchange
+	Accounts                []*account.Account
+	DialerPool              *xchangerUtils.DialerPool
+	Registry                registry.PublicRegistryClient
+	OpenseaCredentials      *xchangerModels.APICredentials
+	DB                      *gorm.DB
+	StrictExchange          bool
+	ReadOnlyAccount         bool
+	DisableAccountReconcile bool
+	DisableAccountListener  bool
 }
 
 type Executor interface {

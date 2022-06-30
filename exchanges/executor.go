@@ -383,11 +383,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.accountManagers = make(map[string]*actor.PID)
 	for _, accnt := range state.Accounts {
 		cfg := &AccountManagerConfig{
-			Account:      accnt,
-			Registry:     state.Registry,
-			DB:           state.DB,
-			PaperTrading: false,
-			ReadOnly:     state.ReadOnlyAccount,
+			Account:          accnt,
+			Registry:         state.Registry,
+			DB:               state.DB,
+			PaperTrading:     false,
+			ReadOnly:         state.ReadOnlyAccount,
+			DisableListener:  state.DisableAccountListener,
+			DisableReconcile: state.DisableAccountReconcile,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
@@ -424,11 +426,13 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 			return fmt.Errorf("error creating account: %v", err)
 		}
 		cfg := &AccountManagerConfig{
-			Account:      accnt,
-			Registry:     state.Registry,
-			DB:           state.DB,
-			PaperTrading: false,
-			ReadOnly:     state.ReadOnlyAccount,
+			Account:          accnt,
+			Registry:         state.Registry,
+			DB:               state.DB,
+			PaperTrading:     false,
+			ReadOnly:         state.ReadOnlyAccount,
+			DisableListener:  state.DisableAccountListener,
+			DisableReconcile: state.DisableAccountReconcile,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {
@@ -1203,11 +1207,13 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			return fmt.Errorf("error creating account: %v", err)
 		}
 		cfg := &AccountManagerConfig{
-			Account:      accnt,
-			Registry:     state.Registry,
-			DB:           state.DB,
-			PaperTrading: false,
-			ReadOnly:     state.ReadOnlyAccount,
+			Account:          accnt,
+			Registry:         state.Registry,
+			DB:               state.DB,
+			PaperTrading:     false,
+			ReadOnly:         state.ReadOnlyAccount,
+			DisableListener:  state.DisableAccountListener,
+			DisableReconcile: state.DisableAccountReconcile,
 		}
 		producer := NewAccountManagerProducer(cfg)
 		if producer == nil {

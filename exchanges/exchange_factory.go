@@ -79,6 +79,19 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	}
 }
 
+func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+	switch account.Exchange.ID {
+	case constants.FBINANCE.ID:
+		return fbinance.NewAccountReconcileProducer(account, registry, db)
+	case constants.FTX.ID:
+		return ftx.NewAccountReconcileProducer(account, registry, db)
+	case constants.BYBITL.ID:
+		return bybitl.NewAccountReconcileProducer(account, registry, db)
+	default:
+		return nil
+	}
+}
+
 func NewPaperAccountListenerProducer(account *account.Account) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:

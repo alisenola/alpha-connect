@@ -231,7 +231,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			}
 			progress := false
 			for _, trd := range trds.Trades {
-				fmt.Println(trd)
 				// check if trade exists
 				var cnt int64
 				tx := state.db.Model(&extypes.Transaction{}).Where("execution_id=?", trd.TradeID).Count(&cnt)
@@ -239,7 +238,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					return fmt.Errorf("error getting trade transaction count: %v", err)
 				}
 				if cnt > 0 {
-					fmt.Println("SKIP")
 					continue
 				}
 				ts := trd.TransactionTime.AsTime()
@@ -320,7 +318,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					} else {
 						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
 					}
-					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
 				}
 			}
 		}
@@ -386,7 +383,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 					return fmt.Errorf("error getting funding transaction count: %v", err)
 				}
 				if cnt > 0 {
-					fmt.Println("SKIP")
 					continue
 				}
 				ts := m.Time.AsTime()
@@ -446,7 +442,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				return fmt.Errorf("error getting transaction count: %v", err)
 			}
 			if cnt > 0 {
-				fmt.Println("SKIP")
 				continue
 			}
 			ts := m.Time.AsTime()
@@ -505,7 +500,6 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				return fmt.Errorf("error getting transaction count: %v", err)
 			}
 			if cnt > 0 {
-				fmt.Println("SKIP")
 				continue
 			}
 			ts := m.Time.AsTime()

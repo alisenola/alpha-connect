@@ -14,6 +14,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -24,7 +25,7 @@ type AccountReconcile struct {
 	extypes.BaseReconcile
 	account          *models.Account
 	dbAccount        *extypes.Account
-	fbinanceExecutor *actor.PID
+	executor         *actor.PID
 	logger           *log.Logger
 	securities       map[uint64]*registry.Security
 	symbToSecs       map[string]*registry.Security
@@ -68,7 +69,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-	state.fbinanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FBINANCE.Name+"_executor")
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FBINANCE.Name+"_executor")
 
 	// Request securities
 	res, err := state.registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
@@ -198,6 +199,23 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 }
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
+	// Fetch positions
+	resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
+		Instrument: nil,
+		Account:    state.account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+
+	positionList, ok := resp.(*messages.PositionList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.PositionList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !positionList.Success {
+		return fmt.Errorf("error getting balances: %s", positionList.RejectionReason.String())
+	}
+
 	for _, sec := range state.securities {
 		instrument := &models.Instrument{
 			SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
@@ -205,7 +223,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
-			res, err := context.RequestFuture(state.fbinanceExecutor, &messages.TradeCaptureReportRequest{
+			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
 					FromID:     &wrapperspb.StringValue{Value: fmt.Sprintf("%d", state.lastTradeID[sec.SecurityId]+1)},
@@ -278,6 +296,57 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 	}
 
+	state.positions = make(map[uint64]*account.Position)
+	for _, sec := range state.securities {
+		if sec.SecurityType == "CRPERP" {
+			state.positions[sec.SecurityId] = account.NewPosition(
+				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
+		}
+	}
+	var transactions []extypes.Transaction
+	state.db.Debug().
+		Model(&extypes.Transaction{}).
+		Joins("Fill").
+		Where(`"transactions"."account_id"=?`, state.dbAccount.ID).
+		Where(`"transactions"."time" < ?`, positionList.Time.AsTime()).
+		Order("time asc, execution_id asc").
+		Find(&transactions)
+	for _, tr := range transactions {
+		switch tr.Type {
+		case "TRADE":
+			if tr.Fill != nil {
+				secID := uint64(tr.Fill.SecurityID)
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
+					if tr.Fill.Quantity < 0 {
+						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
+					} else {
+						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
+					}
+				}
+			}
+		}
+	}
+
+	execPositions := make(map[uint64]*models.Position)
+	for _, pos := range positionList.Positions {
+		execPositions[pos.Instrument.SecurityID.Value] = pos
+	}
+
+	for k, p1 := range state.positions {
+		if p2, ok := execPositions[k]; ok {
+			if p1.GetPosition() != nil {
+				q1 := int(math.Round(1e8 * p1.GetPosition().Quantity))
+				q2 := int(math.Round(1e8 * p2.Quantity))
+				if q1 != q2 {
+					return fmt.Errorf("different position quantity")
+				}
+			}
+		} else if p1.GetPosition() != nil {
+			return fmt.Errorf("%s not in exec", p1.GetPosition().Instrument.Symbol)
+		}
+	}
+
 	return nil
 }
 
@@ -285,7 +354,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 	// Get last account movement
 	done := false
 	for !done {
-		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
 			RequestID: 0,
 			Type:      messages.AccountMovementType_FundingFee,
 			Filter: &messages.AccountMovementFilter{
@@ -335,7 +404,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 
 	done = false
 	for !done {
-		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
 			RequestID: 0,
 			Type:      messages.AccountMovementType_Deposit,
 			Filter: &messages.AccountMovementFilter{
@@ -385,7 +454,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 
 	done = false
 	for !done {
-		res, err := context.RequestFuture(state.fbinanceExecutor, &messages.AccountMovementRequest{
+		res, err := context.RequestFuture(state.executor, &messages.AccountMovementRequest{
 			RequestID: 0,
 			Type:      messages.AccountMovementType_Withdrawal,
 			Filter: &messages.AccountMovementFilter{

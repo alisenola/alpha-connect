@@ -43,7 +43,6 @@ type AccountListener struct {
 	securities         map[uint64]*models.Security
 	client             *http.Client
 	db                 *gorm.DB
-	reconciler         *actor.PID
 }
 
 func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
@@ -324,12 +323,6 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	state.securities = securityMap
 	state.seqNum = 0
 
-	if state.db != nil {
-		// Start reconciliation child
-		props := actor.PropsFromProducer(NewAccountReconcileProducer(state.account.Account, state.registry, state.db))
-		state.reconciler = context.Spawn(props)
-	}
-
 	checkAccountTicker := time.NewTicker(1 * time.Minute)
 	state.checkAccountTicker = checkAccountTicker
 	go func(pid *actor.PID) {
@@ -489,20 +482,12 @@ func (state *AccountListener) OnAccountInformationRequest(context actor.Context)
 }
 
 func (state *AccountListener) OnAccountMovementRequest(context actor.Context) error {
-	if state.reconciler != nil {
-		context.Forward(state.reconciler)
-	} else {
-		context.Forward(state.fbinanceExecutor)
-	}
+	context.Forward(state.fbinanceExecutor)
 	return nil
 }
 
 func (state *AccountListener) OnTradeCaptureReportRequest(context actor.Context) error {
-	if state.reconciler != nil {
-		context.Forward(state.reconciler)
-	} else {
-		context.Forward(state.fbinanceExecutor)
-	}
+	context.Forward(state.fbinanceExecutor)
 	return nil
 }
 

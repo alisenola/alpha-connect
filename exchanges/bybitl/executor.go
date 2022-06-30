@@ -909,7 +909,6 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 	params := bybitl.NewQueryDepositRecordsParams()
 	if from != nil {
 		params.SetStartTime(*from)
-		fmt.Println("FROM", *from)
 	}
 	if to != nil {
 		params.SetEndTime(*to)
@@ -949,7 +948,6 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 				return data.DepositRecords.Rows[i].SuccessAt < data.DepositRecords.Rows[j].SuccessAt
 			})
 			for _, t := range data.DepositRecords.Rows {
-				fmt.Println(t)
 				asset, ok := constants.GetAssetBySymbol(t.Coin)
 				if !ok {
 					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
@@ -1007,7 +1005,6 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 	params := bybitl.NewQueryWithdrawRecordsParams()
 	if from != nil {
 		params.SetStartTime(*from)
-		fmt.Println("FROM", *from)
 	}
 	if to != nil {
 		params.SetEndTime(*to)
@@ -1047,7 +1044,6 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 				return data.WithdrawRecords.Rows[i].CreateTime < data.WithdrawRecords.Rows[j].CreateTime
 			})
 			for _, t := range data.WithdrawRecords.Rows {
-				fmt.Println(t)
 				asset, ok := constants.GetAssetBySymbol(t.Coin)
 				if !ok {
 					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
@@ -1083,7 +1079,6 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 }
 
 func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
-	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
 	req := context.Message().(*messages.AccountMovementRequest)
 
 	switch req.Type {

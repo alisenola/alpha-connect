@@ -15,19 +15,23 @@ import (
 // to actors who subscribed
 
 type AccountManagerConfig struct {
-	Account      *account.Account
-	Registry     registry.PublicRegistryClient
-	DB           *gorm.DB
-	PaperTrading bool
-	ReadOnly     bool
+	Account          *account.Account
+	Registry         registry.PublicRegistryClient
+	DB               *gorm.DB
+	PaperTrading     bool
+	ReadOnly         bool
+	DisableListener  bool
+	DisableReconcile bool
 }
 
 var DefaultAccountManagerConfig = AccountManagerConfig{
-	Account:      nil,
-	Registry:     nil,
-	DB:           nil,
-	PaperTrading: false,
-	ReadOnly:     true,
+	Account:          nil,
+	Registry:         nil,
+	DB:               nil,
+	PaperTrading:     false,
+	ReadOnly:         true,
+	DisableReconcile: false,
+	DisableListener:  false,
 }
 
 type AccountManager struct {
@@ -36,6 +40,7 @@ type AccountManager struct {
 	trdSubscribers  map[uint64]*actor.PID
 	blcSubscribers  map[uint64]*actor.PID
 	listener        *actor.PID
+	reconcile       *actor.PID
 	logger          *log.Logger
 	paperTrading    bool
 }
@@ -138,21 +143,32 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 	state.trdSubscribers = make(map[uint64]*actor.PID)
 	state.execSubscribers = make(map[uint64]*actor.PID)
 	state.blcSubscribers = make(map[uint64]*actor.PID)
-	var producer actor.Producer
-	if state.paperTrading {
-		producer = NewPaperAccountListenerProducer(state.Account)
-		if producer == nil {
-			return fmt.Errorf("error getting account listener")
+
+	if !state.DisableListener {
+		var listenerProducer actor.Producer
+		if state.paperTrading {
+			listenerProducer = NewPaperAccountListenerProducer(state.Account)
+			if listenerProducer == nil {
+				return fmt.Errorf("error getting account listener")
+			}
+		} else {
+			listenerProducer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.ReadOnly)
+			if listenerProducer == nil {
+				return fmt.Errorf("error getting account listener")
+			}
 		}
-	} else {
-		producer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.ReadOnly)
-		if producer == nil {
-			return fmt.Errorf("error getting account listener")
-		}
+
+		props := actor.PropsFromProducer(listenerProducer)
+		state.listener = context.Spawn(props)
 	}
 
-	props := actor.PropsFromProducer(producer)
-	state.listener = context.Spawn(props)
+	if !state.DisableReconcile && state.DB != nil {
+		reconcileProducer := NewAccountReconcileProducer(state.Account.Account, state.Registry, state.DB)
+		if reconcileProducer != nil {
+			props := actor.PropsFromProducer(reconcileProducer)
+			state.reconcile = context.Spawn(props)
+		}
+	}
 
 	return nil
 }
@@ -163,7 +179,14 @@ func (state *AccountManager) Clean(context actor.Context) error {
 
 func (state *AccountManager) OnAccountDataRequest(context actor.Context) error {
 	request := context.Message().(*messages.AccountDataRequest)
-
+	if state.listener == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_AccountListenerDisabled,
+		})
+		return nil
+	}
 	if request.Subscribe && request.Subscriber != nil {
 		state.execSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
@@ -177,7 +200,14 @@ func (state *AccountManager) OnAccountDataRequest(context actor.Context) error {
 
 func (state *AccountManager) OnOrderStatusRequest(context actor.Context) error {
 	request := context.Message().(*messages.OrderStatusRequest)
-
+	if state.listener == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_AccountListenerDisabled,
+		})
+		return nil
+	}
 	if request.Subscribe && request.Subscriber != nil {
 		state.execSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
@@ -191,7 +221,14 @@ func (state *AccountManager) OnOrderStatusRequest(context actor.Context) error {
 
 func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 	request := context.Message().(*messages.PositionsRequest)
-
+	if state.listener == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_AccountListenerDisabled,
+		})
+		return nil
+	}
 	if request.Subscribe {
 		state.trdSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
@@ -204,7 +241,14 @@ func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 
 func (state *AccountManager) OnBalancesRequest(context actor.Context) error {
 	request := context.Message().(*messages.BalancesRequest)
-
+	if state.listener == nil {
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_AccountListenerDisabled,
+		})
+		return nil
+	}
 	if request.Subscribe {
 		state.blcSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
