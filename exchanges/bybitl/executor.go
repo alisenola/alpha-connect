@@ -82,41 +82,118 @@ func (qr *QueryRunner) Post(weight int) {
 	qr.mPostRateLimit.Request(weight)
 }
 
+type SymbolRateLimit struct {
+	orderRateLimit    *exchanges.RateLimit
+	positionRateLimit *exchanges.RateLimit
+	tradeRateLimit    *exchanges.RateLimit
+}
+
+func NewSymbolRateLimit() *SymbolRateLimit {
+	return &SymbolRateLimit{
+		orderRateLimit:    exchanges.NewRateLimit(95, time.Minute),
+		positionRateLimit: exchanges.NewRateLimit(75, time.Minute),
+		tradeRateLimit:    exchanges.NewRateLimit(120, time.Minute),
+	}
+}
+
 type AccountRateLimit struct {
-	rateLimits map[string]*exchanges.RateLimit
+	rateLimits map[string]*SymbolRateLimit
 }
 
 func NewAccountRateLimit() *AccountRateLimit {
 	return &AccountRateLimit{
-		rateLimits: make(map[string]*exchanges.RateLimit),
+		rateLimits: make(map[string]*SymbolRateLimit),
 	}
 }
 
-func (rl *AccountRateLimit) Request(symbol string, weight int) {
+func (rl *AccountRateLimit) OrderRequest(symbol string, weight int) {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(95, time.Minute)
+		l = NewSymbolRateLimit()
 		rl.rateLimits[symbol] = l
 	}
-	l.Request(weight)
+	l.orderRateLimit.Request(weight)
 }
 
-func (rl *AccountRateLimit) IsRateLimited(symbol string) bool {
+func (rl *AccountRateLimit) IsOrderRateLimited(symbol string) bool {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(95, time.Minute)
+		l = NewSymbolRateLimit()
 		rl.rateLimits[symbol] = l
 	}
-	return l.IsRateLimited()
+	return l.orderRateLimit.IsRateLimited()
 }
 
-func (rl *AccountRateLimit) DurationBeforeNextRequest(symbol string, weight int) time.Duration {
+func (rl *AccountRateLimit) DurationBeforeNextOrderRequest(symbol string, weight int) time.Duration {
 	l, ok := rl.rateLimits[symbol]
 	if !ok {
-		l = exchanges.NewRateLimit(95, time.Minute)
+		l = NewSymbolRateLimit()
 		rl.rateLimits[symbol] = l
 	}
-	return l.DurationBeforeNextRequest(weight)
+	return l.orderRateLimit.DurationBeforeNextRequest(weight)
+}
+
+func (rl *AccountRateLimit) PositionRequest(symbol string, weight int) {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	l.positionRateLimit.Request(weight)
+}
+
+func (rl *AccountRateLimit) IsPositionRateLimited(symbol string) bool {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	return l.positionRateLimit.IsRateLimited()
+}
+
+func (rl *AccountRateLimit) DurationBeforeNextPositionRequest(symbol string, weight int) time.Duration {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	return l.positionRateLimit.DurationBeforeNextRequest(weight)
+}
+
+func (rl *AccountRateLimit) TradeRequest(symbol string, weight int) {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	l.tradeRateLimit.Request(weight)
+}
+
+func (rl *AccountRateLimit) IsTradeRateLimited(symbol string) bool {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	return l.tradeRateLimit.IsRateLimited()
+}
+
+func (rl *AccountRateLimit) DurationBeforeNextTradeRequest(symbol string, weight int) time.Duration {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	return l.tradeRateLimit.DurationBeforeNextRequest(weight)
+}
+
+func (rl *AccountRateLimit) WaitTradeRequest(symbol string, weight int) {
+	l, ok := rl.rateLimits[symbol]
+	if !ok {
+		l = NewSymbolRateLimit()
+		rl.rateLimits[symbol] = l
+	}
+	l.tradeRateLimit.WaitRequest(weight)
 }
 
 type Executor struct {
@@ -829,11 +906,16 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 		return nil
 	}
 	qr.Get(weight)
-
+	ar, ok := state.accountRateLimits[req.Account.Name]
+	if !ok {
+		ar = NewAccountRateLimit()
+		state.accountRateLimits[req.Account.Name] = ar
+	}
 	go func() {
 		var movements []*messages.AccountMovement
 		done := false
 		for !done {
+			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
 			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
@@ -1158,11 +1240,16 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		return nil
 	}
 	qr.Get(weight)
-
+	ar, ok := state.accountRateLimits[req.Account.Name]
+	if !ok {
+		ar = NewAccountRateLimit()
+		state.accountRateLimits[req.Account.Name] = ar
+	}
 	go func() {
 		var mtrades []*models.TradeCapture
 		done := false
 		for !done {
+			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
 			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
@@ -1395,13 +1482,13 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		state.accountRateLimits[req.Account.Name] = ar
 	}
 
-	if ar.IsRateLimited(symbol) {
+	if ar.IsOrderRateLimited(symbol) {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(symbol, 1))
+		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextOrderRequest(symbol, 1))
 		context.Send(sender, response)
 		return nil
 	}
-	ar.Request(symbol, 1)
+	ar.OrderRequest(symbol, 1)
 
 	params, rej := buildPostOrderRequest(symbol, req.Order, tickPrecision, lotPrecision)
 	if rej != nil {
@@ -1491,7 +1578,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		ar = NewAccountRateLimit()
 		state.accountRateLimits[req.Account.Name] = ar
 	}
-	ar.Request(symbol, 1)
+	ar.OrderRequest(symbol, 1)
 
 	params := bybitl.NewCancelActiveOrderParams(symbol)
 	if req.OrderID != nil {
