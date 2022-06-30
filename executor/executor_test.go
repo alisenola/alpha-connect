@@ -2,11 +2,8 @@ package executor_test
 
 import (
 	"fmt"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"os"
 	"testing"
 	"time"
 
@@ -14,42 +11,15 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	"google.golang.org/grpc"
 )
 
 func TestMainExecutor(t *testing.T) {
-	registryAddress := "registry.alphaticks.io:7001"
-	if os.Getenv("REGISTRY_ADDRESS") != "" {
-		registryAddress = os.Getenv("REGISTRY_ADDRESS")
+	var C = config.Config{
+		RegistryAddress: "registry.alphaticks.io:8001",
+		Exchanges:       []string{"uniswapv3"},
+		Protocols:       []string{"ERC-721"},
 	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg := registry.NewPublicRegistryClient(conn)
-
-	cfgEx := extypes.ExecutorConfig{
-		Registry: reg,
-		Exchanges: []*xchangerModels.Exchange{
-			{
-				Name: "uniswapv3",
-				ID:   0x20,
-			},
-		},
-	}
-	cfgPr := prtypes.ExecutorConfig{
-		Registry: reg,
-		Protocols: []*xchangerModels.Protocol{
-			{
-				Name: "ERC721",
-				ID:   0x01,
-			},
-		},
-	}
-	chPr := chtypes.ExecutorConfig{}
-	prod := executor.NewExecutorProducer(&cfgEx, &cfgPr, &chPr)
+	prod := executor.NewExecutorProducer(&C)
 	as := actor.NewActorSystem()
 	ex, err := as.Root.SpawnNamed(actor.PropsFromProducer(prod), "executor")
 	if err != nil {

@@ -10,11 +10,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
-type ExecutorConfig struct {
-	Registry registry.PublicRegistryClient
-	Chains   []*models2.Chain
-}
-
 type Executor interface {
 	actor.Actor
 	GetLogger() *log.Logger
@@ -27,7 +22,8 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
-	*ExecutorConfig
+	Registry registry.PublicRegistryClient
+	Chains   []*models2.Chain
 }
 
 func ReceiveExecutor(state Executor, context actor.Context) {

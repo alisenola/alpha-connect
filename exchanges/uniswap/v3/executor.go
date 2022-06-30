@@ -2,7 +2,9 @@ package v3
 
 import (
 	"fmt"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
 	"math/rand"
@@ -43,9 +45,10 @@ type Executor struct {
 	logger         *log.Logger
 }
 
-func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
 	e := &Executor{}
-	e.ExecutorConfig = config
+	e.DialerPool = dialerPool
+	e.Registry = registry
 	return e
 }
 
@@ -70,9 +73,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
-	dialers := state.ExecutorConfig.DialerPool.GetDialers()
+	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		httpClient := &http.Client{
 			Transport: &http.Transport{

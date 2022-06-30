@@ -2,14 +2,11 @@ package tests
 
 import (
 	"fmt"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
 	"testing"
 	"time"
@@ -25,10 +22,10 @@ type ExPubTest struct {
 }
 
 func ExPub(t *testing.T, tc ExPubTest) {
-	as, executor, cleaner := tests.StartExecutor(t,
-		&extypes.ExecutorConfig{Exchanges: []*xchangerModels.Exchange{tc.Instrument.Exchange}},
-		&prtypes.ExecutorConfig{},
-		&chtypes.ExecutorConfig{}, nil)
+	C := &config.Config{
+		Exchanges: []string{tc.Instrument.Exchange.Name},
+	}
+	as, executor, cleaner := tests.StartExecutor(t, C)
 	defer cleaner()
 
 	if tc.SecurityListRequest {

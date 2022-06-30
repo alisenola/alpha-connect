@@ -5,17 +5,17 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/protocols/erc20"
 	"gitlab.com/alphaticks/alpha-connect/protocols/erc721"
-	"gitlab.com/alphaticks/alpha-connect/protocols/types"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
-func NewProtocolExecutorProducer(protocol *models2.Protocol, config *types.ExecutorConfig) actor.Producer {
+func NewProtocolExecutorProducer(protocol *models2.Protocol, registry registry.PublicRegistryClient) actor.Producer {
 	switch protocol.ID {
 	case constants.ERC20.ID:
-		return func() actor.Actor { return erc20.NewExecutor(config.Registry) }
+		return func() actor.Actor { return erc20.NewExecutor(registry) }
 	case constants.ERC721.ID:
-		return func() actor.Actor { return erc721.NewExecutor(config.Registry) }
+		return func() actor.Actor { return erc721.NewExecutor(registry) }
 	default:
 		return nil
 	}

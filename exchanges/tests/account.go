@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	uuid "github.com/satori/go.uuid"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/tests"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
@@ -59,10 +56,20 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 func AccntTest(t *testing.T, tc AccountTest) {
 	tests.LoadStatics(t)
-	as, executor, cleaner := tests.StartExecutor(t, &extypes.ExecutorConfig{
-		Exchanges:       []*xchangerModels.Exchange{tc.Account.Exchange},
-		ReadOnlyAccount: false,
-	}, &prtypes.ExecutorConfig{}, &chtypes.ExecutorConfig{}, tc.Account)
+	C := &config.Config{
+		Accounts: []config.Account{{
+			Name:      tc.Account.Name,
+			Exchange:  tc.Account.Exchange.Name,
+			ID:        tc.Account.ApiCredentials.AccountID,
+			ApiKey:    tc.Account.ApiCredentials.APIKey,
+			ApiSecret: tc.Account.ApiCredentials.APISecret,
+			Reconcile: false,
+			Listen:    true,
+			ReadOnly:  false,
+		}},
+		Exchanges: []string{tc.Account.Exchange.Name},
+	}
+	as, executor, cleaner := tests.StartExecutor(t, C)
 	defer cleaner()
 
 	ctx := AccountTestCtx{

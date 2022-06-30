@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"github.com/spf13/viper"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"net"
 	"os"
@@ -14,16 +15,9 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/data"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/alpha-connect/rpc"
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	tickstore_grpc "gitlab.com/alphaticks/tickstore-grpc"
-	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/models"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
 )
@@ -31,7 +25,6 @@ import (
 var done = make(chan os.Signal, 1)
 
 var executorActor *actor.PID
-var assetLoader *actor.PID
 
 type GuardActor struct{}
 
@@ -39,7 +32,6 @@ func (state *GuardActor) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		context.Watch(executorActor)
-		context.Watch(assetLoader)
 
 	case *actor.Terminated:
 		done <- os.Signal(syscall.SIGTERM)
@@ -47,85 +39,60 @@ func (state *GuardActor) Receive(context actor.Context) {
 }
 
 func main() {
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("/etc/alpha-connect/")
+	configFile := os.Getenv("CONFIG_FILE")
+	if configFile != "" {
+		f, err := os.Open(configFile)
+		if err != nil {
+			panic(fmt.Errorf("error opening provided config file: %v", err))
+		}
+		if err := viper.ReadConfig(f); err != nil {
+			panic(fmt.Errorf("error reading provided config file: %v", err))
+		}
+		_ = f.Close()
+	} else if len(os.Args) > 1 {
+		f, err := os.Open(os.Args[1])
+		if err != nil {
+			panic(fmt.Errorf("error opening provided config file: %v", err))
+		}
+		if err := viper.ReadConfig(f); err != nil {
+			panic(fmt.Errorf("error reading provided config file: %v", err))
+		}
+		_ = f.Close()
+	} else {
+		err := viper.ReadInConfig() // Find and read the config file
+		if err != nil {             // Handle errors reading the config file
+			panic(fmt.Errorf("fatal error config file: %s \n", err))
+		}
+	}
+
+	var C config.Config
+	if err := viper.Unmarshal(&C); err != nil {
+		panic(err)
+	}
 
 	as := actor.NewActorSystem()
 	ctx := actor.NewRootContext(as, nil)
 
-	actorAddress := os.Getenv("ACTOR_ADDRESS")
-	actorAdvertisedAddress := os.Getenv("ACTOR_ADVERTISED_ADDRESS")
-	if actorAddress != "" {
-		address := strings.Split(actorAddress, ":")[0]
-		port, err := strconv.ParseInt(strings.Split(actorAddress, ":")[1], 10, 64)
+	if C.ActorAddress != "" {
+		address := strings.Split(C.ActorAddress, ":")[0]
+		port, err := strconv.ParseInt(strings.Split(C.ActorAddress, ":")[1], 10, 64)
 		if err != nil {
 			panic(err)
 		}
 		conf := remote.Configure(address, int(port))
-		if actorAdvertisedAddress != "" {
-			conf.AdvertisedHost = actorAdvertisedAddress
+		if C.ActorAdvertisedAddress != "" {
+			conf.AdvertisedHost = C.ActorAdvertisedAddress
 		}
 		//conf = conf.WithServerOptions()
 		rem := remote.NewRemote(as, conf)
 		rem.Start()
 	}
 
-	// Start actors
-	exch := []*models.Exchange{
-		constants.BINANCE,
-		constants.BITFINEX,
-		constants.BITSTAMP,
-		constants.COINBASEPRO,
-		constants.GEMINI,
-		constants.KRAKEN,
-		constants.CRYPTOFACILITIES,
-		constants.OKCOIN,
-		constants.FBINANCE,
-		constants.HITBTC,
-		constants.HUOBI,
-		constants.FTX,
-		constants.BITMEX,
-		constants.BITSTAMP,
-		constants.DERIBIT,
-		constants.HUOBIP,
-		constants.HUOBIF,
-		constants.BYBITI,
-		constants.BYBITL,
-		constants.UPBIT,
-		constants.BITHUMB,
-		constants.BITHUMBG,
-		constants.DYDX,
-		constants.OKEXP,
-	}
 	// EXECUTOR //
-	registryAddress := "registry.alphaticks.io:8001"
-	if os.Getenv("REGISTRY_ADDRESS") != "" {
-		registryAddress = os.Getenv("REGISTRY_ADDRESS")
-	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		err := fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
-		panic(err)
-	}
-	rgstr := registry.NewPublicRegistryClient(conn)
-	assetLoader = ctx.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
-	_, err = ctx.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
-	if err != nil {
-		panic(err)
-	}
-	// TODO mongo env
-	cfgExch := &extypes.ExecutorConfig{
-		Exchanges:      exch,
-		DialerPool:     xchangerUtils.DefaultDialerPool,
-		StrictExchange: true,
-	}
-	cfgPrt := &prtypes.ExecutorConfig{
-		Registry:  nil,
-		Protocols: nil,
-	}
-	cfgCh := &chtypes.ExecutorConfig{
-		Registry: nil,
-		Chains:   nil,
-	}
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgExch, cfgPrt, cfgCh)), "executor")
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(&C)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(
@@ -137,19 +104,18 @@ func main() {
 
 	var dataServer *grpc.Server
 	// Start live store gRPC server
-	if address := os.Getenv("DATA_STORE_ADDRESS"); address != "" {
-		lis, err := net.Listen("tcp", address)
+	if C.DataStoreAddress != "" {
+		lis, err := net.Listen("tcp", C.DataStoreAddress)
 		if err != nil {
 			panic(err)
 		}
 		dataServer = grpc.NewServer()
 
-		serverAddress := os.Getenv("DATA_SERVER_ADDRESS")
-		if serverAddress == "" {
-			panic("DATA_SERVER_ADDRESS undefined")
+		if C.DataServerAddress == "" {
+			panic("DataServerAddress undefined")
 		}
 
-		str, err := data.NewStorageClient("", serverAddress)
+		str, err := data.NewStorageClient("", C.DataServerAddress)
 		if err != nil {
 			panic(err)
 		}

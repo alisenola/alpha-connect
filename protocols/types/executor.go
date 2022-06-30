@@ -12,11 +12,6 @@ import (
 
 type updateProtocolAssetList struct{}
 
-type ExecutorConfig struct {
-	Registry  registry.PublicRegistryClient
-	Protocols []*models2.Protocol
-}
-
 type Executor interface {
 	actor.Actor
 	UpdateProtocolAssetList(context actor.Context) error
@@ -28,6 +23,8 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
+	Registry  registry.PublicRegistryClient
+	Protocols []*models2.Protocol
 }
 
 func ReceiveExecutor(state Executor, context actor.Context) {

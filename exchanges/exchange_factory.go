@@ -32,7 +32,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okex"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okexp"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/opensea"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	v3 "gitlab.com/alphaticks/alpha-connect/exchanges/uniswap/v3"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/upbit"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -40,6 +39,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 	"gitlab.com/alphaticks/xchanger/utils"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
 )
 
@@ -172,12 +172,12 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	}
 }
 
-func NewExchangeExecutorProducer(exchange *models2.Exchange, config *types.ExecutorConfig) actor.Producer {
+func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Producer {
 	switch exchange.ID {
 	case constants.BINANCE.ID:
-		return func() actor.Actor { return binance.NewExecutor(config) }
+		return func() actor.Actor { return binance.NewExecutor(dialerPool, registry) }
 	case constants.BITFINEX.ID:
-		return func() actor.Actor { return bitfinex.NewExecutor(config) }
+		return func() actor.Actor { return bitfinex.NewExecutor(dialerPool, registry) }
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewExecutor() }
 	case constants.BITSTAMP.ID:
@@ -189,11 +189,11 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *types.Execu
 	case constants.CRYPTOFACILITIES.ID:
 		return func() actor.Actor { return cryptofacilities.NewExecutor() }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewExecutor(config) }
+		return func() actor.Actor { return fbinance.NewExecutor(dialerPool, registry) }
 	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewExecutor(config) }
+		return func() actor.Actor { return ftx.NewExecutor(dialerPool, registry) }
 	case constants.FTXUS.ID:
-		return func() actor.Actor { return ftxus.NewExecutor(config) }
+		return func() actor.Actor { return ftxus.NewExecutor(dialerPool, registry) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewExecutor() }
 	case constants.HITBTC.ID:
@@ -209,17 +209,17 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *types.Execu
 	case constants.HUOBI.ID:
 		return func() actor.Actor { return huobi.NewExecutor() }
 	case constants.HUOBIP.ID:
-		return func() actor.Actor { return huobip.NewExecutor(config) }
+		return func() actor.Actor { return huobip.NewExecutor(dialerPool, registry) }
 	case constants.HUOBIF.ID:
 		return func() actor.Actor { return huobif.NewExecutor() }
 	case constants.HUOBIL.ID:
-		return func() actor.Actor { return huobil.NewExecutor(config) }
+		return func() actor.Actor { return huobil.NewExecutor(dialerPool, registry) }
 	case constants.BYBITI.ID:
-		return func() actor.Actor { return bybiti.NewExecutor(config) }
+		return func() actor.Actor { return bybiti.NewExecutor(dialerPool, registry) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewExecutor(config) }
+		return func() actor.Actor { return bybitl.NewExecutor(dialerPool, registry) }
 	case constants.BYBITS.ID:
-		return func() actor.Actor { return bybits.NewExecutor(config) }
+		return func() actor.Actor { return bybits.NewExecutor(dialerPool, registry) }
 	case constants.UPBIT.ID:
 		return func() actor.Actor { return upbit.NewExecutor() }
 	case constants.BITHUMB.ID:
@@ -227,15 +227,15 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *types.Execu
 	case constants.BITHUMBG.ID:
 		return func() actor.Actor { return bithumbg.NewExecutor() }
 	case constants.DYDX.ID:
-		return func() actor.Actor { return dydx.NewExecutor(config) }
+		return func() actor.Actor { return dydx.NewExecutor(dialerPool, registry) }
 	case constants.OKEXP.ID:
-		return func() actor.Actor { return okexp.NewExecutor(config) }
+		return func() actor.Actor { return okexp.NewExecutor(dialerPool, registry) }
 	case constants.GATE.ID:
-		return func() actor.Actor { return gate.NewExecutor(config) }
+		return func() actor.Actor { return gate.NewExecutor(dialerPool, registry) }
 	case constants.UNISWAPV3.ID:
-		return func() actor.Actor { return v3.NewExecutor(config) }
+		return func() actor.Actor { return v3.NewExecutor(dialerPool, registry) }
 	case constants.OPENSEA.ID:
-		return func() actor.Actor { return opensea.NewExecutor(config) }
+		return func() actor.Actor { return opensea.NewExecutor(dialerPool, registry) }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }

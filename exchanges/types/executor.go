@@ -64,7 +64,8 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
-	*ExecutorConfig
+	DialerPool               *xchangerUtils.DialerPool
+	Registry                 registry.PublicRegistryClient
 	SecuritiesLock           sync.RWMutex
 	Securities               map[uint64]*models.Security
 	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset

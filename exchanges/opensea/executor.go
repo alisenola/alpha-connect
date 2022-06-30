@@ -4,6 +4,7 @@ import (
 	goContext "context"
 	"encoding/json"
 	"fmt"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -41,9 +42,10 @@ type Executor struct {
 	registry                 registry.PublicRegistryClient
 }
 
-func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
 	e := &Executor{}
-	e.ExecutorConfig = config
+	e.DialerPool = dialerPool
+	e.Registry = registry
 	return e
 }
 
@@ -65,7 +67,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	dialers := state.ExecutorConfig.DialerPool.GetDialers()
+	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

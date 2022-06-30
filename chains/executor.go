@@ -1,8 +1,9 @@
 package chains
 
 import (
-	"gitlab.com/alphaticks/alpha-connect/chains/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"reflect"
 	"time"
 
@@ -15,21 +16,23 @@ import (
 // The executor routes all the request to the underlying exchange executor & listeners
 
 type Executor struct {
-	*types.ExecutorConfig
+	cfg       *config.Config
+	registry  registry.PublicRegistryClient
 	executors map[uint32]*actor.PID // A map from exchange ID to executor
 	logger    *log.Logger
 	strict    bool
 }
 
-func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *config.Config, registry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(cfg)
+		return NewExecutor(cfg, registry)
 	}
 }
 
-func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *config.Config, registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
-		ExecutorConfig: cfg,
+		cfg:      cfg,
+		registry: registry,
 	}
 }
 
@@ -182,7 +185,7 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 func (state *Executor) forward(context actor.Context, chain *models2.Chain) *messages.RejectionReason {
 	pid, ok := state.executors[chain.ID]
 	if !ok {
-		producer := NewChainExecutorProducer(chain, state.ExecutorConfig)
+		producer := NewChainExecutorProducer(chain, state.registry)
 		if producer == nil {
 			tmp := messages.RejectionReason_UnknownChain
 			return &tmp

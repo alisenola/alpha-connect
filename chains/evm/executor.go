@@ -4,6 +4,7 @@ import (
 	"container/list"
 	goContext "context"
 	"fmt"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 
 	"math/big"
 	"reflect"
@@ -49,13 +50,13 @@ type Executor struct {
 	rpc            string
 }
 
-func NewExecutor(config *chtypes.ExecutorConfig, rpc string) actor.Actor {
+func NewExecutor(registry registry.PublicRegistryClient, rpc string) actor.Actor {
 	e := &Executor{
 		protocolAssets: nil,
 		logger:         nil,
 		rpc:            rpc,
 	}
-	e.ExecutorConfig = config
+	e.Registry = registry
 	return e
 }
 

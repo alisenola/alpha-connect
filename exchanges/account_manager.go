@@ -5,6 +5,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gorm.io/gorm"
@@ -14,28 +15,11 @@ import (
 // The account manager spawns an account listener and multiplex its messages
 // to actors who subscribed
 
-type AccountManagerConfig struct {
-	Account          *account.Account
-	Registry         registry.PublicRegistryClient
-	DB               *gorm.DB
-	PaperTrading     bool
-	ReadOnly         bool
-	DisableListener  bool
-	DisableReconcile bool
-}
-
-var DefaultAccountManagerConfig = AccountManagerConfig{
-	Account:          nil,
-	Registry:         nil,
-	DB:               nil,
-	PaperTrading:     false,
-	ReadOnly:         true,
-	DisableReconcile: false,
-	DisableListener:  false,
-}
-
 type AccountManager struct {
-	*AccountManagerConfig
+	config.Account
+	db              *gorm.DB
+	registry        registry.PublicRegistryClient
+	account         *account.Account
 	execSubscribers map[uint64]*actor.PID
 	trdSubscribers  map[uint64]*actor.PID
 	blcSubscribers  map[uint64]*actor.PID
@@ -45,15 +29,18 @@ type AccountManager struct {
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(config *AccountManagerConfig) actor.Producer {
+func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(config)
+		return NewAccountManager(config, account, db, registry)
 	}
 }
 
-func NewAccountManager(config *AccountManagerConfig) actor.Actor {
+func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient) actor.Actor {
 	return &AccountManager{
-		AccountManagerConfig: config,
+		Account:  config,
+		account:  account,
+		db:       db,
+		registry: registry,
 	}
 }
 
@@ -140,19 +127,20 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
+	fmt.Println("ACCOUNT MANAGER STARTING")
 	state.trdSubscribers = make(map[uint64]*actor.PID)
 	state.execSubscribers = make(map[uint64]*actor.PID)
 	state.blcSubscribers = make(map[uint64]*actor.PID)
 
-	if !state.DisableListener {
+	if state.Listen {
 		var listenerProducer actor.Producer
 		if state.paperTrading {
-			listenerProducer = NewPaperAccountListenerProducer(state.Account)
+			listenerProducer = NewPaperAccountListenerProducer(state.account)
 			if listenerProducer == nil {
 				return fmt.Errorf("error getting account listener")
 			}
 		} else {
-			listenerProducer = NewAccountListenerProducer(state.Account, state.Registry, state.DB, state.ReadOnly)
+			listenerProducer = NewAccountListenerProducer(state.account, state.registry, state.db, state.ReadOnly)
 			if listenerProducer == nil {
 				return fmt.Errorf("error getting account listener")
 			}
@@ -162,8 +150,8 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 		state.listener = context.Spawn(props)
 	}
 
-	if !state.DisableReconcile && state.DB != nil {
-		reconcileProducer := NewAccountReconcileProducer(state.Account.Account, state.Registry, state.DB)
+	if state.Reconcile && state.db != nil {
+		reconcileProducer := NewAccountReconcileProducer(state.account.Account, state.registry, state.db)
 		if reconcileProducer != nil {
 			props := actor.PropsFromProducer(reconcileProducer)
 			state.reconcile = context.Spawn(props)

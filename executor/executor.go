@@ -3,9 +3,10 @@ package executor
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/chains"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
+	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"google.golang.org/grpc"
 	"reflect"
 	"time"
 
@@ -18,26 +19,22 @@ import (
 )
 
 type Executor struct {
-	cfgEx     *extypes.ExecutorConfig
-	cfgPr     *prtypes.ExecutorConfig
-	cfgCh     *chtypes.ExecutorConfig
+	cfg       *config.Config
 	exchanges *actor.PID
 	protocols *actor.PID
 	chains    *actor.PID
 	logger    *log.Logger
 }
 
-func NewExecutorProducer(cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *config.Config) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(cfgEx, cfgPr, cfgCh)
+		return NewExecutor(cfg)
 	}
 }
 
-func NewExecutor(cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *config.Config) actor.Actor {
 	return &Executor{
-		cfgEx: cfgEx,
-		cfgPr: cfgPr,
-		cfgCh: cfgCh,
+		cfg: cfg,
 	}
 }
 
@@ -125,7 +122,22 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()),
 	)
 
-	exProducer := exchanges.NewExecutorProducer(state.cfgEx)
+	registryAddress := "registry.alphaticks.io:8001"
+	if state.cfg.RegistryAddress != "" {
+		registryAddress = state.cfg.RegistryAddress
+	}
+	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	if err != nil {
+		return fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
+	}
+	rgstr := registry.NewPublicRegistryClient(conn)
+	assetLoader := context.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
+	_, err = context.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error loading assets: %v", err)
+	}
+
+	exProducer := exchanges.NewExecutorProducer(state.cfg, rgstr)
 	exProps := actor.PropsFromProducer(exProducer, actor.WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
 	))
@@ -135,7 +147,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 	state.exchanges = exEx
 
-	prProducer := protocols.NewExecutorProducer(state.cfgPr)
+	prProducer := protocols.NewExecutorProducer(state.cfg, rgstr)
 	prProps := actor.PropsFromProducer(prProducer, actor.WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
 	))
@@ -145,7 +157,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 	state.protocols = prEx
 
-	chProducer := chains.NewExecutorProducer(state.cfgCh)
+	chProducer := chains.NewExecutorProducer(state.cfg, rgstr)
 	chProps := actor.PropsFromProducer(chProducer, actor.WithSupervisor(
 		actor.NewExponentialBackoffStrategy(100*time.Second, time.Second),
 	))

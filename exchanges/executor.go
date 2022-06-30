@@ -3,9 +3,15 @@ package exchanges
 import (
 	"errors"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
-	models2 "gitlab.com/alphaticks/xchanger/models"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"gitlab.com/alphaticks/xchanger/constants"
+	xmodels "gitlab.com/alphaticks/xchanger/models"
+	"net"
+	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -15,13 +21,18 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // The executor routes all the request to the underlying exchange executor & listeners
 // He is the main part of the whole software..
 
 type Executor struct {
-	*types.ExecutorConfig
+	*config.Config
+	db                       *gorm.DB
+	registry                 registry.PublicRegistryClient
+	dialerPool               *xchangerUtils.DialerPool
 	accountManagers          map[string]*actor.PID
 	executors                map[uint32]*actor.PID                      // A map from exchange ID to executor
 	securities               map[uint64]*models.Security                // A map from security ID to security
@@ -34,15 +45,16 @@ type Executor struct {
 	strict                   bool
 }
 
-func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *config.Config, registry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(cfg)
+		return NewExecutor(cfg, registry)
 	}
 }
 
-func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *config.Config, registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
-		ExecutorConfig: cfg,
+		Config:   cfg,
+		registry: registry,
 	}
 }
 
@@ -259,33 +271,85 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.slSubscribers = make(map[uint64]*actor.PID)
 	state.accountManagers = make(map[string]*actor.PID)
 
-	if state.DialerPool == nil {
-		state.DialerPool = xchangerUtils.DefaultDialerPool
+	var dialerPool *xchangerUtils.DialerPool
+	interfaceName := os.Getenv("DIALER_POOL_INTERFACE")
+	ips := os.Getenv("DIALER_POOL_IPS")
+	if interfaceName != "" {
+		addresses, err := localAddresses(interfaceName)
+		if err != nil {
+			panic(fmt.Errorf("error getting interface addressses: %v", err))
+		}
+		var dialers []*net.Dialer
+		for _, a := range addresses {
+			state.logger.Info("using interface address " + a.String())
+			dialers = append(dialers, &net.Dialer{
+				LocalAddr: a,
+			})
+		}
+		dialerPool, err = xchangerUtils.NewDialerPool(dialers)
+		if err != nil {
+			return fmt.Errorf("error creating dialer pool: %v", err)
+		}
+	} else if ips != "" {
+		ipss := strings.Split(ips, ",")
+		var dialers []*net.Dialer
+		for _, ip := range ipss {
+			tcpAddr := &net.TCPAddr{
+				IP: net.ParseIP(ip),
+			}
+			dialers = append(dialers, &net.Dialer{
+				LocalAddr: tcpAddr,
+			})
+		}
+		var err error
+		dialerPool, err = xchangerUtils.NewDialerPool(dialers)
+		if err != nil {
+			return fmt.Errorf("error creating dialer pool: %v", err)
+		}
+	} else {
+		dialerPool = xchangerUtils.DefaultDialerPool
 	}
+	state.dialerPool = dialerPool
 
 	if state.DB != nil {
-		fmt.Println("MIGRATING")
-		if err := state.DB.AutoMigrate(&types.Account{}); err != nil {
-			return fmt.Errorf("error migrating account type: %v", err)
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Shanghai",
+			state.DB.PostgresHost,
+			state.DB.PostgresUser,
+			state.DB.PostgresPassword,
+			state.DB.PostgresDB,
+			state.DB.PostgresPort)
+		sql, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		if err != nil {
+			panic("failed to connect database")
 		}
-		if err := state.DB.AutoMigrate(&types.Transaction{}); err != nil {
-			return fmt.Errorf("error migrating transaction type: %v", err)
+		if state.DB.Migrate {
+			fmt.Println("MIGRATING")
+			if err := sql.AutoMigrate(&types.Account{}); err != nil {
+				return fmt.Errorf("error migrating account type: %v", err)
+			}
+			if err := sql.AutoMigrate(&types.Transaction{}); err != nil {
+				return fmt.Errorf("error migrating transaction type: %v", err)
+			}
+			if err := sql.AutoMigrate(&types.Fill{}); err != nil {
+				return fmt.Errorf("error migrating transaction type: %v", err)
+			}
+			if err := sql.AutoMigrate(&types.Movement{}); err != nil {
+				return fmt.Errorf("error migrating transaction type: %v", err)
+			}
 		}
-		if err := state.DB.AutoMigrate(&types.Fill{}); err != nil {
-			return fmt.Errorf("error migrating transaction type: %v", err)
-		}
-		if err := state.DB.AutoMigrate(&types.Movement{}); err != nil {
-			return fmt.Errorf("error migrating transaction type: %v", err)
-		}
+		state.db = sql
 	}
 
 	// TODO add dialer pool test
 
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
-	for _, exch := range state.Exchanges {
-		fmt.Println("NEW EXCHANGE", exch.Name)
-		producer := NewExchangeExecutorProducer(exch, state.ExecutorConfig)
+	for _, exchStr := range state.Exchanges {
+		exch, ok := constants.GetExchangeByName(exchStr)
+		if !ok {
+			return fmt.Errorf("unknown exchange %s", exch.Name)
+		}
+		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.registry)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", exch.Name)
 		}
@@ -381,23 +445,30 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all account listeners
 	state.accountManagers = make(map[string]*actor.PID)
-	for _, accnt := range state.Accounts {
-		cfg := &AccountManagerConfig{
-			Account:          accnt,
-			Registry:         state.Registry,
-			DB:               state.DB,
-			PaperTrading:     false,
-			ReadOnly:         state.ReadOnlyAccount,
-			DisableListener:  state.DisableAccountListener,
-			DisableReconcile: state.DisableAccountReconcile,
+	for _, accntCfg := range state.Accounts {
+		exch, ok := constants.GetExchangeByName(accntCfg.Exchange)
+		if !ok {
+			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
-		producer := NewAccountManagerProducer(cfg)
+		account, err := NewAccount(&models.Account{
+			Name:     accntCfg.Name,
+			Exchange: exch,
+			ApiCredentials: &xmodels.APICredentials{
+				APIKey:    accntCfg.ApiKey,
+				APISecret: accntCfg.ApiSecret,
+				AccountID: accntCfg.ID,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error creating new account: %v", err)
+		}
+		producer := NewAccountManagerProducer(accntCfg, account, state.db, state.registry)
 		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
+			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
 		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
-		state.accountManagers[accnt.Name] = context.Spawn(props)
+		state.accountManagers[accntCfg.Name] = context.Spawn(props)
 	}
 
 	return nil
@@ -421,33 +492,11 @@ func (state *Executor) OnAccountDataRequest(context actor.Context) error {
 	if pid, ok := state.accountManagers[request.Account.Name]; ok {
 		context.Forward(pid)
 	} else {
-		accnt, err := NewAccount(request.Account)
-		if err != nil {
-			return fmt.Errorf("error creating account: %v", err)
-		}
-		cfg := &AccountManagerConfig{
-			Account:          accnt,
-			Registry:         state.Registry,
-			DB:               state.DB,
-			PaperTrading:     false,
-			ReadOnly:         state.ReadOnlyAccount,
-			DisableListener:  state.DisableAccountListener,
-			DisableReconcile: state.DisableAccountReconcile,
-		}
-		producer := NewAccountManagerProducer(cfg)
-		if producer == nil {
-			context.Respond(&messages.AccountDataResponse{
-				RequestID:       request.RequestID,
-				Success:         false,
-				RejectionReason: messages.RejectionReason_UnknownExchange,
-			})
-			return nil
-		}
-		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
-		pid := context.Spawn(props)
-		state.accountManagers[request.Account.Name] = pid
-		context.Forward(pid)
+		context.Respond(&messages.AccountDataResponse{
+			RequestID:       request.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownAccount,
+		})
 	}
 
 	return nil
@@ -487,7 +536,7 @@ func (state *Executor) getSecurity(instr *models.Instrument) (*models.Security, 
 	}
 }
 
-func (state *Executor) getExchange(instr *models.Instrument) (*models2.Exchange, *messages.RejectionReason) {
+func (state *Executor) getExchange(instr *models.Instrument) (*xmodels.Exchange, *messages.RejectionReason) {
 	if instr == nil {
 		rej := messages.RejectionReason_MissingInstrument
 		return nil, &rej
@@ -537,7 +586,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool), actor.WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
@@ -561,7 +610,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.DialerPool), actor.WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
@@ -1189,10 +1238,8 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 	request := context.Message().(*commands.GetAccountRequest)
 	if request.Account == nil {
-		context.Respond(&messages.AccountDataResponse{
-			RequestID:       request.RequestID,
-			Success:         false,
-			RejectionReason: messages.RejectionReason_UnknownAccount,
+		context.Respond(&commands.GetAccountResponse{
+			Err: fmt.Errorf("unknown account"),
 		})
 		return nil
 	}
@@ -1202,29 +1249,8 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			Account: Portfolio.GetAccount(request.Account.Name),
 		})
 	} else {
-		accnt, err := NewAccount(request.Account)
-		if err != nil {
-			return fmt.Errorf("error creating account: %v", err)
-		}
-		cfg := &AccountManagerConfig{
-			Account:          accnt,
-			Registry:         state.Registry,
-			DB:               state.DB,
-			PaperTrading:     false,
-			ReadOnly:         state.ReadOnlyAccount,
-			DisableListener:  state.DisableAccountListener,
-			DisableReconcile: state.DisableAccountReconcile,
-		}
-		producer := NewAccountManagerProducer(cfg)
-		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", accnt.Exchange.Name)
-		}
-		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
-			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
-		pid := context.Spawn(props)
-		state.accountManagers[request.Account.Name] = pid
 		context.Respond(&commands.GetAccountResponse{
-			Account: accnt,
+			Err: fmt.Errorf("unknown account"),
 		})
 	}
 	return nil

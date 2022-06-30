@@ -3,7 +3,9 @@ package protocols
 import (
 	"errors"
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
 	"time"
 
@@ -18,7 +20,8 @@ import (
 // He is the main part of the whole software..
 
 type Executor struct {
-	*types.ExecutorConfig
+	*config.Config
+	registry       registry.PublicRegistryClient
 	executors      map[uint32]*actor.PID // A map from exchange ID to executor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
@@ -27,15 +30,16 @@ type Executor struct {
 	strict         bool
 }
 
-func NewExecutorProducer(cfg *types.ExecutorConfig) actor.Producer {
+func NewExecutorProducer(cfg *config.Config, registry registry.PublicRegistryClient) actor.Producer {
 	return func() actor.Actor {
-		return NewExecutor(cfg)
+		return NewExecutor(cfg, registry)
 	}
 }
 
-func NewExecutor(cfg *types.ExecutorConfig) actor.Actor {
+func NewExecutor(cfg *config.Config, registry registry.PublicRegistryClient) actor.Actor {
 	return &Executor{
-		ExecutorConfig: cfg,
+		Config:   cfg,
+		registry: registry,
 	}
 }
 
@@ -106,14 +110,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.dataManagers = make(map[uint64]*actor.PID)
 
 	// Spawn all exchange executors
-	for _, protocol := range state.ExecutorConfig.Protocols {
-		producer := NewProtocolExecutorProducer(protocol, state.ExecutorConfig)
+	for _, protocolStr := range state.Config.Protocols {
+		prtcl, ok := constants.GetProtocolByName(protocolStr)
+		if !ok {
+			return fmt.Errorf("unknown protocol %s", protocolStr)
+		}
+		producer := NewProtocolExecutorProducer(prtcl, state.registry)
 		if producer == nil {
-			return fmt.Errorf("unknown protocol %s", protocol.Name)
+			return fmt.Errorf("unknown protocol %s", prtcl.Name)
 		}
 		props := actor.PropsFromProducer(producer, actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 
-		state.executors[protocol.ID], _ = context.SpawnNamed(props, protocol.Name+"_executor")
+		state.executors[prtcl.ID], _ = context.SpawnNamed(props, prtcl.Name+"_executor")
 	}
 
 	// Request securities for each one of them

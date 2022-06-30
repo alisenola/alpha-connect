@@ -12,9 +12,11 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
 	"math/rand"
@@ -37,9 +39,10 @@ type Executor struct {
 	logger       *log.Logger
 }
 
-func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
 	e := &Executor{}
-	e.ExecutorConfig = config
+	e.DialerPool = dialerPool
+	e.Registry = registry
 	return e
 }
 
@@ -82,7 +85,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		Timeout: 10 * time.Second,
 	}
 
-	dialers := state.ExecutorConfig.DialerPool.GetDialers()
+	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		client := &http.Client{
 			Transport: &http.Transport{

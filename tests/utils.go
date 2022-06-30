@@ -3,13 +3,8 @@ package tests
 import (
 	"encoding/json"
 	"github.com/asynkron/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/account"
-	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/executor"
-	"gitlab.com/alphaticks/alpha-connect/models"
-	prtypes "gitlab.com/alphaticks/alpha-connect/protocols/types"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"io/ioutil"
@@ -64,17 +59,10 @@ func LoadStatics(t *testing.T) {
 	}
 }
 
-func StartExecutor(t *testing.T, cfgEx *extypes.ExecutorConfig, cfgPr *prtypes.ExecutorConfig, cfgCh *chtypes.ExecutorConfig, acc *models.Account) (*actor.ActorSystem, *actor.PID, func()) {
+func StartExecutor(t *testing.T, cfg *config.Config) (*actor.ActorSystem, *actor.PID, func()) {
 	LoadStatics(t)
-	if cfgEx != nil && acc != nil {
-		accnt, err := exchanges.NewAccount(acc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cfgEx.Accounts = []*account.Account{accnt}
-	}
 	config := actor.Config{DeadLetterThrottleInterval: time.Second, DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
 	as := actor.NewActorSystemWithConfig(&config)
-	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfgEx, cfgPr, cfgCh)), "executor")
+	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfg)), "executor")
 	return as, exec, func() { _ = as.Root.PoisonFuture(exec).Wait() }
 }

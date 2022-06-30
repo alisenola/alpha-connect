@@ -110,12 +110,12 @@ type Executor struct {
 	logger              *log.Logger
 }
 
-func NewExecutor(config *extypes.ExecutorConfig) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
 	ex := &Executor{
 		queryRunners: nil,
 		logger:       nil,
 	}
-	ex.ExecutorConfig = config
+	ex.DialerPool = dialerPool
 	return ex
 }
 
@@ -168,7 +168,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(state).String()))
 
-	dialers := state.ExecutorConfig.DialerPool.GetDialers()
+	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{
