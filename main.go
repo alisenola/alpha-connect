@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"net"
@@ -39,43 +38,14 @@ func (state *GuardActor) Receive(context actor.Context) {
 }
 
 func main() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("/etc/alpha-connect/")
-	configFile := os.Getenv("CONFIG_FILE")
-	if configFile != "" {
-		f, err := os.Open(configFile)
-		if err != nil {
-			panic(fmt.Errorf("error opening provided config file: %v", err))
-		}
-		if err := viper.ReadConfig(f); err != nil {
-			panic(fmt.Errorf("error reading provided config file: %v", err))
-		}
-		_ = f.Close()
-	} else if len(os.Args) > 1 {
-		f, err := os.Open(os.Args[1])
-		if err != nil {
-			panic(fmt.Errorf("error opening provided config file: %v", err))
-		}
-		if err := viper.ReadConfig(f); err != nil {
-			panic(fmt.Errorf("error reading provided config file: %v", err))
-		}
-		_ = f.Close()
-	} else {
-		err := viper.ReadInConfig() // Find and read the config file
-		if err != nil {             // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %s \n", err))
-		}
-	}
-
-	var C config.Config
-	if err := viper.Unmarshal(&C); err != nil {
-		panic(err)
-	}
 
 	as := actor.NewActorSystem()
 	ctx := actor.NewRootContext(as, nil)
 
+	C, err := config.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
 	if C.ActorAddress != "" {
 		address := strings.Split(C.ActorAddress, ":")[0]
 		port, err := strconv.ParseInt(strings.Split(C.ActorAddress, ":")[1], 10, 64)
@@ -92,7 +62,7 @@ func main() {
 	}
 
 	// EXECUTOR //
-	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(&C)), "executor")
+	executorActor, _ = ctx.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(C)), "executor")
 
 	// Spawn guard actor
 	guardActor, err := ctx.SpawnNamed(

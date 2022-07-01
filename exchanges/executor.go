@@ -9,9 +9,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"net"
-	"os"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -272,8 +270,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.accountManagers = make(map[string]*actor.PID)
 
 	var dialerPool *xchangerUtils.DialerPool
-	interfaceName := os.Getenv("DIALER_POOL_INTERFACE")
-	ips := os.Getenv("DIALER_POOL_IPS")
+	interfaceName := state.DialerPoolInterface
+	ips := state.DialerPoolIPs
 	if interfaceName != "" {
 		addresses, err := localAddresses(interfaceName)
 		if err != nil {
@@ -290,10 +288,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating dialer pool: %v", err)
 		}
-	} else if ips != "" {
-		ipss := strings.Split(ips, ",")
+	} else if len(ips) > 0 {
 		var dialers []*net.Dialer
-		for _, ip := range ipss {
+		for _, ip := range ips {
 			tcpAddr := &net.TCPAddr{
 				IP: net.ParseIP(ip),
 			}

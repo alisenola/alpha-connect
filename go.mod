@@ -129,3 +129,4 @@ require (
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger
+//replace golang.org/x/net => ../net
