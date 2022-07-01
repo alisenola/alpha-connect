@@ -179,6 +179,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		client := &http.Client{
 			Transport: &http2.Transport{
 				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+					fmt.Println("DIALER !!", dialer.LocalAddr)
 					return tls.DialWithDialer(dialer, network, addr, cfg)
 				},
 				/*
