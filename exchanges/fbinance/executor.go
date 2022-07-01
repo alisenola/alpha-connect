@@ -2,6 +2,7 @@ package fbinance
 
 import (
 	goContext "context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
@@ -16,14 +17,17 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/fbinance"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
+	"net"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -100,6 +104,7 @@ func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration 
 type QueryRunner struct {
 	client          *http.Client
 	globalRateLimit *exchanges.RateLimit
+	pool            sync.Pool
 }
 
 type Executor struct {
@@ -172,10 +177,16 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, dialer := range dialers {
 		fmt.Println("SETTING UP", dialer.LocalAddr)
 		client := &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConnsPerHost: 1024,
-				TLSHandshakeTimeout: 10 * time.Second,
-				DialContext:         dialer.DialContext,
+			Transport: &http2.Transport{
+				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+					return tls.DialWithDialer(dialer, network, addr, cfg)
+				},
+				/*
+					MaxIdleConnsPerHost: 1024,
+					TLSHandshakeTimeout: 10 * time.Second,
+					DialContext:         dialer.DialContext,
+
+				*/
 			},
 			Timeout: 10 * time.Second,
 		}
@@ -389,7 +400,8 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 				qr.globalRateLimit.Request(weight)
 
 				var data fbinance.OpenInterestResponse
-				if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+				err = xutils.PerformRequest(qr.client, request, &data)
+				if err != nil {
 					state.logger.Warn("error fetching open interests", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
