@@ -176,11 +176,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
 		fmt.Println("SETTING UP", dialer.LocalAddr)
+		d := dialer
 		client := &http.Client{
 			Transport: &http2.Transport{
 				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-					fmt.Println("DIALER !!", dialer.LocalAddr)
-					return tls.DialWithDialer(dialer, network, addr, cfg)
+					fmt.Println("DIALER !!", d.LocalAddr)
+					return tls.DialWithDialer(d, network, addr, cfg)
 				},
 				/*
 					MaxIdleConnsPerHost: 1024,
