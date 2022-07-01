@@ -17,7 +17,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220629102515-8242643bd618
+	gitlab.com/alphaticks/xchanger v0.0.0-20220701131232-694971eb76df
 	go.mongodb.org/mongo-driver v1.9.1
 	google.golang.org/grpc v1.46.2
 	google.golang.org/protobuf v1.28.0

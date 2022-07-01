@@ -341,7 +341,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	qr.Get(weight)
 
 	var data bybitl.SymbolsResponse
-	if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+	if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 		err := fmt.Errorf("error updating security list: %v", err)
 		return err
 	}
@@ -601,7 +601,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	qr.Get(w)
 	go func() {
 		var data bybitl.TickersResponse
-		if err := xutils.PerformRequest(qr.client, req, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, req, &data); err != nil {
 			state.logger.Warn("error fetching tickers", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -663,7 +663,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	qr.Get(weight)
 	go func() {
 		var data bybitl.BalanceResponse
-		if err := xutils.PerformRequest(qr.client, req, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, req, &data); err != nil {
 			state.logger.Warn("error fetching balances", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -735,7 +735,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	go func() {
 		var data bybitl.GetPositionsResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching positions", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -816,7 +816,7 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 
 		qr.Get(weight)
 		var data bybitl.APIKeyInfoResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching account information", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -917,7 +917,7 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 		for !done {
 			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
-			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -1014,7 +1014,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 		done := false
 		for !done {
 			var data bybitl.QueryDepositRecordsResponse
-			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -1110,7 +1110,7 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 		done := false
 		for !done {
 			var data bybitl.QueryWithdrawRecordsResponse
-			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -1251,7 +1251,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		for !done {
 			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
-			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching trade records", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -1402,7 +1402,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	// TODO check account rate limit
 	go func() {
 		var data bybitl.QueryActiveOrdersResponse
-		if err := xutils.PerformRequest(qr.client, req, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, req, &data); err != nil {
 			state.logger.Warn("error fetching orders", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -1515,7 +1515,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	qr.Post(weight)
 	go func() {
 		var data bybitl.PostOrderResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching positions", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -1610,7 +1610,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		// We ignore rate limits on cancel
 
 		var data bybitl.CancelOrderResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error cancelling order", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -1683,7 +1683,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 
 	go func() {
 		var data bybitl.CancelOrdersResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error canceling orders", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -1753,7 +1753,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	// TODO check account rate limits
 	go func() {
 		var data bybitl.AmendOrderResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching positions", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)

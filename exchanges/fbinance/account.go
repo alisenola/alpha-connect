@@ -1079,7 +1079,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	}
 
 	listenKey := fbinance.ListenKeyResponse{}
-	if err := utils.PerformRequest(state.client, req, &listenKey); err != nil {
+	if err := utils.PerformJSONRequest(state.client, req, &listenKey); err != nil {
 		return fmt.Errorf("error getting listen key: %v", err)
 	}
 	if listenKey.Code != 0 {
@@ -1090,7 +1090,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting refresh listen key request: %v", err)
 	}
-	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+	if err := utils.PerformJSONRequest(state.client, req, nil); err != nil {
 		return fmt.Errorf("error refreshing listen key: %v", err)
 	}
 
@@ -1134,7 +1134,7 @@ func (state *AccountListener) refreshKey(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting refresh listen key request: %v", err)
 	}
-	if err := utils.PerformRequest(state.client, req, nil); err != nil {
+	if err := utils.PerformJSONRequest(state.client, req, nil); err != nil {
 		return fmt.Errorf("error refreshing listen key: %v", err)
 	}
 	return nil

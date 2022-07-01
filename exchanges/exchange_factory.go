@@ -9,7 +9,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bithumbg"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bitmex"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bitstamp"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/bitz"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybiti"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybitl"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybits"
@@ -111,8 +110,6 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 		return func() actor.Actor { return bitmex.NewListener(securityID, dialerPool) }
 	case constants.BITSTAMP.ID:
 		return func() actor.Actor { return bitstamp.NewListenerL3(securityID, dialerPool) }
-	case constants.BITZ.ID:
-		return func() actor.Actor { return bitz.NewListener(securityID, dialerPool) }
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewListener(securityID, dialerPool) }
 	case constants.CRYPTOFACILITIES.ID:
@@ -182,8 +179,6 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.
 		return func() actor.Actor { return bitmex.NewExecutor() }
 	case constants.BITSTAMP.ID:
 		return func() actor.Actor { return bitstamp.NewExecutor() }
-	case constants.BITZ.ID:
-		return func() actor.Actor { return bitz.NewExecutor() }
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewExecutor() }
 	case constants.CRYPTOFACILITIES.ID:

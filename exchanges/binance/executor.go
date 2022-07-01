@@ -136,7 +136,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return err
 		}
 		var data binance.ExchangeInfo
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			err := fmt.Errorf("error updating security list: %v", err)
 			return err
 		}
@@ -183,7 +183,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	qr.globalRateLimit.Request(weight)
 
 	var data binance.ExchangeInfo
-	if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+	if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 		err := fmt.Errorf("error updating security list: %v", err)
 		return err
 	}
@@ -297,7 +297,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		qr.globalRateLimit.Request(weight)
 
 		var data binance.OrderBookData
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching open interests", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -424,7 +424,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 		qr.globalRateLimit.Request(weight)
 		var data []binance.OrderData
 		if multi {
-			if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 				state.logger.Warn("error fetching open orders", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -432,7 +432,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 			}
 		} else {
 			var sorder binance.QueryOrderResponse
-			if err := xutils.PerformRequest(qr.client, request, &sorder); err != nil {
+			if err := xutils.PerformJSONRequest(qr.client, request, &sorder); err != nil {
 				state.logger.Warn("error fetching open orders", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_HTTPError
 				context.Send(sender, response)
@@ -503,7 +503,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 		qr.globalRateLimit.Request(weight)
 		var data binance.AccountInformationResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching positions", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -614,7 +614,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		ar.Request()
 
 		var data binance.NewOrderResponse
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error fetching order book", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
@@ -693,7 +693,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		qr.globalRateLimit.Request(weight)
 
 		var data binance.OrderData
-		if err := xutils.PerformRequest(qr.client, request, &data); err != nil {
+		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error posting order", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)

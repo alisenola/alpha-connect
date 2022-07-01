@@ -39,7 +39,6 @@ type Executor struct {
 	marketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
 	credentials              *models2.APICredentials
 	logger                   *log.Logger
-	registry                 registry.PublicRegistryClient
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
@@ -65,7 +64,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
@@ -90,7 +89,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 func (state *Executor) UpdateMarketableProtocolAssetList(context actor.Context) error {
 	assets := make([]*models.MarketableProtocolAsset, 0)
-	reg := state.registry
+	reg := state.Registry
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
 	//TODO add matic and solana protocols

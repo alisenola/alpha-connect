@@ -344,11 +344,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 	for _, exchStr := range state.Exchanges {
 		exch, ok := constants.GetExchangeByName(exchStr)
 		if !ok {
-			return fmt.Errorf("unknown exchange %s", exch.Name)
+			state.logger.Warn(fmt.Sprintf("unknown exchange %s", exchStr))
+			continue
 		}
 		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.registry)
 		if producer == nil {
-			return fmt.Errorf("unknown exchange %s", exch.Name)
+			state.logger.Warn(fmt.Sprintf("unknown exchange %s", exchStr))
+			continue
 		}
 		props := actor.PropsFromProducer(
 			producer,
@@ -1233,21 +1235,47 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnGetAccountRequest(context actor.Context) error {
-	request := context.Message().(*commands.GetAccountRequest)
-	if request.Account == nil {
+	req := context.Message().(*commands.GetAccountRequest)
+	if req.Account == nil {
 		context.Respond(&commands.GetAccountResponse{
 			Err: fmt.Errorf("unknown account"),
 		})
 		return nil
 	}
 
-	if _, ok := state.accountManagers[request.Account.Name]; ok {
+	if _, ok := state.accountManagers[req.Account.Name]; ok {
 		context.Respond(&commands.GetAccountResponse{
-			Account: Portfolio.GetAccount(request.Account.Name),
+			Account: Portfolio.GetAccount(req.Account.Name),
 		})
 	} else {
+		exch, ok := constants.GetExchangeByName(req.Account.Exchange)
+		if !ok {
+			context.Respond(&commands.GetAccountResponse{
+				Err: fmt.Errorf("unknown exchange"),
+			})
+			return nil
+		}
+		account, err := NewAccount(&models.Account{
+			Name:     req.Account.Name,
+			Exchange: exch,
+			ApiCredentials: &xmodels.APICredentials{
+				APIKey:    req.Account.ApiKey,
+				APISecret: req.Account.ApiSecret,
+				AccountID: req.Account.ID,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error creating new account: %v", err)
+		}
+		producer := NewAccountManagerProducer(*req.Account, account, state.db, state.registry)
+		if producer == nil {
+			return fmt.Errorf("unknown exchange %s", req.Account.Exchange)
+		}
+		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
+			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
+		state.accountManagers[req.Account.Name] = context.Spawn(props)
 		context.Respond(&commands.GetAccountResponse{
-			Err: fmt.Errorf("unknown account"),
+			Account: Portfolio.GetAccount(req.Account.Name),
 		})
 	}
 	return nil
