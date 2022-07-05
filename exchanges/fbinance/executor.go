@@ -115,12 +115,14 @@ type Executor struct {
 	logger              *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Actor {
 	ex := &Executor{
 		queryRunners: nil,
 		logger:       nil,
 	}
 	ex.DialerPool = dialerPool
+	ex.Registry = registry
+	ex.AccountClients = accountClients
 	return ex
 }
 
@@ -530,12 +532,22 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 
 		qr.globalRateLimit.Request(weight)
 		var data fbinance.AccountInfo
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching account information", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		if data.Code != 0 {
 			state.logger.Warn("error fetching account information", log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -628,11 +640,20 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 
 		qr.globalRateLimit.Request(weight)
 		var data []fbinance.Income
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching order book", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account movement", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching account movement", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
 
 		var movements []*messages.AccountMovement
@@ -769,11 +790,20 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 
 		qr.globalRateLimit.Request(weight)
 		var data []fbinance.UserTrade
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching order book", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account trades", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching account trades", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
 		var mtrades []*models.TradeCapture
 		for _, t := range data {
@@ -901,11 +931,20 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 		qr.globalRateLimit.Request(weight)
 		var data []fbinance.OrderData
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching open orders", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching open orders", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching open orders", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
 		var morders []*models.Order
 		for _, o := range data {
@@ -967,11 +1006,20 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 		qr.globalRateLimit.Request(weight)
 		var data []fbinance.AccountPositionRisk
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching positions", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching positions", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching positions", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
 		for _, p := range data {
 			if p.PositionAmount == 0 {
@@ -1041,12 +1089,22 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		qr.globalRateLimit.Request(weight)
 
 		var data []fbinance.AccountBalance
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching order book", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching positions", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching order book", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		for _, b := range data {
 			if b.Balance == 0. {
 				continue

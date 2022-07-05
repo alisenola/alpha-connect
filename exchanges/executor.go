@@ -8,8 +8,11 @@ import (
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
+	"golang.org/x/net/proxy"
 	"net"
+	"net/http"
 	"reflect"
+	"runtime"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -31,6 +34,7 @@ type Executor struct {
 	db                       *gorm.DB
 	registry                 registry.PublicRegistryClient
 	dialerPool               *xchangerUtils.DialerPool
+	accountClients           map[string]map[string]*http.Client
 	accountManagers          map[string]*actor.PID
 	executors                map[uint32]*actor.PID                      // A map from exchange ID to executor
 	securities               map[uint64]*models.Security                // A map from security ID to security
@@ -339,6 +343,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// TODO add dialer pool test
 
+	state.accountClients = make(map[string]map[string]*http.Client)
 	// Spawn all exchange executors
 	state.executors = make(map[uint32]*actor.PID)
 	for _, exchStr := range state.Exchanges {
@@ -347,7 +352,32 @@ func (state *Executor) Initialize(context actor.Context) error {
 			state.logger.Warn(fmt.Sprintf("unknown exchange %s", exchStr))
 			continue
 		}
-		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.registry)
+		state.accountClients[exch.Name] = make(map[string]*http.Client)
+		for _, accntCfg := range state.Accounts {
+			accntExch, ok := constants.GetExchangeByName(accntCfg.Exchange)
+			if !ok {
+				return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
+			}
+			if accntExch.ID == exch.ID && accntCfg.SOCKS5 != "" {
+				dialSocksProxy, err := proxy.SOCKS5("tcp", accntCfg.SOCKS5, nil, &net.Dialer{
+					Timeout: 10 * time.Second,
+				})
+				if err != nil {
+					return fmt.Errorf("error creating SOCKS5 proxy: %v", err)
+				}
+				state.accountClients[exch.Name][accntCfg.Name] = &http.Client{
+					Transport: &http.Transport{
+						Proxy:                 http.ProxyFromEnvironment,
+						DialContext:           dialSocksProxy.(proxy.ContextDialer).DialContext,
+						IdleConnTimeout:       60 * time.Second,
+						TLSHandshakeTimeout:   10 * time.Second,
+						ExpectContinueTimeout: 1 * time.Second,
+						MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+					},
+				}
+			}
+		}
+		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.registry, state.accountClients[exch.Name])
 		if producer == nil {
 			state.logger.Warn(fmt.Sprintf("unknown exchange %s", exchStr))
 			continue
@@ -461,7 +491,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
-		producer := NewAccountManagerProducer(accntCfg, account, state.db, state.registry)
+		client := state.accountClients[exch.Name][accntCfg.Name]
+		producer := NewAccountManagerProducer(accntCfg, account, state.db, state.registry, client)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
@@ -1255,6 +1286,24 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			})
 			return nil
 		}
+		if req.Account.SOCKS5 != "" {
+			dialSocksProxy, err := proxy.SOCKS5("tcp", req.Account.SOCKS5, nil, &net.Dialer{
+				Timeout: 10 * time.Second,
+			})
+			if err != nil {
+				return fmt.Errorf("error creating SOCKS5 proxy: %v", err)
+			}
+			state.accountClients[exch.Name][req.Account.Name] = &http.Client{
+				Transport: &http.Transport{
+					Proxy:                 http.ProxyFromEnvironment,
+					DialContext:           dialSocksProxy.(proxy.ContextDialer).DialContext,
+					IdleConnTimeout:       60 * time.Second,
+					TLSHandshakeTimeout:   10 * time.Second,
+					ExpectContinueTimeout: 1 * time.Second,
+					MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+				},
+			}
+		}
 		account, err := NewAccount(&models.Account{
 			Name:     req.Account.Name,
 			Exchange: exch,
@@ -1267,7 +1316,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
-		producer := NewAccountManagerProducer(*req.Account, account, state.db, state.registry)
+		producer := NewAccountManagerProducer(*req.Account, account, state.db, state.registry, state.accountClients[exch.Name][req.Account.Name])
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", req.Account.Exchange)
 		}

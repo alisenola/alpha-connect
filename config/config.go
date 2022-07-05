@@ -79,6 +79,7 @@ type Account struct {
 	Reconcile bool
 	Listen    bool
 	ReadOnly  bool
+	SOCKS5    string
 }
 
 type DataBase struct {

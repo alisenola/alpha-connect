@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+type reconcile struct{}
+
 type Reconcile interface {
 	actor.Actor
 	GetLogger() *log.Logger
@@ -16,9 +18,13 @@ type Reconcile interface {
 	Clean(context actor.Context) error
 	OnAccountMovementRequest(context actor.Context) error
 	OnTradeCaptureReportRequest(context actor.Context) error
+	OnReconcile(context actor.Context) error
+	SetReconcileTicker(ticker *time.Ticker)
+	GetReconcileTicker() *time.Ticker
 }
 
 type BaseReconcile struct {
+	reconcileTicker *time.Ticker
 }
 
 func (state *BaseReconcile) GetLogger() *log.Logger {
@@ -30,11 +36,27 @@ func (state *BaseReconcile) Initialize(context actor.Context) error {
 }
 
 func (state *BaseReconcile) Clean(context actor.Context) error {
+	if state.reconcileTicker != nil {
+		state.reconcileTicker.Stop()
+		state.reconcileTicker = nil
+	}
+	return nil
+}
+
+func (state *BaseReconcile) OnReconcile(context actor.Context) error {
 	return nil
 }
 
 func (state *BaseReconcile) GetTransactions() *mongo.Collection {
 	return nil
+}
+
+func (state *BaseReconcile) SetReconcileTicker(ticker *time.Ticker) {
+	state.reconcileTicker = ticker
+}
+
+func (state *BaseReconcile) GetReconcileTicker() *time.Ticker {
+	return state.reconcileTicker
 }
 
 func (state *BaseReconcile) OnAccountMovementRequest(context actor.Context) error {
@@ -128,6 +150,20 @@ func ReconcileReceive(state Reconcile, context actor.Context) {
 			state.GetLogger().Error("error initializing", log.Error(err))
 			panic(err)
 		}
+		reconcileTicker := time.NewTicker(1 * time.Hour)
+		state.SetReconcileTicker(reconcileTicker)
+		go func(pid *actor.PID) {
+			for {
+				select {
+				case <-reconcileTicker.C:
+					context.Send(pid, &reconcile{})
+				case <-time.After(2 * time.Hour):
+					if state.GetReconcileTicker() != reconcileTicker {
+						return
+					}
+				}
+			}
+		}(context.Self())
 		state.GetLogger().Info("actor started")
 
 	case *actor.Stopping:
@@ -156,6 +192,12 @@ func ReconcileReceive(state Reconcile, context actor.Context) {
 	case *messages.TradeCaptureReportRequest:
 		if err := state.OnTradeCaptureReportRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnTradeCaptureReportRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *reconcile:
+		if err := state.OnReconcile(context); err != nil {
+			state.GetLogger().Error("error processing OnReconcile", log.Error(err))
 			panic(err)
 		}
 	}

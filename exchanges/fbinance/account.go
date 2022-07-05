@@ -16,7 +16,6 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
 	"math"
-	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -45,13 +44,13 @@ type AccountListener struct {
 	db                 *gorm.DB
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, strict bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, strict bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db, strict)
+		return NewAccountListener(account, registry, db, client, strict)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		readOnly:        readOnly,
@@ -61,6 +60,7 @@ func NewAccountListener(account *account.Account, registry registry.PublicRegist
 		executorManager: nil,
 		logger:          nil,
 		db:              db,
+		client:          client,
 	}
 }
 
@@ -204,12 +204,16 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 	state.fbinanceExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.FBINANCE.Name+"_executor")
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
+	if state.client == nil {
+		state.client = &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		}
+	} else {
+		fmt.Println("USING CUSTOM CLIENT")
 	}
 
 	if err := state.subscribeAccount(context); err != nil {
@@ -1096,7 +1100,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 	ws := fbinance.NewAuthWebsocket(listenKey.ListenKey)
 	// TODO Dialer
-	if err := ws.Connect(&net.Dialer{}); err != nil {
+	if err := ws.Connect(state.client.Transport.(*http.Transport).DialContext); err != nil {
 		return fmt.Errorf("error connecting to fbinance websocket: %v", err)
 	}
 

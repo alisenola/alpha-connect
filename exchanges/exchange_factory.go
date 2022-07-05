@@ -40,6 +40,7 @@ import (
 	"gitlab.com/alphaticks/xchanger/utils"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
+	"net/http"
 )
 
 // TODO sample size config
@@ -57,14 +58,14 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewAccountListener(account, nil, nil) }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, readOnly) }
+		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, client, readOnly) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, readOnly) }
 	case constants.FTXUS.ID:
@@ -169,7 +170,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	}
 }
 
-func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Producer {
+func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Producer {
 	switch exchange.ID {
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewExecutor(dialerPool, registry) }
@@ -184,7 +185,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.
 	case constants.CRYPTOFACILITIES.ID:
 		return func() actor.Actor { return cryptofacilities.NewExecutor() }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewExecutor(dialerPool, registry) }
+		return func() actor.Actor { return fbinance.NewExecutor(dialerPool, registry, accountClients) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewExecutor(dialerPool, registry) }
 	case constants.FTXUS.ID:

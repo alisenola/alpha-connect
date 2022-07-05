@@ -21,6 +21,8 @@ import (
 	"time"
 )
 
+type reconcile struct{}
+
 type AccountReconcile struct {
 	extypes.BaseReconcile
 	account          *models.Account
@@ -36,6 +38,7 @@ type AccountReconcile struct {
 	lastWithdrawalTs uint64
 	lastFundingTs    uint64
 	lastTradeID      map[uint64]uint64
+	reconcileTicker  *time.Ticker
 }
 
 func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
@@ -110,9 +113,38 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		return fmt.Errorf("error creating account: %v", err)
 	}
 
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
+	if err := state.reconcileMovements(context); err != nil {
+		return fmt.Errorf("error reconcile movements: %v", err)
+	}
+
+	return nil
+}
+
+// TODO
+func (state *AccountReconcile) Clean(context actor.Context) error {
+	return nil
+}
+
+func (state *AccountReconcile) OnReconcile(context actor.Context) error {
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
+	if err := state.reconcileMovements(context); err != nil {
+		return fmt.Errorf("error reconcile movements: %v", err)
+	}
+	return nil
+}
+
+func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	var transactions []extypes.Transaction
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
-	fmt.Println("TXS", state.dbAccount.ID)
 	for _, tr := range transactions {
 		if tr.Fill != nil {
 			secID := uint64(tr.Fill.SecurityID)
@@ -131,74 +163,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		}
 	}
 
-	for k, pos := range state.positions {
-		if ppos := pos.GetPosition(); ppos != nil {
-			fmt.Println(state.securities[k].Symbol, ppos.Quantity)
-		}
-	}
-
-	// Find funding transaction
-	var cnt int64
-	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "FUNDING").Count(&cnt)
-	if tx.Error != nil {
-		return fmt.Errorf("error getting funding transaction count: %v", err)
-	}
-	if cnt > 0 {
-		var tr extypes.Transaction
-		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "FUNDING").Order("time desc").First(&tr)
-		if tx.Error != nil {
-			return fmt.Errorf("error finding last funding transaction: %v", tx.Error)
-		}
-		state.lastFundingTs = uint64(tr.Time.UnixNano() / 1000000)
-	}
-
-	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "DEPOSIT").Count(&cnt)
-	if tx.Error != nil {
-		return fmt.Errorf("error getting deposit transaction count: %v", err)
-	}
-	if cnt > 0 {
-		var tr extypes.Transaction
-		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "DEPOSIT").Order("time desc").First(&tr)
-		if tx.Error != nil {
-			return fmt.Errorf("error finding last deposit transaction: %v", tx.Error)
-		}
-		state.lastDepositTs = uint64(tr.Time.UnixNano() / 1000000)
-	}
-
-	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "WITHDRAWAL").Count(&cnt)
-	if tx.Error != nil {
-		return fmt.Errorf("error getting withdrawal transaction count: %v", err)
-	}
-	if cnt > 0 {
-		var tr extypes.Transaction
-		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "WITHDRAWAL").Order("time desc").First(&tr)
-		if tx.Error != nil {
-			return fmt.Errorf("error finding last withdrawal transaction: %v", tx.Error)
-		}
-		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
-	}
-
-	if err := state.reconcileTrades(context); err != nil {
-		return fmt.Errorf("error reconcile trade: %v", err)
-	}
-	if err := state.reconcileMovements(context); err != nil {
-		return fmt.Errorf("error reconcile movements: %v", err)
-	}
-
-	return nil
-}
-
-// TODO
-func (state *AccountReconcile) Clean(context actor.Context) error {
-
-	return nil
-}
-
-func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) error {
-	return nil
-}
-
-func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	// Fetch positions
 	resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -303,7 +267,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
-	var transactions []extypes.Transaction
 	state.db.Debug().
 		Model(&extypes.Transaction{}).
 		Joins("Fill").
@@ -351,6 +314,47 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 }
 
 func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
+	// Find funding transaction
+	var cnt int64
+	tx := state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "FUNDING").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting funding transaction count: %v", tx.Error)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "FUNDING").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last funding transaction: %v", tx.Error)
+		}
+		state.lastFundingTs = uint64(tr.Time.UnixNano() / 1000000)
+	}
+
+	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "DEPOSIT").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting deposit transaction count: %v", tx.Error)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "DEPOSIT").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last deposit transaction: %v", tx.Error)
+		}
+		state.lastDepositTs = uint64(tr.Time.UnixNano() / 1000000)
+	}
+
+	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "WITHDRAWAL").Count(&cnt)
+	if tx.Error != nil {
+		return fmt.Errorf("error getting withdrawal transaction count: %v", tx.Error)
+	}
+	if cnt > 0 {
+		var tr extypes.Transaction
+		tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "WITHDRAWAL").Order("time desc").First(&tr)
+		if tx.Error != nil {
+			return fmt.Errorf("error finding last withdrawal transaction: %v", tx.Error)
+		}
+		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
+	}
+
 	// Get last account movement
 	done := false
 	for !done {

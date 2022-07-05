@@ -8,6 +8,7 @@ import (
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
 	"math/rand"
+	"net/http"
 	"sync"
 	"time"
 
@@ -66,6 +67,7 @@ type Executor interface {
 type BaseExecutor struct {
 	DialerPool               *xchangerUtils.DialerPool
 	Registry                 registry.PublicRegistryClient
+	AccountClients           map[string]*http.Client
 	SecuritiesLock           sync.RWMutex
 	Securities               map[uint64]*models.Security
 	MarketableProtocolAssets map[uint64]*models.MarketableProtocolAsset

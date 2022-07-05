@@ -9,6 +9,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gorm.io/gorm"
+	"net/http"
 	"reflect"
 )
 
@@ -19,6 +20,7 @@ type AccountManager struct {
 	config.Account
 	db              *gorm.DB
 	registry        registry.PublicRegistryClient
+	client          *http.Client
 	account         *account.Account
 	execSubscribers map[uint64]*actor.PID
 	trdSubscribers  map[uint64]*actor.PID
@@ -29,18 +31,19 @@ type AccountManager struct {
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient) actor.Producer {
+func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient, client *http.Client) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(config, account, db, registry)
+		return NewAccountManager(config, account, db, registry, client)
 	}
 }
 
-func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient) actor.Actor {
+func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient, client *http.Client) actor.Actor {
 	return &AccountManager{
 		Account:  config,
 		account:  account,
 		db:       db,
 		registry: registry,
+		client:   client,
 	}
 }
 
@@ -140,7 +143,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 				return fmt.Errorf("error getting account listener")
 			}
 		} else {
-			listenerProducer = NewAccountListenerProducer(state.account, state.registry, state.db, state.ReadOnly)
+			listenerProducer = NewAccountListenerProducer(state.account, state.registry, state.db, state.client, state.ReadOnly)
 			if listenerProducer == nil {
 				return fmt.Errorf("error getting account listener")
 			}

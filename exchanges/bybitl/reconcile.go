@@ -176,7 +176,16 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 
 // TODO
 func (state *AccountReconcile) Clean(context actor.Context) error {
+	return nil
+}
 
+func (state *AccountReconcile) OnReconcile(context actor.Context) error {
+	if err := state.reconcileTrades(context); err != nil {
+		return fmt.Errorf("error reconcile trade: %v", err)
+	}
+	if err := state.reconcileMovements(context); err != nil {
+		return fmt.Errorf("error reconcile movements: %v", err)
+	}
 	return nil
 }
 
