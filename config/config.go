@@ -32,10 +32,10 @@ func LoadConfig() (*Config, error) {
 		}
 		_ = f.Close()
 	} else {
-		err := viper.ReadInConfig() // Find and read the config file
-		if err != nil {             // Handle errors reading the config file
-			return nil, fmt.Errorf("fatal error config file: %s \n", err)
-		}
+		_ = viper.ReadInConfig() // Find and read the config file
+		//if err != nil {             // Handle errors reading the config file
+		//	return nil, fmt.Errorf("fatal error config file: %s \n", err)
+		//}
 	}
 
 	C := &Config{}
@@ -49,6 +49,15 @@ func LoadConfig() (*Config, error) {
 	}
 	if os.Getenv("DIALER_POOL_IPS") != "" {
 		C.DialerPoolIPs = strings.Split(os.Getenv("DIALER_POOL_IPS"), ",")
+	}
+	if os.Getenv("EXCHANGES") != "" {
+		C.Exchanges = strings.Split(os.Getenv("EXCHANGES"), ",")
+	}
+	if os.Getenv("PROTOCOLS") != "" {
+		C.Protocols = strings.Split(os.Getenv("PROTOCOLS"), ",")
+	}
+	if os.Getenv("CHAINS") != "" {
+		C.Chains = strings.Split(os.Getenv("CHAINS"), ",")
 	}
 
 	return C, nil
