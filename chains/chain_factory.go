@@ -23,6 +23,10 @@ func NewChainExecutorProducer(chain *models2.Chain, registry registry.PublicRegi
 			return func() actor.Actor {
 				return evm.NewExecutor(registry, "wss://polygon-mainnet.g.alchemy.com/v2/PYNN12EJrMrmlxWjy9KZyrYK6GHrErCM")
 			}
+		case 42161:
+			return func() actor.Actor {
+				return evm.NewExecutor(registry, "wss://arb-mainnet.g.alchemy.com/v2/aFDxH7pilsr6I5Ifqp59wVNu_0pd9PaC")
+			}
 		default:
 			return nil
 		}
