@@ -73,7 +73,7 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	case constants.DYDX.ID:
 		return func() actor.Actor { return dydx.NewAccountListener(account, nil, nil) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, readOnly) }
+		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, client, readOnly) }
 	default:
 		return nil
 	}
@@ -213,7 +213,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.
 	case constants.BYBITI.ID:
 		return func() actor.Actor { return bybiti.NewExecutor(dialerPool, registry) }
 	case constants.BYBITL.ID:
-		return func() actor.Actor { return bybitl.NewExecutor(dialerPool, registry) }
+		return func() actor.Actor { return bybitl.NewExecutor(dialerPool, registry, accountClients) }
 	case constants.BYBITS.ID:
 		return func() actor.Actor { return bybits.NewExecutor(dialerPool, registry) }
 	case constants.UPBIT.ID:

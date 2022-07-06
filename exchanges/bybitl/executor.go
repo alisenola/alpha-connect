@@ -203,13 +203,14 @@ type Executor struct {
 	logger            *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Actor {
 	ex := &Executor{
 		queryRunners: nil,
 		logger:       nil,
 	}
 	ex.DialerPool = dialerPool
 	ex.Registry = registry
+	ex.AccountClients = accountClients
 	return ex
 }
 
@@ -649,7 +650,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		context.Send(sender, response)
 		return nil
 	}
-	req, weight, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
+	request, weight, err := bybitl.GetBalance("", msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -663,12 +664,22 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	qr.Get(weight)
 	go func() {
 		var data bybitl.BalanceResponse
-		if err := xutils.PerformJSONRequest(qr.client, req, &data); err != nil {
-			state.logger.Warn("error fetching balances", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching balances", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		if data.RetCode != 0 {
 			state.logger.Warn("error fetching balances", log.Error(errors.New(data.RetMsg)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -735,12 +746,22 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	go func() {
 		var data bybitl.GetPositionsResponse
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching positions", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching positions", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		if data.RetCode != 0 {
 			state.logger.Warn("error fetching positions", log.Error(errors.New(data.RetMsg)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -816,12 +837,22 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 
 		qr.Get(weight)
 		var data bybitl.APIKeyInfoResponse
-		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-			state.logger.Warn("error fetching account information", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		if data.RetCode != 0 {
 			state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -917,12 +948,22 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 		for !done {
 			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
-			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-				state.logger.Warn("error fetching trade records", log.Error(err))
-				response.RejectionReason = messages.RejectionReason_HTTPError
-				context.Send(sender, response)
-				return
+			if client, ok := state.AccountClients[req.Account.Name]; ok {
+				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+					state.logger.Warn("error fetching account information", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			} else {
+				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+					state.logger.Warn("error fetching trade records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
 			}
+
 			if data.RetCode != 0 {
 				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -1014,12 +1055,22 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 		done := false
 		for !done {
 			var data bybitl.QueryDepositRecordsResponse
-			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-				state.logger.Warn("error fetching trade records", log.Error(err))
-				response.RejectionReason = messages.RejectionReason_HTTPError
-				context.Send(sender, response)
-				return
+			if client, ok := state.AccountClients[req.Account.Name]; ok {
+				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+					state.logger.Warn("error fetching account information", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			} else {
+				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+					state.logger.Warn("error fetching trade records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
 			}
+
 			if data.RetCode != 0 {
 				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -1110,12 +1161,22 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 		done := false
 		for !done {
 			var data bybitl.QueryWithdrawRecordsResponse
-			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-				state.logger.Warn("error fetching trade records", log.Error(err))
-				response.RejectionReason = messages.RejectionReason_HTTPError
-				context.Send(sender, response)
-				return
+			if client, ok := state.AccountClients[req.Account.Name]; ok {
+				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+					state.logger.Warn("error fetching account information", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			} else {
+				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+					state.logger.Warn("error fetching trade records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
 			}
+
 			if data.RetCode != 0 {
 				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -1251,12 +1312,22 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 		for !done {
 			ar.WaitTradeRequest(symbol, 1)
 			var data bybitl.TradingRecordResponse
-			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-				state.logger.Warn("error fetching trade records", log.Error(err))
-				response.RejectionReason = messages.RejectionReason_HTTPError
-				context.Send(sender, response)
-				return
+			if client, ok := state.AccountClients[req.Account.Name]; ok {
+				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+					state.logger.Warn("error fetching account information", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			} else {
+				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+					state.logger.Warn("error fetching trade records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
 			}
+
 			if data.RetCode != 0 {
 				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -1387,7 +1458,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	if orderId != "" {
 		params.SetOrderID(orderId)
 	}
-	req, _, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
+	request, _, err := bybitl.QueryActiveOrdersRT(params, msg.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1402,12 +1473,22 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	// TODO check account rate limit
 	go func() {
 		var data bybitl.QueryActiveOrdersResponse
-		if err := xutils.PerformJSONRequest(qr.client, req, &data); err != nil {
-			state.logger.Warn("error fetching orders", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
+				state.logger.Warn("error fetching account information", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
+				state.logger.Warn("error fetching orders", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
 		}
+
 		if data.RetCode != 0 {
 			state.logger.Warn("error fetching orders", log.Error(errors.New(data.RetMsg)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError

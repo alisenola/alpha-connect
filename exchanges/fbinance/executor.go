@@ -210,11 +210,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	var data fbinance.ExchangeInfoResponse
 	if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-		err := fmt.Errorf("error updating security list: %v", err)
+		err := fmt.Errorf("error getting exchange info: %v", err)
 		return err
 	}
 	if data.Code != 0 {
-		err := fmt.Errorf("error updating security list: %v", errors.New(data.Message))
+		err := fmt.Errorf("error getting exchange info: %v", errors.New(data.Message))
 		return err
 	}
 
@@ -234,7 +234,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			for _, q := range state.queryRunners {
 				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
-				q.globalRateLimit.Request(weight)
+				q.globalRateLimit.Request(weight * 10)
 			}
 		}
 	}
@@ -416,6 +416,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 					state.logger.Warn("error fetching open interests", log.Error(errors.New(data.Message)))
 					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 					context.Send(sender, response)
+					state.updateRateLimits(data.BaseResponse, nil, qr)
 					return
 				}
 				response.Statistics = append(response.Statistics, &models.Stat{
@@ -481,6 +482,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 			state.logger.Warn("error fetching order book", log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
+			state.updateRateLimits(data.BaseResponse, nil, qr)
 			return
 		}
 
@@ -552,6 +554,7 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 			state.logger.Warn("error fetching account information", log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
+			state.updateRateLimits(data.BaseResponse, nil, qr)
 			return
 		}
 		if data.FeeTier < 0 || data.FeeTier > 9 {
@@ -1201,37 +1204,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(errors.New(data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
-
-			if data.Code == -1015 {
-				// Order rate limit, find
-				re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
-				match := re.FindStringSubmatch(data.Message)
-				if len(match) == 3 {
-					switch match[2] {
-					case "MINUTE":
-						limit, err := strconv.ParseInt(match[1], 10, 64)
-						if err != nil {
-							state.logger.Warn("error parsing rate limit " + match[2])
-						} else {
-							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
-							ar.minute.SetLimit(int(limit))
-						}
-					case "TEN_SECONDS":
-						limit, err := strconv.ParseInt(match[1], 10, 64)
-						if err != nil {
-							state.logger.Warn("error parsing rate limit " + match[2])
-						} else {
-							state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
-							ar.second.SetLimit(int(limit))
-						}
-					default:
-						state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
-					}
-				} else {
-					state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
-				}
-			}
-
+			state.updateRateLimits(data.BaseResponse, ar, qr)
 			return
 		}
 		status := StatusToModel(data.Status)
@@ -1333,6 +1306,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 				response.RejectionReason = messages.RejectionReason_UnknownOrder
 			}
 			context.Send(sender, response)
+			state.updateRateLimits(data.BaseResponse, nil, qr)
 			return
 		}
 
@@ -1418,4 +1392,48 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}()
 
 	return nil
+}
+
+func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRateLimit, qr *QueryRunner) {
+	if ar != nil && res.Code == -1015 {
+		// Order rate limit, find
+		re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
+		match := re.FindStringSubmatch(res.Message)
+		if len(match) == 3 {
+			switch match[2] {
+			case "MINUTE":
+				limit, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil {
+					state.logger.Warn("error parsing rate limit " + match[1])
+				} else {
+					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					ar.minute.SetLimit(int(limit))
+				}
+			case "TEN_SECONDS":
+				limit, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil {
+					state.logger.Warn("error parsing rate limit " + match[1])
+				} else {
+					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					ar.second.SetLimit(int(limit))
+				}
+			default:
+				state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
+			}
+		} else {
+			state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
+		}
+	} else if qr != nil && res.Code == -1003 {
+		re := regexp.MustCompile(`.* is (\d+) requests per minute.*`)
+		match := re.FindStringSubmatch(res.Message)
+		if len(match) == 2 {
+			limit, err := strconv.ParseInt(match[1], 10, 64)
+			if err != nil {
+				state.logger.Warn("error parsing rate limit " + match[1])
+			} else {
+				state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+				qr.globalRateLimit.SetLimit(int(limit))
+			}
+		}
+	}
 }

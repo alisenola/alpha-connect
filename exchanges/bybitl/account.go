@@ -15,7 +15,6 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
 	"math"
-	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -42,13 +41,13 @@ type AccountListener struct {
 	db                 *gorm.DB
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountListener(account, registry, db, readOnly)
+		return NewAccountListener(account, registry, db, client, readOnly)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:  account,
 		readOnly: readOnly,
@@ -57,6 +56,7 @@ func NewAccountListener(account *account.Account, registry registry.PublicRegist
 		logger:   nil,
 		db:       db,
 		registry: registry,
+		client:   client,
 	}
 }
 
@@ -147,12 +147,14 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()),
 	)
 	state.bybitlExecutor = actor.NewPID(context.ActorSystem().Address(), "executor/exchanges/"+constants.BYBITL.Name+"_executor")
-	state.client = &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 1024,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		Timeout: 10 * time.Second,
+	if state.client == nil {
+		state.client = &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 1024,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		}
 	}
 
 	// Then fetch fees
@@ -723,7 +725,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	}
 
 	ws := bybitl.NewWebsocket()
-	if err := ws.ConnectPrivate(&net.Dialer{}); err != nil {
+	if err := ws.ConnectPrivate(state.client.Transport.(*http.Transport).DialContext); err != nil {
 		return fmt.Errorf("error connection to bybitl websocket: %v", err)
 	}
 	if err := ws.Authenticate(state.account.ApiCredentials); err != nil {
