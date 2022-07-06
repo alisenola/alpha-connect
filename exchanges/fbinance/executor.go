@@ -164,6 +164,50 @@ func (state *Executor) durationBeforeNextRequest(weight int) time.Duration {
 	return minDur
 }
 
+func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRateLimit, qr *QueryRunner) {
+	if ar != nil && res.Code == -1015 {
+		// Order rate limit, find
+		re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
+		match := re.FindStringSubmatch(res.Message)
+		if len(match) == 3 {
+			switch match[2] {
+			case "MINUTE":
+				limit, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil {
+					state.logger.Warn("error parsing rate limit " + match[1])
+				} else {
+					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					ar.minute.SetLimit(int(limit))
+				}
+			case "TEN_SECONDS":
+				limit, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil {
+					state.logger.Warn("error parsing rate limit " + match[1])
+				} else {
+					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					ar.second.SetLimit(int(limit))
+				}
+			default:
+				state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
+			}
+		} else {
+			state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
+		}
+	} else if qr != nil && res.Code == -1003 {
+		re := regexp.MustCompile(`.* is (\d+) requests per minute.*`)
+		match := re.FindStringSubmatch(res.Message)
+		if len(match) == 2 {
+			limit, err := strconv.ParseInt(match[1], 10, 64)
+			if err != nil {
+				state.logger.Warn("error parsing rate limit " + match[1])
+			} else {
+				state.logger.Info(fmt.Sprintf("updated global rate limit to %d", limit))
+				qr.globalRateLimit.SetLimit(int(limit))
+			}
+		}
+	}
+}
+
 func (state *Executor) GetLogger() *log.Logger {
 	return state.logger
 }
@@ -1392,48 +1436,4 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}()
 
 	return nil
-}
-
-func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRateLimit, qr *QueryRunner) {
-	if ar != nil && res.Code == -1015 {
-		// Order rate limit, find
-		re := regexp.MustCompile(`Too many new orders; current limit is (\d+) orders per ([A-Z_]+)\.`)
-		match := re.FindStringSubmatch(res.Message)
-		if len(match) == 3 {
-			switch match[2] {
-			case "MINUTE":
-				limit, err := strconv.ParseInt(match[1], 10, 64)
-				if err != nil {
-					state.logger.Warn("error parsing rate limit " + match[1])
-				} else {
-					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
-					ar.minute.SetLimit(int(limit))
-				}
-			case "TEN_SECONDS":
-				limit, err := strconv.ParseInt(match[1], 10, 64)
-				if err != nil {
-					state.logger.Warn("error parsing rate limit " + match[1])
-				} else {
-					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
-					ar.second.SetLimit(int(limit))
-				}
-			default:
-				state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
-			}
-		} else {
-			state.logger.Warn(fmt.Sprintf("error matching message: %v", match))
-		}
-	} else if qr != nil && res.Code == -1003 {
-		re := regexp.MustCompile(`.* is (\d+) requests per minute.*`)
-		match := re.FindStringSubmatch(res.Message)
-		if len(match) == 2 {
-			limit, err := strconv.ParseInt(match[1], 10, 64)
-			if err != nil {
-				state.logger.Warn("error parsing rate limit " + match[1])
-			} else {
-				state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
-				qr.globalRateLimit.SetLimit(int(limit))
-			}
-		}
-	}
 }
