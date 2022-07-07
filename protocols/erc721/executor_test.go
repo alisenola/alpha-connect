@@ -141,7 +141,7 @@ func TestExecutorEVM(t *testing.T) {
 	owners := make(map[[20]byte]int32)
 	for k, v := range snap.Coins {
 		owners[v.Owner] += 1
-		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.Bytes2Hex(v.Owner[:]))
+		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.BytesToHash(v.Owner[:]))
 	}
 	//Check owners using the transfers, from graphql
 	ownersCheck := make(map[[20]byte]int32)
@@ -224,7 +224,7 @@ func TestExecutorSVM(t *testing.T) {
 	for _, ev := range response.Update {
 		events = append(events, ev.Transfers...)
 	}
-	assert.GreaterOrEqual(t, len(events), 6964, "expected more than 6964 events")
+	assert.GreaterOrEqual(t, len(events), 20, "expected more than 20 events")
 }
 
 func find(t *gorderbookModels.AssetTransfer, arr []*Transfer) bool {
