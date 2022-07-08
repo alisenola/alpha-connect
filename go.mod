@@ -13,13 +13,13 @@ require (
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220507064833-3bb45d8aa619
-	gitlab.com/alphaticks/tickfunctors v0.0.0-20220513100305-54584c7c93aa
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220708153910-e5f547d6d020
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220708154023-3f351cc7a395
 	gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220629092659-88bc8d68bd06
+	gitlab.com/alphaticks/xchanger v0.0.0-20220708153807-272f803a8e3d
 	go.mongodb.org/mongo-driver v1.9.1
 	google.golang.org/grpc v1.46.2
 	google.golang.org/protobuf v1.28.0
@@ -117,3 +117,7 @@ require (
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger
+
+//replace gitlab.com/alphaticks/gorderbook => ../gorderbook
+
+//replace gitlab.com/alphaticks/tickfunctors => ../tickfunctors

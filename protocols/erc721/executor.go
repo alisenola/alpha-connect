@@ -349,9 +349,9 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				}
 			}
 			update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
-				From:    from,
-				To:      to,
-				TokenId: tok,
+				From:  from,
+				To:    to,
+				Value: tok,
 			})
 		}
 		if update != nil {

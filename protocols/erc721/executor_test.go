@@ -3,6 +3,7 @@ package erc721_test
 import (
 	"context"
 	"fmt"
+	"github.com/melaurent/gotickfile/v2"
 	"github.com/stretchr/testify/assert"
 	ctypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	xtypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
@@ -11,7 +12,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	gorderbookModels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/tickfunctors/market"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	"unsafe"
 
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/grpc"
@@ -24,7 +27,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/go-graphql-client"
-	"gitlab.com/alphaticks/gorderbook"
 )
 
 type ERC721Data struct {
@@ -123,25 +125,38 @@ func TestExecutorEVM(t *testing.T) {
 		}
 	}
 	//Run the transfers using the nft tracker
-	tracker := gorderbook.NewERC721Tracker()
+	tracker := market.NewERC721Tracker()
 	for _, updt := range response.Update {
 		for _, transfer := range updt.Transfers {
+			tokenID := big.NewInt(1)
+			tokenID.SetBytes(transfer.Value)
 			var from [20]byte
 			var to [20]byte
-			tokenID := big.NewInt(1)
+			var tok [32]byte
 			copy(from[:], transfer.From)
 			copy(to[:], transfer.To)
-			tokenID.SetBytes(transfer.TokenId)
-			err := tracker.TransferFrom(from, to, tokenID)
-			assert.Nil(t, err, "TransferFrom err: %v", err)
+			tokenID.FillBytes(tok[:])
+			c := market.ERC721Delta{
+				From:    from,
+				To:      to,
+				TokenId: tok,
+				Block:   updt.BlockNumber,
+			}
+			dlt := gotickfile.TickDeltas{
+				Pointer: unsafe.Pointer(&c),
+				Len:     1,
+			}
+			if !assert.Nil(t, tracker.ProcessDeltas(dlt), "TransferFrom err: %v", err) {
+				t.Fatal()
+			}
 		}
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
-	snap := tracker.GetSnapshot()
+	snap := tracker.GetTokens()
 	owners := make(map[[20]byte]int32)
-	for k, v := range snap.Coins {
-		owners[v.Owner] += 1
-		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.BytesToHash(v.Owner[:]))
+	for k, v := range snap {
+		owners[v] += 1
+		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.BytesToAddress(v[:]))
 	}
 	//Check owners using the transfers, from graphql
 	ownersCheck := make(map[[20]byte]int32)

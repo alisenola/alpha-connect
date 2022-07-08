@@ -63,7 +63,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	dialers := state.ExecutorConfig.DialerPool.GetDialers()
 	for _, dialer := range dialers {
@@ -335,9 +335,9 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				tok.FillBytes(tokenID[:])
 				transfers = append(transfers,
 					&gorderbook.AssetTransfer{
-						From:    from[:],
-						To:      to[:],
-						TokenId: tokenID[:],
+						From:  from[:],
+						To:    to[:],
+						Value: tokenID[:],
 					})
 			}
 			sales = append(sales, &models.Sale{

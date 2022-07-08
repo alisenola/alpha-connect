@@ -283,9 +283,9 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 				}
 				//fmt.Println("TRANSFER", event.From, event.To, event.TokenId.Text(10))
 				update.Transfers = append(update.Transfers, &gorderbook_models.AssetTransfer{
-					From:    event.From[:],
-					To:      event.To[:],
-					TokenId: event.TokenId.Bytes(),
+					From:  event.From[:],
+					To:    event.To[:],
+					Value: event.TokenId.Bytes(),
 				})
 			}
 		}

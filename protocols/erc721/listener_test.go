@@ -63,7 +63,7 @@ func TestListenerEVM(t *testing.T) {
 	if asset == nil {
 		t.Fatal("asset not found")
 	}
-	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
+	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
 	checker := as.Root.Spawn(props)
 	defer as.Root.PoisonFuture(checker)
 	time.Sleep(10 * time.Minute)
@@ -130,7 +130,7 @@ func TestListenerSVM(t *testing.T) {
 	if asset == nil {
 		t.Fatal("asset not found")
 	}
-	props := actor.PropsFromProducer(tests.NewERC721CheckerProducer(asset))
+	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
 	checker := as.Root.Spawn(props)
 	defer as.Root.PoisonFuture(checker)
 	time.Sleep(3 * time.Minute)
