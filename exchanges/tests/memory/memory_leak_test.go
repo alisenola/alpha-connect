@@ -3,10 +3,12 @@ package memory
 import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
+	tests2 "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"log"
 	"os"
@@ -18,9 +20,7 @@ import (
 )
 
 func TestMemoryLeak(t *testing.T) {
-
-	exch := constants.COINBASEPRO
-	as, ex, cancel := tests.StartExecutor(t, exch, nil)
+	as, ex, cancel := tests2.StartExecutor(t, &config.Config{Exchanges: []string{constants.COINBASEPRO.Name}})
 	defer cancel()
 
 	f, err := os.Create("profiles/mem.prof")

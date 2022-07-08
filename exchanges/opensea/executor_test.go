@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/alphaticks/alpha-connect/config"
+	tests2 "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"io/ioutil"
@@ -13,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	models2 "gitlab.com/alphaticks/xchanger/models"
@@ -23,7 +24,7 @@ func TestExecutor(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	as, executor, cancel := tests.StartExecutor(t, &models2.Exchange{ID: 0x23, Name: "opensea"}, nil)
+	as, executor, cancel := tests2.StartExecutor(t, &config.Config{Exchanges: []string{constants.OPENSEA.Name}})
 	defer cancel()
 	testAsset := models2.Asset{
 		ID:     276.,

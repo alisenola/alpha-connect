@@ -2,34 +2,18 @@ package data
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/config"
+	"gitlab.com/alphaticks/alpha-connect/tests"
 	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/xchanger/constants"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"testing"
 	"time"
 )
 
-func StartExecutor(exchange *xchangerModels.Exchange) (*actor.ActorSystem, *actor.PID, func()) {
-	exch := []*xchangerModels.Exchange{
-		exchange,
-		constants.COINBASEPRO,
-	}
-	as := actor.NewActorSystem()
-	cfg := exchanges.ExecutorConfig{
-		Exchanges:  exch,
-		Strict:     false,
-		DialerPool: xchangerUtils.DefaultDialerPool,
-	}
-	executor, _ := as.Root.SpawnNamed(actor.PropsFromProducer(exchanges.NewExecutorProducer(&cfg)), "executor")
-	return as, executor, func() { _ = as.Root.PoisonFuture(executor).Wait() }
-}
-
 func TestLiveQuery(t *testing.T) {
-	as, executor, clean := StartExecutor(constants.BINANCE)
+	cfg := config.Config{Exchanges: []string{constants.BINANCE.Name}}
+	as, executor, clean := tests.StartExecutor(t, &cfg)
 	defer clean()
 	lt, err := NewLiveStore(as, executor)
 	if err != nil {

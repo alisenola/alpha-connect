@@ -1,5 +1,6 @@
 package legacy
 
+/*
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -523,3 +524,5 @@ func (p *AccountPortfolio) Sync(orders []*models.Order, positions []*models.Posi
 
 	return nil
 }
+
+*/
