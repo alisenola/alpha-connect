@@ -2,6 +2,8 @@ package tests
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 	"reflect"
 	"time"
 
@@ -18,7 +20,7 @@ type GetDataResponse struct {
 	Err     error
 }
 
-type ERC721Checker struct {
+type ProtocolChecker struct {
 	asset   *models.ProtocolAsset
 	logger  *log.Logger
 	updates []*models.ProtocolAssetUpdate
@@ -26,14 +28,14 @@ type ERC721Checker struct {
 	seqNum  uint64
 }
 
-func NewERC721CheckerProducer(asset *models.ProtocolAsset) actor.Producer {
+func NewProtocolCheckerProducer(asset *models.ProtocolAsset) actor.Producer {
 	return func() actor.Actor {
-		return NewERC721Checker(asset)
+		return NewProtocolChecker(asset)
 	}
 }
 
-func NewERC721Checker(asset *models.ProtocolAsset) actor.Actor {
-	return &ERC721Checker{
+func NewProtocolChecker(asset *models.ProtocolAsset) actor.Actor {
+	return &ProtocolChecker{
 		asset:   asset,
 		updates: nil,
 		logger:  nil,
@@ -41,7 +43,7 @@ func NewERC721Checker(asset *models.ProtocolAsset) actor.Actor {
 	}
 }
 
-func (state *ERC721Checker) Receive(context actor.Context) {
+func (state *ProtocolChecker) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -61,7 +63,7 @@ func (state *ERC721Checker) Receive(context actor.Context) {
 	}
 }
 
-func (state *ERC721Checker) Initialize(context actor.Context) error {
+func (state *ProtocolChecker) Initialize(context actor.Context) error {
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -89,19 +91,24 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.Context) error {
+func (state *ProtocolChecker) OnProtocolAssetDataIncrementalRefresh(context actor.Context) error {
 	if state.err != nil {
 		return nil
 	}
 	res := context.Message().(*messages.ProtocolAssetDataIncrementalRefresh)
-	if res.Update == nil {
-		return nil
-	}
 	if res.SeqNum <= state.seqNum {
 		return nil
 	}
 	if res.SeqNum != state.seqNum+1 {
 		return fmt.Errorf("seqNum not in sequence, expected %d, got %d", state.seqNum+1, res.SeqNum)
+	}
+	if res.Update != nil {
+		for _, tr := range res.Update.Transfers {
+			fmt.Println("FROM", common.BytesToHash(tr.From))
+			fmt.Println("TO", common.BytesToHash(tr.To))
+			fmt.Println("VALUE", big.NewInt(1).SetBytes(tr.Value))
+			fmt.Println("BLOCK NUMBER", res.Update.BlockNumber)
+		}
 	}
 	state.seqNum = res.SeqNum
 	return nil
