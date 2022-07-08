@@ -1,9 +1,12 @@
-package account
+package account_test
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"os"
 	"testing"
@@ -12,6 +15,11 @@ import (
 var model modeling.MarketModel
 
 func TestMain(m *testing.M) {
+	os.Exit(m.Run())
+}
+
+func InitModel(t *testing.T) {
+	tests.LoadStatics(t)
 	mdl := modeling.NewMapMarketModel()
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.TETHER.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(100.))
@@ -37,11 +45,11 @@ func TestMain(m *testing.M) {
 
 	model = mdl
 
-	os.Exit(m.Run())
 }
 
 func TestAccount_GetAvailableMargin(t *testing.T) {
-	account, err := NewAccount(bitmexAccount)
+	InitModel(t)
+	account, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +97,8 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 }
 
 func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
-	account, err := NewAccount(bitmexAccount)
+	InitModel(t)
+	account, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +145,8 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 }
 
 func TestAccount_PnL_Inverse(t *testing.T) {
-	account, err := NewAccount(bitmexAccount)
+	InitModel(t)
+	account, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +225,8 @@ func TestAccount_PnL_Inverse(t *testing.T) {
 }
 
 func TestPortfolio_Spot_ELR(t *testing.T) {
-	account, err := NewAccount(bitstampAccount)
+	InitModel(t)
+	accnt, err := account.NewAccount(bitstampAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,12 +240,12 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		Asset:    constants.ETHEREUM,
 		Quantity: 10,
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, nil, nil); err != nil {
+	if err := accnt.Sync([]*models.Security{BTCUSD_SPOT_SEC, ETHUSD_SPOT_SEC}, nil, nil, []*models.Balance{dollarBalance, ethereumBalance}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	p := NewPortfolio(1000)
-	p.AddAccount(account)
+	p := account.NewPortfolio(1000)
+	p.AddAccount(accnt)
 
 	expectedBaseChange := 2 - (2 * 0.0025)
 	expectedQuoteChange := 2 * 50.
@@ -248,7 +259,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	}
 	o.Quantity = math.Round(o.Quantity/BTCUSD_SPOT_SEC.RoundLot.Value) * BTCUSD_SPOT_SEC.RoundLot.Value
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej := account.NewOrder(&models.Order{
+	_, rej := accnt.NewOrder(&models.Order{
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
@@ -267,7 +278,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy1", "buy1")
+	_, err = accnt.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,8 +292,8 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
 
-	account.CancelOrder("buy1")
-	if _, err := account.ConfirmCancelOrder("buy1"); err != nil {
+	accnt.CancelOrder("buy1")
+	if _, err := accnt.ConfirmCancelOrder("buy1"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -303,7 +314,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	}
 	o.Quantity = math.Round(o.Quantity/ETHUSD_SPOT_SEC.RoundLot.Value) * ETHUSD_SPOT_SEC.RoundLot.Value
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej = account.NewOrder(&models.Order{
+	_, rej = accnt.NewOrder(&models.Order{
 		OrderID:       "buy2",
 		ClientOrderID: "buy2",
 		Instrument: &models.Instrument{
@@ -322,7 +333,7 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy2", "buy2")
+	_, err = accnt.ConfirmNewOrder("buy2", "buy2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,8 +347,8 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
 
-	account.CancelOrder("buy2")
-	if _, err := account.ConfirmCancelOrder("buy2"); err != nil {
+	accnt.CancelOrder("buy2")
+	if _, err := accnt.ConfirmCancelOrder("buy2"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -349,17 +360,17 @@ func TestPortfolio_Spot_ELR(t *testing.T) {
 }
 
 func TestPortfolio_Margin_ELR(t *testing.T) {
-
-	account, err := NewAccount(bitmexAccount)
+	InitModel(t)
+	accnt, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
+	if err := accnt.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	p := NewPortfolio(1000)
-	p.AddAccount(account)
+	p := account.NewPortfolio(1000)
+	p.AddAccount(accnt)
 
 	expectedMarginChange := ((1./90 - 1./100) * 9) - (0.00075 * (1. / 90) * 9)
 	expectedElr := math.Log((p.Value(model) + (expectedMarginChange * 100)) / p.Value(model))
@@ -376,7 +387,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", expectedElr, elr)
 	}
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej := account.NewOrder(&models.Order{
+	_, rej := accnt.NewOrder(&models.Order{
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
@@ -395,11 +406,11 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy1", "buy1")
+	_, err = accnt.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateBidOrderQueue(BTCUSD_PERP_SEC.SecurityID, "buy1", 1)
+	accnt.UpdateBidOrderQueue(BTCUSD_PERP_SEC.SecurityID, "buy1", 1)
 	// Try with same time to test value cache consistency
 	elr = p.ExpectedLogReturn(model, 10)
 	if math.Abs(elr-expectedElr) > 0.000001 {
@@ -417,8 +428,8 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
-	account.CancelOrder("buy1")
-	_, err = account.ConfirmCancelOrder("buy1")
+	accnt.CancelOrder("buy1")
+	_, err = accnt.ConfirmCancelOrder("buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +462,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	}
 	o.Quantity = math.Round(o.Quantity)
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej = account.NewOrder(&models.Order{
+	_, rej = accnt.NewOrder(&models.Order{
 		OrderID:       "buy2",
 		ClientOrderID: "buy2",
 		Instrument: &models.Instrument{
@@ -470,11 +481,11 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy2", "buy2")
+	_, err = accnt.ConfirmNewOrder("buy2", "buy2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateBidOrderQueue(ETHUSD_PERP_SEC.SecurityID, "buy2", 1)
+	accnt.UpdateBidOrderQueue(ETHUSD_PERP_SEC.SecurityID, "buy2", 1)
 
 	elr = p.ExpectedLogReturn(model, 10)
 	if math.Abs(elr-expectedElr) > 0.000001 {
@@ -489,8 +500,8 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if math.Abs(elr) > 0.000001 {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
-	account.CancelOrder("buy2")
-	if _, err := account.ConfirmCancelOrder("buy2"); err != nil {
+	accnt.CancelOrder("buy2")
+	if _, err := accnt.ConfirmCancelOrder("buy2"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -525,7 +536,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	o.Quantity = math.Round(o.Quantity)
 
 	// Add a sell order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej = account.NewOrder(&models.Order{
+	_, rej = accnt.NewOrder(&models.Order{
 		OrderID:       "sell1",
 		ClientOrderID: "sell1",
 		Instrument: &models.Instrument{
@@ -544,11 +555,11 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("sell1", "sell1")
+	_, err = accnt.ConfirmNewOrder("sell1", "sell1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateAskOrderQueue(BTCUSD_PERP_SEC.SecurityID, "sell1", 1)
+	accnt.UpdateAskOrderQueue(BTCUSD_PERP_SEC.SecurityID, "sell1", 1)
 
 	elr = p.ExpectedLogReturn(model, 10)
 	if math.Abs(elr-expectedElr) > 0.000001 {
@@ -568,8 +579,8 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
-	account.CancelOrder("sell1")
-	if _, err := account.ConfirmCancelOrder("sell1"); err != nil {
+	accnt.CancelOrder("sell1")
+	if _, err := accnt.ConfirmCancelOrder("sell1"); err != nil {
 		t.Fatal(err)
 	}
 	elr = p.ExpectedLogReturn(model, 10)
@@ -599,7 +610,7 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	o.Quantity = math.Round(o.Quantity)
 
 	// Add a sell order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej = account.NewOrder(&models.Order{
+	_, rej = accnt.NewOrder(&models.Order{
 		OrderID:       "sell2",
 		ClientOrderID: "sell2",
 		Instrument: &models.Instrument{
@@ -618,11 +629,11 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("sell2", "sell2")
+	_, err = accnt.ConfirmNewOrder("sell2", "sell2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateAskOrderQueue(ETHUSD_PERP_SEC.SecurityID, "sell2", 1)
+	accnt.UpdateAskOrderQueue(ETHUSD_PERP_SEC.SecurityID, "sell2", 1)
 
 	elr = p.ExpectedLogReturn(model, 10)
 
@@ -635,8 +646,8 @@ func TestPortfolio_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
-	account.CancelOrder("sell2")
-	if _, err := account.ConfirmCancelOrder("sell2"); err != nil {
+	accnt.CancelOrder("sell2")
+	if _, err := accnt.ConfirmCancelOrder("sell2"); err != nil {
 		t.Fatal(err)
 	}
 	elr = p.ExpectedLogReturn(model, 10)
@@ -676,17 +687,17 @@ func TestBitmexPortfolio_Parallel(t *testing.T) {
 */
 
 func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
-
-	account, err := NewAccount(fbinanceAccount)
+	InitModel(t)
+	accnt, err := account.NewAccount(fbinanceAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := account.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
+	if err := accnt.Sync([]*models.Security{BTCUSDT_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	p := NewPortfolio(1000)
-	p.AddAccount(account)
+	p := account.NewPortfolio(1000)
+	p.AddAccount(accnt)
 
 	expectedMarginChange := ((100 - 90) * 0.1) - (0.0004 * 90 * 0.1)
 	expectedElr := math.Log((p.Value(model) + (expectedMarginChange)) / p.Value(model))
@@ -705,7 +716,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	}
 	// Add a buy order. Using o.quantity allows us to check if the returned order's quantity is correct too
 	o.Quantity = 1.
-	_, rej := account.NewOrder(&models.Order{
+	_, rej := accnt.NewOrder(&models.Order{
 		OrderID:       "buy1",
 		ClientOrderID: "buy1",
 		Instrument: &models.Instrument{
@@ -724,11 +735,11 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy1", "buy1")
+	_, err = accnt.ConfirmNewOrder("buy1", "buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateBidOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "buy1", 1)
+	accnt.UpdateBidOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "buy1", 1)
 	// Try with same time to test value cache consistency
 	elr = p.ExpectedLogReturn(model, 10)
 	if math.Abs(elr-expectedElr) > 0.000001 {
@@ -746,8 +757,8 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
-	account.CancelOrder("buy1")
-	_, err = account.ConfirmCancelOrder("buy1")
+	accnt.CancelOrder("buy1")
+	_, err = accnt.ConfirmCancelOrder("buy1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -782,7 +793,7 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	o.Quantity = math.Round(o.Quantity)
 
 	// Add a sell order. Using o.quantity allows us to check if the returned order's quantity is correct too
-	_, rej = account.NewOrder(&models.Order{
+	_, rej = accnt.NewOrder(&models.Order{
 		OrderID:       "sell2",
 		ClientOrderID: "sell2",
 		Instrument: &models.Instrument{
@@ -801,11 +812,11 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("sell2", "sell2")
+	_, err = accnt.ConfirmNewOrder("sell2", "sell2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.UpdateAskOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "sell2", 1)
+	accnt.UpdateAskOrderQueue(BTCUSDT_PERP_SEC.SecurityID, "sell2", 1)
 
 	elr = p.ExpectedLogReturn(model, 10)
 
@@ -818,8 +829,8 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 
-	account.CancelOrder("sell2")
-	if _, err := account.ConfirmCancelOrder("sell2"); err != nil {
+	accnt.CancelOrder("sell2")
+	if _, err := accnt.ConfirmCancelOrder("sell2"); err != nil {
 		t.Fatal(err)
 	}
 	elr = p.ExpectedLogReturn(model, 10)

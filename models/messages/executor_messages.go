@@ -3,7 +3,9 @@ package messages
 import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"gitlab.com/alphaticks/xchanger/chains/svm"
 	"gitlab.com/alphaticks/xchanger/models"
 	"time"
 )
@@ -90,4 +92,47 @@ type EVMLogs struct {
 	BlockNumber uint64
 	BlockTime   time.Time
 	Logs        []types.Log
+}
+
+type SVMEventsQueryRequest struct {
+	RequestID uint64
+	Query     svm.EventQuery
+	Chain     *models.Chain
+}
+
+type SVMEventsQueryResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Events          []*svm.Event
+	Times           []uint64
+	Success         bool
+	RejectionReason RejectionReason
+}
+
+type SVMBlockQueryRequest struct {
+	RequestID uint64
+	Query     *svm.BlockQuery
+	Chain     *models.Chain
+}
+
+type SVMBlockQueryResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Block           *svm.Block
+	Success         bool
+	RejectionReason RejectionReason
+}
+
+type SVMTransactionByHashRequest struct {
+	RequestID uint64
+	Hash      common.Hash
+	Chain     *models.Chain
+}
+
+type SVMTransactionByHashResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Transaction     *svm.Transaction
+	Success         bool
+	RejectionReason RejectionReason
 }

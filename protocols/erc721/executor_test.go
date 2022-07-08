@@ -3,17 +3,14 @@ package erc721_test
 import (
 	"context"
 	"fmt"
-	"gitlab.com/alphaticks/alpha-connect/chains"
-	"gitlab.com/alphaticks/alpha-connect/exchanges"
-	"gitlab.com/alphaticks/alpha-connect/protocols"
+	"github.com/stretchr/testify/assert"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	gorderbookModels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 
 	"gitlab.com/alphaticks/xchanger/constants"
-	"google.golang.org/grpc"
 	"math/big"
 	"reflect"
 	"testing"
@@ -51,21 +48,13 @@ type ERC721Contract struct {
 	ERC721Contract ERC721Data `graphql:"erc721Contract(block:{number:$number} id:$id)"`
 }
 
-func TestExecutor(t *testing.T) {
+func TestExecutorEVM(t *testing.T) {
 	exTests.LoadStatics(t)
-	protocol := constants.ERC721
-	registryAddress := "registry.alphaticks.io:8001"
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
+	cfg := config.Config{
+		RegistryAddress: "registry.alphaticks.io:8001",
+		Protocols:       []string{constants.ERC721.Name},
 	}
-	reg := registry.NewPublicRegistryClient(conn)
-
-	prCfg := &protocols.ExecutorConfig{
-		Registry:  reg,
-		Protocols: []*xchangerModels.Protocol{protocol},
-	}
-	as, executor, clean := exTests.StartExecutor(t, &exchanges.ExecutorConfig{}, prCfg, &chains.ExecutorConfig{}, nil)
+	as, executor, clean := exTests.StartExecutor(t, &cfg)
 	defer clean()
 
 	testAsset := xchangerModels.Asset{
@@ -73,13 +62,9 @@ func TestExecutor(t *testing.T) {
 		Symbol: "BAYC",
 	}
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(t, err, "RequestFuture ProtocolAssetList err: %v", err)
 	assets, ok := res.(*messages.ProtocolAssetList)
-	if !ok {
-		t.Fatal("incorrect for type assertion")
-	}
+	assert.True(t, ok, "incorrect for type assertion")
 	var coll *models.ProtocolAsset
 	for _, asset := range assets.ProtocolAssets {
 		fmt.Printf("asset %+v \n", asset)
@@ -87,23 +72,15 @@ func TestExecutor(t *testing.T) {
 			coll = asset
 		}
 	}
-	if coll == nil {
-		t.Fatal("missing collection")
-	}
+	assert.NotNil(t, coll, "missing collection")
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
 		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.EthereumMainnet),
 	}, 15*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err)
 	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
-	if !ok {
-		t.Fatalf("was expecting ProtocolAssetDefinitionResponse got %s", reflect.TypeOf(r).String())
-	}
-	if !def.Success {
-		t.Fatal(def.RejectionReason)
-	}
+	assert.True(t, ok, "expected ProtocolAssetDefinitionResponse got %s", reflect.TypeOf(r).String())
+	assert.True(t, def.Success, "request failed with %s", def.RejectionReason.String())
 	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
 	//Execute the future request for the NFT historical data
 	resp, err := as.Root.RequestFuture(
@@ -116,13 +93,10 @@ func TestExecutor(t *testing.T) {
 		},
 		30*time.Second,
 	).Result()
-	if err != nil {
-		t.Fatal()
-	}
-	response, _ := resp.(*messages.HistoricalProtocolAssetTransferResponse)
-	if !response.Success {
-		t.Fatal("error in the transfers request", response.RejectionReason)
-	}
+	assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err)
+	response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+	assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String())
+	assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String())
 	//Execute the graphql query for the same period querying transfers for the BAYC contract
 	client := graphql.NewClient("https://api.thegraph.com/subgraphs/name/ryry79261/mainnet-erc721-erc1155", nil)
 	query := ERC721Contract{}
@@ -132,14 +106,10 @@ func TestExecutor(t *testing.T) {
 		"timestamp": graphql.Int(1619228194), //Exact cut off time for block 12300000
 	}
 	err = client.Query(context.Background(), &query, variables)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(t, err, "Query err: %v", err)
 	for _, resT := range response.Update {
 		for _, transfer := range resT.Transfers {
-			if ok := find(transfer, query.ERC721Contract.Transfers); !ok {
-				t.Fatal()
-			}
+			assert.True(t, find(transfer, query.ERC721Contract.Transfers), "failed to with transfer")
 		}
 	}
 	//Run the transfers using the nft tracker
@@ -152,9 +122,8 @@ func TestExecutor(t *testing.T) {
 			copy(from[:], transfer.From)
 			copy(to[:], transfer.To)
 			tokenID.SetBytes(transfer.TokenId)
-			if err := tracker.TransferFrom(from, to, tokenID); err != nil {
-				t.Fatal(err)
-			}
+			err := tracker.TransferFrom(from, to, tokenID)
+			assert.Nil(t, err, "TransferFrom err: %v", err)
 		}
 	}
 	//Capture snapshot of the tracker and extract owners and nft amount
@@ -162,7 +131,7 @@ func TestExecutor(t *testing.T) {
 	owners := make(map[[20]byte]int32)
 	for k, v := range snap.Coins {
 		owners[v.Owner] += 1
-		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.Bytes2Hex(v.Owner[:]))
+		fmt.Println("Token", big.NewInt(1).SetBytes(k[:]), "has owner", common.BytesToHash(v.Owner[:]))
 	}
 	//Check owners using the transfers, from graphql
 	ownersCheck := make(map[[20]byte]int32)
@@ -182,6 +151,64 @@ func TestExecutor(t *testing.T) {
 			fmt.Println("error with", common.Bytes2Hex(k[:]))
 		}
 	}
+}
+
+func TestExecutorSVM(t *testing.T) {
+	exTests.LoadStatics(t)
+	cfg := config.Config{
+		RegistryAddress: "registry.alphaticks.io:8001",
+		Protocols:       []string{constants.ERC721.Name},
+	}
+	as, executor, clean := exTests.StartExecutor(t, &cfg)
+	defer clean()
+
+	testAsset := xchangerModels.Asset{
+		ID:     275.,
+		Symbol: "BAYC",
+	}
+	chain, ok := constants.GetChainByID(5)
+	assert.True(t, ok, "missings svm")
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
+	assert.Nil(t, err, "RequestFuture ProtocolAssetList err: %v", err)
+	assets, ok := res.(*messages.ProtocolAssetList)
+	assert.True(t, ok, "incorrect type assertion")
+	var coll *models.ProtocolAsset
+	for _, asset := range assets.ProtocolAssets {
+		if asset.Asset.Symbol == testAsset.Symbol && asset.Chain.ID == chain.ID {
+			fmt.Printf("asset %+v \n", asset)
+			coll = asset
+		}
+	}
+	assert.NotNil(t, coll, "missing collection")
+	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
+		RequestID:       uint64(time.Now().UnixNano()),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.StarknetMainnet),
+	}, 15*time.Second).Result()
+	assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err)
+	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
+	assert.True(t, ok, "expected ProtocolAssetDefinitionResponse, got %s", reflect.TypeOf(r).String())
+	assert.True(t, def.Success, "request failed with %v", def.RejectionReason.String())
+	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
+	//Execute the future request for the NFT historical data
+	resp, err := as.Root.RequestFuture(
+		executor,
+		&messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:       uint64(time.Now().UnixNano()),
+			ProtocolAssetID: coll.ProtocolAssetID,
+			Start:           0,
+			Stop:            3000,
+		},
+		30*time.Second,
+	).Result()
+	assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err)
+	response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+	assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String())
+	assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String())
+	var events []*gorderbookModels.AssetTransfer
+	for _, ev := range response.Update {
+		events = append(events, ev.Transfers...)
+	}
+	assert.GreaterOrEqual(t, len(events), 20, "expected more than 20 events")
 }
 
 func find(t *gorderbookModels.AssetTransfer, arr []*Transfer) bool {

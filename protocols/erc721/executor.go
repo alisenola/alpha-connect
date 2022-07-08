@@ -3,27 +3,30 @@ package erc721
 import (
 	goContext "context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"math/big"
 	"reflect"
 	"sort"
 	"time"
 
-	"gitlab.com/alphaticks/alpha-connect/utils"
-	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
-
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	extype "gitlab.com/alphaticks/alpha-connect/protocols/types"
+	"gitlab.com/alphaticks/alpha-connect/utils"
+	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/chains/evm"
+	"gitlab.com/alphaticks/xchanger/chains/svm"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/eth"
 	models2 "gitlab.com/alphaticks/xchanger/models"
-	nft "gitlab.com/alphaticks/xchanger/protocols/erc721"
+	nft "gitlab.com/alphaticks/xchanger/protocols/erc721/evm"
+	snft "gitlab.com/alphaticks/xchanger/protocols/erc721/svm"
 )
 
 type QueryRunner struct {
@@ -34,7 +37,8 @@ type Executor struct {
 	extype.BaseExecutor
 	executor       *actor.PID
 	protocolAssets map[uint64]*models.ProtocolAsset
-	abi            *abi.ABI
+	eabi           *abi.ABI
+	sabi           *sabi.ABI
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
@@ -62,9 +66,15 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
-		return fmt.Errorf("error getting abi: %v", err)
+		return fmt.Errorf("error getting ethereum abi: %v", err)
 	}
-	state.abi = eabi
+	state.eabi = eabi
+
+	stabi, err := snft.ERC721MetaData.GetAbi()
+	if err != nil {
+		return fmt.Errorf("error getting starknet abi: %v", err)
+	}
+	state.sabi = stabi
 	return state.UpdateProtocolAssetList(context)
 }
 
@@ -178,85 +188,169 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		context.Respond(msg)
 		return nil
 	}
-
-	topics := [][]common.Hash{{
-		state.abi.Events["Transfer"].ID,
-	}}
-	var address [20]byte
-	addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
-	if !ok {
-		state.logger.Warn("invalid protocol asset address")
-		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
-		context.Respond(msg)
-		return nil
+	var future *actor.Future
+	var query interface{}
+	var delay int64
+	switch pa.Chain.Type {
+	case "EVM":
+		topics := [][]common.Hash{{
+			state.eabi.Events["Transfer"].ID,
+		}}
+		var address [20]byte
+		addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
+		if !ok {
+			state.logger.Warn("invalid protocol asset address")
+			msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+			context.Respond(msg)
+			return nil
+		}
+		copy(address[:], addressBig.Bytes())
+		fQuery := ethereum.FilterQuery{
+			Addresses: []common.Address{address},
+			FromBlock: big.NewInt(1).SetUint64(req.Start),
+			ToBlock:   big.NewInt(1).SetUint64(req.Stop),
+			Topics:    topics,
+		}
+		query = &messages.EVMLogsQueryRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Chain:     pa.Chain,
+			Query:     fQuery,
+		}
+		delay = 20
+	case "SVM":
+		add := common.HexToHash(pa.ContractAddress.Value)
+		q := svm.EventQuery{
+			ContractAddress: &add,
+			Keys:            &[]common.Hash{state.sabi.Events["Transfer"].ID},
+			From:            big.NewInt(1).SetUint64(req.Start),
+			To:              big.NewInt(1).SetUint64(req.Stop),
+			PageSize:        1000,
+			PageNumber:      0,
+		}
+		query = &messages.SVMEventsQueryRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Chain:     pa.Chain,
+			Query:     q,
+		}
+		delay = 120
 	}
-
-	copy(address[:], addressBig.Bytes())
-	fQuery := ethereum.FilterQuery{
-		Addresses: []common.Address{address},
-		FromBlock: big.NewInt(1).SetUint64(req.Start),
-		ToBlock:   big.NewInt(1).SetUint64(req.Stop),
-		Topics:    topics,
-	}
-	future := context.RequestFuture(state.executor, &messages.EVMLogsQueryRequest{
-		Chain: pa.Chain,
-		Query: fQuery,
-	}, 15*time.Second)
+	future = context.RequestFuture(state.executor, query, time.Duration(delay)*time.Second)
 	context.ReenterAfter(future, func(res interface{}, err error) {
 		if err != nil {
-			state.logger.Warn("error at eth rpc server", log.Error(err))
+			state.logger.Warn("error at rpc server", log.Error(err))
 			switch err.Error() {
 			case "future: timeout":
-				msg.RejectionReason = messages.RejectionReason_EthRPCTimeout
+				msg.RejectionReason = messages.RejectionReason_RPCTimeout
 			default:
-				msg.RejectionReason = messages.RejectionReason_EthRPCError
+				msg.RejectionReason = messages.RejectionReason_RPCError
 			}
 			context.Respond(msg)
 			return
 		}
 
-		resp := res.(*messages.EVMLogsQueryResponse)
-		if !resp.Success {
-			state.logger.Warn("error at eth rpc server: " + resp.RejectionReason.String())
-			msg.RejectionReason = messages.RejectionReason_EthRPCError
-			context.Respond(msg)
-			return
+		var datas []interface{}
+		var times []uint64
+		switch resp := res.(type) {
+		case *messages.EVMLogsQueryResponse:
+			if !resp.Success {
+				state.logger.Warn("error at eth rpc server", log.String("rejection reason", resp.RejectionReason.String()))
+				msg.RejectionReason = messages.RejectionReason_RPCError
+				context.Respond(msg)
+				return
+			}
+			if len(resp.Times) != len(resp.Logs) {
+				state.logger.Warn("mismatched logs and times array length", log.Int("times length", len(resp.Times)), log.Int("events length", len(resp.Logs)))
+				msg.RejectionReason = messages.RejectionReason_Other
+				context.Respond(msg)
+				return
+			}
+			sort.Slice(resp.Logs, func(i, j int) bool {
+				if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
+					return resp.Logs[i].Index < resp.Logs[j].Index
+				}
+				return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
+			})
+			for _, l := range resp.Logs {
+				datas = append(datas, l)
+			}
+			times = resp.Times
+		case *messages.SVMEventsQueryResponse:
+			if !resp.Success {
+				state.logger.Warn("error at stark rpc server", log.String("rejection reason", resp.RejectionReason.String()))
+				msg.RejectionReason = messages.RejectionReason_RPCError
+				context.Respond(msg)
+				return
+			}
+			if len(resp.Times) != len(resp.Events) {
+				state.logger.Warn("mismatched events and times array length", log.Int("times length", len(resp.Times)), log.Int("events length", len(resp.Events)))
+				msg.RejectionReason = messages.RejectionReason_Other
+				context.Respond(msg)
+				return
+			}
+			sort.SliceStable(resp.Events, func(i, j int) bool {
+				return resp.Events[i].BlockNumber < resp.Events[j].BlockNumber
+			})
+			for _, l := range resp.Events {
+				datas = append(datas, l)
+			}
+			times = resp.Times
 		}
-
 		events := make([]*models.ProtocolAssetUpdate, 0)
-		sort.Slice(resp.Logs, func(i, j int) bool {
-			if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
-				return resp.Logs[i].Index < resp.Logs[j].Index
-			}
-			return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
-		})
 		var update *models.ProtocolAssetUpdate
-		for i, l := range resp.Logs {
-			switch l.Topics[0] {
-			case state.abi.Events["Transfer"].ID:
-				event := nft.ERC721Transfer{}
-				if err := eth.UnpackLog(state.abi, &event, "Transfer", l); err != nil {
-					state.logger.Warn("error unpacking log", log.Error(err))
-					msg.RejectionReason = messages.RejectionReason_EthRPCError
-					context.Respond(msg)
-					return
-				}
-				if update == nil || update.BlockNumber != l.BlockNumber {
-					if update != nil {
-						events = append(events, update)
+		for i, d := range datas {
+			from := make([]byte, 32)
+			to := make([]byte, 32)
+			tok := make([]byte, 32)
+			var num uint64
+			switch l := d.(type) {
+			case types.Log:
+				switch l.Topics[0] {
+				case state.eabi.Events["Transfer"].ID:
+					event := nft.ERC721Transfer{}
+					if err := evm.UnpackLog(state.eabi, &event, "Transfer", l); err != nil {
+						state.logger.Warn("error unpacking eth log", log.Error(err))
+						msg.RejectionReason = messages.RejectionReason_RPCError
+						context.Respond(msg)
+						return
 					}
-					update = &models.ProtocolAssetUpdate{
-						Transfers:   nil,
-						BlockNumber: l.BlockNumber,
-						BlockTime:   utils.SecondToTimestamp(resp.Times[i]),
-					}
+					from = event.From[:]
+					to = event.To[:]
+					tok = event.TokenId.Bytes()
+					num = l.BlockNumber
 				}
-				update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
-					From:    event.From[:],
-					To:      event.To[:],
-					TokenId: event.TokenId.Bytes(),
-				})
+			case *svm.Event:
+				key := [32]byte(l.Keys[0])
+				id := [32]byte(state.sabi.Events["Transfer"].ID)
+				switch key {
+				case id:
+					event := snft.ERC721Transfer{}
+					if err := svm.UnpackLog(state.sabi, &event, "Transfer", l); err != nil {
+						state.logger.Warn("error unpacking stark event", log.Error(err))
+						msg.RejectionReason = messages.RejectionReason_RPCError
+						context.Respond(msg)
+						return
+					}
+					event.From.FillBytes(from[:])
+					event.To.FillBytes(to[:])
+					event.TokenId.FillBytes(tok[:])
+					num = uint64(l.BlockNumber)
+				}
 			}
+			if update == nil || update.BlockNumber != num {
+				if update != nil {
+					events = append(events, update)
+				}
+				update = &models.ProtocolAssetUpdate{
+					Transfers:   nil,
+					BlockNumber: num,
+					BlockTime:   utils.SecondToTimestamp(times[i]),
+				}
+			}
+			update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
+				From:    from,
+				To:      to,
+				TokenId: tok,
+			})
 		}
 		if update != nil {
 			events = append(events, update)

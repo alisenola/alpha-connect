@@ -120,7 +120,7 @@ func (state *Executor) OnBlockNumberRequest(context actor.Context) error {
 		current, err := state.client.BlockNumber(goContext.Background())
 		if err != nil {
 			state.logger.Warn("error filtering logs", log.Error(err))
-			res.RejectionReason = messages.RejectionReason_EthRPCError
+			res.RejectionReason = messages.RejectionReason_RPCError
 			context.Send(sender, res)
 			return
 		}
@@ -143,7 +143,7 @@ func (state *Executor) OnBlockInfoRequest(context actor.Context) error {
 		header, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
 		if err != nil {
 			state.logger.Warn("error getting header", log.Error(err))
-			res.RejectionReason = messages.RejectionReason_EthRPCError
+			res.RejectionReason = messages.RejectionReason_RPCError
 			context.Send(sender, res)
 			return
 		}
@@ -166,7 +166,7 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 		out, err := state.client.CallContract(goContext.Background(), req.Msg, big.NewInt(int64(req.BlockNumber)))
 		if err != nil {
 			state.logger.Warn("error filtering logs", log.Error(err))
-			res.RejectionReason = messages.RejectionReason_EthRPCError
+			res.RejectionReason = messages.RejectionReason_RPCError
 			context.Send(sender, res)
 			return
 		}
@@ -235,7 +235,7 @@ func (state *Executor) OnEVMLogsQueryRequest(context actor.Context) error {
 		logs, err := state.client.FilterLogs(goContext.Background(), req.Query)
 		if err != nil {
 			state.logger.Warn("error filtering logs", log.Error(err))
-			res.RejectionReason = messages.RejectionReason_EthRPCError
+			res.RejectionReason = messages.RejectionReason_RPCError
 			context.Send(sender, res)
 			return
 		}
@@ -248,7 +248,7 @@ func (state *Executor) OnEVMLogsQueryRequest(context actor.Context) error {
 				block, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
 				if err != nil {
 					state.logger.Warn("error getting header", log.Error(err))
-					res.RejectionReason = messages.RejectionReason_EthRPCError
+					res.RejectionReason = messages.RejectionReason_RPCError
 					context.Send(sender, res)
 					return
 				}
@@ -275,7 +275,7 @@ func (state *Executor) OnEVMLogsSubscribeRequest(context actor.Context) error {
 	ch := make(chan types.Log)
 	sub, err := state.client.SubscribeFilterLogs(goContext.Background(), req.Query, ch)
 	if err != nil {
-		res.RejectionReason = messages.RejectionReason_EthRPCError
+		res.RejectionReason = messages.RejectionReason_RPCError
 		context.Respond(res)
 		return nil
 	}
@@ -331,7 +331,8 @@ func (state *Executor) OnEVMLogsSubscribeRequest(context actor.Context) error {
 }
 
 func (state *Executor) onFlushLogs(context actor.Context) error {
-	ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	ctx, canc := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+	defer canc()
 	current, err := state.client.BlockNumber(ctx)
 	if err != nil {
 		state.logger.Warn("error fetching block number", log.Error(err))

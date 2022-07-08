@@ -65,12 +65,12 @@ enum RejectionReason {
     UnknownExchange = 26;
     GraphQLError = 27;
     ABIError = 28;
-    EthRPCError = 29;
+    RPCError = 29;
     UnknownProtocol = 30;
     MissingProtocolAsset = 31;
     UnknownProtocolAsset = 32;
     UnknownAsset = 33;
-    EthRPCTimeout = 34;
+    RPCTimeout = 34;
     UnknownChain = 35;
     RequestExpired = 36;
     AccountListenerDisabled = 37;

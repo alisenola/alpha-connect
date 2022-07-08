@@ -1,6 +1,7 @@
-package account
+package account_test
 
 import (
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
@@ -103,7 +104,7 @@ var ETHUSD_SPOT_SEC = &models.Security{
 }
 
 func TestAccount_ConfirmFill(t *testing.T) {
-	accnt, err := NewAccount(bitmexAccount)
+	accnt, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +208,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
-	accnt, err := NewAccount(bitmexAccount)
+	accnt, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +315,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	// Post a matching limit order and post a replace right after
 
-	accnt, err := NewAccount(bitmexAccount)
+	accnt, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +420,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 }
 
 func TestAccount_Compare(t *testing.T) {
-	accnt1, err := NewAccount(bitmexAccount)
+	accnt1, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +428,7 @@ func TestAccount_Compare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	accnt2, err := NewAccount(bitmexAccount)
+	accnt2, err := account.NewAccount(bitmexAccount)
 	if err != nil {
 		t.Fatal(err)
 	}

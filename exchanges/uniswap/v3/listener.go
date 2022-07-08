@@ -5,6 +5,7 @@ import (
 	goContext "context"
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/utils"
+	"gitlab.com/alphaticks/xchanger/chains/evm"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
@@ -22,7 +23,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
-	"gitlab.com/alphaticks/xchanger/eth"
 	uniswap "gitlab.com/alphaticks/xchanger/exchanges/uniswap/V3"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 )
@@ -38,7 +38,7 @@ type InstrumentData struct {
 type Listener struct {
 	extypes.Listener
 	client         *ethclient.Client
-	iterator       *eth.LogIterator
+	iterator       *evm.LogIterator
 	securityID     uint64
 	security       *models.Security
 	executor       *actor.PID
@@ -147,7 +147,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		seqNum: uint64(time.Now().UnixNano()),
 	}
 
-	client, err := ethclient.Dial(eth.ETH_CLIENT_WS)
+	client, err := ethclient.Dial(evm.ETH_CLIENT_WS)
 	if err != nil {
 		return fmt.Errorf("error while dialing eth rpc client %v", err)
 	}
@@ -216,7 +216,7 @@ func (state *Listener) subscribeLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting contract abi %v", err)
 	}
-	it := eth.NewLogIterator(uabi)
+	it := evm.NewLogIterator(uabi)
 
 	query := [][]interface{}{{
 		uabi.Events["Initialize"].ID,
@@ -295,7 +295,7 @@ func (state *Listener) onLog(context actor.Context) error {
 	switch msg.Topics[0] {
 	case uabi.Events["Initialize"].ID:
 		event := new(uniswap.UniswapInitialize)
-		if err := eth.UnpackLog(uabi, event, "Initialize", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Initialize", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -308,7 +308,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["Mint"].ID:
 		event := new(uniswap.UniswapMint)
-		if err := eth.UnpackLog(uabi, event, "Mint", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Mint", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -325,7 +325,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["Burn"].ID:
 		event := new(uniswap.UniswapBurn)
-		if err := eth.UnpackLog(uabi, event, "Burn", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Burn", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -342,7 +342,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["Swap"].ID:
 		event := new(uniswap.UniswapSwap)
-		if err := eth.UnpackLog(uabi, event, "Swap", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Swap", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -357,7 +357,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["Collect"].ID:
 		event := new(uniswap.UniswapCollect)
-		if err := eth.UnpackLog(uabi, event, "Collect", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Collect", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -373,7 +373,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["Flash"].ID:
 		event := new(uniswap.UniswapFlash)
-		if err := eth.UnpackLog(uabi, event, "Flash", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "Flash", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -386,7 +386,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["SetFeeProtocol"].ID:
 		event := new(uniswap.UniswapSetFeeProtocol)
-		if err := eth.UnpackLog(uabi, event, "SetFeeProtocol", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "SetFeeProtocol", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{
@@ -398,7 +398,7 @@ func (state *Listener) onLog(context actor.Context) error {
 		}
 	case uabi.Events["CollectProtocol"].ID:
 		event := new(uniswap.UniswapCollectProtocol)
-		if err := eth.UnpackLog(uabi, event, "CollectProtocol", *msg); err != nil {
+		if err := evm.UnpackLog(uabi, event, "CollectProtocol", *msg); err != nil {
 			return fmt.Errorf("error unpacking the log %v", err)
 		}
 		update = &models.UPV3Update{

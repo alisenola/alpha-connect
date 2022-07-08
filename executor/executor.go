@@ -106,6 +106,9 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.EVMLogsQueryRequest,
 		*messages.EVMLogsSubscribeRequest,
 		*messages.EVMContractCallRequest,
+		*messages.SVMBlockQueryRequest,
+		*messages.SVMEventsQueryRequest,
+		*messages.SVMTransactionByHashRequest,
 		*messages.BlockNumberRequest,
 		*messages.BlockInfoRequest:
 		if err := state.OnChainsMessage(context); err != nil {

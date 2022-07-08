@@ -3,5 +3,10 @@
     "ID": 1,
     "name": "Ethereum Mainnet",
     "type": "EVM"
+  },
+  "5": {
+    "ID": 5,
+    "name": "Starknet Mainnet",
+    "type": "SVM"
   }
 }

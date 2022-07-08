@@ -12,10 +12,17 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
+type GetDataRequest struct{}
+type GetDataResponse struct {
+	Updates []*models.ProtocolAssetUpdate
+	Err     error
+}
+
 type ERC721Checker struct {
 	asset   *models.ProtocolAsset
 	logger  *log.Logger
 	updates []*models.ProtocolAssetUpdate
+	err     error
 	seqNum  uint64
 }
 
@@ -39,13 +46,18 @@ func (state *ERC721Checker) Receive(context actor.Context) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
 			state.logger.Error("error starting the actor", log.Error(err))
-			panic(err)
+			state.err = err
 		}
 	case *messages.ProtocolAssetDataIncrementalRefresh:
 		if err := state.OnProtocolAssetDataIncrementalRefresh(context); err != nil {
 			state.logger.Error("error processing ProtocolAssetDataIncrementalRefresh", log.Error(err))
-			panic(err)
+			state.err = err
 		}
+	case *GetDataRequest:
+		context.Respond(&GetDataResponse{
+			Updates: state.updates,
+			Err:     state.err,
+		})
 	}
 }
 
@@ -73,10 +85,14 @@ func (state *ERC721Checker) Initialize(context actor.Context) error {
 	if !updt.Success {
 		return fmt.Errorf("error on ProtocolAssetTransferResponse, got %s", updt.RejectionReason.String())
 	}
+	state.seqNum = updt.SeqNum
 	return nil
 }
 
 func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.Context) error {
+	if state.err != nil {
+		return nil
+	}
 	res := context.Message().(*messages.ProtocolAssetDataIncrementalRefresh)
 	if res.Update == nil {
 		return nil
@@ -85,9 +101,8 @@ func (state *ERC721Checker) OnProtocolAssetDataIncrementalRefresh(context actor.
 		return nil
 	}
 	if res.SeqNum != state.seqNum+1 {
-
+		return fmt.Errorf("seqNum not in sequence, expected %d, got %d", state.seqNum+1, res.SeqNum)
 	}
 	state.seqNum = res.SeqNum
-
 	return nil
 }
