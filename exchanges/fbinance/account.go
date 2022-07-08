@@ -1148,10 +1148,7 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 	fmt.Println("CHECKING ACCOUNT !")
 	state.account.CleanOrders()
 
-	if err := state.account.CheckExpiration(); err != nil {
-		return fmt.Errorf("error checking expired orders: %v", err)
-	}
-
+	pos1 := state.account.GetPositions()
 	// Fetch positions
 	res, err := context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -1169,6 +1166,40 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 
 	if !positionList.Success {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
+	}
+
+	var pos2 []*models.Position
+	for _, p := range positionList.Positions {
+		if p.Quantity != 0 {
+			pos2 = append(pos2, p)
+		}
+	}
+	if len(pos1) != len(pos2) {
+		return fmt.Errorf("different number of positions: %d %d", len(pos1), len(pos2))
+	}
+
+	// sort
+	sort.Slice(pos1, func(i, j int) bool {
+		return pos1[i].Instrument.SecurityID.Value < pos1[j].Instrument.SecurityID.Value
+	})
+	sort.Slice(pos2, func(i, j int) bool {
+		return pos2[i].Instrument.SecurityID.Value < pos2[j].Instrument.SecurityID.Value
+	})
+
+	for i := range pos1 {
+		//lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
+		diff := math.Abs(pos1[i].Quantity-pos2[i].Quantity) / math.Abs(pos1[i].Quantity+pos2[i].Quantity)
+		if diff > 0.01 {
+			return fmt.Errorf("different position quantity: %f %f", pos1[i].Cost, pos2[i].Cost)
+		}
+		diff = math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
+		if diff > 0.01 {
+			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
+		}
+	}
+
+	if err := state.account.CheckExpiration(); err != nil {
+		return fmt.Errorf("error checking expired orders: %v", err)
 	}
 
 	// Fetch balances
@@ -1206,36 +1237,5 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		}
 	}
 
-	pos1 := state.account.GetPositions()
-
-	var pos2 []*models.Position
-	for _, p := range positionList.Positions {
-		if p.Quantity != 0 {
-			pos2 = append(pos2, p)
-		}
-	}
-	if len(pos1) != len(pos2) {
-		return fmt.Errorf("different number of positions: %d %d", len(pos1), len(pos2))
-	}
-
-	// sort
-	sort.Slice(pos1, func(i, j int) bool {
-		return pos1[i].Instrument.SecurityID.Value < pos1[j].Instrument.SecurityID.Value
-	})
-	sort.Slice(pos2, func(i, j int) bool {
-		return pos2[i].Instrument.SecurityID.Value < pos2[j].Instrument.SecurityID.Value
-	})
-
-	for i := range pos1 {
-		//lp := math.Ceil(1. / state.securities[pos1[i].Instrument.SecurityID.Value].RoundLot.Value)
-		diff := math.Abs(pos1[i].Quantity-pos2[i].Quantity) / math.Abs(pos1[i].Quantity+pos2[i].Quantity)
-		if diff > 0.01 {
-			return fmt.Errorf("different position quantity: %f %f", pos1[i].Cost, pos2[i].Cost)
-		}
-		diff = math.Abs(pos1[i].Cost-pos2[i].Cost) / math.Abs(pos1[i].Cost+pos2[i].Cost)
-		if diff > 0.01 {
-			return fmt.Errorf("different position cost: %f %f", pos1[i].Cost, pos2[i].Cost)
-		}
-	}
 	return nil
 }
