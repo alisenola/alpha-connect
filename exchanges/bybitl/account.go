@@ -875,16 +875,22 @@ func (state *AccountListener) Clean(context actor.Context) error {
 
 	if !state.readOnly {
 		for _, sec := range state.securities {
-			context.Request(state.bybitlExecutor, &messages.OrderMassCancelRequest{
-				Account: state.account.Account,
-				Filter: &messages.OrderFilter{
-					Instrument: &models.Instrument{
-						SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
-						Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
-						Exchange:   sec.Exchange,
-					},
-				},
-			})
+			orders := state.account.GetOrders(&messages.OrderFilter{Instrument: &models.Instrument{SecurityID: wrapperspb.UInt64(sec.SecurityID)}})
+			for _, o := range orders {
+				if account.IsOpen(o.OrderStatus) || account.IsPending(o.OrderStatus) {
+					context.Request(state.bybitlExecutor, &messages.OrderMassCancelRequest{
+						Account: state.account.Account,
+						Filter: &messages.OrderFilter{
+							Instrument: &models.Instrument{
+								SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+								Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
+								Exchange:   sec.Exchange,
+							},
+						},
+					})
+					break
+				}
+			}
 		}
 	}
 

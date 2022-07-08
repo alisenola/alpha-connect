@@ -308,10 +308,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			client:         client,
-			sGetRateLimit:  exchanges.NewRateLimit(50*100, 2*time.Minute),
-			mGetRateLimit:  exchanges.NewRateLimit(70*4, 5*time.Second),
-			sPostRateLimit: exchanges.NewRateLimit(20*100, 2*time.Minute),
-			mPostRateLimit: exchanges.NewRateLimit(50*4, 5*time.Second),
+			sGetRateLimit:  exchanges.NewRateLimit(40*100, 2*time.Minute),
+			mGetRateLimit:  exchanges.NewRateLimit(40*4, 5*time.Second),
+			sPostRateLimit: exchanges.NewRateLimit(10*100, 2*time.Minute),
+			mPostRateLimit: exchanges.NewRateLimit(25*4, 5*time.Second),
 		})
 	}
 
@@ -1686,7 +1686,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		context.Send(sender, response)
 		return nil
 	}
-	qr := state.getQueryRunner(true, false)
+	qr := state.getQueryRunner(true, true)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(true, weight))
