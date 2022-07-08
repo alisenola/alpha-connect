@@ -63,6 +63,11 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnBlockNumberRequest", log.Error(err))
 			panic(err)
 		}
+	case *messages.BlockInfoRequest:
+		if err := state.OnBlockInfoRequest(context); err != nil {
+			state.logger.Error("error processing OnBlockInfoRequest", log.Error(err))
+			panic(err)
+		}
 	case *messages.EVMLogsQueryRequest:
 		if err := state.OnEVMLogsQueryRequest(context); err != nil {
 			state.logger.Error("error processing OnEVMLogsQueryRequest", log.Error(err))
@@ -109,6 +114,28 @@ func (state *Executor) OnBlockNumberRequest(context actor.Context) error {
 
 	if rej := state.forward(context, req.Chain); rej != nil {
 		context.Respond(&messages.BlockNumberResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
+func (state *Executor) OnBlockInfoRequest(context actor.Context) error {
+	req := context.Message().(*messages.BlockInfoRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.BlockInfoResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.BlockInfoResponse{
 			RequestID:       req.RequestID,
 			Success:         false,
 			RejectionReason: *rej,

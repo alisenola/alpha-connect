@@ -1177,6 +1177,14 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	req := context.Message().(*messages.NewOrderSingleRequest)
+	if req.Expire != nil && req.Expire.AsTime().Before(time.Now()) {
+		context.Respond(&messages.NewOrderSingleResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_RequestExpired,
+		})
+		return nil
+	}
 	sender := context.Sender()
 	response := &messages.NewOrderSingleResponse{
 		RequestID:  req.RequestID,

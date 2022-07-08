@@ -132,6 +132,29 @@ func (state *Executor) OnBlockNumberRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnBlockInfoRequest(context actor.Context) error {
+	req := context.Message().(*messages.BlockInfoRequest)
+	go func(sender *actor.PID) {
+		res := &messages.BlockInfoResponse{
+			RequestID:  req.RequestID,
+			ResponseID: uint64(time.Now().UnixNano()),
+		}
+
+		header, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
+		if err != nil {
+			state.logger.Warn("error getting header", log.Error(err))
+			res.RejectionReason = messages.RejectionReason_EthRPCError
+			context.Send(sender, res)
+			return
+		}
+		res.BlockTime = time.Unix(int64(header.Time), 0)
+		res.Success = true
+		context.Send(sender, res)
+	}(context.Sender())
+
+	return nil
+}
+
 func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 	req := context.Message().(*messages.EVMContractCallRequest)
 	go func(sender *actor.PID) {

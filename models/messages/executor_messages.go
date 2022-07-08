@@ -21,6 +21,20 @@ type BlockNumberResponse struct {
 	BlockNumber     uint64
 }
 
+type BlockInfoRequest struct {
+	RequestID   uint64
+	Chain       *models.Chain
+	BlockNumber uint64
+}
+
+type BlockInfoResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Success         bool
+	RejectionReason RejectionReason
+	BlockTime       time.Time
+}
+
 type EVMContractCallRequest struct {
 	RequestID   uint64
 	Chain       *models.Chain

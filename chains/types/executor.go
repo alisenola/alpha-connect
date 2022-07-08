@@ -16,6 +16,7 @@ type Executor interface {
 	Initialize(context actor.Context) error
 	Clean(context actor.Context) error
 	OnBlockNumberRequest(context actor.Context) error
+	OnBlockInfoRequest(context actor.Context) error
 	OnEVMContractCallRequest(context actor.Context) error
 	OnEVMLogsQueryRequest(context actor.Context) error
 	OnEVMLogsSubscribeRequest(context actor.Context) error
@@ -58,6 +59,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			panic(err)
 		}
 
+	case *messages.BlockInfoRequest:
+		if err := state.OnBlockInfoRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnBlockInfoRequest", log.Error(err))
+			panic(err)
+		}
+
 	case *messages.EVMContractCallRequest:
 		if err := state.OnEVMContractCallRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnEVMContractCallRequest", log.Error(err))
@@ -81,6 +88,17 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 func (state *BaseExecutor) OnBlockNumberRequest(context actor.Context) error {
 	req := context.Message().(*messages.BlockNumberRequest)
 	context.Respond(&messages.BlockNumberResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnBlockInfoRequest(context actor.Context) error {
+	req := context.Message().(*messages.BlockInfoRequest)
+	context.Respond(&messages.BlockInfoResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,
