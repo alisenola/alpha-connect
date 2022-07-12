@@ -221,9 +221,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			if len(splits) == 2 {
 				underlying, ok := constants.GetAssetBySymbol(market.Underlying)
 				if !ok {
-					if splits[1] == "PERP" {
-						state.logger.Info(fmt.Sprintf("unknown currency %s", market.Underlying))
-					}
+					/*
+						if splits[1] == "PERP" {
+							state.logger.Info(fmt.Sprintf("unknown currency %s", market.Underlying))
+						}
+					*/
 					continue
 				}
 				security.Underlying = underlying
