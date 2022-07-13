@@ -66,10 +66,7 @@ func (state *StaticLoader) Receive(context actor.Context) {
 		}
 
 	case *Ready:
-		if err := state.onReady(context); err != nil {
-			state.logger.Error("error onReady", log.Error(err))
-			panic(err)
-		}
+		context.Respond(&Ready{})
 	}
 }
 
@@ -104,11 +101,6 @@ func (state *StaticLoader) Clean(context actor.Context) error {
 		state.ticker = nil
 	}
 
-	return nil
-}
-
-func (state *StaticLoader) onReady(context actor.Context) error {
-	context.Respond(&Ready{})
 	return nil
 }
 

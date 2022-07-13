@@ -115,6 +115,9 @@ func (state *Executor) Receive(context actor.Context) {
 			state.logger.Error("error processing OnChainsMessage", log.Error(err))
 			panic(err)
 		}
+
+	case *utils.Ready:
+		context.Respond(&utils.Ready{})
 	}
 }
 
