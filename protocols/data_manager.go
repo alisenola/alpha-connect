@@ -2,12 +2,12 @@ package protocols
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"reflect"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
@@ -21,15 +21,15 @@ type DataManager struct {
 	logger      *log.Logger
 }
 
-func NewDataManagerProducer(protocol *models.ProtocolAsset) actor.Producer {
+func NewDataManagerProducer(protocolAsset *models.ProtocolAsset) actor.Producer {
 	return func() actor.Actor {
-		return NewDataManager(protocol)
+		return NewDataManager(protocolAsset)
 	}
 }
 
-func NewDataManager(protocol *models.ProtocolAsset) actor.Actor {
+func NewDataManager(protocolAsset *models.ProtocolAsset) actor.Actor {
 	return &DataManager{
-		asset:  protocol,
+		asset:  protocolAsset,
 		logger: nil,
 	}
 }

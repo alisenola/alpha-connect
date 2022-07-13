@@ -21,12 +21,12 @@ func NewProtocolExecutorProducer(protocol *models2.Protocol, registry registry.P
 	}
 }
 
-func NewProtocolAssetListenerProducer(asset *models.ProtocolAsset) actor.Producer {
-	switch asset.Protocol.ID {
+func NewProtocolAssetListenerProducer(protocolAsset *models.ProtocolAsset) actor.Producer {
+	switch protocolAsset.Protocol.ID {
 	case constants.ERC721.ID:
-		return func() actor.Actor { return erc721.NewListener(asset) }
+		return func() actor.Actor { return erc721.NewListener(protocolAsset) }
 	case constants.ERC20.ID:
-		return func() actor.Actor { return erc20.NewListener(asset) }
+		return func() actor.Actor { return erc20.NewListener(protocolAsset) }
 	}
 	return nil
 }
