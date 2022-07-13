@@ -62,7 +62,7 @@ func (state *PublicExecutor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	state.rateLimit = exchanges.NewRateLimit(3, time.Second)
 	state.client = &http.Client{
