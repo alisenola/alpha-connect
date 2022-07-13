@@ -1,7 +1,6 @@
 package chains
 
 import (
-	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -257,8 +256,6 @@ func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 		})
 		return nil
 	}
-
-	fmt.Println("SVM BLOCK QUERY")
 
 	if rej := state.forward(context, req.Chain); rej != nil {
 		context.Respond(&messages.SVMBlockQueryResponse{

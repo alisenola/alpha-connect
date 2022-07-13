@@ -3,12 +3,17 @@ package erc20
 import (
 	goContext "context"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/chains/evm"
 	"gitlab.com/alphaticks/xchanger/chains/svm"
-	token "gitlab.com/alphaticks/xchanger/protocols/erc20/svm"
+	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
+	tokensvm "gitlab.com/alphaticks/xchanger/protocols/erc20/svm"
 	"math/big"
 	"reflect"
 	"sort"
@@ -33,6 +38,7 @@ type Executor struct {
 	protocolAssets map[uint64]*models.ProtocolAsset
 	executor       *actor.PID
 	sabi           *sabi.ABI
+	eabi           *abi.ABI
 	logger         *log.Logger
 	registry       registry.PublicRegistryClient
 }
@@ -56,8 +62,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
+	eabi, err := tokenevm.ERC20MetaData.GetAbi()
+	if err != nil {
+		return fmt.Errorf("error getting ethereum abi: %v", err)
+	}
+	state.eabi = eabi
 
-	stabi, err := token.ERC20MetaData.GetAbi()
+	stabi, err := tokensvm.ERC20MetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting starknet abi: %v", err)
 	}
@@ -160,35 +171,80 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-
-	pa, ok := state.protocolAssets[req.ProtocolAssetID]
+	var pa *models.ProtocolAsset
+	chain, ok := constants.GetChainByID(req.ChainID)
 	if !ok {
-		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownChain
 		context.Respond(msg)
 		return nil
+	}
+	if req.AssetID != nil {
+		var ok bool
+		asset, ok := constants.GetAssetByID(req.AssetID.Value)
+		if !ok {
+			msg.RejectionReason = messages.RejectionReason_UnknownAsset
+			context.Respond(msg)
+			return nil
+		}
+		id := utils.GetProtocolAssetID(asset, constants.ERC20, chain)
+		pa, ok = state.protocolAssets[id]
+		if !ok {
+			msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+			context.Respond(msg)
+			return nil
+		}
 	}
 	var future *actor.Future
 	var query interface{}
 	var delay int64
-	switch pa.Chain.Type {
+	switch chain.Type {
 	case "EVM":
-		return nil
-	case "SVM":
-		add := common.HexToHash(pa.ContractAddress.Value)
-		q := svm.EventQuery{
-			ContractAddress: &add,
-			Keys:            &[]common.Hash{state.sabi.Events["Transfer"].ID},
-			From:            big.NewInt(1).SetUint64(req.Start),
-			To:              big.NewInt(1).SetUint64(req.Stop),
-			PageSize:        1000,
-			PageNumber:      0,
+		topics := [][]common.Hash{{
+			state.eabi.Events["Transfer"].ID,
+		}}
+		fQuery := ethereum.FilterQuery{
+			FromBlock: big.NewInt(1).SetUint64(req.Start),
+			ToBlock:   big.NewInt(1).SetUint64(req.Stop),
+			Topics:    topics,
 		}
-		query = &messages.SVMEventsQueryRequest{
+		r := &messages.EVMLogsQueryRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Chain:     pa.Chain,
+			Chain:     chain,
+			Query:     fQuery,
+		}
+		if pa != nil {
+			var address [20]byte
+			addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
+			if !ok {
+				state.logger.Warn("invalid protocol asset address")
+				msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+				context.Respond(msg)
+				return nil
+			}
+			copy(address[:], addressBig.Bytes())
+			r.Query.Addresses = append(r.Query.Addresses, address)
+		}
+		delay = 20
+		query = r
+	case "SVM":
+		q := svm.EventQuery{
+			Keys:       &[]common.Hash{state.sabi.Events["Transfer"].ID},
+			From:       big.NewInt(1).SetUint64(req.Start),
+			To:         big.NewInt(1).SetUint64(req.Stop),
+			PageSize:   1000,
+			PageNumber: 0,
+		}
+		r := &messages.SVMEventsQueryRequest{
+			RequestID: uint64(time.Now().UnixNano()),
+			Chain:     chain,
 			Query:     q,
 		}
+		if pa != nil {
+			add := common.HexToHash(pa.ContractAddress.Value)
+			r.Query.ContractAddress = &add
+		}
 		delay = 120
+		query = r
 	}
 	future = context.RequestFuture(state.executor, query, time.Duration(delay)*time.Second)
 	context.ReenterAfter(future, func(res interface{}, err error) {
@@ -220,13 +276,20 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				context.Respond(msg)
 				return
 			}
-			sort.Slice(resp.Logs, func(i, j int) bool {
-				if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
-					return resp.Logs[i].Index < resp.Logs[j].Index
-				}
-				return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
-			})
+			var c []types.Log
 			for _, l := range resp.Logs {
+				if len(l.Topics) != 3 {
+					continue
+				}
+				c = append(c, l)
+			}
+			sort.Slice(c, func(i, j int) bool {
+				if c[i].BlockNumber == c[j].BlockNumber {
+					return c[i].Index < c[j].Index
+				}
+				return c[i].BlockNumber < c[j].BlockNumber
+			})
+			for _, l := range c {
 				datas = append(datas, l)
 			}
 			times = resp.Times
@@ -257,14 +320,31 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			from := make([]byte, 32)
 			to := make([]byte, 32)
 			tok := make([]byte, 32)
+			contract := make([]byte, 32)
 			var num uint64
 			switch l := d.(type) {
+			case types.Log:
+				switch l.Topics[0] {
+				case state.eabi.Events["Transfer"].ID:
+					event := tokenevm.ERC20Transfer{}
+					if err := evm.UnpackLog(state.eabi, &event, "Transfer", l); err != nil {
+						state.logger.Warn("error unpacking eth log", log.Error(err))
+						msg.RejectionReason = messages.RejectionReason_RPCError
+						context.Respond(msg)
+						return
+					}
+					from = event.From[:]
+					to = event.To[:]
+					tok = event.Value.Bytes()
+					contract = l.Address.Bytes()
+					num = l.BlockNumber
+				}
 			case *svm.Event:
 				key := [32]byte(l.Keys[0])
 				id := [32]byte(state.sabi.Events["Transfer"].ID)
 				switch key {
 				case id:
-					event := token.ERC20Transfer{}
+					event := tokensvm.ERC20Transfer{}
 					if err := svm.UnpackLog(state.sabi, &event, "Transfer", l); err != nil {
 						state.logger.Warn("error unpacking stark event", log.Error(err))
 						msg.RejectionReason = messages.RejectionReason_RPCError
@@ -274,6 +354,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					event.Sender.FillBytes(from[:])
 					event.Recipient.FillBytes(to[:])
 					event.Value.FillBytes(tok[:])
+					contract = l.FromAddress[:]
 					num = uint64(l.BlockNumber)
 				}
 			}
@@ -288,9 +369,10 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				}
 			}
 			update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
-				From:  from,
-				To:    to,
-				Value: tok,
+				From:     from,
+				To:       to,
+				Value:    tok,
+				Contract: contract,
 			})
 		}
 		if update != nil {

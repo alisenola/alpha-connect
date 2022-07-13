@@ -140,7 +140,6 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 			Name: p.Name,
 		}
 	}
-	fmt.Println(protocols)
 	if err := constants.LoadProtocols(protocols); err != nil {
 		return err
 	}
