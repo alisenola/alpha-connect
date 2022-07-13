@@ -25,6 +25,8 @@ func NewProtocolAssetListenerProducer(asset *models.ProtocolAsset) actor.Produce
 	switch asset.Protocol.ID {
 	case constants.ERC721.ID:
 		return func() actor.Actor { return erc721.NewListener(asset) }
+	case constants.ERC20.ID:
+		return func() actor.Actor { return erc20.NewListener(asset) }
 	}
 	return nil
 }

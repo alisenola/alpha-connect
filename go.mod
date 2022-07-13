@@ -14,19 +14,19 @@ require (
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220507064833-3bb45d8aa619
-	gitlab.com/alphaticks/tickfunctors v0.0.0-20220513100305-54584c7c93aa
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220708153910-e5f547d6d020
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220713101350-9ddcc399bef7
 	gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220708111529-8cca0323e7f3
+	gitlab.com/alphaticks/xchanger v0.0.0-20220713102202-4830c3d49698
 	go.mongodb.org/mongo-driver v1.9.1
-	golang.org/x/net v0.0.0-20220526153639-5463443f8c37
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	google.golang.org/grpc v1.46.2
 	google.golang.org/protobuf v1.28.0
 	gorm.io/driver/postgres v1.3.5
-	gorm.io/gorm v1.23.5
+	gorm.io/gorm v1.23.6
 )
 
 require (
@@ -63,13 +63,13 @@ require (
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgconn v1.12.0 // indirect
+	github.com/jackc/pgconn v1.12.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.11.0 // indirect
-	github.com/jackc/pgx/v4 v4.16.0 // indirect
+	github.com/jackc/pgx/v4 v4.16.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.4 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
@@ -126,7 +126,7 @@ require (
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.10 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	google.golang.org/api v0.36.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220526192754-51939a95c655 // indirect
@@ -137,4 +137,7 @@ require (
 )
 
 //replace gitlab.com/alphaticks/xchanger => ../xchanger
-//replace golang.org/x/net => ../net
+
+//replace gitlab.com/alphaticks/gorderbook => ../gorderbook
+
+//replace gitlab.com/alphaticks/tickfunctors => ../tickfunctors

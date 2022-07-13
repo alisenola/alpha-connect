@@ -336,9 +336,9 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 				tok.FillBytes(tokenID[:])
 				transfers = append(transfers,
 					&gorderbook.AssetTransfer{
-						From:    from[:],
-						To:      to[:],
-						TokenId: tokenID[:],
+						From:  from[:],
+						To:    to[:],
+						Value: tokenID[:],
 					})
 			}
 			sales = append(sales, &models.Sale{
