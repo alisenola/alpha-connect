@@ -115,7 +115,7 @@ OUTER:
 			s = append(s, SaleFile{
 				From:        common.BytesToAddress(tr.From),
 				To:          common.BytesToAddress(tr.To),
-				TokenID:     big.NewInt(1).SetBytes(tr.TokenId),
+				TokenID:     big.NewInt(1).SetBytes(tr.Value),
 				Price:       big.NewInt(1).SetBytes(sale.Price),
 				SaleId:      sale.Id,
 				BlockNumber: sale.Block,

@@ -80,7 +80,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 
 	dialers := state.DialerPool.GetDialers()
 	for _, dialer := range dialers {
