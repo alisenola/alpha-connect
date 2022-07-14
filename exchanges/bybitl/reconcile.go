@@ -108,7 +108,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	if tx.Error != nil {
 		return fmt.Errorf("error creating account: %v", err)
 	}
-	var transactions []extypes.Transaction
+	var transactions []*extypes.Transaction
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
 		switch tr.Type {
@@ -307,7 +307,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
-	var transactions []extypes.Transaction
+	var transactions []*extypes.Transaction
 	state.db.Debug().
 		Model(&extypes.Transaction{}).
 		Joins("Fill").

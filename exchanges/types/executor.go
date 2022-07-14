@@ -2,6 +2,7 @@ package types
 
 import (
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
@@ -65,6 +66,7 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
+	Config                   *config.Config
 	DialerPool               *xchangerUtils.DialerPool
 	Registry                 registry.PublicRegistryClient
 	AccountClients           map[string]*http.Client

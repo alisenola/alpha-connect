@@ -42,6 +42,9 @@ func TestExecutor(t *testing.T) {
 	if !ok {
 		t.Fatal("incorrect for type assertion")
 	}
+	if !assets.Success {
+		t.Fatal(assets.RejectionReason.String())
+	}
 	var coll *models.MarketableProtocolAsset
 	for _, asset := range assets.MarketableProtocolAssets {
 		fmt.Printf("asset %+v \n", asset)
@@ -115,7 +118,7 @@ OUTER:
 			s = append(s, SaleFile{
 				From:        common.BytesToAddress(tr.From),
 				To:          common.BytesToAddress(tr.To),
-				TokenID:     big.NewInt(1).SetBytes(tr.TokenId),
+				TokenID:     big.NewInt(1).SetBytes(tr.Value),
 				Price:       big.NewInt(1).SetBytes(sale.Price),
 				SaleId:      sale.Id,
 				BlockNumber: sale.Block,

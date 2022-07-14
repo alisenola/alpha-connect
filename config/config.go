@@ -38,7 +38,14 @@ func LoadConfig() (*Config, error) {
 		//}
 	}
 
-	C := &Config{}
+	C := &Config{
+		ChainRPCs: []ChainRPC{
+			{Chain: 1, Endpoint: "wss://eth-mainnet.alchemyapi.io/v2/4kjvftiD6NzHc6kkD1ih3-5wilV--3mz"},
+			{Chain: 10, Endpoint: "wss://opt-mainnet.g.alchemy.com/v2/MAdidiXxtFnW5b4q9pTmBLcTW73SHoMN"},
+			{Chain: 147, Endpoint: "wss://polygon-mainnet.g.alchemy.com/v2/PYNN12EJrMrmlxWjy9KZyrYK6GHrErCM"},
+			{Chain: 42161, Endpoint: "wss://arb-mainnet.g.alchemy.com/v2/aFDxH7pilsr6I5Ifqp59wVNu_0pd9PaC"},
+		},
+	}
 	if err := viper.Unmarshal(C); err != nil {
 		return nil, fmt.Errorf("error unmarshalling config: %v", err)
 	}
@@ -56,9 +63,6 @@ func LoadConfig() (*Config, error) {
 	if os.Getenv("PROTOCOLS") != "" {
 		C.Protocols = strings.Split(os.Getenv("PROTOCOLS"), ",")
 	}
-	if os.Getenv("CHAINS") != "" {
-		C.Chains = strings.Split(os.Getenv("CHAINS"), ",")
-	}
 
 	return C, nil
 }
@@ -69,13 +73,14 @@ type Config struct {
 	RegistryAddress        string
 	DataStoreAddress       string
 	DataServerAddress      string
+	OpenseaAPIKey          string
 	StrictExchange         bool
 	DialerPoolInterface    string
 	DialerPoolIPs          []string
 	Accounts               []Account
 	Exchanges              []string
 	Protocols              []string
-	Chains                 []string
+	ChainRPCs              []ChainRPC
 	DB                     *DataBase
 }
 
@@ -98,4 +103,9 @@ type DataBase struct {
 	PostgresPassword string
 	PostgresDB       string
 	PostgresPort     string
+}
+
+type ChainRPC struct {
+	Chain    uint32
+	Endpoint string
 }

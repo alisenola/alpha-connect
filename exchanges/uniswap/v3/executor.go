@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/jobs"
@@ -39,9 +38,9 @@ type QueryRunner struct {
 
 type Executor struct {
 	extypes.BaseExecutor
-	queryRunnerETH *QueryRunner
-	queryRunners   []*QueryRunner
-	logger         *log.Logger
+	queryRunners []*QueryRunner
+	logger       *log.Logger
+	executor     *actor.PID
 }
 
 func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
@@ -93,16 +92,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 		})
 	}
 
-	client, err := ethclient.Dial(evm.ETH_CLIENT_WS)
-	if err != nil {
-		return fmt.Errorf("error while dialing eth rpc client %v", err)
-	}
-	props := actor.PropsFromProducer(func() actor.Actor {
-		return jobs.NewETHQuery(client)
-	})
-	state.queryRunnerETH = &QueryRunner{
-		pid: context.Spawn(props),
-	}
+	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
+
 	return state.UpdateSecurityList(context)
 }
 
@@ -270,9 +261,7 @@ func (state *Executor) OnHistoricalUnipoolV3DataRequest(context actor.Context) e
 		Topics:    topics,
 	}
 
-	qr := state.queryRunnerETH
-
-	future := context.RequestFuture(qr.pid, &jobs.PerformLogsQueryRequest{Query: fQuery}, 50*time.Second)
+	future := context.RequestFuture(state.executor, &jobs.PerformLogsQueryRequest{Query: fQuery}, 50*time.Second)
 	context.ReenterAfter(future, func(resp interface{}, err error) {
 		if err != nil {
 			state.logger.Warn("error at eth rpc server", log.Error(err))

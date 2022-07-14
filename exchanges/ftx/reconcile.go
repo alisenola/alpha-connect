@@ -105,7 +105,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		return fmt.Errorf("error creating account: %v", err)
 	}
 
-	var transactions []extypes.Transaction
+	var transactions []*extypes.Transaction
 	state.db.Debug().Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&transactions)
 	for _, tr := range transactions {
 		switch tr.Type {
@@ -166,7 +166,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
 	}
 
-	var movements []extypes.Movement
+	var movements []*extypes.Movement
 	state.db.Debug().Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
 	fpnl := 0.
 	balances := make(map[uint32]float64)

@@ -4,6 +4,7 @@ import (
 	goContext "context"
 	"encoding/json"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"math/big"
 	"math/rand"
@@ -25,7 +26,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	opensea "gitlab.com/alphaticks/xchanger/exchanges/opensea"
-	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
 type QueryRunner struct {
@@ -37,12 +37,12 @@ type Executor struct {
 	extypes.BaseExecutor
 	queryRunners             []*QueryRunner
 	marketableProtocolAssets map[uint64]*models.MarketableProtocolAsset
-	credentials              *models2.APICredentials
 	logger                   *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(config *config.Config, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
 	e := &Executor{}
+	e.Config = config
 	e.DialerPool = dialerPool
 	e.Registry = registry
 	return e
@@ -207,7 +207,7 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-	if state.credentials.APIKey == "" {
+	if state.Config.OpenseaAPIKey == "" {
 		msg.RejectionReason = messages.RejectionReason_UnsupportedRequest
 		context.Respond(msg)
 		return nil
@@ -232,9 +232,9 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 	if req.From != nil {
 		params.SetOccurredAfter(uint64(req.From.Seconds))
 	}
-	r, weight, err := opensea.GetEvents(params, state.credentials.APIKey)
+	r, weight, err := opensea.GetEvents(params, state.Config.OpenseaAPIKey)
 	if err != nil {
-		msg.RejectionReason = messages.RejectionReason_UnsupportedOrderCharacteristic
+		msg.RejectionReason = messages.RejectionReason_InvalidRequest
 		context.Respond(msg)
 		return nil
 	}
@@ -353,9 +353,9 @@ func (state *Executor) OnHistoricalSalesRequest(context actor.Context) error {
 		done = cursor == ""
 		if !done {
 			params.SetCursor(cursor)
-			r, weight, err = opensea.GetEvents(params, state.credentials.APIKey)
+			r, weight, err = opensea.GetEvents(params, state.Config.OpenseaAPIKey)
 			if err != nil {
-				msg.RejectionReason = messages.RejectionReason_UnsupportedOrderCharacteristic
+				msg.RejectionReason = messages.RejectionReason_InvalidRequest
 				context.Send(sender, msg)
 				return
 			}

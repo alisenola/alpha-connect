@@ -143,10 +143,10 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 }
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
-	var transactions []extypes.Transaction
+	var transactions []*extypes.Transaction
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
-		if tr.Fill != nil {
+		if tr.Type == "TRADE" {
 			secID := uint64(tr.Fill.SecurityID)
 			_, ok := state.securities[secID]
 			if ok {
@@ -158,7 +158,10 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			} else {
 				fmt.Println("NOT FOUND", uint64(tr.Fill.SecurityID))
 			}
-			tradeID, _ := strconv.ParseUint(strings.Split(tr.ExecutionID, "-")[0], 10, 64)
+			tradeID, err := strconv.ParseUint(strings.Split(tr.ExecutionID, "-")[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("error parsing executiong id: %v", err)
+			}
 			state.lastTradeID[secID] = tradeID
 		}
 	}
@@ -187,6 +190,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
+			fmt.Println("KAST", state.lastTradeID[sec.SecurityId])
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{

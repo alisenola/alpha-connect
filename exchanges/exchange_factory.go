@@ -3,6 +3,7 @@ package exchanges
 import (
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/binance"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bitfinex"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bithumb"
@@ -170,7 +171,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	}
 }
 
-func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Producer {
+func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Config, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Producer {
 	switch exchange.ID {
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewExecutor(dialerPool, registry) }
@@ -231,7 +232,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, dialerPool *xutils.
 	case constants.UNISWAPV3.ID:
 		return func() actor.Actor { return v3.NewExecutor(dialerPool, registry) }
 	case constants.OPENSEA.ID:
-		return func() actor.Actor { return opensea.NewExecutor(dialerPool, registry) }
+		return func() actor.Actor { return opensea.NewExecutor(config, dialerPool, registry) }
 		/*
 			case constants.BITTREX:
 				return func() actor.Actor { return bittrex.NewExecutor() }

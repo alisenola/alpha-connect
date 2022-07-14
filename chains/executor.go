@@ -296,7 +296,18 @@ func (state *Executor) OnSVMTransactionByHashRequest(context actor.Context) erro
 func (state *Executor) forward(context actor.Context, chain *models2.Chain) *messages.RejectionReason {
 	pid, ok := state.executors[chain.ID]
 	if !ok {
-		producer := NewChainExecutorProducer(chain, state.registry)
+		// Find the rpc
+		rpc := ""
+		for _, r := range state.cfg.ChainRPCs {
+			if r.Chain == chain.ID {
+				rpc = r.Endpoint
+			}
+		}
+		if rpc == "" {
+			tmp := messages.RejectionReason_UnknownChain
+			return &tmp
+		}
+		producer := NewChainExecutorProducer(chain, rpc, state.registry)
 		if producer == nil {
 			tmp := messages.RejectionReason_UnknownChain
 			return &tmp

@@ -377,7 +377,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 				}
 			}
 		}
-		producer := NewExchangeExecutorProducer(exch, state.dialerPool, state.registry, state.accountClients[exch.Name])
+		producer := NewExchangeExecutorProducer(exch, state.Config, state.dialerPool, state.registry, state.accountClients[exch.Name])
 		if producer == nil {
 			state.logger.Warn(fmt.Sprintf("unknown exchange %s", exchStr))
 			continue
