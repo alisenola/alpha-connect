@@ -24,13 +24,10 @@ func LoadConfig() (*Config, error) {
 		_ = f.Close()
 	} else if len(os.Args) > 1 {
 		f, err := os.Open(os.Args[1])
-		if err != nil {
-			return nil, fmt.Errorf("error opening provided config file: %v", err)
+		if err == nil {
+			_ = viper.ReadConfig(f)
+			_ = f.Close()
 		}
-		if err := viper.ReadConfig(f); err != nil {
-			return nil, fmt.Errorf("error reading provided config file: %v", err)
-		}
-		_ = f.Close()
 	} else {
 		_ = viper.ReadInConfig() // Find and read the config file
 		//if err != nil {             // Handle errors reading the config file
