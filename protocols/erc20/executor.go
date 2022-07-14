@@ -137,7 +137,6 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	for _, a := range assets {
 		state.protocolAssets[a.ProtocolAssetID] = a
 	}
-
 	context.Send(context.Parent(), &messages.ProtocolAssetList{
 		ResponseID:     uint64(time.Now().UnixNano()),
 		ProtocolAssets: assets,

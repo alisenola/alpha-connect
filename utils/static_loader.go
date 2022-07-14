@@ -128,8 +128,9 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 	protocols := make(map[uint32]*models.Protocol)
 	for _, p := range resp.Protocols {
 		protocols[p.ProtocolId] = &models.Protocol{
-			ID:   p.ProtocolId,
-			Name: p.Name,
+			ID:      p.ProtocolId,
+			Name:    p.Name,
+			ChainID: p.ChainId,
 		}
 	}
 	if err := constants.LoadProtocols(protocols); err != nil {
