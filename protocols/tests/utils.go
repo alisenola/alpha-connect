@@ -2,8 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"math/big"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"time"
 
@@ -71,12 +70,17 @@ func (state *ProtocolChecker) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(state).String()),
 	)
 	executor := context.ActorSystem().NewLocalPID("executor")
-	res, err := context.RequestFuture(executor, &messages.ProtocolAssetDataRequest{
-		RequestID:       0,
-		ProtocolAssetID: state.asset.ProtocolAssetID,
-		Subscriber:      context.Self(),
-		Subscribe:       true,
-	}, 30*time.Second).Result()
+	req := &messages.ProtocolAssetDataRequest{
+		RequestID:  0,
+		ChainID:    state.asset.Chain.ID,
+		ProtocolID: state.asset.Protocol.ID,
+		Subscriber: context.Self(),
+		Subscribe:  true,
+	}
+	if state.asset.Asset != nil {
+		req.AssetID = &wrapperspb.UInt32Value{Value: state.asset.Asset.ID}
+	}
+	res, err := context.RequestFuture(executor, req, 30*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching the asset transfer %v", err)
 	}
@@ -103,12 +107,7 @@ func (state *ProtocolChecker) OnProtocolAssetDataIncrementalRefresh(context acto
 		return fmt.Errorf("seqNum not in sequence, expected %d, got %d", state.seqNum+1, res.SeqNum)
 	}
 	if res.Update != nil {
-		for _, tr := range res.Update.Transfers {
-			fmt.Println("FROM", common.BytesToHash(tr.From))
-			fmt.Println("TO", common.BytesToHash(tr.To))
-			fmt.Println("VALUE", big.NewInt(1).SetBytes(tr.Value))
-			fmt.Println("BLOCK NUMBER", res.Update.BlockNumber)
-		}
+		state.updates = append(state.updates, res.Update)
 	}
 	state.seqNum = res.SeqNum
 	return nil

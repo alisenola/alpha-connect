@@ -20,14 +20,16 @@ func TestListenerSVM(t *testing.T) {
 	exTests.LoadStatics(t)
 	protocol := constants.ERC20
 	registryAddress := "127.0.0.1:8001"
-	cfg := config.Config{
-		RegistryAddress: registryAddress,
-		Protocols:       []string{protocol.Name},
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
 	}
-	as, executor, clean := exTests.StartExecutor(t, &cfg)
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{protocol.Name}
+	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
-	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{
+	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Subscribe: false,
 	}, 20*time.Second).Result()
@@ -80,11 +82,13 @@ func TestListenerEVM(t *testing.T) {
 	protocol := constants.ERC20
 	registryAddress := "127.0.0.1:8001"
 
-	cfg := config.Config{
-		RegistryAddress: registryAddress,
-		Protocols:       []string{protocol.Name},
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
 	}
-	as, ex, clean := exTests.StartExecutor(t, &cfg)
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{protocol.Name}
+	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{

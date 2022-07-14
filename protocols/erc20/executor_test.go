@@ -113,11 +113,13 @@ func TestExecutorEVM(t *testing.T) {
 		ID: 35.,
 	}
 	registryAddress := "127.0.0.1:8001"
-	cfg := config.Config{
-		RegistryAddress: registryAddress,
-		Protocols:       []string{protocol.Name},
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
 	}
-	as, executor, clean := exTests.StartExecutor(t, &cfg)
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{protocol.Name}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 	chain, ok := constants.GetChainByID(1)
 	if !assert.True(t, ok, "missings evm") {
