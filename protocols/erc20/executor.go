@@ -212,16 +212,8 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			Query:     fQuery,
 		}
 		if pa != nil {
-			var address [20]byte
-			addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
-			if !ok {
-				state.logger.Warn("invalid protocol asset address")
-				msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
-				context.Respond(msg)
-				return nil
-			}
-			copy(address[:], addressBig.Bytes())
-			r.Query.Addresses = append(r.Query.Addresses, address)
+			a := common.HexToAddress(pa.ContractAddress.Value)
+			r.Query.Addresses = []common.Address{a}
 		}
 		delay = 20
 		query = r

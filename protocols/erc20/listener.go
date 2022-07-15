@@ -8,8 +8,10 @@ import (
 	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/chains/evm"
+	"gitlab.com/alphaticks/xchanger/constants"
 	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"time"
 
@@ -27,7 +29,6 @@ type Listener struct {
 	types.BaseListener
 	executor        *actor.PID
 	protocolAsset   *models.ProtocolAsset
-	address         *common.Address
 	sabi            *sabi.ABI
 	eabi            *abi.ABI
 	seqNum          uint64
@@ -47,7 +48,6 @@ func NewListenerProducer(protocolAsset *models.ProtocolAsset) actor.Producer {
 func NewListener(protocolAsset *models.ProtocolAsset) actor.Actor {
 	return &Listener{
 		protocolAsset: protocolAsset,
-		address:       nil,
 		logger:        nil,
 	}
 }
@@ -108,15 +108,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("chain", state.protocolAsset.Chain.Type),
 	)
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-	if state.protocolAsset.Asset != nil {
-		addr := state.protocolAsset.ContractAddress
-		if addr == nil || len(addr.Value) < 2 {
-			return fmt.Errorf("invalid collection address")
-		}
-		state.logger.With(log.String("contract", addr.Value))
-		address := common.HexToAddress(addr.Value)
-		state.address = &address
-	}
+
 	switch state.protocolAsset.Chain.Type {
 	case "EVM":
 		if err := state.subscribeEVMLogs(context); err != nil {
@@ -165,10 +157,9 @@ func (state *Listener) subscribeEVMLogs(context actor.Context) error {
 	query := ethereum.FilterQuery{
 		Topics: topics,
 	}
-	if state.address != nil {
-		query.Addresses = []common.Address{
-			*state.address,
-		}
+	if state.protocolAsset.Asset != nil {
+		a := common.HexToAddress(state.protocolAsset.ContractAddress.Value)
+		query.Addresses = []common.Address{a}
 	}
 
 	res, err := context.RequestFuture(state.executor, &messages.EVMLogsSubscribeRequest{
@@ -193,7 +184,6 @@ func (state *Listener) subscribeEVMLogs(context actor.Context) error {
 }
 
 func (state *Listener) subscribeSVMEvents(context actor.Context) error {
-	// TODO asset modifications
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
 		RequestID: state.protocolAsset.ProtocolAssetID,
 		Chain:     state.protocolAsset.Chain,
@@ -301,12 +291,17 @@ func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 
 	var update *models.ProtocolAssetUpdate
 	if b.BlockNumber >= state.lastBlock {
-		resp, err := context.RequestFuture(state.executor, &messages.HistoricalProtocolAssetTransferRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			ChainID:   state.protocolAsset.Chain.ID,
-			Start:     state.lastBlock,
-			Stop:      state.lastBlock,
-		}, 1*time.Minute).Result()
+		q := &messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:  uint64(time.Now().UnixNano()),
+			ProtocolID: constants.ERC20.ID,
+			ChainID:    state.protocolAsset.Chain.ID,
+			Start:      state.lastBlock,
+			Stop:       state.lastBlock,
+		}
+		if state.protocolAsset.Asset != nil {
+			q.AssetID = &wrapperspb.UInt32Value{Value: state.protocolAsset.Asset.ID}
+		}
+		resp, err := context.RequestFuture(state.executor, q, 1*time.Minute).Result()
 		if err != nil {
 			return fmt.Errorf("error fetching svm events: %v", err)
 		}
