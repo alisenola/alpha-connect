@@ -181,58 +181,73 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-
-	pa, ok := state.protocolAssets[req.ProtocolAssetID]
+	var pa *models.ProtocolAsset
+	chain, ok := constants.GetChainByID(req.ChainID)
 	if !ok {
-		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownChain
 		context.Respond(msg)
 		return nil
 	}
-	var future *actor.Future
-	var query interface{}
-	var delay int64
-	switch pa.Chain.Type {
-	case "EVM":
-		topics := [][]common.Hash{{
-			state.eabi.Events["Transfer"].ID,
-		}}
-		var address [20]byte
-		addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
+	if req.AssetID != nil {
+		var ok bool
+		asset, ok := constants.GetAssetByID(req.AssetID.Value)
 		if !ok {
-			state.logger.Warn("invalid protocol asset address")
+			msg.RejectionReason = messages.RejectionReason_UnknownAsset
+			context.Respond(msg)
+			return nil
+		}
+		id := utils.GetProtocolAssetID(asset, constants.ERC721, chain)
+		pa, ok = state.protocolAssets[id]
+		if !ok {
 			msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 			context.Respond(msg)
 			return nil
 		}
-		copy(address[:], addressBig.Bytes())
+	}
+
+	var future *actor.Future
+	var query interface{}
+	var delay int64
+	switch chain.Type {
+	case "EVM":
+		topics := [][]common.Hash{{
+			state.eabi.Events["Transfer"].ID,
+		}}
 		fQuery := ethereum.FilterQuery{
-			Addresses: []common.Address{address},
 			FromBlock: big.NewInt(1).SetUint64(req.Start),
 			ToBlock:   big.NewInt(1).SetUint64(req.Stop),
 			Topics:    topics,
 		}
-		query = &messages.EVMLogsQueryRequest{
+		r := &messages.EVMLogsQueryRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Chain:     pa.Chain,
+			Chain:     chain,
 			Query:     fQuery,
 		}
-		delay = 20
-	case "SVM":
-		add := common.HexToHash(pa.ContractAddress.Value)
-		q := svm.EventQuery{
-			ContractAddress: &add,
-			Keys:            &[]common.Hash{state.sabi.Events["Transfer"].ID},
-			From:            big.NewInt(1).SetUint64(req.Start),
-			To:              big.NewInt(1).SetUint64(req.Stop),
-			PageSize:        1000,
-			PageNumber:      0,
+		if pa != nil {
+			a := common.HexToAddress(pa.ContractAddress.Value)
+			r.Query.Addresses = []common.Address{a}
 		}
-		query = &messages.SVMEventsQueryRequest{
+		delay = 20
+		query = r
+	case "SVM":
+		q := svm.EventQuery{
+			Keys:       &[]common.Hash{state.sabi.Events["Transfer"].ID},
+			From:       big.NewInt(1).SetUint64(req.Start),
+			To:         big.NewInt(1).SetUint64(req.Stop),
+			PageSize:   1000,
+			PageNumber: 0,
+		}
+		r := &messages.SVMEventsQueryRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Chain:     pa.Chain,
+			Chain:     chain,
 			Query:     q,
 		}
+		if pa != nil {
+			add := common.HexToHash(pa.ContractAddress.Value)
+			r.Query.ContractAddress = &add
+		}
 		delay = 120
+		query = r
 	}
 	future = context.RequestFuture(state.executor, query, time.Duration(delay)*time.Second)
 	context.ReenterAfter(future, func(res interface{}, err error) {
@@ -264,13 +279,20 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				context.Respond(msg)
 				return
 			}
-			sort.Slice(resp.Logs, func(i, j int) bool {
-				if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
-					return resp.Logs[i].Index < resp.Logs[j].Index
-				}
-				return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
-			})
+			var c []types.Log
 			for _, l := range resp.Logs {
+				if len(l.Topics) != 4 {
+					continue
+				}
+				c = append(c, l)
+			}
+			sort.Slice(c, func(i, j int) bool {
+				if c[i].BlockNumber == c[j].BlockNumber {
+					return c[i].Index < c[j].Index
+				}
+				return c[i].BlockNumber < c[j].BlockNumber
+			})
+			for _, l := range c {
 				datas = append(datas, l)
 			}
 			times = resp.Times
@@ -301,6 +323,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			from := make([]byte, 32)
 			to := make([]byte, 32)
 			tok := make([]byte, 32)
+			contract := make([]byte, 32)
 			var num uint64
 			switch l := d.(type) {
 			case types.Log:
@@ -316,6 +339,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					from = event.From[:]
 					to = event.To[:]
 					tok = event.TokenId.Bytes()
+					contract = l.Address.Bytes()
 					num = l.BlockNumber
 				}
 			case *svm.Event:
@@ -333,6 +357,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					event.From.FillBytes(from[:])
 					event.To.FillBytes(to[:])
 					event.TokenId.FillBytes(tok[:])
+					contract = l.FromAddress[:]
 					num = uint64(l.BlockNumber)
 				}
 			}
@@ -347,9 +372,10 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				}
 			}
 			update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
-				From:  from,
-				To:    to,
-				Value: tok,
+				From:     from,
+				To:       to,
+				Value:    tok,
+				Contract: contract,
 			})
 		}
 		if update != nil {
@@ -361,7 +387,6 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		context.Respond(msg)
 
 	})
-
 	return nil
 }
 

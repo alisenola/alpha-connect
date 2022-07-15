@@ -3,9 +3,10 @@ package erc721
 import (
 	"fmt"
 	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
+	"gitlab.com/alphaticks/xchanger/constants"
 	snft "gitlab.com/alphaticks/xchanger/protocols/erc721/svm"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"math/big"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"time"
 
@@ -25,19 +26,10 @@ import (
 type checkTimeout struct{}
 type updateRequest struct{}
 
-type protoUpdates struct {
-	Transfer  *gorderbook_models.AssetTransfer
-	Timestamp *timestamppb.Timestamp
-	Block     uint64
-	Hash      common.Hash
-	Index     uint
-}
-
 type Listener struct {
 	types.BaseListener
 	executor        *actor.PID
-	address         [32]byte
-	collection      *models.ProtocolAsset
+	protocolAsset   *models.ProtocolAsset
 	eabi            *abi.ABI
 	sabi            *sabi.ABI
 	seqNum          uint64
@@ -48,16 +40,16 @@ type Listener struct {
 	timeoutTicker   *time.Ticker
 }
 
-func NewListenerProducer(collection *models.ProtocolAsset) actor.Producer {
+func NewListenerProducer(protocolAsset *models.ProtocolAsset) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(collection)
+		return NewListener(protocolAsset)
 	}
 }
 
-func NewListener(collection *models.ProtocolAsset) actor.Actor {
+func NewListener(protocolAsset *models.ProtocolAsset) actor.Actor {
 	return &Listener{
-		collection: collection,
-		logger:     nil,
+		protocolAsset: protocolAsset,
+		logger:        nil,
 	}
 }
 
@@ -114,28 +106,15 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("protocol", "ERC-721"),
-		log.String("chain", state.collection.Chain.Type),
+		log.String("chain", state.protocolAsset.Chain.Type),
 	)
-	addr := state.collection.ContractAddress
-	if addr == nil || len(addr.Value) < 2 {
-		return fmt.Errorf("invalid collection address")
-	}
-	state.logger.With(log.String("contract", addr.Value))
-
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-	switch state.collection.Chain.Type {
+	switch state.protocolAsset.Chain.Type {
 	case "EVM":
-		addressBig, ok := big.NewInt(1).SetString(addr.Value[2:], 16)
-		if !ok {
-			return fmt.Errorf("invalid collection address: %s", addr.Value)
-		}
-		copy(state.address[:], addressBig.Bytes())
 		if err := state.subscribeEVMLogs(context); err != nil {
 			return err
 		}
 	case "SVM":
-		add := common.HexToHash(addr.Value)
-		copy(state.address[:], add.Bytes())
 		if err := state.subscribeSVMEvents(context); err != nil {
 			return err
 		}
@@ -175,16 +154,17 @@ func (state *Listener) subscribeEVMLogs(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error making topics: %v", err)
 	}
-	var add [20]byte
-	copy(add[:], state.address[:20])
 	query := ethereum.FilterQuery{
-		Addresses: []common.Address{add},
-		Topics:    topics,
+		Topics: topics,
+	}
+	if state.protocolAsset.Asset != nil {
+		a := common.HexToAddress(state.protocolAsset.ContractAddress.Value)
+		query.Addresses = []common.Address{a}
 	}
 
 	res, err := context.RequestFuture(state.executor, &messages.EVMLogsSubscribeRequest{
-		RequestID:  state.collection.ProtocolAssetID,
-		Chain:      state.collection.Chain,
+		RequestID:  state.protocolAsset.ProtocolAssetID,
+		Chain:      state.protocolAsset.Chain,
 		Query:      query,
 		Subscriber: context.Self(),
 	}, 10*time.Second).Result()
@@ -211,8 +191,8 @@ func (state *Listener) subscribeSVMEvents(context actor.Context) error {
 	state.sabi = stabi
 
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
-		RequestID: state.collection.ProtocolAssetID,
-		Chain:     state.collection.Chain,
+		RequestID: state.protocolAsset.ProtocolAssetID,
+		Chain:     state.protocolAsset.Chain,
 	}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching block number: %v", err)
@@ -275,6 +255,9 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 			BlockTime:   timestamppb.New(refresh.Update.BlockTime),
 		}
 		for _, l := range refresh.Update.Logs {
+			if len(l.Topics) != 4 {
+				continue
+			}
 			switch l.Topics[0] {
 			case state.eabi.Events["Transfer"].ID:
 				event := new(nft.ERC721Transfer)
@@ -283,9 +266,10 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 				}
 				//fmt.Println("TRANSFER", event.From, event.To, event.TokenId.Text(10))
 				update.Transfers = append(update.Transfers, &gorderbook_models.AssetTransfer{
-					From:  event.From[:],
-					To:    event.To[:],
-					Value: event.TokenId.Bytes(),
+					From:     event.From[:],
+					To:       event.To[:],
+					Value:    event.TokenId.Bytes(),
+					Contract: l.Address.Bytes(),
 				})
 			}
 		}
@@ -300,8 +284,8 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 
 func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
-		RequestID: state.collection.ProtocolAssetID,
-		Chain:     state.collection.Chain,
+		RequestID: state.protocolAsset.ProtocolAssetID,
+		Chain:     state.protocolAsset.Chain,
 	}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching block number: %v", err)
@@ -316,12 +300,17 @@ func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 
 	var update *models.ProtocolAssetUpdate
 	if b.BlockNumber >= state.lastBlock {
-		resp, err := context.RequestFuture(state.executor, &messages.HistoricalProtocolAssetTransferRequest{
-			RequestID:       uint64(time.Now().UnixNano()),
-			ProtocolAssetID: state.collection.ProtocolAssetID,
-			Start:           state.lastBlock,
-			Stop:            state.lastBlock,
-		}, 1*time.Minute).Result()
+		q := &messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:  uint64(time.Now().UnixNano()),
+			ProtocolID: constants.ERC721.ID,
+			ChainID:    state.protocolAsset.Chain.ID,
+			Start:      state.lastBlock,
+			Stop:       state.lastBlock,
+		}
+		if state.protocolAsset.Asset != nil {
+			q.AssetID = &wrapperspb.UInt32Value{Value: state.protocolAsset.Asset.ID}
+		}
+		resp, err := context.RequestFuture(state.executor, q, 1*time.Minute).Result()
 		if err != nil {
 			return fmt.Errorf("error fetching svm events: %v", err)
 		}
