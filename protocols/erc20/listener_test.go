@@ -19,7 +19,7 @@ import (
 func TestListenerSVM(t *testing.T) {
 	exTests.LoadStatics(t)
 	protocol := constants.ERC20
-	registryAddress := "127.0.0.1:8001"
+	registryAddress := "registry.alphaticks.io:8001"
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()

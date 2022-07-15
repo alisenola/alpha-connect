@@ -23,7 +23,7 @@ import (
 func TestExecutorSVM(t *testing.T) {
 	exTests.LoadStatics(t)
 	protocol := constants.ERC20
-	registryAddress := "127.0.0.1:8001"
+	registryAddress := "registry.alphaticks.io:8001"
 	cfg := config.Config{
 		RegistryAddress: registryAddress,
 		Protocols:       []string{protocol.Name},
@@ -146,14 +146,13 @@ func TestExecutorEVM(t *testing.T) {
 		t.Fatal()
 	}
 
-	var step uint64 = 10
+	var step uint64 = 5
 	var start uint64 = 15110232
 	var stop uint64 = 15110300
-	done := false
 	var events []*gorderbookModels.AssetTransfer
 
 	// test get all historical transfers
-	for !done {
+	for start < stop {
 		//Execute the future request for the ERC20 historical data
 		resp, err := as.Root.RequestFuture(
 			executor,
@@ -173,14 +172,21 @@ func TestExecutorEVM(t *testing.T) {
 		if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
 			t.Fatal()
 		}
+		switch response.RejectionReason.String() {
+		case "RPCTimeout":
+			step /= 2
+			continue
+		}
 		if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
 			t.Fatal()
 		}
 		for _, ev := range response.Update {
 			events = append(events, ev.Transfers...)
 		}
-		done = step+start > stop
 		start += step + 1
+		if start+step > stop {
+			start = stop
+		}
 	}
 	if !assert.GreaterOrEqual(t, len(events), 1000, "expected more than 1000 events") {
 		t.Fatal()
@@ -189,9 +195,8 @@ func TestExecutorEVM(t *testing.T) {
 	// test get specific asset historical transfer
 	start = 15110232
 	stop = 15110300
-	done = false
 	events = nil
-	for !done {
+	for start < stop {
 		//Execute the future request for the ERC20 historical data
 		resp, err := as.Root.RequestFuture(
 			executor,
@@ -220,10 +225,12 @@ func TestExecutorEVM(t *testing.T) {
 		for _, ev := range response.Update {
 			events = append(events, ev.Transfers...)
 		}
-		done = step+start > stop
 		start += step + 1
+		if start+step > stop {
+			start = stop
+		}
 	}
-	if !assert.GreaterOrEqual(t, len(events), 700, "expected more than 700 events") {
+	if !assert.GreaterOrEqual(t, len(events), 600, "expected more than 700 events") {
 		t.Fatal()
 	}
 	for _, tx := range events {
