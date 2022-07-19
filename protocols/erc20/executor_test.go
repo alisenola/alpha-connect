@@ -2,6 +2,7 @@ package erc20_test
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/alphaticks/alpha-connect/config"
@@ -9,7 +10,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbookModels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
+	evm20 "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"math/big"
 
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
@@ -237,5 +240,35 @@ func TestExecutorEVM(t *testing.T) {
 		if !assert.Equal(t, asset.ContractAddress.Value, common.BytesToAddress(tx.Contract).String(), "contract address error") {
 			t.Fatal()
 		}
+	}
+
+	//test contract call
+	eabi, err := evm20.ERC20MetaData.GetAbi()
+	if !assert.Nil(t, err, "GetAbi err: %v", err) {
+		t.Fatal()
+	}
+	add := common.HexToAddress("0x111111111117dC0aa78b770fA6A738034120C302")
+	resp, err := as.Root.RequestFuture(executor, &messages.EVMContractCallRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Chain:     asset.Chain,
+		Msg: ethereum.CallMsg{
+			To:   &add,
+			Data: eabi.Methods["decimals"].ID,
+		},
+		BlockNumber: 14000000,
+	}, 10*time.Second).Result()
+	if !assert.Nil(t, err, "EVMContractCall err: %v", err) {
+		t.Fatal()
+	}
+	decimal, ok := resp.(*messages.EVMContractCallResponse)
+	if !assert.True(t, ok, "expected EVMContractCallResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, decimal.Success, "error getting protocol asset decimals: %s", decimal.RejectionReason.String()) {
+		t.Fatal()
+	}
+	i := big.NewInt(1).SetBytes(decimal.Out)
+	if !assert.NotEqualValues(t, i, big.NewInt(0), "expected 18 decimals") {
+		t.Fatal()
 	}
 }
