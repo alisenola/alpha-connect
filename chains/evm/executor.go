@@ -165,8 +165,12 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 
 		out, err := state.client.CallContract(goContext.Background(), req.Msg, big.NewInt(int64(req.BlockNumber)))
 		if err != nil {
-			state.logger.Warn("error filtering logs", log.Error(err))
+			state.logger.Warn("error with contract call", log.Error(err))
 			res.RejectionReason = messages.RejectionReason_RPCError
+			switch err.Error() {
+			case "invalid jump destination":
+				res.RejectionReason = messages.RejectionReason_InvalidJumpDestination
+			}
 			context.Send(sender, res)
 			return
 		}

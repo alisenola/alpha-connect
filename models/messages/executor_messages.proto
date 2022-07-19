@@ -74,6 +74,7 @@ enum RejectionReason {
     UnknownChain = 35;
     RequestExpired = 36;
     AccountListenerDisabled = 37;
+    InvalidJumpDestination = 38;
 }
 
 enum ResponseType {
