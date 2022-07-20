@@ -16,7 +16,7 @@ func NewChainExecutorProducer(chain *models2.Chain, rpc string, registry registr
 		}
 	case "SVM":
 		return func() actor.Actor {
-			return svm.NewExecutor(registry, "http://127.0.0.1:9545")
+			return svm.NewExecutor(registry, rpc)
 		}
 	default:
 		return nil

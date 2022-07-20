@@ -21,6 +21,7 @@ type Executor interface {
 	OnEVMLogsQueryRequest(context actor.Context) error
 	OnEVMLogsSubscribeRequest(context actor.Context) error
 	OnSVMEventsQueryRequest(context actor.Context) error
+	OnSVMContractCallRequest(context actor.Context) error
 	OnSVMBlockQueryRequest(context actor.Context) error
 	OnSVMTransactionByHashRequest(context actor.Context) error
 }
@@ -89,6 +90,12 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 	case *messages.SVMEventsQueryRequest:
 		if err := state.OnSVMEventsQueryRequest(context); err != nil {
 			state.GetLogger().Error("error processing OnSVMEventsQueryRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.SVMContractCallRequest:
+		if err := state.OnSVMContractCallRequest(context); err != nil {
+			state.GetLogger().Error("error processing OnSVMContractCallRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -164,6 +171,17 @@ func (state *BaseExecutor) OnEVMLogsSubscribeRequest(context actor.Context) erro
 func (state *BaseExecutor) OnSVMEventsQueryRequest(context actor.Context) error {
 	req := context.Message().(*messages.SVMEventsQueryRequest)
 	context.Respond(&messages.SVMEventsQueryResponse{
+		RequestID:       req.RequestID,
+		ResponseID:      uint64(time.Now().UnixNano()),
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *BaseExecutor) OnSVMContractCallRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMContractCallRequest)
+	context.Respond(&messages.SVMContractCallResponse{
 		RequestID:       req.RequestID,
 		ResponseID:      uint64(time.Now().UnixNano()),
 		Success:         false,

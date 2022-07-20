@@ -133,6 +133,30 @@ func (state *Executor) OnSVMEventsQueryRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnSVMContractCallRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMContractCallRequest)
+	msg := &messages.SVMContractCallResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func(pid *actor.PID) {
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 15*time.Second)
+		defer cancel()
+		hashes, err := state.client.Call(ctx, *req.CallParameters)
+		if err != nil {
+			state.logger.Error("error making svm contract call", log.Error(err))
+			msg.RejectionReason = messages.RejectionReason_RPCError
+			context.Send(pid, msg)
+			return
+		}
+		msg.Success = true
+		msg.Data = hashes
+		context.Send(pid, msg)
+	}(context.Sender())
+	return nil
+}
+
 func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 	req := context.Message().(*messages.SVMBlockQueryRequest)
 	msg := &messages.SVMBlockQueryResponse{
