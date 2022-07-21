@@ -123,6 +123,20 @@ type SVMContractCallResponse struct {
 	RejectionReason RejectionReason
 }
 
+type SVMContractClassRequest struct {
+	RequestID uint64
+	Chain     *models.Chain
+	Query     *svm.ContractClassQuery
+}
+
+type SVMContractClassResponse struct {
+	RequestID       uint64
+	ResponseID      uint64
+	Class           *svm.Class
+	Success         bool
+	RejectionReason RejectionReason
+}
+
 type SVMBlockQueryRequest struct {
 	RequestID uint64
 	Query     *svm.BlockQuery

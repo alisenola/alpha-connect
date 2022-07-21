@@ -157,6 +157,30 @@ func (state *Executor) OnSVMContractCallRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnSVMContractClassRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMContractClassRequest)
+	msg := &messages.SVMContractClassResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func(pid *actor.PID) {
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 15*time.Second)
+		defer cancel()
+		class, err := state.client.GetClassAt(ctx, *req.Query)
+		if err != nil {
+			state.logger.Error("error getting svm contract class", log.Error(err))
+			msg.RejectionReason = messages.RejectionReason_RPCError
+			context.Send(pid, msg)
+			return
+		}
+		msg.Success = true
+		msg.Class = class
+		context.Send(pid, msg)
+	}(context.Sender())
+	return nil
+}
+
 func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 	req := context.Message().(*messages.SVMBlockQueryRequest)
 	msg := &messages.SVMBlockQueryResponse{
