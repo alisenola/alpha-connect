@@ -139,6 +139,55 @@ func TestExecutorSVMContractCallRequest(t *testing.T) {
 	}
 }
 
+func TestExecutorSVMContractClassRequest(t *testing.T) {
+	chain := &models2.Chain{
+		ID:   5,
+		Name: "Starknet Mainnet",
+		Type: "SVM",
+	}
+	cfg := config.Config{
+		ChainRPCs: []config.ChainRPC{
+			{Chain: 5, Endpoint: "http://127.0.0.1:9545"},
+		},
+	}
+	as, ex, poison := tests.StartExecutor(t, &cfg)
+	defer poison()
+	add := common.HexToHash("0x00da114221cb83fa859dbdb4c44beeaa0bb37c7537ad5ae66fe5e0efd20e6eb3")
+	// get class erc20
+	q := svm.ContractClassQuery{
+		ContractAddress: &add,
+	}
+	resp, err := as.Root.RequestFuture(ex, &messages.SVMContractClassRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Chain:     chain,
+		Query:     &q,
+	}, 15*time.Second).Result()
+	if !assert.Nil(t, err, "SVMContractClassRequest err: %v", err) {
+		t.Fatal()
+	}
+	class, ok := resp.(*messages.SVMContractClassResponse)
+	if !assert.True(t, ok, "expected SVMContractClassResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, class.Success, "failed SVMContractClassResponse, got: %s", class.RejectionReason.String()) {
+		t.Fatal()
+	}
+	found := false
+	selector := svm.GetSelectorFromName("decimals")
+	for _, c := range class.Class.EntryPointsByType.External {
+		i, ok := big.NewInt(0).SetString(c.Selector[2:], 16)
+		if !assert.True(t, ok, "error with big.Int SetString for string %s", c.Selector[2:]) {
+			t.Fatal()
+		}
+		if selector.Cmp(i) == 0 {
+			found = true
+		}
+	}
+	if !assert.True(t, found, "expected contract to have decimals") {
+		t.Fatal()
+	}
+}
+
 func TestExecutorSVMEventsQueryRequestTransfer(t *testing.T) {
 	chain := &models2.Chain{
 		ID:   5,
