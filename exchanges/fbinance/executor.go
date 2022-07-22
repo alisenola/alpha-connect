@@ -246,7 +246,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	state.accountRateLimits = make(map[string]*AccountRateLimit)
 	qr := state.queryRunners[0]
-	fbinance.SelectAddr(qr.client)
+	//fbinance.SelectAddr(qr.client)
 	request, weight, err := fbinance.GetExchangeInfo()
 	if err != nil {
 		return err
@@ -1253,7 +1253,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		}
 		fmt.Println("PERFORM", time.Since(start))
 		if data.Code != 0 {
-			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(errors.New(data.Message)))
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(fmt.Errorf("%d: %s", data.Code, data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
 			state.updateRateLimits(data.BaseResponse, ar, qr)
