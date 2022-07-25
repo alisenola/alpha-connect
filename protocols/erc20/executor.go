@@ -12,6 +12,7 @@ import (
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/chains/evm"
 	"gitlab.com/alphaticks/xchanger/chains/svm"
+	xmodels "gitlab.com/alphaticks/xchanger/models"
 	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	tokensvm "gitlab.com/alphaticks/xchanger/protocols/erc20/svm"
 	"math/big"
@@ -37,6 +38,7 @@ type Executor struct {
 	extype.BaseExecutor
 	addresses      map[string]bool
 	key            *big.Int
+	protocol       *xmodels.Protocol
 	protocolAssets map[uint64]*models.ProtocolAsset
 	executor       *actor.PID
 	sabi           *sabi.ABI
@@ -45,11 +47,12 @@ type Executor struct {
 	registry       registry.PublicRegistryClient
 }
 
-func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(registry registry.PublicRegistryClient, protocol *xmodels.Protocol) actor.Actor {
 	return &Executor{
 		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
+		protocol:       protocol,
 	}
 }
 
@@ -92,7 +95,7 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
 	filter := registry.ProtocolAssetFilter{
-		ProtocolId: []uint32{constants.ERC20.ID},
+		ProtocolId: []uint32{state.protocol.ID},
 	}
 	in := registry.ProtocolAssetsRequest{
 		Filter: &filter,
@@ -130,7 +133,11 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			assets,
 			&models.ProtocolAsset{
 				ProtocolAssetID: protocolAsset.ProtocolAssetId,
-				Protocol:        constants.ERC20,
+				Protocol: &xmodels.Protocol{
+					ID:      state.protocol.ID,
+					Name:    state.protocol.Name,
+					ChainID: state.protocol.ChainID,
+				},
 				Asset:           as,
 				Chain:           ch,
 				CreationBlock:   protocolAsset.CreationBlock,
@@ -138,6 +145,7 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 				ContractAddress: protocolAsset.ContractAddress,
 				Decimals:        protocolAsset.Decimals,
 			})
+		state.addresses[protocolAsset.ContractAddress.Value] = true
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	for _, a := range assets {
@@ -191,7 +199,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			context.Respond(msg)
 			return nil
 		}
-		id := utils.GetProtocolAssetID(asset, constants.ERC20, chain)
+		id := utils.GetProtocolAssetID(asset, state.protocol, chain)
 		pa, ok = state.protocolAssets[id]
 		if !ok {
 			msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset

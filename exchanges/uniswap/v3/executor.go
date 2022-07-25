@@ -176,7 +176,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: float64(tickSpacing)}
 			security.TakerFee = &wrapperspb.DoubleValue{Value: float64(pool.FeeTier)}
 			security.CreationBlock = &wrapperspb.UInt64Value{Value: pool.CreatedAtBlockNumber.Uint64()}
-			security.Protocol = constants.ERC20
+			security.Protocol = &xmodels.Protocol{ID: 1, Name: "ERC-20", ChainID: constants.EthereumMainnet.ID}
 			security.Chain = constants.EthereumMainnet
 			securities = append(securities, &security)
 		}
