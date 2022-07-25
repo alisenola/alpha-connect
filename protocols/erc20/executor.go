@@ -35,6 +35,8 @@ type QueryRunner struct {
 
 type Executor struct {
 	extype.BaseExecutor
+	addresses      map[string]bool
+	key            *big.Int
 	protocolAssets map[uint64]*models.ProtocolAsset
 	executor       *actor.PID
 	sabi           *sabi.ABI
@@ -73,6 +75,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting starknet abi: %v", err)
 	}
 	state.sabi = stabi
+
+	state.addresses = make(map[string]bool)
+	state.key = svm.GetSelectorFromName("ownerOf")
+
 	return state.UpdateProtocolAssetList(context)
 }
 
@@ -297,13 +303,62 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				context.Respond(msg)
 				return
 			}
-			sort.SliceStable(resp.Events, func(i, j int) bool {
-				return resp.Events[i].BlockNumber < resp.Events[j].BlockNumber
-			})
+			//filter out erc20 events
+			var e []*svm.Event
 			for _, l := range resp.Events {
+				if v, ok := state.addresses[l.FromAddress.String()]; !ok {
+					add := common.BytesToHash(l.FromAddress.Bytes())
+					q := &svm.ContractClassQuery{
+						ContractAddress: &add,
+					}
+					resp, err := context.RequestFuture(state.executor, &messages.SVMContractClassRequest{
+						RequestID: uint64(time.Now().UnixNano()),
+						Chain:     chain,
+						Query:     q,
+					}, 10*time.Second).Result()
+					if err != nil {
+						state.logger.Error("error at stark rpc server", log.Error(err))
+						msg.RejectionReason = messages.RejectionReason_RPCError
+						context.Respond(msg)
+						return
+					}
+					c, ok := resp.(*messages.SVMContractClassResponse)
+					if !ok {
+						msg.RejectionReason = messages.RejectionReason_Other
+						context.Respond(msg)
+						return
+					}
+					if !c.Success {
+						msg.RejectionReason = c.RejectionReason
+						context.Respond(msg)
+						return
+					}
+					state.addresses[l.FromAddress.String()] = true
+					e = append(e, l)
+					for _, ext := range c.Class.EntryPointsByType.External {
+						i, _ := big.NewInt(0).SetString(ext.Selector[2:], 16)
+						if state.key.Cmp(i) == 0 {
+							e = e[:len(e)-1]
+							state.addresses[l.FromAddress.String()] = false
+							break
+						}
+					}
+				} else if v {
+					e = append(e, l)
+				}
+			}
+			sort.SliceStable(e, func(i, j int) bool {
+				return e[i].BlockNumber < e[j].BlockNumber
+			})
+			for _, l := range e {
 				datas = append(datas, l)
 			}
 			times = resp.Times
+		default:
+			state.logger.Warn("incorrect type, expected SVMEventsQueryResponse or EVMLogsQueryResponse", log.String("type", reflect.TypeOf(res).String()))
+			msg.RejectionReason = messages.RejectionReason_Other
+			context.Respond(msg)
+			return
 		}
 		events := make([]*models.ProtocolAssetUpdate, 0)
 		var update *models.ProtocolAssetUpdate
