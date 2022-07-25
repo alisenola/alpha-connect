@@ -7,6 +7,7 @@ import (
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -111,7 +112,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all exchange executors
 	for _, protocolStr := range state.Config.Protocols {
-		prtcl, ok := constants.GetProtocolByName(protocolStr)
+		i, err := strconv.Atoi(protocolStr)
+		if err != nil {
+			state.logger.Warn("incorrect id format for protocol", log.String("format", protocolStr))
+			continue
+		}
+		prtcl, ok := constants.GetProtocolByID(uint32(i))
 		if !ok {
 			return fmt.Errorf("unknown protocol %s", protocolStr)
 		}
@@ -235,7 +241,7 @@ func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 	}
 	passet.Protocol = proto
 	passet.Chain = chain
-	var id = uint64(proto.ID)
+	passet.ProtocolAssetID = uint64(proto.ID)
 	if req.AssetID != nil {
 		asset, ok := constants.GetAssetByID(req.AssetID.Value)
 		if !ok {
@@ -245,7 +251,7 @@ func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 				Success:         false,
 			})
 		}
-		id = utils.GetProtocolAssetID(asset, proto, chain)
+		id := utils.GetProtocolAssetID(asset, proto, chain)
 		passet, ok = state.protocolAssets[id]
 		if !ok {
 			context.Respond(&messages.ProtocolAssetDataResponse{
@@ -255,13 +261,13 @@ func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 			})
 		}
 	}
-	if pid, ok := state.dataManagers[id]; ok {
+	if pid, ok := state.dataManagers[passet.ProtocolAssetID]; ok {
 		context.Forward(pid)
 	} else {
 		props := actor.PropsFromProducer(NewDataManagerProducer(passet), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
-		state.dataManagers[id] = pid
+		state.dataManagers[passet.ProtocolAssetID] = pid
 		context.Forward(pid)
 	}
 	return nil

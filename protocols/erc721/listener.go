@@ -3,7 +3,6 @@ package erc721
 import (
 	"fmt"
 	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
-	"gitlab.com/alphaticks/xchanger/constants"
 	snft "gitlab.com/alphaticks/xchanger/protocols/erc721/svm"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -302,7 +301,7 @@ func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 	if b.BlockNumber >= state.lastBlock {
 		q := &messages.HistoricalProtocolAssetTransferRequest{
 			RequestID:  uint64(time.Now().UnixNano()),
-			ProtocolID: constants.ERC721.ID,
+			ProtocolID: state.protocolAsset.Protocol.ID,
 			ChainID:    state.protocolAsset.Chain.ID,
 			Start:      state.lastBlock,
 			Stop:       state.lastBlock,

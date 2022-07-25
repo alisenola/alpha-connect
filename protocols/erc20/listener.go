@@ -8,7 +8,6 @@ import (
 	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/chains/evm"
-	"gitlab.com/alphaticks/xchanger/constants"
 	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -293,7 +292,7 @@ func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 	if b.BlockNumber >= state.lastBlock {
 		q := &messages.HistoricalProtocolAssetTransferRequest{
 			RequestID:  uint64(time.Now().UnixNano()),
-			ProtocolID: constants.ERC20.ID,
+			ProtocolID: state.protocolAsset.Protocol.ID,
 			ChainID:    state.protocolAsset.Chain.ID,
 			Start:      state.lastBlock,
 			Stop:       state.lastBlock,
