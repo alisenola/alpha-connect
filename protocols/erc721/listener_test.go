@@ -1,13 +1,13 @@
 package erc721_test
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,7 +21,10 @@ import (
 func TestListenerEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol := constants.ERC721
+	protocol, ok := constants.GetProtocolByID(2)
+	if !assert.True(t, ok, "Missing protocol ERC-721 for EVM") {
+		t.Fatal()
+	}
 	assetTest := models.ProtocolAsset{
 		Asset: &xchangerModels.Asset{
 			ID: 275,
@@ -38,7 +41,7 @@ func TestListenerEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{protocol.Name}
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -125,14 +128,21 @@ func TestListenerEVM(t *testing.T) {
 }
 
 func TestListenerSVM(t *testing.T) {
-	// TODO Listen on all protocol assets updates
 	exTests.LoadStatics(t)
-	cfg := config.Config{
-		RegistryAddress: "registry.alphaticks.io:8001",
-		Protocols:       []string{constants.ERC721.Name},
+	protocol, ok := constants.GetProtocolByID(5)
+	if !assert.True(t, ok, "Missing protocol ERC-721 for SVM") {
+		t.Fatal()
 	}
-	as, executor, clean := exTests.StartExecutor(t, &cfg)
+	registryAddress := "127.0.0.1:8001"
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
+
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Subscribe: false,
@@ -144,7 +154,6 @@ func TestListenerSVM(t *testing.T) {
 	if !ok {
 		t.Fatal("incorrect type assertion")
 	}
-	fmt.Println(response.ProtocolAssets)
 	assetTest := models.ProtocolAsset{
 		Asset: &xchangerModels.Asset{
 			ID: 275,
@@ -163,15 +172,37 @@ func TestListenerSVM(t *testing.T) {
 	if asset == nil {
 		t.Fatal("asset not found")
 	}
+	s := asset.Asset
+
+	// listen on all protocol assets
+	asset.Asset = nil
 	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
 	checker := as.Root.Spawn(props)
 	defer as.Root.PoisonFuture(checker)
-	time.Sleep(3 * time.Minute)
+	time.Sleep(2 * time.Minute)
 	resp, err := as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := resp.(*tests.GetDataResponse)
+	if !ok {
+		t.Fatalf("expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if d.Err != nil {
+		t.Fatal(d.Err)
+	}
+
+	// listen on a specific protocol asset
+	asset.Asset = s
+	props = actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
+	checker = as.Root.Spawn(props)
+	defer as.Root.PoisonFuture(checker)
+	time.Sleep(2 * time.Minute)
+	resp, err = as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok = resp.(*tests.GetDataResponse)
 	if !ok {
 		t.Fatalf("expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String())
 	}

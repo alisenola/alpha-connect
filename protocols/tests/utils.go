@@ -49,6 +49,11 @@ func (state *ProtocolChecker) Receive(context actor.Context) {
 			state.logger.Error("error starting the actor", log.Error(err))
 			state.err = err
 		}
+	case *actor.Stopping:
+		state.logger.Info("actor stopping")
+	case *actor.Stopped:
+		state.logger.Info("actor stopped")
+
 	case *messages.ProtocolAssetDataIncrementalRefresh:
 		if err := state.OnProtocolAssetDataIncrementalRefresh(context); err != nil {
 			state.logger.Error("error processing ProtocolAssetDataIncrementalRefresh", log.Error(err))

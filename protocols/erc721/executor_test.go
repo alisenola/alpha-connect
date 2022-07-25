@@ -12,6 +12,7 @@ import (
 	"gitlab.com/alphaticks/tickfunctors/protocols/erc721/evm"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"strconv"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -53,7 +54,10 @@ type ERC721Contract struct {
 func TestExecutorEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol := constants.ERC721
+	protocol, ok := constants.GetProtocolByID(2)
+	if !assert.True(t, ok, "Missing protocol ERC-20 for EVM") {
+		t.Fatal()
+	}
 	testAsset := xchangerModels.Asset{
 		ID:     275.,
 		Symbol: "BAYC",
@@ -64,7 +68,7 @@ func TestExecutorEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{protocol.Name}
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -87,7 +91,7 @@ func TestExecutorEVM(t *testing.T) {
 	}
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.EthereumMainnet),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, coll.Protocol, constants.EthereumMainnet),
 	}, 15*time.Second).Result()
 	if !assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err) {
 		t.Fatal()
@@ -247,12 +251,20 @@ func TestExecutorEVM(t *testing.T) {
 }
 
 func TestExecutorSVM(t *testing.T) {
+	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	cfg := config.Config{
-		RegistryAddress: "registry.alphaticks.io:8001",
-		Protocols:       []string{constants.ERC721.Name},
+	protocol, ok := constants.GetProtocolByID(5)
+	if !assert.True(t, ok, "Missing protocol ERC-721 for SVM") {
+		t.Fatal()
 	}
-	as, executor, clean := exTests.StartExecutor(t, &cfg)
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	registryAddress := "127.0.0.1:8001"
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
 	testAsset := xchangerModels.Asset{
@@ -260,7 +272,7 @@ func TestExecutorSVM(t *testing.T) {
 		Symbol: "BAYC",
 	}
 	chain, ok := constants.GetChainByID(5)
-	if !assert.True(t, ok, "missings svm") {
+	if !assert.True(t, ok, "missing svm") {
 		t.Fatal()
 	}
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
@@ -283,7 +295,7 @@ func TestExecutorSVM(t *testing.T) {
 	}
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC721, constants.StarknetMainnet),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, coll.Protocol, constants.StarknetMainnet),
 	}, 15*time.Second).Result()
 	if !assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err) {
 		t.Fatal()
@@ -295,8 +307,9 @@ func TestExecutorSVM(t *testing.T) {
 	if !assert.True(t, def.Success, "request failed with %v", def.RejectionReason.String()) {
 		t.Fatal()
 	}
-	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
-	//Execute the future request for the NFT historical data
+	s := coll.Asset
+
+	// execute the future on all protocol assets
 	resp, err := as.Root.RequestFuture(
 		executor,
 		&messages.HistoricalProtocolAssetTransferRequest{
@@ -325,7 +338,38 @@ func TestExecutorSVM(t *testing.T) {
 	if !assert.GreaterOrEqual(t, len(events), 20, "expected more than 20 events") {
 		t.Fatal()
 	}
-	//TODO get all historical transfers
+
+	// execute the future on a specific protocol asset
+	coll.Asset = s
+	resp, err = as.Root.RequestFuture(
+		executor,
+		&messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:  uint64(time.Now().UnixNano()),
+			AssetID:    &wrapperspb.UInt32Value{Value: coll.Asset.ID},
+			ProtocolID: def.ProtocolAsset.Protocol.ID,
+			ChainID:    def.ProtocolAsset.Chain.ID,
+			Start:      0,
+			Stop:       3000,
+		},
+		30*time.Second,
+	).Result()
+	if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+		t.Fatal()
+	}
+	response, ok = resp.(*messages.HistoricalProtocolAssetTransferResponse)
+	if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+		t.Fatal()
+	}
+	events = nil
+	for _, ev := range response.Update {
+		events = append(events, ev.Transfers...)
+	}
+	if !assert.GreaterOrEqual(t, len(events), 20, "expected more than 20 events") {
+		t.Fatal()
+	}
 }
 
 func find(t *gorderbookModels.AssetTransfer, arr []*Transfer) bool {

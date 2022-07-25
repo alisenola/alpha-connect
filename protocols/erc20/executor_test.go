@@ -1,7 +1,6 @@
 package erc20_test
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +12,7 @@ import (
 	evm20 "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
+	"strconv"
 
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
@@ -24,22 +24,28 @@ import (
 )
 
 func TestExecutorSVM(t *testing.T) {
+	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol := constants.ERC20
-	registryAddress := "registry.alphaticks.io:8001"
-	cfg := config.Config{
-		RegistryAddress: registryAddress,
-		Protocols:       []string{protocol.Name},
+	protocol, ok := constants.GetProtocolByID(4)
+	if !assert.True(t, ok, "Missing protocol ERC-20 for SVM") {
+		t.Fatal()
 	}
-	as, executor, clean := exTests.StartExecutor(t, &cfg)
-	defer clean()
-
 	testAsset := xchangerModels.Asset{
 		ID:     57.,
 		Symbol: "DAI",
 	}
+	registryAddress := "127.0.0.1:8001"
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
+	defer clean()
+
 	chain, ok := constants.GetChainByID(5)
-	if !assert.True(t, ok, "missings svm") {
+	if !assert.True(t, ok, "missing svm") {
 		t.Fatal()
 	}
 	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
@@ -53,7 +59,6 @@ func TestExecutorSVM(t *testing.T) {
 	var coll *models.ProtocolAsset
 	for _, asset := range assets.ProtocolAssets {
 		if asset.Asset.Symbol == testAsset.Symbol && asset.Chain.ID == chain.ID {
-			fmt.Printf("asset %+v \n", asset)
 			coll = asset
 		}
 	}
@@ -62,7 +67,7 @@ func TestExecutorSVM(t *testing.T) {
 	}
 	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
 		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, constants.ERC20, constants.StarknetMainnet),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, coll.Protocol, constants.StarknetMainnet),
 	}, 15*time.Second).Result()
 	if !assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err) {
 		t.Fatal()
@@ -74,8 +79,8 @@ func TestExecutorSVM(t *testing.T) {
 	if !assert.True(t, def.Success, "request failed with %v", def.RejectionReason.String()) {
 		t.Fatal()
 	}
-	fmt.Println("Protocol Asset definition", def.ProtocolAsset)
-	//Execute the future request for the ERC20 historical data
+
+	// execute the future on all protocol assets
 	resp, err := as.Root.RequestFuture(
 		executor,
 		&messages.HistoricalProtocolAssetTransferRequest{
@@ -105,13 +110,45 @@ func TestExecutorSVM(t *testing.T) {
 		t.Fatal()
 	}
 
-	//TODO test for HistoricalProtocolAssetTransferRequest with assetID
+	// execute the future on a specific protocol asset
+	resp, err = as.Root.RequestFuture(
+		executor,
+		&messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:  uint64(time.Now().UnixNano()),
+			AssetID:    &wrapperspb.UInt32Value{Value: testAsset.ID},
+			ProtocolID: protocol.ID,
+			ChainID:    chain.ID,
+			Start:      0,
+			Stop:       4000,
+		},
+		30*time.Second,
+	).Result()
+	if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+		t.Fatal()
+	}
+	response, ok = resp.(*messages.HistoricalProtocolAssetTransferResponse)
+	if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+		t.Fatal()
+	}
+	events = nil
+	for _, ev := range response.Update {
+		events = append(events, ev.Transfers...)
+	}
+	if !assert.GreaterOrEqual(t, len(events), 7000, "expected more than 20 events") {
+		t.Fatal()
+	}
 }
 
 func TestExecutorEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol := constants.ERC20
+	protocol, ok := constants.GetProtocolByID(1)
+	if !assert.True(t, ok, "Missing protocol ERC-20 for EVM") {
+		t.Fatal()
+	}
 	testAsset := xchangerModels.Asset{
 		ID: 35.,
 	}
@@ -121,7 +158,7 @@ func TestExecutorEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{protocol.Name}
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 	chain, ok := constants.GetChainByID(1)
