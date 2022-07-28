@@ -120,6 +120,7 @@ func TestListenerEVM(t *testing.T) {
 	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
+	// get asset
 	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
 		RequestID: uint64(time.Now().UnixNano()),
 		Subscribe: false,
@@ -190,6 +191,120 @@ func TestListenerEVM(t *testing.T) {
 	c := as.Root.Spawn(props)
 	defer as.Root.PoisonFuture(c)
 	time.Sleep(2 * time.Minute)
+	resp, err = as.Root.RequestFuture(c, &tests.GetDataRequest{}, 10*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
+		t.Fatal()
+	}
+	d, ok = resp.(*tests.GetDataResponse)
+	if !assert.True(t, ok, "expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.Nil(t, d.Err, "listener error: %v", d.Err) {
+		t.Fatal()
+	}
+	if !assert.GreaterOrEqual(t, len(d.Updates), 0, "expected length of updates > 0") {
+		t.Fatal()
+	}
+	// check the contract address is what we expect for all transactions
+	for _, u := range d.Updates {
+		for _, tx := range u.Transfers {
+			if !assert.Equal(t, asset.ContractAddress.Value, common.BytesToAddress(tx.Contract).String()) {
+				t.Fatal()
+			}
+		}
+	}
+}
+
+func TestListenerZKEVM(t *testing.T) {
+	// Load statics and get protocolAsset
+	exTests.LoadStatics(t)
+	protocol, ok := constants.GetProtocolByID(6)
+	if !assert.True(t, ok, "Missing protocol erc-20 for zkevm") {
+		t.Fatal()
+	}
+	testAsset := models.ProtocolAsset{
+		Asset: &xchangerModels.Asset{
+			ID: 12,
+		},
+	}
+	registryAddress := "127.0.0.1:8001"
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, ex, clean := exTests.StartExecutor(t, cfg)
+	defer clean()
+
+	// get asset
+	chain, ok := constants.GetChainByID(6)
+	if !assert.True(t, ok, "missing zkevm") {
+		t.Fatal()
+	}
+	res, err := as.Root.RequestFuture(ex, &messages.ProtocolAssetListRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Subscribe: false,
+	}, 20*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture ProtocolAssetList err: %v", err) {
+		t.Fatal()
+	}
+	response, ok := res.(*messages.ProtocolAssetList)
+	if !assert.True(t, ok, "expected *messages.ProtocolAssetList, got %s", reflect.TypeOf(res).String()) {
+		t.Fatal()
+	}
+	var asset *models.ProtocolAsset
+	for _, a := range response.ProtocolAssets {
+		if testAsset.Asset.ID == a.Asset.ID && a.Chain.ID == chain.ID {
+			asset = a
+		}
+	}
+	if !assert.NotNil(t, asset, "asset not found") {
+		t.Fatal()
+	}
+	s := asset.Asset
+
+	// Listen on all protocol assets updates
+	asset.Asset = nil
+	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
+	checker := as.Root.Spawn(props)
+	time.Sleep(2 * time.Minute)
+	resp, err := as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
+		t.Fatal()
+	}
+	as.Root.PoisonFuture(checker)
+	d, ok := resp.(*tests.GetDataResponse)
+	if !assert.True(t, ok, "expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String()) {
+		t.Fatal()
+	}
+	if !assert.Nil(t, d.Err, "listener error: %v", d.Err) {
+		t.Fatal()
+	}
+	if !assert.GreaterOrEqual(t, len(d.Updates), 0, "expected length of updates > 0") {
+		t.Fatal()
+	}
+	diff := false
+	// check the contract addresses are different
+outer:
+	for _, u := range d.Updates {
+		for _, tx := range u.Transfers {
+			if asset.ContractAddress.Value != common.BytesToAddress(tx.Contract).String() {
+				diff = true
+				break outer
+			}
+		}
+	}
+	if !assert.True(t, diff, "expected different contracts") {
+		t.Fatal()
+	}
+
+	// Listen on a specific protocol asset updates
+	asset.Asset = s
+	props = actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
+	c := as.Root.Spawn(props)
+	defer as.Root.PoisonFuture(c)
+	time.Sleep(1 * time.Minute)
 	resp, err = as.Root.RequestFuture(c, &tests.GetDataRequest{}, 10*time.Second).Result()
 	if !assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
 		t.Fatal()
