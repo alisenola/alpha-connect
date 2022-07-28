@@ -2,8 +2,6 @@ package erc721
 
 import (
 	"fmt"
-	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
-	snft "gitlab.com/alphaticks/xchanger/protocols/erc721/svm"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
@@ -30,7 +28,6 @@ type Listener struct {
 	executor        *actor.PID
 	protocolAsset   *models.ProtocolAsset
 	eabi            *abi.ABI
-	sabi            *sabi.ABI
 	seqNum          uint64
 	lastBlock       uint64
 	lastRefreshTime time.Time
@@ -74,9 +71,10 @@ func (state *Listener) Receive(context actor.Context) {
 			// No panic or we get an infinite loop
 		}
 		state.logger.Info("actor restarting")
+
 	case *messages.EVMLogsSubscribeRefresh:
 		if err := state.OnEVMLogsSubscribeRefresh(context); err != nil {
-			state.logger.Error("error processing onEVMLogsSubscribeRefresh", log.Error(err))
+			state.logger.Error("error processing OnEVMLogsSubscribeRefresh", log.Error(err))
 			panic(err)
 		}
 	case *messages.ProtocolAssetDataRequest:
@@ -84,7 +82,6 @@ func (state *Listener) Receive(context actor.Context) {
 			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
 			panic(err)
 		}
-
 	case *updateRequest:
 		if err := state.OnSVMUpdateRequest(context); err != nil {
 			state.logger.Error("error processing OnUpdateRequest", log.Error(err))
@@ -109,7 +106,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	)
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
 	switch state.protocolAsset.Chain.Type {
-	case "EVM":
+	case "ZKEVM",
+		"EVM":
 		if err := state.subscribeEVMLogs(context); err != nil {
 			return err
 		}
@@ -183,12 +181,6 @@ func (state *Listener) subscribeEVMLogs(context actor.Context) error {
 }
 
 func (state *Listener) subscribeSVMEvents(context actor.Context) error {
-	stabi, err := snft.ERC721MetaData.GetAbi()
-	if err != nil {
-		return fmt.Errorf("error getting stark abi: %v", err)
-	}
-	state.sabi = stabi
-
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
 		RequestID: state.protocolAsset.ProtocolAssetID,
 		Chain:     state.protocolAsset.Chain,
@@ -248,7 +240,6 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 	state.lastRefreshTime = time.Now()
 	var update *models.ProtocolAssetUpdate
 	if refresh.Update != nil {
-		//fmt.Println("REFRESH", refresh.SeqNum, state.seqNum, len(refresh.Update.Logs))
 		update = &models.ProtocolAssetUpdate{
 			BlockNumber: refresh.Update.BlockNumber,
 			BlockTime:   timestamppb.New(refresh.Update.BlockTime),
@@ -263,7 +254,6 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 				if err := xutils.UnpackLog(state.eabi, event, "Transfer", l); err != nil {
 					return fmt.Errorf("error unpacking log: %v", err)
 				}
-				//fmt.Println("TRANSFER", event.From, event.To, event.TokenId.Text(10))
 				update.Transfers = append(update.Transfers, &gorderbook_models.AssetTransfer{
 					From:     event.From[:],
 					To:       event.To[:],
@@ -274,10 +264,9 @@ func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
 		}
 	}
 	context.Send(context.Parent(), &messages.ProtocolAssetDataIncrementalRefresh{
-		SeqNum: state.seqNum,
 		Update: update,
+		SeqNum: state.seqNum,
 	})
-
 	return nil
 }
 

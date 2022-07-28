@@ -5,7 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
 	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/chains/evm"
 	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
@@ -28,7 +27,6 @@ type Listener struct {
 	types.BaseListener
 	executor        *actor.PID
 	protocolAsset   *models.ProtocolAsset
-	sabi            *sabi.ABI
 	eabi            *abi.ABI
 	seqNum          uint64
 	lastBlock       uint64
@@ -107,7 +105,6 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("chain", state.protocolAsset.Chain.Type),
 	)
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-
 	switch state.protocolAsset.Chain.Type {
 	case "ZKEVM",
 		"EVM":

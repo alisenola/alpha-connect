@@ -65,9 +65,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting ethereum abi: %v", err)
@@ -91,7 +89,6 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 		return nil
 	}
 	assets := make([]*models.ProtocolAsset, 0)
-
 	reg := state.registry
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
@@ -151,12 +148,12 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 				ContractAddress: protocolAsset.ContractAddress,
 				Decimals:        protocolAsset.Decimals,
 			})
+		state.addresses[protocolAsset.ContractAddress.Value] = true
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	for _, a := range assets {
 		state.protocolAssets[a.ProtocolAssetID] = a
 	}
-
 	context.Send(context.Parent(), &messages.ProtocolAssetList{
 		ResponseID:     uint64(time.Now().UnixNano()),
 		ProtocolAssets: assets,
@@ -213,12 +210,12 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			return nil
 		}
 	}
-
 	var future *actor.Future
 	var query interface{}
 	var delay int64
 	switch chain.Type {
-	case "EVM":
+	case "ZKEVM",
+		"EVM":
 		topics := [][]common.Hash{{
 			state.eabi.Events["Transfer"].ID,
 		}}
@@ -368,6 +365,11 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				datas = append(datas, l)
 			}
 			times = resp.Times
+		default:
+			state.logger.Warn("incorrect type, expected SVMEventsQueryResponse or EVMLogsQueryResponse", log.String("type", reflect.TypeOf(res).String()))
+			msg.RejectionReason = messages.RejectionReason_Other
+			context.Respond(msg)
+			return
 		}
 		events := make([]*models.ProtocolAssetUpdate, 0)
 		var update *models.ProtocolAssetUpdate
