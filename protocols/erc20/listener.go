@@ -109,7 +109,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
 
 	switch state.protocolAsset.Chain.Type {
-	case "EVM":
+	case "ZKEVM",
+		"EVM":
 		if err := state.subscribeEVMLogs(context); err != nil {
 			return err
 		}
