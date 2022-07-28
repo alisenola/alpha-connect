@@ -1,10 +1,12 @@
 package erc721_test
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
 	"strconv"
@@ -128,6 +130,7 @@ func TestListenerEVM(t *testing.T) {
 }
 
 func TestListenerSVM(t *testing.T) {
+	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
 	protocol, ok := constants.GetProtocolByID(5)
 	if !assert.True(t, ok, "Missing protocol ERC-721 for SVM") {
@@ -208,5 +211,107 @@ func TestListenerSVM(t *testing.T) {
 	}
 	if d.Err != nil {
 		t.Fatal(d.Err)
+	}
+}
+
+func TestListenerZKEVM(t *testing.T) {
+	// Load executor, chain and protocol asset
+	exTests.LoadStatics(t)
+	protocol, ok := constants.GetProtocolByID(7)
+	if !assert.True(t, ok, "Missing protocol ERC-721 for ZKEVM") {
+		t.Fatal()
+	}
+	registryAddress := "127.0.0.1:8001"
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
+	defer clean()
+
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Subscribe: false,
+	}, 20*time.Second).Result()
+	if err != nil {
+		t.Fatal()
+	}
+	response, ok := res.(*messages.ProtocolAssetList)
+	if !ok {
+		t.Fatal("incorrect type assertion")
+	}
+	assetTest := models.ProtocolAsset{
+		Asset: &xchangerModels.Asset{
+			ID: 480,
+		},
+	}
+	var asset *models.ProtocolAsset
+	chain, ok := constants.GetChainByID(6)
+	if !ok {
+		t.Fatal("missing chain")
+	}
+	for _, a := range response.ProtocolAssets {
+		if assetTest.Asset.ID == a.Asset.ID && a.Chain.ID == chain.ID {
+			asset = a
+		}
+	}
+	if asset == nil {
+		t.Fatal("asset not found")
+	}
+	s := asset.Asset
+
+	// listen on all protocol assets
+	asset.Asset = nil
+	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
+	checker := as.Root.Spawn(props)
+	defer as.Root.PoisonFuture(checker)
+	time.Sleep(2 * time.Minute)
+	resp, err := as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := resp.(*tests.GetDataResponse)
+	if !ok {
+		t.Fatalf("expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if d.Err != nil {
+		t.Fatal(d.Err)
+	}
+	for _, up := range d.Updates {
+		for _, tx := range up.Transfers {
+			fmt.Println("ADDRESS", common.BytesToAddress(tx.Contract))
+		}
+	}
+
+	// listen on a specific protocol asset
+	asset.Asset = s
+	props = actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
+	checker = as.Root.Spawn(props)
+	defer as.Root.PoisonFuture(checker)
+	time.Sleep(2 * time.Minute)
+	resp, err = as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok = resp.(*tests.GetDataResponse)
+	if !ok {
+		t.Fatalf("expected *tests.GetDataResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if d.Err != nil {
+		t.Fatal(d.Err)
+	}
+	var txs []*gorderbook.AssetTransfer
+	for _, up := range d.Updates {
+		txs = append(txs, up.Transfers...)
+	}
+	if !assert.Greater(t, len(txs), 0, "expected at least one transaction") {
+		t.Fatal()
+	}
+	for _, tx := range txs {
+		if !assert.Equal(t, asset.ContractAddress.Value, common.BytesToAddress(tx.Contract).String(), "contract address error") {
+			t.Fatal()
+		}
 	}
 }

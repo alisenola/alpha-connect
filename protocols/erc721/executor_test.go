@@ -372,6 +372,157 @@ func TestExecutorSVM(t *testing.T) {
 	}
 }
 
+func TestExecutorZKEVM(t *testing.T) {
+	// Load executor, chain and protocol asset
+	exTests.LoadStatics(t)
+	protocol, ok := constants.GetProtocolByID(7)
+	if !assert.True(t, ok, "Missing protocol ERC-721 for ZKEVM") {
+		t.Fatal()
+	}
+	testAsset := xchangerModels.Asset{
+		ID:     275.,
+		Symbol: "BAYC",
+	}
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	registryAddress := "127.0.0.1:8001"
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
+	defer clean()
+
+	// get asset
+	chain, ok := constants.GetChainByID(6)
+	if !assert.True(t, ok, "missing svm") {
+		t.Fatal()
+	}
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture ProtocolAssetList err: %v", err) {
+		t.Fatal()
+	}
+	assets, ok := res.(*messages.ProtocolAssetList)
+	if !assert.True(t, ok, "incorrect type assertion") {
+		t.Fatal()
+	}
+	var coll *models.ProtocolAsset
+	for _, asset := range assets.ProtocolAssets {
+		if asset.Asset.Symbol == testAsset.Symbol && asset.Chain.ID == chain.ID {
+			fmt.Printf("asset %+v \n", asset)
+			coll = asset
+		}
+	}
+	if !assert.NotNil(t, coll, "missing collection") {
+		t.Fatal()
+	}
+	r, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetDefinitionRequest{
+		RequestID:       uint64(time.Now().UnixNano()),
+		ProtocolAssetID: utils.GetProtocolAssetID(&testAsset, coll.Protocol, chain),
+	}, 15*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture ProtocolAssetDefinition err: %v", err) {
+		t.Fatal()
+	}
+	def, ok := r.(*messages.ProtocolAssetDefinitionResponse)
+	if !assert.True(t, ok, "expected ProtocolAssetDefinitionResponse, got %s", reflect.TypeOf(r).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, def.Success, "request failed with %v", def.RejectionReason.String()) {
+		t.Fatal()
+	}
+
+	// set step start stop
+	var step uint64 = 99
+	var start uint64 = 3000
+	end := start
+	var stop uint64 = 4200
+	var events []*gorderbookModels.AssetTransfer
+	// execute the future on all protocol assets
+	for end < stop {
+		end = start + step
+		if end > stop {
+			end = stop
+		}
+		resp, err := as.Root.RequestFuture(
+			executor,
+			&messages.HistoricalProtocolAssetTransferRequest{
+				RequestID:  uint64(time.Now().UnixNano()),
+				ProtocolID: protocol.ID,
+				ChainID:    chain.ID,
+				Start:      start,
+				Stop:       end,
+			},
+			30*time.Second,
+		).Result()
+		if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+			t.Fatal()
+		}
+		response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+		if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+			t.Fatal()
+		}
+		if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+			t.Fatal()
+		}
+		for _, ev := range response.Update {
+			events = append(events, ev.Transfers...)
+		}
+		start += step + 1
+	}
+	if !assert.GreaterOrEqual(t, len(events), 9, "expected more than 200 events") {
+		t.Fatal()
+	}
+
+	// get specific asset historical transfer
+	start = 3100
+	end = start
+	stop = start + 30000
+	events = nil
+	for end < stop {
+		end = start + step
+		if end > stop {
+			end = stop
+		}
+		//Execute the future request for the ERC20 historical data on the specific asset
+		resp, err := as.Root.RequestFuture(
+			executor,
+			&messages.HistoricalProtocolAssetTransferRequest{
+				RequestID:  uint64(time.Now().UnixNano()),
+				ProtocolID: protocol.ID,
+				ChainID:    chain.ID,
+				AssetID: &wrapperspb.UInt32Value{
+					Value: coll.Asset.ID,
+				},
+				Start: start,
+				Stop:  end,
+			},
+			30*time.Second,
+		).Result()
+		if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+			t.Fatal()
+		}
+		response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+		if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+			t.Fatal()
+		}
+		if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+			t.Fatal()
+		}
+		for _, ev := range response.Update {
+			events = append(events, ev.Transfers...)
+		}
+		start += step + 1
+	}
+	if !assert.GreaterOrEqual(t, len(events), 200, "expected more than 200 events") {
+		t.Fatal()
+	}
+	for _, tx := range events {
+		if !assert.Equal(t, coll.ContractAddress.Value, common.BytesToAddress(tx.Contract).String(), "contract address error") {
+			t.Fatal()
+		}
+	}
+}
+
 func find(t *gorderbookModels.AssetTransfer, arr []*Transfer) bool {
 	from := big.NewInt(1).SetBytes(t.From)
 	to := big.NewInt(1).SetBytes(t.To)
