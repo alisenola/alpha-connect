@@ -1,6 +1,7 @@
 package erc20_test
 
 import (
+	"bytes"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -307,5 +308,181 @@ func TestExecutorEVM(t *testing.T) {
 	i := big.NewInt(1).SetBytes(decimal.Out)
 	if !assert.NotEqualValues(t, i, big.NewInt(0), "expected 18 decimals") {
 		t.Fatal()
+	}
+}
+
+func TestExecutorZKEVM(t *testing.T) {
+	// Load executor, chain and protocol asset
+	exTests.LoadStatics(t)
+	protocol, ok := constants.GetProtocolByID(6)
+	if !assert.True(t, ok, "Missing protocol ERC-20 for ZKEVM") {
+		t.Fatal()
+	}
+	testAsset := xchangerModels.Asset{
+		ID: 12.,
+	}
+	registryAddress := "127.0.0.1:8001"
+	cfg, err := config.LoadConfig()
+	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
+		t.Fatal()
+	}
+	cfg.RegistryAddress = registryAddress
+	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	as, executor, clean := exTests.StartExecutor(t, cfg)
+	defer clean()
+
+	// get asset
+	chain, ok := constants.GetChainByID(6)
+	if !assert.True(t, ok, "missing zkevm") {
+		t.Fatal()
+	}
+	res, err := as.Root.RequestFuture(executor, &messages.ProtocolAssetListRequest{}, 20*time.Second).Result()
+	if !assert.Nil(t, err, "RequestFuture ProtocolAssetList err: %v", err) {
+		t.Fatal()
+	}
+	assets, ok := res.(*messages.ProtocolAssetList)
+	if !assert.True(t, ok, "incorrect type assertion") {
+		t.Fatal()
+	}
+	if !assert.GreaterOrEqual(t, len(assets.ProtocolAssets), 0, "expected at least one asset") {
+		t.Fatal()
+	}
+	var asset *models.ProtocolAsset
+	for _, pa := range assets.ProtocolAssets {
+		if pa.Protocol.ID == protocol.ID && chain.ID == chain.ID && pa.Asset.ID == testAsset.ID {
+			asset = pa
+		}
+	}
+	if !assert.NotNil(t, asset, "Missing protocol asset") {
+		t.Fatal()
+	}
+	if !assert.NotNil(t, asset.CreationBlock.Value, "expected creation block") {
+		t.Fatal()
+	}
+
+	// get current block
+	r, err := as.Root.RequestFuture(executor, &messages.BlockNumberRequest{
+		RequestID: uint64(time.Now().UnixNano()),
+		Chain:     chain,
+	}, 10*time.Second).Result()
+	if !assert.Nil(t, err, "BlockNumberRequest err: %v", err) {
+		t.Fatal()
+	}
+	b, ok := r.(*messages.BlockNumberResponse)
+	if !assert.True(t, ok, "expected BlockNumberResponse, got %s", reflect.TypeOf(r).String()) {
+		t.Fatal()
+	}
+	if !assert.True(t, b.Success, "request failed with %s", b.RejectionReason.String()) {
+		t.Fatal()
+	}
+
+	// set step start stop
+	var step uint64 = 99
+	var start = asset.CreationBlock.Value
+	var stop = start + 1000
+	var events []*gorderbookModels.AssetTransfer
+
+	// get all historical transfers
+	for start < stop {
+		//Execute the future request for the ERC20 historical data
+		resp, err := as.Root.RequestFuture(
+			executor,
+			&messages.HistoricalProtocolAssetTransferRequest{
+				RequestID:  uint64(time.Now().UnixNano()),
+				ProtocolID: protocol.ID,
+				ChainID:    chain.ID,
+				Start:      start,
+				Stop:       step + start,
+			},
+			30*time.Second,
+		).Result()
+		if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+			t.Fatal()
+		}
+		response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+		if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+			t.Fatal()
+		}
+		switch response.RejectionReason.String() {
+		case "RPCTimeout":
+			step /= 2
+			continue
+		}
+		if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+			t.Fatal()
+		}
+		for _, ev := range response.Update {
+			events = append(events, ev.Transfers...)
+		}
+		start += step + 1
+		if start+step > stop {
+			start = stop
+		}
+	}
+	// check events size + addresses
+	if !assert.GreaterOrEqual(t, len(events), 900, "expected more than 900 events") {
+		t.Fatal()
+	}
+	diff := false
+outer:
+	for _, ev1 := range events {
+		for _, ev2 := range events {
+			if bytes.Compare(ev1.Contract, ev2.Contract) != 0 {
+				diff = true
+				break outer
+			}
+		}
+	}
+	if !assert.True(t, diff, "expected different contract addresses") {
+		t.Fatal()
+	}
+
+	// get specific asset historical transfer
+	start = 70000
+	end := start
+	stop = start + 30000
+	events = nil
+	for end < stop {
+		end = start + step
+		if end > stop {
+			end = stop
+		}
+		//Execute the future request for the ERC20 historical data on the specific asset
+		resp, err := as.Root.RequestFuture(
+			executor,
+			&messages.HistoricalProtocolAssetTransferRequest{
+				RequestID:  uint64(time.Now().UnixNano()),
+				ProtocolID: protocol.ID,
+				ChainID:    chain.ID,
+				AssetID: &wrapperspb.UInt32Value{
+					Value: asset.Asset.ID,
+				},
+				Start: start,
+				Stop:  end,
+			},
+			30*time.Second,
+		).Result()
+		if !assert.Nil(t, err, "RequestFuture HistoricalProtocolAssetTransferRequest err: %v", err) {
+			t.Fatal()
+		}
+		response, ok := resp.(*messages.HistoricalProtocolAssetTransferResponse)
+		if !assert.True(t, ok, "expected HistoricalProtocolAssetTransferResponse, got %s", reflect.TypeOf(resp).String()) {
+			t.Fatal()
+		}
+		if !assert.True(t, response.Success, "request failed with %s", response.RejectionReason.String()) {
+			t.Fatal()
+		}
+		for _, ev := range response.Update {
+			events = append(events, ev.Transfers...)
+		}
+		start += step + 1
+	}
+	if !assert.GreaterOrEqual(t, len(events), 200, "expected more than 200 events") {
+		t.Fatal()
+	}
+	for _, tx := range events {
+		if !assert.Equal(t, asset.ContractAddress.Value, common.BytesToAddress(tx.Contract).String(), "contract address error") {
+			t.Fatal()
+		}
 	}
 }
