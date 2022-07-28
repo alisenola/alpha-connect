@@ -353,6 +353,12 @@ func (state *Executor) onFlushLogs(context actor.Context) error {
 	}
 	for k, sub := range state.subscriptions {
 		sub.RLock()
+		select {
+		case err := <-sub.subscription.Err():
+			// TODO restart subscription
+			fmt.Println("Error on subscription", err)
+		default:
+		}
 		var logs *messages.EVMLogs
 		for el := sub.logs.Front(); el != nil; el = sub.logs.Front() {
 			updt := el.Value.(*types.Log)
@@ -428,6 +434,7 @@ func (state *Executor) OnTerminated(context actor.Context) error {
 	msg := context.Message().(*actor.Terminated)
 	for k, sub := range state.subscriptions {
 		if sub.subscriber.String() == msg.Who.String() {
+			sub.subscription.Unsubscribe()
 			close(sub.ch)
 			delete(state.subscriptions, k)
 		}
