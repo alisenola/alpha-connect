@@ -211,7 +211,8 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 	var query interface{}
 	var delay int64
 	switch chain.Type {
-	case "EVM":
+	case "ZKEVM",
+		"EVM":
 		topics := [][]common.Hash{{
 			state.eabi.Events["Transfer"].ID,
 		}}
