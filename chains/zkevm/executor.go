@@ -172,7 +172,7 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 			state.logger.Warn("error with contract call", log.Error(err))
 			res.RejectionReason = messages.RejectionReason_RPCError
 			switch err.Error() {
-			case "invalid jump destination":
+			case "Execution error":
 				res.RejectionReason = messages.RejectionReason_InvalidJumpDestination
 			}
 			context.Send(sender, res)
