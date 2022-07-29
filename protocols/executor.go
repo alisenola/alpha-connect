@@ -7,7 +7,6 @@ import (
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -112,12 +111,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 
 	// Spawn all exchange executors
 	for _, protocolStr := range state.Config.Protocols {
-		i, err := strconv.Atoi(protocolStr)
-		if err != nil {
-			state.logger.Warn("incorrect id format for protocol", log.String("format", protocolStr))
-			continue
-		}
-		prtcl, ok := constants.GetProtocolByID(uint32(i))
+		prtcl, ok := constants.GetProtocolByName(protocolStr)
 		if !ok {
 			return fmt.Errorf("unknown protocol %s", protocolStr)
 		}
