@@ -108,34 +108,6 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	if tx.Error != nil {
 		return fmt.Errorf("error creating account: %v", err)
 	}
-	var transactions []*extypes.Transaction
-	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
-	for _, tr := range transactions {
-		switch tr.Type {
-		case "TRADE":
-			if tr.Fill != nil {
-				secID := uint64(tr.Fill.SecurityID)
-				sec, ok := state.securities[secID]
-				if ok && sec.SecurityType == "CRPERP" {
-					if tr.Fill.Quantity < 0 {
-						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
-					} else {
-						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
-					}
-					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
-				}
-			}
-		case "FUNDING":
-			symbol := tr.SubType
-			sec := state.symbToSecs[symbol]
-			if sec == nil {
-				return fmt.Errorf("unknown symbol %s", symbol)
-			}
-			if sec.SecurityType == "CRPERP" {
-				state.lastFundingTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
-			}
-		}
-	}
 
 	var cnt int64
 	tx = state.db.Model(&extypes.Transaction{}).Where("type=?", "DEPOSIT").Count(&cnt)
@@ -194,6 +166,35 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 }
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
+	var transactions []*extypes.Transaction
+	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
+	for _, tr := range transactions {
+		switch tr.Type {
+		case "TRADE":
+			if tr.Fill != nil {
+				secID := uint64(tr.Fill.SecurityID)
+				sec, ok := state.securities[secID]
+				if ok && sec.SecurityType == "CRPERP" {
+					if tr.Fill.Quantity < 0 {
+						state.positions[secID].Sell(tr.Fill.Price, -tr.Fill.Quantity, false)
+					} else {
+						state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
+					}
+					state.lastTradeTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
+				}
+			}
+		case "FUNDING":
+			symbol := tr.SubType
+			sec := state.symbToSecs[symbol]
+			if sec == nil {
+				return fmt.Errorf("unknown symbol %s", symbol)
+			}
+			if sec.SecurityType == "CRPERP" {
+				state.lastFundingTs[sec.SecurityId] = uint64(tr.Time.UnixNano() / 1000000)
+			}
+		}
+	}
+
 	// Fetch positions
 	resp, err := context.RequestFuture(state.executor, &messages.PositionsRequest{
 		Instrument: nil,
@@ -307,7 +308,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
-	var transactions []*extypes.Transaction
 	state.db.Debug().
 		Model(&extypes.Transaction{}).
 		Joins("Fill").

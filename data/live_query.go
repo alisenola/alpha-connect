@@ -8,7 +8,8 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
-	"gitlab.com/alphaticks/tickfunctors/market"
+	"gitlab.com/alphaticks/tickfunctors/market/book"
+	"gitlab.com/alphaticks/tickfunctors/market/trade"
 	"gitlab.com/alphaticks/tickstore-types/tickobjects"
 	"gitlab.com/alphaticks/tickstore/parsing"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -23,9 +24,9 @@ func ConstructFunctor(f parsing.Functor) (tickobjects.TickFunctor, reflect.Type,
 	if f.Measurement != nil {
 		switch *f.Measurement {
 		case "orderbook":
-			return &market.RawOrderBook{}, reflect.TypeOf(market.RawOrderBookDelta{}), nil
+			return &book.RawOrderBook{}, reflect.TypeOf(book.RawOrderBookDelta{}), nil
 		case "trade":
-			return &market.RawTrade{}, reflect.TypeOf(market.RawTradeDelta{}), nil
+			return &trade.RawTrade{}, reflect.TypeOf(trade.RawTradeDelta{}), nil
 		default:
 			return nil, nil, fmt.Errorf("unknown measurement %s", *f.Measurement)
 		}
@@ -164,7 +165,7 @@ func (lq *LiveQuery) next() bool {
 				10000)
 			ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
 
-			snapshot := market.NewRawOrderBook(ob).ToSnapshot()
+			snapshot := book.NewRawOrderBook(ob).ToSnapshot()
 			if functor, ok := lq.objects[feed.groupID]; ok {
 				deltas, err := functor.ApplySnapshot(snapshot, feed.security.securityID, ts)
 				if err != nil {
@@ -204,12 +205,12 @@ func (lq *LiveQuery) next() bool {
 		if lq.measurement == "orderbook" && msg.UpdateL2 != nil && len(msg.UpdateL2.Levels) > 0 {
 			ts := utils.TimestampToMilli(msg.UpdateL2.Timestamp)
 			var err error
-			slice := make([]market.RawOrderBookDelta, len(msg.UpdateL2.Levels))
+			slice := make([]book.RawOrderBookDelta, len(msg.UpdateL2.Levels))
 			// TODO check, not sure about that, do tests
 			for i, l := range msg.UpdateL2.Levels {
 				rawPrice := uint64(math.Round(l.Price * float64(feed.security.tickPrecision)))
 				rawQty := uint64(math.Round(l.Quantity * float64(feed.security.lotPrecision)))
-				slice[i], err = market.NewRawOrderBookDelta(rawPrice, rawQty, l.Bid, false)
+				slice[i], err = book.NewRawOrderBookDelta(rawPrice, rawQty, l.Bid, false)
 				if err != nil {
 					lq.err = fmt.Errorf("error building delta: %v", err)
 					return false
@@ -253,18 +254,18 @@ func (lq *LiveQuery) next() bool {
 				return true
 			}
 		} else if lq.measurement == "trade" && len(msg.Trades) > 0 {
-			var tradeDeltas []market.RawTradeDelta
+			var tradeDeltas []trade.RawTradeDelta
 			var ts uint64
 			for _, aggTrade := range msg.Trades {
 				ts = utils.TimestampToMilli(aggTrade.Timestamp)
-				for _, trade := range aggTrade.Trades {
-					rawPrice := uint64(math.Round(float64(feed.security.tickPrecision) * trade.Price))
-					rawQuantity := uint64(math.Round(float64(feed.security.lotPrecision) * trade.Quantity))
+				for _, trd := range aggTrade.Trades {
+					rawPrice := uint64(math.Round(float64(feed.security.tickPrecision) * trd.Price))
+					rawQuantity := uint64(math.Round(float64(feed.security.lotPrecision) * trd.Quantity))
 					// Create delta
-					dlt, err := market.NewRawTradeDelta(
+					dlt, err := trade.NewRawTradeDelta(
 						rawPrice,
 						rawQuantity,
-						trade.ID,
+						trd.ID,
 						aggTrade.AggregateID,
 						aggTrade.Bid)
 					if err != nil {
@@ -297,7 +298,7 @@ func (lq *LiveQuery) next() bool {
 				return true
 			} else {
 				functor, _, _ := ConstructFunctor(lq.functor)
-				aggTrade := market.NewRawTrade(feed.security.tickPrecision, feed.security.lotPrecision)
+				aggTrade := trade.NewRawTrade(feed.security.tickPrecision, feed.security.lotPrecision)
 				_, err := functor.ApplySnapshot(aggTrade.ToSnapshot(), feed.security.securityID, ts)
 				if err != nil {
 					lq.err = fmt.Errorf("error applying snap: %v", err)

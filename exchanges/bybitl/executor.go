@@ -1030,7 +1030,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 			to = &ts
 		}
 	}
-	params := bybitl.NewQueryDepositRecordsParams()
+	params := bybitl.NewQueryTransferListParams()
 	if from != nil {
 		params.SetStartTime(*from)
 	}
@@ -1038,7 +1038,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 		params.SetEndTime(*to)
 	}
 	params.SetDirection(bybitl.NextPage)
-	request, weight, err := bybitl.QueryDepositRecords(params, req.Account.ApiCredentials)
+	request, weight, err := bybitl.QueryTransferList(params, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
@@ -1054,7 +1054,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 		var movements []*messages.AccountMovement
 		done := false
 		for !done {
-			var data bybitl.QueryDepositRecordsResponse
+			var data bybitl.QueryTransferListResponse
 			if client, ok := state.AccountClients[req.Account.Name]; ok {
 				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
 					state.logger.Warn("error fetching account information", log.Error(err))
@@ -1078,10 +1078,11 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 				return
 			}
 
-			sort.Slice(data.DepositRecords.Rows, func(i, j int) bool {
-				return data.DepositRecords.Rows[i].SuccessAt < data.DepositRecords.Rows[j].SuccessAt
+			sort.Slice(data.TransferList.List, func(i, j int) bool {
+				return data.TransferList.List[i].Timestamp < data.TransferList.List[j].Timestamp
 			})
-			for _, t := range data.DepositRecords.Rows {
+			for _, t := range data.TransferList.List {
+				fmt.Println(t.Amount)
 				asset, ok := constants.GetAssetBySymbol(t.Coin)
 				if !ok {
 					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
@@ -1092,16 +1093,16 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 				mvt := &messages.AccountMovement{
 					Asset:      asset,
 					Change:     t.Amount,
-					MovementID: t.TxId,
+					MovementID: t.TransferId,
 					Type:       messages.AccountMovementType_Deposit,
-					Time:       utils.SecondToTimestamp(t.SuccessAt),
+					Time:       utils.SecondToTimestamp(t.Timestamp),
 				}
 				movements = append(movements, mvt)
 			}
-			done = len(data.DepositRecords.Rows) == 0
+			done = len(data.TransferList.List) == 0
 			if !done {
-				params.SetCursor(data.DepositRecords.Cursor)
-				request, weight, err = bybitl.QueryDepositRecords(params, req.Account.ApiCredentials)
+				params.SetCursor(data.TransferList.Cursor)
+				request, weight, err = bybitl.QueryTransferList(params, req.Account.ApiCredentials)
 				if err != nil {
 					panic(err)
 				}

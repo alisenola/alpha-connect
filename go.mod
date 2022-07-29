@@ -14,13 +14,13 @@ require (
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20220708153910-e5f547d6d020
-	gitlab.com/alphaticks/tickfunctors v0.0.0-20220713101350-9ddcc399bef7
+	gitlab.com/alphaticks/gorderbook v0.0.0-20220728095318-cdee2054f4c6
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220728130521-0cc95f984b5f
 	gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220713102202-4830c3d49698
+	gitlab.com/alphaticks/xchanger v0.0.0-20220728100007-b1b4c313eea1
 	go.mongodb.org/mongo-driver v1.9.1
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	google.golang.org/grpc v1.46.2
