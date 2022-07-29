@@ -2,6 +2,7 @@ package erc20_test
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -9,13 +10,11 @@ import (
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	gorderbookModels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	evm20 "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/big"
-	"strconv"
-
-	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
 	"testing"
 	"time"
@@ -27,7 +26,7 @@ import (
 func TestExecutorSVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(4)
+	protocol, ok := constants.GetProtocolByID(1)
 	if !assert.True(t, ok, "Missing protocol ERC-20 for SVM") {
 		t.Fatal()
 	}
@@ -41,7 +40,7 @@ func TestExecutorSVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -89,7 +88,7 @@ func TestExecutorSVM(t *testing.T) {
 			ProtocolID: protocol.ID,
 			ChainID:    chain.ID,
 			Start:      0,
-			Stop:       3000,
+			Stop:       2800,
 		},
 		30*time.Second,
 	).Result()
@@ -107,7 +106,7 @@ func TestExecutorSVM(t *testing.T) {
 	for _, ev := range response.Update {
 		events = append(events, ev.Transfers...)
 	}
-	if !assert.GreaterOrEqual(t, len(events), 7000, "expected more than 20 events") {
+	if !assert.GreaterOrEqual(t, len(events), 6000, "expected more than 6000 events") {
 		t.Fatal()
 	}
 
@@ -138,7 +137,7 @@ func TestExecutorSVM(t *testing.T) {
 	for _, ev := range response.Update {
 		events = append(events, ev.Transfers...)
 	}
-	if !assert.GreaterOrEqual(t, len(events), 7000, "expected more than 20 events") {
+	if !assert.GreaterOrEqual(t, len(events), 7000, "expected more than 7000 events") {
 		t.Fatal()
 	}
 }
@@ -159,7 +158,7 @@ func TestExecutorEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 	chain, ok := constants.GetChainByID(1)
@@ -314,7 +313,7 @@ func TestExecutorEVM(t *testing.T) {
 func TestExecutorZKEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(6)
+	protocol, ok := constants.GetProtocolByID(1)
 	if !assert.True(t, ok, "Missing protocol ERC-20 for ZKEVM") {
 		t.Fatal()
 	}
@@ -327,7 +326,7 @@ func TestExecutorZKEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -379,12 +378,13 @@ func TestExecutorZKEVM(t *testing.T) {
 	// set step start stop
 	var step uint64 = 99
 	var start = asset.CreationBlock.Value
-	var stop = start + 1000
+	var stop = start + 500
 	var events []*gorderbookModels.AssetTransfer
 
 	// get all historical transfers
 	for start < stop {
 		//Execute the future request for the ERC20 historical data
+		fmt.Println("START", start, "END", step+start)
 		resp, err := as.Root.RequestFuture(
 			executor,
 			&messages.HistoricalProtocolAssetTransferRequest{

@@ -12,25 +12,20 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 )
 
 func TestListenerSVM(t *testing.T) {
-	// get protocol with id 4 (erc-20 SVM)
+	// Load statics
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(4)
-	if !assert.True(t, ok, "Missing protocol ERC-20 for SVM") {
-		t.Fatal()
-	}
 	registryAddress := "127.0.0.1:8001"
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -69,10 +64,10 @@ func TestListenerSVM(t *testing.T) {
 	asset.Asset = nil
 	props := actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
 	checker := as.Root.Spawn(props)
-	defer as.Root.PoisonFuture(checker)
-	time.Sleep(10 * time.Minute)
+	time.Sleep(2 * time.Minute)
 	resp, err := as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
-	if assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
+	as.Root.PoisonFuture(checker)
+	if !assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
 		t.Fatal()
 	}
 	d, ok := resp.(*tests.GetDataResponse)
@@ -87,10 +82,10 @@ func TestListenerSVM(t *testing.T) {
 	asset.Asset = s
 	props = actor.PropsFromProducer(tests.NewProtocolCheckerProducer(asset))
 	checker = as.Root.Spawn(props)
-	defer as.Root.PoisonFuture(checker)
-	time.Sleep(10 * time.Minute)
+	time.Sleep(2 * time.Minute)
 	resp, err = as.Root.RequestFuture(checker, &tests.GetDataRequest{}, 10*time.Second).Result()
-	if assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
+	as.Root.PoisonFuture(checker)
+	if !assert.Nil(t, err, "RequestFuture GetData err: %v", err) {
 		t.Fatal()
 	}
 	d, ok = resp.(*tests.GetDataResponse)
@@ -103,20 +98,15 @@ func TestListenerSVM(t *testing.T) {
 }
 
 func TestListenerEVM(t *testing.T) {
-	// Load statics and get protocolAsset
+	// Load statics
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(1)
-	if !assert.True(t, ok, "expected a protocol") {
-		t.Fatal()
-	}
 	registryAddress := "127.0.0.1:8001"
-
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -216,12 +206,8 @@ func TestListenerEVM(t *testing.T) {
 }
 
 func TestListenerZKEVM(t *testing.T) {
-	// Load statics and get protocolAsset
+	// Load statics
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(6)
-	if !assert.True(t, ok, "Missing protocol erc-20 for zkevm") {
-		t.Fatal()
-	}
 	testAsset := models.ProtocolAsset{
 		Asset: &xchangerModels.Asset{
 			ID: 12,
@@ -233,7 +219,7 @@ func TestListenerZKEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-20"}
 	as, ex, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 

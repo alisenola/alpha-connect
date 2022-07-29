@@ -1,15 +1,12 @@
 package erc721_test
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	exTests "gitlab.com/alphaticks/alpha-connect/tests"
-	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -23,10 +20,6 @@ import (
 func TestListenerEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(2)
-	if !assert.True(t, ok, "Missing protocol ERC-721 for EVM") {
-		t.Fatal()
-	}
 	assetTest := models.ProtocolAsset{
 		Asset: &xchangerModels.Asset{
 			ID: 275,
@@ -43,7 +36,7 @@ func TestListenerEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -132,17 +125,13 @@ func TestListenerEVM(t *testing.T) {
 func TestListenerSVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(5)
-	if !assert.True(t, ok, "Missing protocol ERC-721 for SVM") {
-		t.Fatal()
-	}
 	registryAddress := "127.0.0.1:8001"
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -217,17 +206,13 @@ func TestListenerSVM(t *testing.T) {
 func TestListenerZKEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(7)
-	if !assert.True(t, ok, "Missing protocol ERC-721 for ZKEVM") {
-		t.Fatal()
-	}
 	registryAddress := "127.0.0.1:8001"
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -244,7 +229,7 @@ func TestListenerZKEVM(t *testing.T) {
 	}
 	assetTest := models.ProtocolAsset{
 		Asset: &xchangerModels.Asset{
-			ID: 480,
+			ID: 275,
 		},
 	}
 	var asset *models.ProtocolAsset
@@ -279,11 +264,6 @@ func TestListenerZKEVM(t *testing.T) {
 	if d.Err != nil {
 		t.Fatal(d.Err)
 	}
-	for _, up := range d.Updates {
-		for _, tx := range up.Transfers {
-			fmt.Println("ADDRESS", common.BytesToAddress(tx.Contract))
-		}
-	}
 
 	// listen on a specific protocol asset
 	asset.Asset = s
@@ -301,17 +281,5 @@ func TestListenerZKEVM(t *testing.T) {
 	}
 	if d.Err != nil {
 		t.Fatal(d.Err)
-	}
-	var txs []*gorderbook.AssetTransfer
-	for _, up := range d.Updates {
-		txs = append(txs, up.Transfers...)
-	}
-	if !assert.Greater(t, len(txs), 0, "expected at least one transaction") {
-		t.Fatal()
-	}
-	for _, tx := range txs {
-		if !assert.Equal(t, asset.ContractAddress.Value, common.BytesToAddress(tx.Contract).String(), "contract address error") {
-			t.Fatal()
-		}
 	}
 }

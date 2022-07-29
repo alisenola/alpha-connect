@@ -12,7 +12,6 @@ import (
 	"gitlab.com/alphaticks/tickfunctors/protocols/erc721/evm"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"strconv"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -54,10 +53,6 @@ type ERC721Contract struct {
 func TestExecutorEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(2)
-	if !assert.True(t, ok, "Missing protocol ERC-20 for EVM") {
-		t.Fatal()
-	}
 	testAsset := xchangerModels.Asset{
 		ID:     275.,
 		Symbol: "BAYC",
@@ -68,7 +63,7 @@ func TestExecutorEVM(t *testing.T) {
 		t.Fatal()
 	}
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -253,17 +248,13 @@ func TestExecutorEVM(t *testing.T) {
 func TestExecutorSVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(5)
-	if !assert.True(t, ok, "Missing protocol ERC-721 for SVM") {
-		t.Fatal()
-	}
 	cfg, err := config.LoadConfig()
 	if !assert.Nil(t, err, "LoadConfig err: %v", err) {
 		t.Fatal()
 	}
 	registryAddress := "127.0.0.1:8001"
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -349,7 +340,7 @@ func TestExecutorSVM(t *testing.T) {
 			ProtocolID: def.ProtocolAsset.Protocol.ID,
 			ChainID:    def.ProtocolAsset.Chain.ID,
 			Start:      0,
-			Stop:       3000,
+			Stop:       4000,
 		},
 		30*time.Second,
 	).Result()
@@ -375,8 +366,8 @@ func TestExecutorSVM(t *testing.T) {
 func TestExecutorZKEVM(t *testing.T) {
 	// Load executor, chain and protocol asset
 	exTests.LoadStatics(t)
-	protocol, ok := constants.GetProtocolByID(7)
-	if !assert.True(t, ok, "Missing protocol ERC-721 for ZKEVM") {
+	protocol, ok := constants.GetProtocolByID(2)
+	if !assert.True(t, ok, "Missing protocol ERC-721") {
 		t.Fatal()
 	}
 	testAsset := xchangerModels.Asset{
@@ -389,7 +380,7 @@ func TestExecutorZKEVM(t *testing.T) {
 	}
 	registryAddress := "127.0.0.1:8001"
 	cfg.RegistryAddress = registryAddress
-	cfg.Protocols = []string{strconv.FormatUint(uint64(protocol.ID), 10)}
+	cfg.Protocols = []string{"ERC-721"}
 	as, executor, clean := exTests.StartExecutor(t, cfg)
 	defer clean()
 
@@ -474,9 +465,9 @@ func TestExecutorZKEVM(t *testing.T) {
 	}
 
 	// get specific asset historical transfer
-	start = 3100
+	stop = 696033
+	start = stop - 30000
 	end = start
-	stop = start + 30000
 	events = nil
 	for end < stop {
 		end = start + step
