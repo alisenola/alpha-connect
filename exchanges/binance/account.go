@@ -505,7 +505,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 					context.Respond(response)
 
 					if response.Success {
-						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID, nil)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
 							state.seqNum += 1
@@ -618,7 +618,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		context.Respond(response)
 		if response.Success {
 			for i, r := range reports {
-				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i], nil)
 				if err != nil {
 					panic(err)
 				}
@@ -867,7 +867,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 
 			*/
 			orderID := fmt.Sprintf("%d", res.OrderID)
-			report, err := state.account.ConfirmNewOrder(res.ClientOrderID, orderID)
+			report, err := state.account.ConfirmNewOrder(res.ClientOrderID, orderID, nil)
 			if err != nil {
 				return fmt.Errorf("error confirming new order: %v", err)
 			}

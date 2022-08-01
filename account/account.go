@@ -352,7 +352,7 @@ func (accnt *Account) NewOrder(order *models.Order) (*messages.ExecutionReport, 
 	}, nil
 }
 
-func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.ExecutionReport, error) {
+func (accnt *Account) ConfirmNewOrder(clientID string, ID string, leavesQuantity *float64) (*messages.ExecutionReport, error) {
 	accnt.Lock()
 	defer accnt.Unlock()
 	order, ok := accnt.ordersClID[clientID]
@@ -367,6 +367,10 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.OrderStatus = models.OrderStatus_New
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
+	// Overwrite leaves quantity
+	if leavesQuantity != nil {
+		order.LeavesQuantity = *leavesQuantity
+	}
 	accnt.ordersID[ID] = order
 	sec, rej := accnt.getSec(order.Instrument)
 	if rej != nil {

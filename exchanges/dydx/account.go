@@ -587,7 +587,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		context.Respond(response)
 		if response.Success {
 			for i, r := range reports {
-				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i], nil)
 				if err != nil {
 					panic(err)
 				}
@@ -800,7 +800,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 					return fmt.Errorf("order does not exists")
 				}
 				if ao.OrderStatus == models.OrderStatus_PendingNew {
-					report, err := state.account.ConfirmNewOrder(o.ClientID, o.ID)
+					report, err := state.account.ConfirmNewOrder(o.ClientID, o.ID, nil)
 					if err != nil {
 						return fmt.Errorf("error confirming new order: %v", err)
 					}

@@ -458,9 +458,11 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 						return
 					}
 					response := res.(*messages.NewOrderSingleResponse)
+					if math.Abs(order.LeavesQuantity-response.LeavesQuantity) > 0.001 {
+						fmt.Println("CONFIRM NEW", response.OrderID, response.LeavesQuantity, order.LeavesQuantity, response.CumQuantity, order.CumQuantity)
+					}
 					if response.Success {
-						fmt.Println("CONFIRM NEW", response.OrderID, response.LeavesQuantity, order.LeavesQuantity)
-						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID, &response.LeavesQuantity)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
 							state.seqNum += 1
@@ -799,7 +801,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 						return fmt.Errorf("error creating new order: %s", rej.String())
 					}
 				}
-				report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
+				report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
 				if err != nil {
 					return fmt.Errorf("error confirming new order: %v", err)
 				}
@@ -834,7 +836,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				// Therefore, we check if it's pendingNew, and we confirm it here. We let
 				// the confirmFill to the bybitl.WSExecutions
 				if ord.OrderStatus == models.OrderStatus_PendingNew {
-					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId)
+					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
 					if err != nil {
 						return fmt.Errorf("error confirming filled order: %v", err)
 					}

@@ -557,7 +557,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 					response := res.(*messages.NewOrderSingleResponse)
 
 					if response.Success {
-						confirmReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+						confirmReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID, nil)
 						if confirmReport != nil {
 							confirmReport.SeqNum = state.seqNum + 1
 							state.seqNum += 1
@@ -694,7 +694,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		context.Respond(response)
 		if response.Success {
 			for i, r := range reports {
-				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i], nil)
 				if err != nil {
 					panic(err)
 				}
@@ -1009,7 +1009,7 @@ func (state *AccountListener) onWSOrdersUpdate(context actor.Context) error {
 			if rej != nil {
 				return fmt.Errorf("error creating new order: %s", rej.String())
 			}
-			_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+			_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID), nil)
 			if err != nil {
 				return fmt.Errorf("error creating new order: %v", err)
 			}
@@ -1018,7 +1018,7 @@ func (state *AccountListener) onWSOrdersUpdate(context actor.Context) error {
 		if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
 			// Order closed because of filled
 			if res.Order.ClientID != nil && state.account.HasOrder(*res.Order.ClientID) {
-				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID), nil)
 				if err != nil {
 					return fmt.Errorf("error confirming new order: %v", err)
 				}
@@ -1066,7 +1066,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				if rej != nil {
 					return fmt.Errorf("error creating new order: %s", rej.String())
 				}
-				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+				_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID), nil)
 				if err != nil {
 					return fmt.Errorf("error creating new order: %v", err)
 				}
@@ -1075,7 +1075,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			if res.Order.FilledSize > 0 && res.Order.FilledSize == res.Order.Size {
 				// Order closed because of filled
 				if res.Order.ClientID != nil && state.account.HasOrder(*res.Order.ClientID) {
-					_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID))
+					_, err := state.account.ConfirmNewOrder(*res.Order.ClientID, fmt.Sprintf("%d", res.Order.ID), nil)
 					if err != nil {
 						return fmt.Errorf("error confirming new order: %v", err)
 					}

@@ -236,7 +236,7 @@ func (state *PaperAccountListener) OnNewOrderSingle(context actor.Context) error
 			state.seqNum += 1
 			context.Send(context.Parent(), report)
 			if report.ExecutionType == messages.ExecutionType_PendingNew {
-				report, err := state.account.ConfirmNewOrder(order.ClientOrderID, order.ClientOrderID)
+				report, err := state.account.ConfirmNewOrder(order.ClientOrderID, order.ClientOrderID, nil)
 				if err != nil {
 					return fmt.Errorf("error confirming new order: %v", err)
 				}
@@ -303,7 +303,7 @@ func (state *PaperAccountListener) OnNewOrderBulkRequest(context actor.Context) 
 		context.Send(context.Parent(), report)
 	}
 	for _, r := range reports {
-		report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, r.ClientOrderID.Value)
+		report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, r.ClientOrderID.Value, nil)
 		if err != nil {
 			return fmt.Errorf("error confirming order: %v", err)
 		}

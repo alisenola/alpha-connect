@@ -456,7 +456,7 @@ func (state *AccountListener) NewOrderSingleRequest(context actor.Context) error
 					context.Respond(response)
 
 					if response.Success {
-						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
+						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID, nil)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
 							state.seqNum += 1
@@ -569,7 +569,7 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 		context.Respond(response)
 		if response.Success {
 			for i, r := range reports {
-				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i])
+				report, err := state.account.ConfirmNewOrder(r.ClientOrderID.Value, response.OrderIDs[i], nil)
 				if err != nil {
 					panic(err)
 				}
@@ -974,7 +974,7 @@ func (state *AccountListener) onWSExecutionData(context actor.Context, execution
 			if data.ClOrdID == nil {
 				return fmt.Errorf("got an order with nil ClOrdID")
 			}
-			report, err := state.account.ConfirmNewOrder(*data.ClOrdID, data.OrderID)
+			report, err := state.account.ConfirmNewOrder(*data.ClOrdID, data.OrderID, nil)
 			if err != nil {
 				return fmt.Errorf("error confirming new order: %v", err)
 			}
