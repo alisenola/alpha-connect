@@ -25,23 +25,25 @@ import (
 type checkSocket struct{}
 type checkAccount struct{}
 type refreshKey struct{}
+type refreshMarkPrices struct{}
 
 type AccountListener struct {
-	account            *account.Account
-	readOnly           bool
-	seqNum             uint64
-	fbinanceExecutor   *actor.PID
-	ws                 *fbinance.AuthWebsocket
-	executorManager    *actor.PID
-	logger             *log.Logger
-	registry           registry.PublicRegistryClient
-	checkAccountTicker *time.Ticker
-	checkSocketTicker  *time.Ticker
-	refreshKeyTicker   *time.Ticker
-	lastPingTime       time.Time
-	securities         map[uint64]*models.Security
-	client             *http.Client
-	db                 *gorm.DB
+	account                 *account.Account
+	readOnly                bool
+	seqNum                  uint64
+	fbinanceExecutor        *actor.PID
+	ws                      *fbinance.AuthWebsocket
+	executorManager         *actor.PID
+	logger                  *log.Logger
+	registry                registry.PublicRegistryClient
+	checkAccountTicker      *time.Ticker
+	checkSocketTicker       *time.Ticker
+	refreshKeyTicker        *time.Ticker
+	refreshMarkPricesTicker *time.Ticker
+	lastPingTime            time.Time
+	securities              map[uint64]*models.Security
+	client                  *http.Client
+	db                      *gorm.DB
 }
 
 func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, strict bool) actor.Producer {
@@ -189,6 +191,11 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *refreshKey:
 		if err := state.refreshKey(context); err != nil {
 			state.logger.Error("error refreshing key", log.Error(err))
+			panic(err)
+		}
+	case *refreshMarkPrices:
+		if err := state.refreshMarkPrices(context); err != nil {
+			state.logger.Error("error refreshing mark prices", log.Error(err))
 			panic(err)
 		}
 	}
@@ -372,6 +379,21 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	refreshMarkPricesTicker := time.NewTicker(5 * time.Second)
+	state.refreshMarkPricesTicker = refreshMarkPricesTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case <-refreshMarkPricesTicker.C:
+				context.Send(pid, &refreshMarkPrices{})
+			case <-time.After(31 * time.Second):
+				if state.refreshMarkPricesTicker != refreshMarkPricesTicker {
+					return
+				}
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -396,6 +418,11 @@ func (state *AccountListener) Clean(context actor.Context) error {
 	if state.refreshKeyTicker != nil {
 		state.refreshKeyTicker.Stop()
 		state.refreshKeyTicker = nil
+	}
+
+	if state.refreshMarkPricesTicker != nil {
+		state.refreshMarkPricesTicker.Stop()
+		state.refreshMarkPricesTicker = nil
 	}
 
 	if !state.readOnly {
@@ -1141,6 +1168,28 @@ func (state *AccountListener) refreshKey(context actor.Context) error {
 	if err := utils.PerformJSONRequest(state.client, req, nil); err != nil {
 		return fmt.Errorf("error refreshing listen key: %v", err)
 	}
+	return nil
+}
+
+func (state *AccountListener) refreshMarkPrices(context actor.Context) error {
+	future := context.RequestFuture(state.fbinanceExecutor, &messages.PositionsRequest{
+		RequestID: 0,
+		Account:   state.account.Account,
+	}, 10*time.Second)
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Error("error updating mark price", log.Error(err))
+		}
+		pos := res.(*messages.PositionList)
+		if !pos.Success {
+			state.logger.Error("error updating mark price", log.String("rejection", pos.RejectionReason.String()))
+		}
+		for _, p := range pos.Positions {
+			if p.MarkPrice != nil {
+				state.account.UpdateMarkPrice(p.Instrument.SecurityID.Value, p.MarkPrice.Value)
+			}
+		}
+	})
 	return nil
 }
 

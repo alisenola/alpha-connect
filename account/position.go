@@ -2,6 +2,7 @@ package account
 
 import (
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 )
 
@@ -16,6 +17,7 @@ type Position struct {
 	cost            int64
 	rawSize         int64
 	cross           bool
+	markPrice       *float64
 }
 
 func NewPosition(inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
@@ -30,6 +32,7 @@ func NewPosition(inverse bool, tp, lp, mp, mul, maker, taker float64) *Position 
 		cost:            0,
 		rawSize:         0,
 		cross:           false,
+		markPrice:       nil,
 	}
 }
 
@@ -148,11 +151,15 @@ func (pos *Position) Funding(markPrice, fee float64) int64 {
 
 func (pos *Position) GetPosition() *models.Position {
 	if pos.rawSize != 0 {
-		return &models.Position{
+		p := &models.Position{
 			Quantity: float64(pos.rawSize) / pos.lotPrecision,
 			Cost:     float64(pos.cost) / pos.marginPrecision,
 			Cross:    pos.cross,
 		}
+		if pos.markPrice != nil {
+			p.MarkPrice = wrapperspb.Double(*pos.markPrice)
+		}
+		return p
 	} else {
 		return nil
 	}
@@ -161,4 +168,8 @@ func (pos *Position) GetPosition() *models.Position {
 func (pos *Position) Sync(cost, size float64) {
 	pos.cost = int64(math.Round(cost * pos.marginPrecision))
 	pos.rawSize = int64(math.Round(pos.lotPrecision * size))
+}
+
+func (pos *Position) UpdateMarkPrice(price float64) {
+	pos.markPrice = &price
 }

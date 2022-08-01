@@ -204,12 +204,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		case "spot":
 			baseCurrency, ok := constants.GetAssetBySymbol(market.BaseCurrency)
 			if !ok {
-				//state.logger.Info(fmt.Sprintf("unknown currency %s", market.BaseCurrency))
+				state.logger.Debug(fmt.Sprintf("unknown currency %s", market.BaseCurrency))
 				continue
 			}
 			quoteCurrency, ok := constants.GetAssetBySymbol(market.QuoteCurrency)
 			if !ok {
-				//fmt.Printf("unknown currency symbol %s \n", market.BaseCurrency)
+				state.logger.Debug(fmt.Sprintf("unknown currency %s", market.QuoteCurrency))
 				continue
 			}
 			security.Underlying = baseCurrency

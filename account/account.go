@@ -368,7 +368,6 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string) (*messages.Exe
 	order.lastEventTime = time.Now()
 	order.LastEventTime = timestamppb.New(order.lastEventTime)
 	accnt.ordersID[ID] = order
-	fmt.Println("CONFIRM NEW", order.OrderID)
 	sec, rej := accnt.getSec(order.Instrument)
 	if rej != nil {
 		return nil, fmt.Errorf("unknown instrument: %s", rej.String())
@@ -749,7 +748,6 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
-	fmt.Println("FILL", order.OrderID, price, quantity, order.LeavesQuantity, lotPrecision)
 	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
 	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {
@@ -965,8 +963,8 @@ func (accnt *Account) GetPositions() []*models.Position {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	var positions []*models.Position
-	for k, pos := range accnt.positions {
-		pos := pos.GetPosition()
+	for k, p := range accnt.positions {
+		pos := p.GetPosition()
 		if pos != nil {
 			pos.Instrument = accnt.securities[k].GetInstrument()
 			pos.Account = accnt.Name

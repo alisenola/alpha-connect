@@ -231,3 +231,7 @@ func (accnt *Account) UpdateAskOrderQueue(securityID uint64, orderID string, que
 func (accnt *Account) UpdateBidOrderQueue(securityID uint64, orderID string, queue float64) {
 	accnt.securities[securityID].UpdateBidOrderQueue(orderID, queue)
 }
+
+func (accnt *Account) UpdateMarkPrice(securityID uint64, price float64) {
+	accnt.positions[securityID].UpdateMarkPrice(price)
+}

@@ -23,22 +23,24 @@ import (
 
 type checkSocket struct{}
 type checkAccount struct{}
+type refreshMarkPrices struct{}
 
 type AccountListener struct {
-	account            *account.Account
-	readOnly           bool
-	seqNum             uint64
-	bybitlExecutor     *actor.PID
-	ws                 *bybitl.Websocket
-	logger             *log.Logger
-	registry           registry.PublicRegistryClient
-	checkAccountTicker *time.Ticker
-	checkSocketTicker  *time.Ticker
-	lastPingTime       time.Time
-	securities         map[uint64]*models.Security
-	symbolToSec        map[string]*models.Security
-	client             *http.Client
-	db                 *gorm.DB
+	account                 *account.Account
+	readOnly                bool
+	seqNum                  uint64
+	bybitlExecutor          *actor.PID
+	ws                      *bybitl.Websocket
+	logger                  *log.Logger
+	registry                registry.PublicRegistryClient
+	checkAccountTicker      *time.Ticker
+	checkSocketTicker       *time.Ticker
+	refreshMarkPricesTicker *time.Ticker
+	lastPingTime            time.Time
+	securities              map[uint64]*models.Security
+	symbolToSec             map[string]*models.Security
+	client                  *http.Client
+	db                      *gorm.DB
 }
 
 func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
@@ -134,6 +136,11 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *checkAccount:
 		if err := state.checkAccount(context); err != nil {
 			state.logger.Error("error checking account", log.Error(err))
+			panic(err)
+		}
+	case *refreshMarkPrices:
+		if err := state.refreshMarkPrices(context); err != nil {
+			state.logger.Error("error refreshing mark prices", log.Error(err))
 			panic(err)
 		}
 	}
@@ -289,6 +296,21 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 		}
 	}(context.Self())
 
+	refreshMarkPricesTicker := time.NewTicker(5 * time.Second)
+	state.refreshMarkPricesTicker = refreshMarkPricesTicker
+	go func(pid *actor.PID) {
+		for {
+			select {
+			case <-refreshMarkPricesTicker.C:
+				context.Send(pid, &refreshMarkPrices{})
+			case <-time.After(10 * time.Second):
+				if state.refreshMarkPricesTicker != refreshMarkPricesTicker {
+					return
+				}
+			}
+		}
+	}(context.Self())
+
 	return nil
 }
 
@@ -437,6 +459,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 					}
 					response := res.(*messages.NewOrderSingleResponse)
 					if response.Success {
+						fmt.Println("CONFIRM NEW", order.OrderID, response.LeavesQuantity, order.LeavesQuantity)
 						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
@@ -872,6 +895,10 @@ func (state *AccountListener) Clean(context actor.Context) error {
 		state.checkSocketTicker.Stop()
 		state.checkSocketTicker = nil
 	}
+	if state.refreshMarkPricesTicker != nil {
+		state.refreshMarkPricesTicker.Stop()
+		state.refreshMarkPricesTicker = nil
+	}
 
 	if !state.readOnly {
 		for _, sec := range state.securities {
@@ -1007,5 +1034,26 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		}
 	}
 
+	return nil
+}
+
+func (state *AccountListener) refreshMarkPrices(context actor.Context) error {
+	future := context.RequestFuture(state.bybitlExecutor, &messages.MarketStatisticsRequest{
+		RequestID:  0,
+		Instrument: &models.Instrument{Exchange: constants.BYBITL},
+		Statistics: []models.StatType{models.StatType_MarkPrice},
+	}, 10*time.Second)
+	context.ReenterAfter(future, func(res interface{}, err error) {
+		if err != nil {
+			state.logger.Error("error updating mark price", log.Error(err))
+		}
+		secs := res.(*messages.MarketStatisticsResponse)
+		if !secs.Success {
+			state.logger.Error("error updating mark price", log.String("rejection", secs.RejectionReason.String()))
+		}
+		for _, sec := range secs.Statistics {
+			state.account.UpdateMarkPrice(sec.SecurityID, sec.Value)
+		}
+	})
 	return nil
 }

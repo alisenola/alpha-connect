@@ -326,11 +326,12 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	for _, symbol := range data.Symbols {
 		baseCurrency, ok := constants.GetAssetBySymbol(symbol.BaseAsset)
 		if !ok {
-			//state.logger.Info(fmt.Sprintf("unknown currency %s", symbol.BaseAsset))
+			state.logger.Debug(fmt.Sprintf("unknown currency %s", symbol.BaseAsset))
 			continue
 		}
 		quoteCurrency, ok := constants.GetAssetBySymbol(symbol.QuoteAsset)
 		if !ok {
+			state.logger.Debug(fmt.Sprintf("unknown currency %s", symbol.QuoteAsset))
 			continue
 		}
 		security := models.Security{}
