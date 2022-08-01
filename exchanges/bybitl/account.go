@@ -802,18 +802,15 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 						return fmt.Errorf("error creating new order: %s", rej.String())
 					}
 				}
-				// TODO ?
-				/*
-					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
-					if err != nil {
-						return fmt.Errorf("error confirming new order: %v", err)
-					}
-					if report != nil {
-						report.SeqNum = state.seqNum + 1
-						state.seqNum += 1
-						context.Send(context.Parent(), report)
-					}
-				*/
+				report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
+				if err != nil {
+					return fmt.Errorf("error confirming new order: %v", err)
+				}
+				if report != nil {
+					report.SeqNum = state.seqNum + 1
+					state.seqNum += 1
+					context.Send(context.Parent(), report)
+				}
 			case bybitl.OrderCancelled:
 				if state.readOnly && !state.account.HasOrder(order.OrderLinkId) {
 					return nil
