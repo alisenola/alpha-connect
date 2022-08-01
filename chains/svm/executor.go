@@ -147,6 +147,10 @@ func (state *Executor) OnSVMContractCallRequest(context actor.Context) error {
 		if err != nil {
 			state.logger.Error("error making svm contract call", log.Error(err))
 			msg.RejectionReason = messages.RejectionReason_RPCError
+			switch err.Error() {
+			case "Invalid message selector":
+				msg.RejectionReason = messages.RejectionReason_InvalidJumpDestination
+			}
 			context.Send(pid, msg)
 			return
 		}
