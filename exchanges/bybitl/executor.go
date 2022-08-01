@@ -2,6 +2,7 @@ package bybitl
 
 import (
 	goContext "context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
@@ -1625,6 +1626,8 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 		response.Success = true
+		b, _ := json.Marshal(data)
+		fmt.Println("ORDER DATA", string(b))
 		response.OrderStatus = *status
 		response.CumQuantity = data.Order.CumExecQty
 		response.LeavesQuantity = data.Order.Qty
