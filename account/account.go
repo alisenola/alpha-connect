@@ -748,6 +748,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
+	fmt.Println("FILL", order.OrderID, price, quantity, order.LeavesQuantity, lotPrecision)
 	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
 	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {

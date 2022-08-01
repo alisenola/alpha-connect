@@ -459,7 +459,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 					}
 					response := res.(*messages.NewOrderSingleResponse)
 					if response.Success {
-						fmt.Println("CONFIRM NEW", order.OrderID, response.LeavesQuantity, order.LeavesQuantity)
+						fmt.Println("CONFIRM NEW", response.OrderID, response.LeavesQuantity, order.LeavesQuantity)
 						nReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, response.OrderID)
 						if nReport != nil {
 							nReport.SeqNum = state.seqNum + 1
