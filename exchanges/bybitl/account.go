@@ -804,16 +804,16 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				}
 				// TODO ?
 				/*
-				report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
-				if err != nil {
-					return fmt.Errorf("error confirming new order: %v", err)
-				}
-				if report != nil {
-					report.SeqNum = state.seqNum + 1
-					state.seqNum += 1
-					context.Send(context.Parent(), report)
-				}
-				 */
+					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
+					if err != nil {
+						return fmt.Errorf("error confirming new order: %v", err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+				*/
 			case bybitl.OrderCancelled:
 				if state.readOnly && !state.account.HasOrder(order.OrderLinkId) {
 					return nil
@@ -839,10 +839,9 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 				// therefore we won't go through the branch above that confirms the new order.
 				// Therefore, we check if it's pendingNew, and we confirm it here. We let
 				// the confirmFill to the bybitl.WSExecutions
-				/*
 				if ord.OrderStatus == models.OrderStatus_PendingNew {
-					fmt.Println("PRE-CONFIRM")
-					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.LeavesQty)
+					fmt.Println("PRE-CONFIRM", order.OrderLinkId, order.Qty, order.LeavesQty, order.CumExecQty)
+					report, err := state.account.ConfirmNewOrder(order.OrderLinkId, order.OrderId, &order.Qty)
 					if err != nil {
 						return fmt.Errorf("error confirming filled order: %v", err)
 					}
@@ -852,7 +851,6 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 						context.Send(context.Parent(), report)
 					}
 				}
-				 */
 			}
 		}
 	case bybitl.WSExecutions:
