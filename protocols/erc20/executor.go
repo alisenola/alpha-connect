@@ -134,9 +134,8 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			&models.ProtocolAsset{
 				ProtocolAssetID: protocolAsset.ProtocolAssetId,
 				Protocol: &xmodels.Protocol{
-					ID:      state.protocol.ID,
-					Name:    state.protocol.Name,
-					ChainID: state.protocol.ChainID,
+					ID:   state.protocol.ID,
+					Name: state.protocol.Name,
 				},
 				Asset:           as,
 				Chain:           ch,
