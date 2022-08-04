@@ -1460,7 +1460,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 				}
 				mtrades = append(mtrades, &trd)
 			}
-			done = true //len(data.TradingRecords.Trades) == 0
+			done = len(data.TradingRecords.Trades) == 0
 			if !done {
 				params.SetPage(int(data.TradingRecords.CurrentPage + 1))
 				_, weight, err = bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
