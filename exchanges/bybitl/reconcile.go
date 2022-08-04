@@ -349,7 +349,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				}
 			}
 		} else if p1.GetPosition() != nil {
-			return fmt.Errorf("%s not in exec", p1.GetPosition().Instrument.Symbol)
+			return fmt.Errorf("%v not in exec", p1.GetPosition().Instrument)
 		}
 	}
 
