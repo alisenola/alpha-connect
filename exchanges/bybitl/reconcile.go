@@ -218,9 +218,9 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
 			Symbol:     &wrapperspb.StringValue{Value: sec.Symbol},
 		}
-		var newTransactions []*extypes.Transaction
 		done := false
 		for !done {
+			var newTransactions []*extypes.Transaction
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
@@ -293,14 +293,14 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				state.lastTradeTs[sec.SecurityId] = uint64(ts.UnixMilli())
 				progress = true
 			}
+			if len(newTransactions) > 0 {
+				fmt.Println("INSERTING", len(newTransactions))
+				if tx := state.db.Create(newTransactions); tx.Error != nil {
+					return fmt.Errorf("error inserting: %v", err)
+				}
+			}
 			if len(trds.Trades) == 0 || !progress {
 				done = true
-			}
-		}
-		if len(newTransactions) > 0 {
-			fmt.Println("INSERTING", len(newTransactions))
-			if tx := state.db.Create(newTransactions); tx.Error != nil {
-				return fmt.Errorf("error inserting: %v", err)
 			}
 		}
 	}
