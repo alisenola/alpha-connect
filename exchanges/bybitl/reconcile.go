@@ -347,7 +347,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				q1 := int(math.Round(1e8 * p1.GetPosition().Quantity))
 				q2 := int(math.Round(1e8 * p2.Quantity))
 				if q1 != q2 {
-					return fmt.Errorf("different position quantity %d %d %v", q1, q2, p1.GetPosition().Instrument)
+					return fmt.Errorf("different position quantity %d %d %v", q1, q2, k)
 				}
 			}
 		} else if p1.GetPosition() != nil {
