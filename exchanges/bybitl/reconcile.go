@@ -297,9 +297,11 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				done = true
 			}
 		}
-		fmt.Println("INSERTING", len(newTransactions))
-		if tx := state.db.Create(newTransactions); tx.Error != nil {
-			return fmt.Errorf("error inserting: %v", err)
+		if len(newTransactions) > 0 {
+			fmt.Println("INSERTING", len(newTransactions))
+			if tx := state.db.Create(newTransactions); tx.Error != nil {
+				return fmt.Errorf("error inserting: %v", err)
+			}
 		}
 	}
 
