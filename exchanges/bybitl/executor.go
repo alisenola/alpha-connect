@@ -1463,11 +1463,15 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			done = len(data.TradingRecords.Trades) == 0
 			if !done {
 				params.SetPage(int(data.TradingRecords.CurrentPage + 1))
-				request, weight, err = bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
+				_, weight, err = bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
 				if err != nil {
 					panic(err)
 				}
 				qr.WaitGet(weight)
+				request, weight, err = bybitl.GetTradeRecords(params, req.Account.ApiCredentials)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 		response.Success = true

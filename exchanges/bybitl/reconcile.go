@@ -228,7 +228,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 					Instrument: instrument,
 				},
 				Account: state.account,
-			}, 25*time.Second).Result()
+			}, 1*time.Minute).Result()
 			if err != nil {
 				fmt.Println("error getting trade capture report", err)
 				time.Sleep(1 * time.Second)
