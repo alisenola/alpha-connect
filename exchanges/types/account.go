@@ -15,7 +15,7 @@ type Transaction struct {
 	Type        string
 	SubType     string
 	Time        time.Time
-	ExecutionID string     `gorm:"unique"`
+	ExecutionID string     `gorm:"uniqueIndex"`
 	AccountID   uint       `gorm:"index"`
 	Account     Account    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Fill        *Fill      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

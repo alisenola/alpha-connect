@@ -951,7 +951,7 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 			var data bybitl.TradingRecordResponse
 			if client, ok := state.AccountClients[req.Account.Name]; ok {
 				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
-					state.logger.Warn("error fetching account information", log.Error(err))
+					state.logger.Warn("error fetching trade records", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
 					return
@@ -966,7 +966,7 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 			}
 
 			if data.RetCode != 0 {
-				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				state.logger.Warn("error fetching trade records", log.Error(errors.New(fmt.Sprintf("%d: %s", data.RetCode, data.RetMsg))))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -1058,14 +1058,14 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 			var data bybitl.QueryTransferListResponse
 			if client, ok := state.AccountClients[req.Account.Name]; ok {
 				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
-					state.logger.Warn("error fetching account information", log.Error(err))
+					state.logger.Warn("error fetching transfer list", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
 					return
 				}
 			} else {
 				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-					state.logger.Warn("error fetching trade records", log.Error(err))
+					state.logger.Warn("error fetching transfer list", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
 					return
@@ -1073,7 +1073,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 			}
 
 			if data.RetCode != 0 {
-				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				state.logger.Warn("error fetching transfer list", log.Error(fmt.Errorf("%d: %s", data.RetCode, data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -1083,7 +1083,9 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 				return data.TransferList.List[i].Timestamp < data.TransferList.List[j].Timestamp
 			})
 			for _, t := range data.TransferList.List {
-				fmt.Println(t.Amount)
+				if t.Amount < 0 {
+					continue
+				}
 				asset, ok := constants.GetAssetBySymbol(t.Coin)
 				if !ok {
 					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
@@ -1138,41 +1140,56 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 			to = &ts
 		}
 	}
-	params := bybitl.NewQueryWithdrawRecordsParams()
+	tparams := bybitl.NewQueryTransferListParams()
 	if from != nil {
-		params.SetStartTime(*from)
+		tparams.SetStartTime(*from)
 	}
 	if to != nil {
-		params.SetEndTime(*to)
+		tparams.SetEndTime(*to)
 	}
-	params.SetDirection(bybitl.NextPage)
-	request, weight, err := bybitl.QueryWithdrawRecords(params, req.Account.ApiCredentials)
+	tparams.SetDirection(bybitl.NextPage)
+	trequest, weight, err := bybitl.QueryTransferList(tparams, req.Account.ApiCredentials)
 	if err != nil {
 		return err
 	}
+
+	wparams := bybitl.NewQueryWithdrawRecordsParams()
+	if from != nil {
+		wparams.SetStartTime(*from)
+	}
+	if to != nil {
+		wparams.SetEndTime(*to)
+	}
+	wparams.SetDirection(bybitl.NextPage)
+	wrequest, weight, err := bybitl.QueryWithdrawRecords(wparams, req.Account.ApiCredentials)
+	if err != nil {
+		return err
+	}
+
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
 		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
 		context.Send(sender, response)
-		return nil
+		return err
 	}
 	qr.Get(weight)
 
 	go func() {
 		var movements []*messages.AccountMovement
+
 		done := false
 		for !done {
-			var data bybitl.QueryWithdrawRecordsResponse
+			var data bybitl.QueryTransferListResponse
 			if client, ok := state.AccountClients[req.Account.Name]; ok {
-				if err := xutils.PerformJSONRequest(client, request, &data); err != nil {
-					state.logger.Warn("error fetching account information", log.Error(err))
+				if err := xutils.PerformJSONRequest(client, trequest, &data); err != nil {
+					state.logger.Warn("error fetching transfer list", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
 					return
 				}
 			} else {
-				if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
-					state.logger.Warn("error fetching trade records", log.Error(err))
+				if err := xutils.PerformJSONRequest(qr.client, trequest, &data); err != nil {
+					state.logger.Warn("error fetching transfer list", log.Error(err))
 					response.RejectionReason = messages.RejectionReason_HTTPError
 					context.Send(sender, response)
 					return
@@ -1180,7 +1197,67 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 			}
 
 			if data.RetCode != 0 {
-				state.logger.Warn("error fetching trade records", log.Error(errors.New(data.RetMsg)))
+				state.logger.Warn("error fetching transfer list", log.Error(fmt.Errorf("%d: %s", data.RetCode, data.RetMsg)))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+
+			sort.Slice(data.TransferList.List, func(i, j int) bool {
+				return data.TransferList.List[i].Timestamp < data.TransferList.List[j].Timestamp
+			})
+			for _, t := range data.TransferList.List {
+				if t.Amount > 0 {
+					continue
+				}
+				asset, ok := constants.GetAssetBySymbol(t.Coin)
+				if !ok {
+					state.logger.Warn(fmt.Sprintf("unknown asset %s", t.Coin))
+					response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+					context.Send(sender, response)
+					return
+				}
+				mvt := &messages.AccountMovement{
+					Asset:      asset,
+					Change:     t.Amount,
+					MovementID: t.TransferId,
+					Type:       messages.AccountMovementType_Withdrawal,
+					Time:       utils.SecondToTimestamp(t.Timestamp),
+				}
+				movements = append(movements, mvt)
+			}
+			done = len(data.TransferList.List) == 0
+			if !done {
+				tparams.SetCursor(data.TransferList.Cursor)
+				trequest, weight, err = bybitl.QueryTransferList(tparams, req.Account.ApiCredentials)
+				if err != nil {
+					panic(err)
+				}
+				qr.WaitGet(weight)
+			}
+		}
+
+		done = false
+		for !done {
+			var data bybitl.QueryWithdrawRecordsResponse
+			if client, ok := state.AccountClients[req.Account.Name]; ok {
+				if err := xutils.PerformJSONRequest(client, wrequest, &data); err != nil {
+					state.logger.Warn("error fetching withdraw records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			} else {
+				if err := xutils.PerformJSONRequest(qr.client, wrequest, &data); err != nil {
+					state.logger.Warn("error fetching withdraw records", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+			}
+
+			if data.RetCode != 0 {
+				state.logger.Warn("error fetching withdraw records", log.Error(fmt.Errorf("%d: %s", data.RetCode, data.RetMsg)))
 				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 				context.Send(sender, response)
 				return
@@ -1200,7 +1277,7 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 				mvt := &messages.AccountMovement{
 					Asset:      asset,
 					Change:     t.Amount,
-					MovementID: t.TxId,
+					MovementID: t.WithdrawId,
 					Type:       messages.AccountMovementType_Withdrawal,
 					Time:       utils.SecondToTimestamp(t.CreateTime),
 				}
@@ -1208,14 +1285,15 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 			}
 			done = len(data.WithdrawRecords.Rows) == 0
 			if !done {
-				params.SetCursor(data.WithdrawRecords.Cursor)
-				request, weight, err = bybitl.QueryWithdrawRecords(params, req.Account.ApiCredentials)
+				wparams.SetCursor(data.WithdrawRecords.Cursor)
+				wrequest, weight, err = bybitl.QueryWithdrawRecords(wparams, req.Account.ApiCredentials)
 				if err != nil {
 					panic(err)
 				}
 				qr.WaitGet(weight)
 			}
 		}
+
 		response.Success = true
 		response.Movements = movements
 		context.Send(sender, response)
@@ -1233,7 +1311,7 @@ func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
 	case messages.AccountMovementType_Deposit:
 		return state.onDepositMovementRequest(context)
 	case messages.AccountMovementType_Withdrawal:
-		return state.onDepositMovementRequest(context)
+		return state.onWithdrawalMovementRequest(context)
 	}
 
 	return nil
