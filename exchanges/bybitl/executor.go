@@ -43,6 +43,8 @@ var TakerFees = map[string]float64{
 	"VIP-3":  0.0425 / 100,
 }
 
+var sevenDays uint64 = 7 * 24 * 60 * 60
+
 func (state *Executor) getSymbol(instrument *models.Instrument) (string, *messages.RejectionReason) {
 	symbol := ""
 	if instrument != nil {
@@ -1036,6 +1038,9 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 		params.SetStartTime(*from)
 	}
 	if to != nil {
+		if from != nil && *to-*from > sevenDays {
+			*to = *from + sevenDays
+		}
 		params.SetEndTime(*to)
 	}
 	params.SetDirection(bybitl.NextPage)
@@ -1145,6 +1150,9 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 		tparams.SetStartTime(*from)
 	}
 	if to != nil {
+		if from != nil && *to-*from > sevenDays {
+			*to = *from + sevenDays
+		}
 		tparams.SetEndTime(*to)
 	}
 	tparams.SetDirection(bybitl.NextPage)
