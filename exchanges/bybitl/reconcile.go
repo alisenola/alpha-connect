@@ -220,7 +220,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
-			var newTransactions []*extypes.Transaction
+			var newTransactions map[string]*extypes.Transaction
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
@@ -289,13 +289,19 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 						Quantity:  -trd.Commission,
 					})
 				}
-				newTransactions = append(newTransactions, tr)
+				newTransactions[tr.ExecutionID] = tr
 				state.lastTradeTs[sec.SecurityId] = uint64(ts.UnixMilli())
 				progress = true
 			}
 			if len(newTransactions) > 0 {
-				fmt.Println("INSERTING", len(newTransactions))
-				if tx := state.db.Create(newTransactions); tx.Error != nil {
+				txs := make([]*extypes.Transaction, len(newTransactions))
+				i := 0
+				for _, tr := range newTransactions {
+					txs[i] = tr
+					i += 1
+				}
+				fmt.Println("INSERTING", len(txs))
+				if tx := state.db.Create(txs); tx.Error != nil {
 					return fmt.Errorf("error inserting: %v", err)
 				}
 			}
