@@ -220,7 +220,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
-			var newTransactions map[string]*extypes.Transaction
+			newTransactions := make(map[string]*extypes.Transaction)
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
