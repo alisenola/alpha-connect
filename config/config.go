@@ -60,6 +60,9 @@ func LoadConfig() (*Config, error) {
 	if os.Getenv("PROTOCOLS") != "" {
 		C.Protocols = strings.Split(os.Getenv("PROTOCOLS"), ",")
 	}
+	if os.Getenv("FBINANCE_WHITELISTED_IPS") != "" {
+		C.FBinanceWhitelistedIPs = strings.Split(os.Getenv("FBINANCE_WHITELISTED_IPS"), ",")
+	}
 
 	return C, nil
 }
