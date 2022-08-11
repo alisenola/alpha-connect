@@ -186,7 +186,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Conf
 	case constants.CRYPTOFACILITIES.ID:
 		return func() actor.Actor { return cryptofacilities.NewExecutor() }
 	case constants.FBINANCE.ID:
-		return func() actor.Actor { return fbinance.NewExecutor(dialerPool, registry, accountClients) }
+		return func() actor.Actor { return fbinance.NewExecutor(config, dialerPool, registry, accountClients) }
 	case constants.FTX.ID:
 		return func() actor.Actor { return ftx.NewExecutor(dialerPool, registry) }
 	case constants.FTXUS.ID:

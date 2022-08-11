@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -27,7 +28,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 )
 
@@ -104,7 +105,7 @@ func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration 
 type QueryRunner struct {
 	client          *http.Client
 	globalRateLimit *exchanges.RateLimit
-	pool            sync.Pool
+	private         bool
 }
 
 type Executor struct {
@@ -113,12 +114,14 @@ type Executor struct {
 	newAccountRateLimit func() *AccountRateLimit
 	queryRunners        []*QueryRunner
 	logger              *log.Logger
+	config              *config.Config
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Actor {
+func NewExecutor(config *config.Config, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Actor {
 	ex := &Executor{
 		queryRunners: nil,
 		logger:       nil,
+		config:       config,
 	}
 	ex.DialerPool = dialerPool
 	ex.Registry = registry
@@ -238,9 +241,17 @@ func (state *Executor) Initialize(context actor.Context) error {
 			},
 			Timeout: 10 * time.Second,
 		}
+		private := false
+		for _, addr := range state.config.FBinanceWhitelistedIPs {
+			if strings.Split(d.LocalAddr.String(), ":")[0] == addr {
+				fmt.Println("PRIVATE", addr)
+				private = true
+			}
+		}
 		state.queryRunners = append(state.queryRunners, &QueryRunner{
 			client:          client,
 			globalRateLimit: nil,
+			private:         private,
 		})
 	}
 
@@ -1225,24 +1236,37 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			return
 		}
 
-		request, weight, err := fbinance.NewOrder(params, req.Account.ApiCredentials)
-		if err != nil {
-			state.logger.Warn("error building request", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
-			context.Send(sender, response)
-			return
-		}
-
 		qr := state.getQueryRunner(false)
 		if qr == nil {
 			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
+			response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(1))
 			context.Send(sender, response)
 			return
 		}
 
+		var request *http.Request
+		if qr.private {
+			var err error
+			request, _, err = fbinance.NewOrder(params, req.Account.ApiCredentials, fbinance.PrivateURL)
+			if err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			var err error
+			request, _, err = fbinance.NewOrder(params, req.Account.ApiCredentials)
+			if err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+		}
+
 		ar.Request()
-		qr.globalRateLimit.Request(weight)
+		qr.globalRateLimit.Request(1)
 
 		var data fbinance.OrderData
 		start := time.Now()
@@ -1324,24 +1348,27 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 
-		request, weight, err := fbinance.CancelOrder(params, req.Account.ApiCredentials)
-		if err != nil {
-			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
-			context.Send(sender, response)
-			return
-		}
-
 		qr := state.getQueryRunner(true)
-		/*
-			if qr == nil {
-				response.RejectionReason = messages.RejectionReason_RateLimitExceeded
-				response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(weight))
+		var request *http.Request
+		if qr.private {
+			var err error
+			request, _, err = fbinance.CancelOrder(params, req.Account.ApiCredentials, fbinance.PrivateURL)
+			if err != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
 				context.Send(sender, response)
 				return
 			}
-		*/
+		} else {
+			var err error
+			request, _, err = fbinance.CancelOrder(params, req.Account.ApiCredentials)
+			if err != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+		}
 
-		qr.globalRateLimit.Request(weight)
+		qr.globalRateLimit.Request(1)
 		var data fbinance.OrderData
 		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error cancelling order", log.Error(err))

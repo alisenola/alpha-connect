@@ -20,7 +20,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
-	gitlab.com/alphaticks/xchanger v0.0.0-20220804102715-453c599d313d
+	gitlab.com/alphaticks/xchanger v0.0.0-20220811091235-9d674617244c
 	go.mongodb.org/mongo-driver v1.9.1
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	google.golang.org/grpc v1.46.2
@@ -136,7 +136,7 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-replace gitlab.com/alphaticks/xchanger => ../xchanger
+//replace gitlab.com/alphaticks/xchanger => ../xchanger
 
 //replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 

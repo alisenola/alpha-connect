@@ -71,6 +71,7 @@ type Config struct {
 	DataStoreAddress       string
 	DataServerAddress      string
 	OpenseaAPIKey          string
+	FBinanceWhitelistedIPs []string
 	StrictExchange         bool
 	DialerPoolInterface    string
 	DialerPoolIPs          []string
