@@ -22,10 +22,10 @@ import (
 type Executor struct {
 	*config.Config
 	registry       registry.PublicRegistryClient
-	executors      map[uint32]*actor.PID // A map from exchange ID to executor
+	executors      map[uint32]*actor.PID // A map from protocol ID to executor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
-	dataManagers   map[uint64]*actor.PID // A map from asset ID to data manager
+	dataManagers   map[uint64]*actor.PID // A map from protocol asset ID to data manager
 	logger         *log.Logger
 	strict         bool
 }
@@ -216,22 +216,52 @@ func (state *Executor) OnProtocolAssetList(context actor.Context) error {
 
 func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 	req := context.Message().(*messages.ProtocolAssetDataRequest)
-	a, ok := state.protocolAssets[req.ProtocolAssetID]
+	passet := &models.ProtocolAsset{}
+	proto, ok := constants.GetProtocolByID(req.ProtocolID)
 	if !ok {
-		context.Respond(&messages.ProtocolAssetList{
+		context.Respond(&messages.ProtocolAssetDataResponse{
 			RequestID:       req.RequestID,
-			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
+			RejectionReason: messages.RejectionReason_UnknownProtocol,
 			Success:         false,
 		})
-		return nil
 	}
-	if pid, ok := state.dataManagers[a.ProtocolAssetID]; ok {
+	chain, ok := constants.GetChainByID(req.ChainID)
+	if !ok {
+		context.Respond(&messages.ProtocolAssetDataResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+			Success:         false,
+		})
+	}
+	passet.Protocol = proto
+	passet.Chain = chain
+	passet.ProtocolAssetID = uint64(proto.ID)
+	if req.AssetID != nil {
+		asset, ok := constants.GetAssetByID(req.AssetID.Value)
+		if !ok {
+			context.Respond(&messages.ProtocolAssetDataResponse{
+				RequestID:       req.RequestID,
+				RejectionReason: messages.RejectionReason_UnknownAsset,
+				Success:         false,
+			})
+		}
+		id := utils.GetProtocolAssetID(asset, proto, chain)
+		passet, ok = state.protocolAssets[id]
+		if !ok {
+			context.Respond(&messages.ProtocolAssetDataResponse{
+				RequestID:       req.RequestID,
+				RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
+				Success:         false,
+			})
+		}
+	}
+	if pid, ok := state.dataManagers[passet.ProtocolAssetID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(a), actor.WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(passet), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
-		state.dataManagers[a.ProtocolAssetID] = pid
+		state.dataManagers[passet.ProtocolAssetID] = pid
 		context.Forward(pid)
 	}
 	return nil
@@ -239,16 +269,7 @@ func (state *Executor) OnProtocolAssetDataRequest(context actor.Context) error {
 
 func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Context) error {
 	req := context.Message().(*messages.HistoricalProtocolAssetTransferRequest)
-	a, ok := state.protocolAssets[req.ProtocolAssetID]
-	if !ok {
-		context.Respond(&messages.ProtocolAssetList{
-			RequestID:       req.RequestID,
-			RejectionReason: messages.RejectionReason_UnknownProtocolAsset,
-			Success:         false,
-		})
-		return nil
-	}
-	ex, ok := state.executors[a.Protocol.ID]
+	ex, ok := state.executors[req.ProtocolID]
 	if !ok {
 		context.Respond(&messages.HistoricalProtocolAssetTransferResponse{
 			RequestID:       req.RequestID,

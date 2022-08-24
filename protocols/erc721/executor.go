@@ -35,6 +35,9 @@ type QueryRunner struct {
 
 type Executor struct {
 	extype.BaseExecutor
+	addresses      map[string]bool
+	key            *big.Int
+	protocol       *models2.Protocol
 	executor       *actor.PID
 	protocolAssets map[uint64]*models.ProtocolAsset
 	eabi           *abi.ABI
@@ -43,11 +46,12 @@ type Executor struct {
 	registry       registry.PublicRegistryClient
 }
 
-func NewExecutor(registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(registry registry.PublicRegistryClient, protocol *models2.Protocol) actor.Actor {
 	return &Executor{
 		protocolAssets: nil,
 		logger:         nil,
 		registry:       registry,
+		protocol:       protocol,
 	}
 }
 
@@ -61,9 +65,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		"",
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
-
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-
 	eabi, err := nft.ERC721MetaData.GetAbi()
 	if err != nil {
 		return fmt.Errorf("error getting ethereum abi: %v", err)
@@ -75,6 +77,10 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error getting starknet abi: %v", err)
 	}
 	state.sabi = stabi
+
+	state.addresses = make(map[string]bool)
+	state.key = svm.GetSelectorFromName("ownerOf")
+
 	return state.UpdateProtocolAssetList(context)
 }
 
@@ -83,13 +89,12 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 		return nil
 	}
 	assets := make([]*models.ProtocolAsset, 0)
-
 	reg := state.registry
 
 	ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
 	defer cancel()
 	filter := registry.ProtocolAssetFilter{
-		ProtocolId: []uint32{constants.ERC721.ID},
+		ProtocolId: []uint32{state.protocol.ID},
 	}
 	in := registry.ProtocolAssetsRequest{
 		Filter: &filter,
@@ -124,8 +129,8 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 			&models.ProtocolAsset{
 				ProtocolAssetID: protocolAsset.ProtocolAssetId,
 				Protocol: &models2.Protocol{
-					ID:   constants.ERC721.ID,
-					Name: "ERC-721",
+					ID:   state.protocol.ID,
+					Name: state.protocol.Name,
 				},
 				Asset: &models2.Asset{
 					Name:   as.Name,
@@ -142,12 +147,12 @@ func (state *Executor) UpdateProtocolAssetList(context actor.Context) error {
 				ContractAddress: protocolAsset.ContractAddress,
 				Decimals:        protocolAsset.Decimals,
 			})
+		state.addresses[protocolAsset.ContractAddress.Value] = true
 	}
 	state.protocolAssets = make(map[uint64]*models.ProtocolAsset)
 	for _, a := range assets {
 		state.protocolAssets[a.ProtocolAssetID] = a
 	}
-
 	context.Send(context.Parent(), &messages.ProtocolAssetList{
 		ResponseID:     uint64(time.Now().UnixNano()),
 		ProtocolAssets: assets,
@@ -181,58 +186,73 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		ResponseID: uint64(time.Now().UnixNano()),
 		Success:    false,
 	}
-
-	pa, ok := state.protocolAssets[req.ProtocolAssetID]
+	var pa *models.ProtocolAsset
+	chain, ok := constants.GetChainByID(req.ChainID)
 	if !ok {
-		msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
+		msg.RejectionReason = messages.RejectionReason_UnknownChain
 		context.Respond(msg)
 		return nil
 	}
-	var future *actor.Future
-	var query interface{}
-	var delay int64
-	switch pa.Chain.Type {
-	case "EVM":
-		topics := [][]common.Hash{{
-			state.eabi.Events["Transfer"].ID,
-		}}
-		var address [20]byte
-		addressBig, ok := big.NewInt(1).SetString(pa.ContractAddress.Value[2:], 16)
+	if req.AssetID != nil {
+		var ok bool
+		asset, ok := constants.GetAssetByID(req.AssetID.Value)
 		if !ok {
-			state.logger.Warn("invalid protocol asset address")
+			msg.RejectionReason = messages.RejectionReason_UnknownAsset
+			context.Respond(msg)
+			return nil
+		}
+		id := utils.GetProtocolAssetID(asset, state.protocol, chain)
+		pa, ok = state.protocolAssets[id]
+		if !ok {
 			msg.RejectionReason = messages.RejectionReason_UnknownProtocolAsset
 			context.Respond(msg)
 			return nil
 		}
-		copy(address[:], addressBig.Bytes())
+	}
+	var future *actor.Future
+	var query interface{}
+	var delay int64
+	switch chain.Type {
+	case "ZKEVM",
+		"EVM":
+		topics := [][]common.Hash{{
+			state.eabi.Events["Transfer"].ID,
+		}}
 		fQuery := ethereum.FilterQuery{
-			Addresses: []common.Address{address},
 			FromBlock: big.NewInt(1).SetUint64(req.Start),
 			ToBlock:   big.NewInt(1).SetUint64(req.Stop),
 			Topics:    topics,
 		}
-		query = &messages.EVMLogsQueryRequest{
+		r := &messages.EVMLogsQueryRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Chain:     pa.Chain,
+			Chain:     chain,
 			Query:     fQuery,
 		}
-		delay = 20
-	case "SVM":
-		add := common.HexToHash(pa.ContractAddress.Value)
-		q := svm.EventQuery{
-			ContractAddress: &add,
-			Keys:            &[]common.Hash{state.sabi.Events["Transfer"].ID},
-			From:            big.NewInt(1).SetUint64(req.Start),
-			To:              big.NewInt(1).SetUint64(req.Stop),
-			PageSize:        1000,
-			PageNumber:      0,
+		if pa != nil {
+			a := common.HexToAddress(pa.ContractAddress.Value)
+			r.Query.Addresses = []common.Address{a}
 		}
-		query = &messages.SVMEventsQueryRequest{
+		delay = 20
+		query = r
+	case "SVM":
+		q := svm.EventQuery{
+			Keys:       &[]common.Hash{state.sabi.Events["Transfer"].ID},
+			From:       big.NewInt(1).SetUint64(req.Start),
+			To:         big.NewInt(1).SetUint64(req.Stop),
+			PageSize:   1000,
+			PageNumber: 0,
+		}
+		r := &messages.SVMEventsQueryRequest{
 			RequestID: uint64(time.Now().UnixNano()),
-			Chain:     pa.Chain,
+			Chain:     chain,
 			Query:     q,
 		}
+		if pa != nil {
+			add := common.HexToHash(pa.ContractAddress.Value)
+			r.Query.ContractAddress = &add
+		}
 		delay = 120
+		query = r
 	}
 	future = context.RequestFuture(state.executor, query, time.Duration(delay)*time.Second)
 	context.ReenterAfter(future, func(res interface{}, err error) {
@@ -264,13 +284,20 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				context.Respond(msg)
 				return
 			}
-			sort.Slice(resp.Logs, func(i, j int) bool {
-				if resp.Logs[i].BlockNumber == resp.Logs[j].BlockNumber {
-					return resp.Logs[i].Index < resp.Logs[j].Index
-				}
-				return resp.Logs[i].BlockNumber < resp.Logs[j].BlockNumber
-			})
+			var c []types.Log
 			for _, l := range resp.Logs {
+				if len(l.Topics) != 4 {
+					continue
+				}
+				c = append(c, l)
+			}
+			sort.Slice(c, func(i, j int) bool {
+				if c[i].BlockNumber == c[j].BlockNumber {
+					return c[i].Index < c[j].Index
+				}
+				return c[i].BlockNumber < c[j].BlockNumber
+			})
+			for _, l := range c {
 				datas = append(datas, l)
 			}
 			times = resp.Times
@@ -287,13 +314,61 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				context.Respond(msg)
 				return
 			}
-			sort.SliceStable(resp.Events, func(i, j int) bool {
-				return resp.Events[i].BlockNumber < resp.Events[j].BlockNumber
-			})
+			//filter out erc721 events
+			var e []*svm.Event
 			for _, l := range resp.Events {
+				if v, ok := state.addresses[l.FromAddress.String()]; !ok {
+					add := common.BytesToHash(l.FromAddress.Bytes())
+					q := &svm.ContractClassQuery{
+						ContractAddress: &add,
+					}
+					resp, err := context.RequestFuture(state.executor, &messages.SVMContractClassRequest{
+						RequestID: uint64(time.Now().UnixNano()),
+						Chain:     chain,
+						Query:     q,
+					}, 10*time.Second).Result()
+					if err != nil {
+						state.logger.Error("error at stark rpc server", log.Error(err))
+						msg.RejectionReason = messages.RejectionReason_RPCError
+						context.Respond(msg)
+						return
+					}
+					c, ok := resp.(*messages.SVMContractClassResponse)
+					if !ok {
+						msg.RejectionReason = messages.RejectionReason_Other
+						context.Respond(msg)
+						return
+					}
+					if !c.Success {
+						msg.RejectionReason = c.RejectionReason
+						context.Respond(msg)
+						return
+					}
+					state.addresses[l.FromAddress.String()] = false
+					for _, ext := range c.Class.EntryPointsByType.External {
+						i, _ := big.NewInt(0).SetString(ext.Selector[2:], 16)
+						if state.key.Cmp(i) == 0 {
+							e = append(e, l)
+							state.addresses[l.FromAddress.String()] = true
+							break
+						}
+					}
+				} else if v {
+					e = append(e, l)
+				}
+			}
+			sort.SliceStable(e, func(i, j int) bool {
+				return e[i].BlockNumber < e[j].BlockNumber
+			})
+			for _, l := range e {
 				datas = append(datas, l)
 			}
 			times = resp.Times
+		default:
+			state.logger.Warn("incorrect type, expected SVMEventsQueryResponse or EVMLogsQueryResponse", log.String("type", reflect.TypeOf(res).String()))
+			msg.RejectionReason = messages.RejectionReason_Other
+			context.Respond(msg)
+			return
 		}
 		events := make([]*models.ProtocolAssetUpdate, 0)
 		var update *models.ProtocolAssetUpdate
@@ -301,6 +376,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 			from := make([]byte, 32)
 			to := make([]byte, 32)
 			tok := make([]byte, 32)
+			contract := make([]byte, 32)
 			var num uint64
 			switch l := d.(type) {
 			case types.Log:
@@ -316,6 +392,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					from = event.From[:]
 					to = event.To[:]
 					tok = event.TokenId.Bytes()
+					contract = l.Address.Bytes()
 					num = l.BlockNumber
 				}
 			case *svm.Event:
@@ -333,6 +410,7 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 					event.From.FillBytes(from[:])
 					event.To.FillBytes(to[:])
 					event.TokenId.FillBytes(tok[:])
+					contract = l.FromAddress[:]
 					num = uint64(l.BlockNumber)
 				}
 			}
@@ -347,9 +425,10 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 				}
 			}
 			update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
-				From:  from,
-				To:    to,
-				Value: tok,
+				From:     from,
+				To:       to,
+				Value:    tok,
+				Contract: contract,
 			})
 		}
 		if update != nil {
@@ -361,7 +440,6 @@ func (state *Executor) OnHistoricalProtocolAssetTransferRequest(context actor.Co
 		context.Respond(msg)
 
 	})
-
 	return nil
 }
 

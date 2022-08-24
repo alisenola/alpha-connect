@@ -91,10 +91,12 @@ func TestMainExecutor(t *testing.T) {
 		t.Fatal("Missing asset")
 	}
 	r, err := as.Root.RequestFuture(ex, &messages.HistoricalProtocolAssetTransferRequest{
-		RequestID:       uint64(time.Now().UnixNano()),
-		ProtocolAssetID: a.ProtocolAssetID,
-		Start:           14268513 - 500,
-		Stop:            14268513,
+		RequestID:  uint64(time.Now().UnixNano()),
+		AssetID:    wrapperspb.UInt32(a.Asset.ID),
+		ChainID:    a.Chain.ID,
+		ProtocolID: a.Protocol.ID,
+		Start:      14268513 - 500,
+		Stop:       14268513,
 	}, 40*time.Second).Result()
 	if err != nil {
 		t.Fatal(err)

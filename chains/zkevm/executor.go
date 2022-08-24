@@ -1,25 +1,28 @@
-package evm
+package zkevm
 
 import (
 	"container/list"
 	goContext "context"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"gitlab.com/alphaticks/xchanger/exchanges"
+	"sync"
 
 	"math/big"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	chtypes "gitlab.com/alphaticks/alpha-connect/chains/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
-	"gitlab.com/alphaticks/xchanger/exchanges"
+	"gitlab.com/alphaticks/xchanger/chains/zks"
 )
 
 type flushLogs struct{}
@@ -34,27 +37,23 @@ type logsSubscription struct {
 	ch           chan types.Log
 }
 
-type EVMLog struct {
-	log            types.Log
-	subscriptionID uint64
-}
-
 type Executor struct {
 	chtypes.BaseExecutor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	logger         *log.Logger
 	client         *ethclient.Client
+	rpc            *rpc.Client
 	rateLimit      *exchanges.RateLimit
 	subscriptions  map[uint64]*logsSubscription
 	flushTicker    *time.Ticker
-	rpc            string
+	endpoint       string
 }
 
 func NewExecutor(registry registry.PublicRegistryClient, rpc string) actor.Actor {
 	e := &Executor{
 		protocolAssets: nil,
 		logger:         nil,
-		rpc:            rpc,
+		endpoint:       rpc,
 	}
 	e.Registry = registry
 	return e
@@ -82,12 +81,13 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()))
 
-	client, err := ethclient.Dial(state.rpc)
+	r, err := rpc.DialContext(goContext.Background(), state.endpoint)
 	if err != nil {
-		return fmt.Errorf("error while dialing eth rpc client %v", err)
+		return fmt.Errorf("error while dialing zksync rpc client %v", err)
 	}
-	state.client = client
-	//state.rateLimit =
+	state.client = ethclient.NewClient(r)
+	state.rpc = r
+	// state.rateLimit =
 	state.subscriptions = make(map[uint64]*logsSubscription)
 
 	flushTicker := time.NewTicker(5 * time.Second)
@@ -119,7 +119,7 @@ func (state *Executor) OnBlockNumberRequest(context actor.Context) error {
 
 		current, err := state.client.BlockNumber(goContext.Background())
 		if err != nil {
-			state.logger.Warn("error filtering logs", log.Error(err))
+			state.logger.Warn("error getting block number", log.Error(err))
 			res.RejectionReason = messages.RejectionReason_RPCError
 			context.Send(sender, res)
 			return
@@ -140,7 +140,11 @@ func (state *Executor) OnBlockInfoRequest(context actor.Context) error {
 			ResponseID: uint64(time.Now().UnixNano()),
 		}
 
-		header, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(req.BlockNumber)))
+		var header *zks.Header
+		ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+		defer cancel()
+		num := hexutil.EncodeBig(big.NewInt(int64(req.BlockNumber)))
+		err := state.rpc.CallContext(ctx, &header, "eth_getBlockByNumber", num, false)
 		if err != nil {
 			state.logger.Warn("error getting header", log.Error(err))
 			res.RejectionReason = messages.RejectionReason_RPCError
@@ -168,7 +172,7 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 			state.logger.Warn("error with contract call", log.Error(err))
 			res.RejectionReason = messages.RejectionReason_RPCError
 			switch err.Error() {
-			case "invalid jump destination":
+			case "Execution error":
 				res.RejectionReason = messages.RejectionReason_InvalidJumpDestination
 			}
 			context.Send(sender, res)
@@ -249,15 +253,20 @@ func (state *Executor) OnEVMLogsQueryRequest(context actor.Context) error {
 		var lastTime uint64 = 0
 		for _, l := range logs {
 			if lastBlock != l.BlockNumber {
-				block, err := state.client.HeaderByNumber(goContext.Background(), big.NewInt(int64(l.BlockNumber)))
+				var header *zks.Header
+				ctx, cancel := goContext.WithTimeout(goContext.Background(), 15*time.Second)
+				num := hexutil.EncodeBig(big.NewInt(int64(l.BlockNumber)))
+				err := state.rpc.CallContext(ctx, &header, "eth_getBlockByNumber", num, false)
 				if err != nil {
 					state.logger.Warn("error getting header", log.Error(err))
 					res.RejectionReason = messages.RejectionReason_RPCError
 					context.Send(sender, res)
+					cancel()
 					return
 				}
-				lastTime = block.Time
+				lastTime = header.Time
 				lastBlock = l.BlockNumber
+				cancel()
 			}
 			res.Times = append(res.Times, lastTime)
 		}
@@ -342,16 +351,16 @@ func (state *Executor) onFlushLogs(context actor.Context) error {
 		state.logger.Warn("error fetching block number", log.Error(err))
 		return nil
 	}
-	for k, subs := range state.subscriptions {
-		subs.RLock()
+	for k, sub := range state.subscriptions {
+		sub.RLock()
 		select {
-		case err := <-subs.subscription.Err():
+		case err := <-sub.subscription.Err():
 			// TODO restart subscription
 			fmt.Println("Error on subscription", err)
 		default:
 		}
 		var logs *messages.EVMLogs
-		for el := subs.logs.Front(); el != nil; el = subs.logs.Front() {
+		for el := sub.logs.Front(); el != nil; el = sub.logs.Front() {
 			updt := el.Value.(*types.Log)
 			if updt.BlockNumber > current-3 {
 				// we are done
@@ -360,53 +369,56 @@ func (state *Executor) onFlushLogs(context actor.Context) error {
 			if logs == nil || logs.BlockNumber != updt.BlockNumber {
 				// No update or new block, publish
 				if logs != nil {
-					context.Send(subs.subscriber, &messages.EVMLogsSubscribeRefresh{
+					context.Send(sub.subscriber, &messages.EVMLogsSubscribeRefresh{
 						RequestID: k,
-						SeqNum:    subs.seqNum + 1,
+						SeqNum:    sub.seqNum + 1,
 						Update:    logs,
 					})
-					subs.seqNum += 1
+					sub.seqNum += 1
 				}
-				ctx, _ := goContext.WithTimeout(goContext.Background(), 10*time.Second)
-				h, err := state.client.HeaderByNumber(ctx, big.NewInt(int64(updt.BlockNumber)))
+				ctx, cancel := goContext.WithTimeout(goContext.Background(), 10*time.Second)
+				var head *zks.Header
+				num := hexutil.EncodeBig(big.NewInt(int64(updt.BlockNumber)))
+				err := state.rpc.CallContext(ctx, &head, "eth_getBlockByNumber", num, false)
 				if err != nil {
 					state.logger.Warn("error getting block header", log.Error(err))
-					subs.RUnlock()
+					sub.RUnlock()
+					cancel()
 					return nil
 				}
 				logs = &messages.EVMLogs{
 					BlockNumber: updt.BlockNumber,
-					BlockTime:   time.Unix(int64(h.Time), 0),
+					BlockTime:   time.Unix(int64(head.Time), 0),
 				}
+				cancel()
 			}
 			logs.Logs = append(logs.Logs, *updt)
-			subs.logs.Remove(el)
+			sub.logs.Remove(el)
 		}
 		// Publish it
 		if logs != nil {
-			context.Send(subs.subscriber, &messages.EVMLogsSubscribeRefresh{
+			context.Send(sub.subscriber, &messages.EVMLogsSubscribeRefresh{
 				RequestID: k,
-				SeqNum:    subs.seqNum + 1,
+				SeqNum:    sub.seqNum + 1,
 				Update:    logs,
 			})
-			subs.seqNum += 1
-			subs.lastPingTime = time.Now()
-		} else if time.Since(subs.lastPingTime) > 10*time.Second {
-			context.Send(subs.subscriber, &messages.EVMLogsSubscribeRefresh{
+			sub.seqNum += 1
+			sub.lastPingTime = time.Now()
+		} else if time.Since(sub.lastPingTime) > 10*time.Second {
+			context.Send(sub.subscriber, &messages.EVMLogsSubscribeRefresh{
 				RequestID: k,
-				SeqNum:    subs.seqNum + 1,
+				SeqNum:    sub.seqNum + 1,
 			})
-			subs.seqNum += 1
-			subs.lastPingTime = time.Now()
+			sub.seqNum += 1
+			sub.lastPingTime = time.Now()
 		}
-		subs.RUnlock()
+		sub.RUnlock()
 	}
 	return nil
 }
 
 func (state *Executor) Clean(context actor.Context) error {
 	for _, sub := range state.subscriptions {
-		sub.subscription.Unsubscribe()
 		close(sub.ch)
 		context.Unwatch(sub.subscriber)
 	}

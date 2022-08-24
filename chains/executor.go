@@ -1,7 +1,6 @@
 package chains
 
 import (
-	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -87,6 +86,16 @@ func (state *Executor) Receive(context actor.Context) {
 	case *messages.SVMEventsQueryRequest:
 		if err := state.OnSVMEventsQueryRequest(context); err != nil {
 			state.logger.Error("error processing OnSVMEventsQueryRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.SVMContractCallRequest:
+		if err := state.OnSVMContractCallRequest(context); err != nil {
+			state.logger.Error("error processing OnSVMContractCallRequest", log.Error(err))
+			panic(err)
+		}
+	case *messages.SVMContractClassRequest:
+		if err := state.OnSVMContractClassRequest(context); err != nil {
+			state.logger.Error("error processing OnSVMContractClassRequest", log.Error(err))
 			panic(err)
 		}
 	case *messages.SVMBlockQueryRequest:
@@ -247,6 +256,50 @@ func (state *Executor) OnSVMEventsQueryRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnSVMContractCallRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMContractCallRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.SVMContractCallResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.SVMContractCallResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
+func (state *Executor) OnSVMContractClassRequest(context actor.Context) error {
+	req := context.Message().(*messages.SVMContractClassRequest)
+	if req.Chain == nil {
+		context.Respond(&messages.SVMContractClassResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownChain,
+		})
+		return nil
+	}
+
+	if rej := state.forward(context, req.Chain); rej != nil {
+		context.Respond(&messages.SVMContractClassResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: *rej,
+		})
+		return nil
+	}
+	return nil
+}
+
 func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 	req := context.Message().(*messages.SVMBlockQueryRequest)
 	if req.Chain == nil {
@@ -257,8 +310,6 @@ func (state *Executor) OnSVMBlockQueryRequest(context actor.Context) error {
 		})
 		return nil
 	}
-
-	fmt.Println("SVM BLOCK QUERY")
 
 	if rej := state.forward(context, req.Chain); rej != nil {
 		context.Respond(&messages.SVMBlockQueryResponse{

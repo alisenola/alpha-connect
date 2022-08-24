@@ -553,8 +553,8 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54 h1:IbjSsQUT3ur0+qKnNsEpHYcTeiqR4bFC1kf19BPKePo=
 gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54/go.mod h1:QK3gJk4qCtVrgAzgroL81IzhuQ67isIv+5vud3xPG34=
-gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1 h1:ElZ8iA1ChWXnmdyyZyWRlDv4bwAw1B/O94fHczB5Y1o=
-gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220606082528-78515a6e75f1/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220714092106-829bce1ff174 h1:Am0vl43V2y0LW7kzz3+T7sQejgBnwIO5Oo3EeenZ2d4=
+gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220714092106-829bce1ff174/go.mod h1:PcT4nYBGowTvPPHnNEv1mLXw84OBYnvCO2PxFVdeSjo=
 gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d h1:rvhwFm/PMMF0kyp3WAmKVhVMcGdJGKjhWkVr0SMz80A=
 gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d/go.mod h1:zUMmafXU2rGVaex05bnwsdn9XMxhz7Joy5Bpii3qFBc=
 gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23 h1:GfPM45VFkp/CxDPbBiRuw29lqMUQ2b7W+J4izhxLmm8=
@@ -575,14 +575,8 @@ gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb/go.mod h
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220216193750-c9d32c432117/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d h1:ADKlvT+V6+DV8KID+6BKJJ53N3VKfsx28vmmcv0qxS8=
 gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d/go.mod h1:IXHq3xexEvpyfVAGq67FFn6V5TPULfCL/BE87sPVavk=
-gitlab.com/alphaticks/xchanger v0.0.0-20220728100007-b1b4c313eea1 h1:v+w8Aq8gX1mB74J+VS33dYuJIvgeUuGyc8V85DD+pzI=
-gitlab.com/alphaticks/xchanger v0.0.0-20220728100007-b1b4c313eea1/go.mod h1:n6et+qS21Ug9nQGf1WhuE+Qokvh5D02En8Lj3DLa1Ug=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811091235-9d674617244c h1:tAg0wfcO9ME1NHI4Hcg8kFSi74lRba5qD9UaVshn3Bg=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811091235-9d674617244c/go.mod h1:n6et+qS21Ug9nQGf1WhuE+Qokvh5D02En8Lj3DLa1Ug=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811092009-dedc03ea7078 h1:CrkyFLzqU6n2Qb38nGzsePgAHfwM1RKax2t8rMkv6WM=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811092009-dedc03ea7078/go.mod h1:n6et+qS21Ug9nQGf1WhuE+Qokvh5D02En8Lj3DLa1Ug=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811092042-853087d1c7c6 h1:E76ls8FjTb/vJ19JC4J9LzIR5r+Grg7c6StfNj4MWLQ=
-gitlab.com/alphaticks/xchanger v0.0.0-20220811092042-853087d1c7c6/go.mod h1:n6et+qS21Ug9nQGf1WhuE+Qokvh5D02En8Lj3DLa1Ug=
+gitlab.com/alphaticks/xchanger v0.0.0-20220824122932-045e409de53c h1:rit6AJf4JoLe9cvLJb5G7VKVFng5DPLS0w1oB+9j5I0=
+gitlab.com/alphaticks/xchanger v0.0.0-20220824122932-045e409de53c/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=

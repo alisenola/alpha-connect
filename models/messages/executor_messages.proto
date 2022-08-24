@@ -74,6 +74,7 @@ enum RejectionReason {
     UnknownChain = 35;
     RequestExpired = 36;
     AccountListenerDisabled = 37;
+    InvalidJumpDestination = 38;
 }
 
 enum ResponseType {
@@ -581,9 +582,11 @@ message OrderMassCancelResponse {
 
 message HistoricalProtocolAssetTransferRequest {
     uint64 requestID = 1;
-    uint64 protocol_assetID = 2;
-    uint64 start = 3;
-    uint64 stop = 4;
+    google.protobuf.UInt32Value assetID = 2;
+    uint32 chainID = 3;
+    uint32 protocolID = 4;
+    uint64 start = 5;
+    uint64 stop = 6;
 }
 
 message HistoricalProtocolAssetTransferResponse {
@@ -599,7 +602,9 @@ message ProtocolAssetDataRequest{
     uint64 requestID = 1;
     bool subscribe = 2;
     actor.PID subscriber = 3;
-    uint64 protocol_assetID = 4;
+    google.protobuf.UInt32Value assetID = 4;
+    uint32 protocolID = 5;
+    uint32 chainID = 6;
 }
 
 message ProtocolAssetDataResponse {

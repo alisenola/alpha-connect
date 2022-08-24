@@ -108,6 +108,8 @@ func (state *Executor) Receive(context actor.Context) {
 		*messages.EVMContractCallRequest,
 		*messages.SVMBlockQueryRequest,
 		*messages.SVMEventsQueryRequest,
+		*messages.SVMContractCallRequest,
+		*messages.SVMContractClassRequest,
 		*messages.SVMTransactionByHashRequest,
 		*messages.BlockNumberRequest,
 		*messages.BlockInfoRequest:

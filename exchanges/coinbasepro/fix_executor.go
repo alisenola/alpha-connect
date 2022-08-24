@@ -44,7 +44,7 @@ func (state *FixExecutor) Initialize(context actor.Context) error {
 		log.InfoLevel,
 		"",
 		log.String("ID", context.Self().Id),
-		log.String("type", reflect.TypeOf(*state).String()))
+		log.String("type", reflect.TypeOf(state).String()))
 	state.fixRateLimit = exchanges.NewRateLimit(50, time.Second)
 	return nil
 }

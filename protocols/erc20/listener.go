@@ -2,14 +2,19 @@ package erc20
 
 import (
 	"fmt"
-	sabi "gitlab.com/alphaticks/abigen-starknet/accounts/abi"
-	token "gitlab.com/alphaticks/xchanger/protocols/erc20/svm"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	gorderbook "gitlab.com/alphaticks/gorderbook/gorderbook.models"
+	"gitlab.com/alphaticks/xchanger/chains/evm"
+	tokenevm "gitlab.com/alphaticks/xchanger/protocols/erc20/evm"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"reflect"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
-	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/protocols/types"
@@ -21,9 +26,8 @@ type updateRequest struct{}
 type Listener struct {
 	types.BaseListener
 	executor        *actor.PID
-	address         [32]byte
-	collection      *models.ProtocolAsset
-	sabi            *sabi.ABI
+	protocolAsset   *models.ProtocolAsset
+	eabi            *abi.ABI
 	seqNum          uint64
 	lastBlock       uint64
 	lastRefreshTime time.Time
@@ -32,16 +36,16 @@ type Listener struct {
 	timeoutTicker   *time.Ticker
 }
 
-func NewListenerProducer(collection *models.ProtocolAsset) actor.Producer {
+func NewListenerProducer(protocolAsset *models.ProtocolAsset) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(collection)
+		return NewListener(protocolAsset)
 	}
 }
 
-func NewListener(collection *models.ProtocolAsset) actor.Actor {
+func NewListener(protocolAsset *models.ProtocolAsset) actor.Actor {
 	return &Listener{
-		collection: collection,
-		logger:     nil,
+		protocolAsset: protocolAsset,
+		logger:        nil,
 	}
 }
 
@@ -68,6 +72,11 @@ func (state *Listener) Receive(context actor.Context) {
 		}
 		state.logger.Info("actor restarting")
 
+	case *messages.EVMLogsSubscribeRefresh:
+		if err := state.OnEVMLogsSubscribeRefresh(context); err != nil {
+			state.logger.Error("error processing OnEVMLogsSubscribeRefresh", log.Error(err))
+			panic(err)
+		}
 	case *messages.ProtocolAssetDataRequest:
 		if err := state.OnProtocolAssetDataRequest(context); err != nil {
 			state.logger.Error("error processing OnProtocolAssetDataRequest", log.Error(err))
@@ -93,19 +102,16 @@ func (state *Listener) Initialize(context actor.Context) error {
 		log.String("ID", context.Self().Id),
 		log.String("type", reflect.TypeOf(*state).String()),
 		log.String("protocol", "ERC-20"),
-		log.String("chain", state.collection.Chain.Type),
+		log.String("chain", state.protocolAsset.Chain.Type),
 	)
-	addr := state.collection.ContractAddress
-	if addr == nil || len(addr.Value) < 2 {
-		return fmt.Errorf("invalid collection address")
-	}
-	state.logger.With(log.String("contract", addr.Value))
-
 	state.executor = actor.NewPID(context.ActorSystem().Address(), "executor")
-	switch state.collection.Chain.Type {
+	switch state.protocolAsset.Chain.Type {
+	case "ZKEVM",
+		"EVM":
+		if err := state.subscribeEVMLogs(context); err != nil {
+			return err
+		}
 	case "SVM":
-		add := common.HexToHash(addr.Value)
-		copy(state.address[:], add.Bytes())
 		if err := state.subscribeSVMEvents(context); err != nil {
 			return err
 		}
@@ -131,16 +137,53 @@ func (state *Listener) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeSVMEvents(context actor.Context) error {
-	stabi, err := token.ERC20MetaData.GetAbi()
+func (state *Listener) subscribeEVMLogs(context actor.Context) error {
+	eabi, err := tokenevm.ERC20MetaData.GetAbi()
 	if err != nil {
-		return fmt.Errorf("error getting stark abi: %v", err)
+		return fmt.Errorf("error getting eth abi: %v", err)
 	}
-	state.sabi = stabi
+	state.eabi = eabi
 
+	topicsv := [][]interface{}{{
+		state.eabi.Events["Transfer"].ID,
+	}}
+	topics, err := abi.MakeTopics(topicsv...)
+	if err != nil {
+		return fmt.Errorf("error making topics: %v", err)
+	}
+	query := ethereum.FilterQuery{
+		Topics: topics,
+	}
+	if state.protocolAsset.Asset != nil {
+		a := common.HexToAddress(state.protocolAsset.ContractAddress.Value)
+		query.Addresses = []common.Address{a}
+	}
+
+	res, err := context.RequestFuture(state.executor, &messages.EVMLogsSubscribeRequest{
+		RequestID:  state.protocolAsset.ProtocolAssetID,
+		Chain:      state.protocolAsset.Chain,
+		Query:      query,
+		Subscriber: context.Self(),
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		return fmt.Errorf("error subscribing to EVM logs: %v", err)
+	}
+	subRes, ok := res.(*messages.EVMLogsSubscribeResponse)
+	if !ok {
+		return fmt.Errorf("was expecting EVMLogsSubscribeResponse, got %s", reflect.TypeOf(subRes).String())
+	}
+	if !subRes.Success {
+		return fmt.Errorf("error subscribing to EVM logs: %s", subRes.RejectionReason.String())
+	}
+	state.seqNum = subRes.SeqNum
+	return nil
+}
+
+func (state *Listener) subscribeSVMEvents(context actor.Context) error {
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
-		RequestID: state.collection.ProtocolAssetID,
-		Chain:     state.collection.Chain,
+		RequestID: state.protocolAsset.ProtocolAssetID,
+		Chain:     state.protocolAsset.Chain,
 	}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching block number: %v", err)
@@ -184,10 +227,53 @@ func (state *Listener) OnProtocolAssetDataRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Listener) OnEVMLogsSubscribeRefresh(context actor.Context) error {
+	refresh := context.Message().(*messages.EVMLogsSubscribeRefresh)
+	if refresh.SeqNum <= state.seqNum {
+		return nil
+	}
+	if refresh.SeqNum != state.seqNum+1 {
+		return fmt.Errorf("out of order sequence")
+	}
+
+	state.seqNum = refresh.SeqNum
+	state.lastRefreshTime = time.Now()
+	var update *models.ProtocolAssetUpdate
+	if refresh.Update != nil {
+		update = &models.ProtocolAssetUpdate{
+			BlockNumber: refresh.Update.BlockNumber,
+			BlockTime:   timestamppb.New(refresh.Update.BlockTime),
+		}
+		for _, l := range refresh.Update.Logs {
+			if len(l.Topics) != 3 {
+				continue
+			}
+			switch l.Topics[0] {
+			case state.eabi.Events["Transfer"].ID:
+				transfer := tokenevm.ERC20Transfer{}
+				if err := evm.UnpackLog(state.eabi, &transfer, "Transfer", l); err != nil {
+					return fmt.Errorf("error unpacking log: %v", err)
+				}
+				update.Transfers = append(update.Transfers, &gorderbook.AssetTransfer{
+					From:     transfer.From[:],
+					To:       transfer.To[:],
+					Value:    transfer.Value.Bytes(),
+					Contract: l.Address.Bytes(),
+				})
+			}
+		}
+	}
+	context.Send(context.Parent(), &messages.ProtocolAssetDataIncrementalRefresh{
+		Update: update,
+		SeqNum: state.seqNum,
+	})
+	return nil
+}
+
 func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 	res, err := context.RequestFuture(state.executor, &messages.BlockNumberRequest{
-		RequestID: state.collection.ProtocolAssetID,
-		Chain:     state.collection.Chain,
+		RequestID: state.protocolAsset.ProtocolAssetID,
+		Chain:     state.protocolAsset.Chain,
 	}, 10*time.Second).Result()
 	if err != nil {
 		return fmt.Errorf("error fetching block number: %v", err)
@@ -202,12 +288,17 @@ func (state *Listener) OnSVMUpdateRequest(context actor.Context) error {
 
 	var update *models.ProtocolAssetUpdate
 	if b.BlockNumber >= state.lastBlock {
-		resp, err := context.RequestFuture(state.executor, &messages.HistoricalProtocolAssetTransferRequest{
-			RequestID:       uint64(time.Now().UnixNano()),
-			ProtocolAssetID: state.collection.ProtocolAssetID,
-			Start:           state.lastBlock,
-			Stop:            state.lastBlock,
-		}, 1*time.Minute).Result()
+		q := &messages.HistoricalProtocolAssetTransferRequest{
+			RequestID:  uint64(time.Now().UnixNano()),
+			ProtocolID: state.protocolAsset.Protocol.ID,
+			ChainID:    state.protocolAsset.Chain.ID,
+			Start:      state.lastBlock,
+			Stop:       state.lastBlock,
+		}
+		if state.protocolAsset.Asset != nil {
+			q.AssetID = &wrapperspb.UInt32Value{Value: state.protocolAsset.Asset.ID}
+		}
+		resp, err := context.RequestFuture(state.executor, q, 1*time.Minute).Result()
 		if err != nil {
 			return fmt.Errorf("error fetching svm events: %v", err)
 		}

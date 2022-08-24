@@ -123,7 +123,7 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 
 	resp, err := state.registry.Protocols(goContext.Background(), &registry.ProtocolsRequest{})
 	if err != nil {
-		return fmt.Errorf("error fetching assets: %v", err)
+		return fmt.Errorf("error fetching protocols: %v", err)
 	}
 	protocols := make(map[uint32]*models.Protocol)
 	for _, p := range resp.Protocols {
@@ -132,14 +132,13 @@ func (state *StaticLoader) checkStatic(context actor.Context) error {
 			Name: p.Name,
 		}
 	}
-	fmt.Println(protocols)
 	if err := constants.LoadProtocols(protocols); err != nil {
 		return err
 	}
 
 	resc, err := state.registry.Chains(goContext.Background(), &registry.ChainsRequest{})
 	if err != nil {
-		return fmt.Errorf("error fetching assets: %v", err)
+		return fmt.Errorf("error fetching chains: %v", err)
 	}
 	chains := make(map[uint32]*models.Chain)
 	for _, c := range resc.Chains {
