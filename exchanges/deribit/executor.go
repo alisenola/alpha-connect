@@ -197,6 +197,26 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 			security := models.Security{}
+			if i.Kind == "future" {
+				if i.SettlementPeriod == "perpetual" {
+					security.SecurityType = enum.SecurityType_CRYPTO_PERP
+				} else {
+					security.SecurityType = enum.SecurityType_CRYPTO_FUT
+					security.MaturityDate = utils.MilliToTimestamp(i.ExpirationTimestamp)
+				}
+			} else if i.Kind == "option" {
+				security.SecurityType = enum.SecurityType_CRYPTO_OPT
+				if i.OptionType == "call" {
+					security.SecuritySubType = wrapperspb.String(enum.SecuritySubType_CALL)
+				} else {
+					security.SecuritySubType = wrapperspb.String(enum.SecuritySubType_PUT)
+				}
+				security.StrikePrice = wrapperspb.Double(i.Strike)
+			} else {
+				// Skip combos
+				continue
+			}
+
 			if i.IsActive {
 				security.Status = models.InstrumentStatus_Trading
 			} else {
@@ -214,18 +234,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			}
 			security.QuoteCurrency = quoteCurrency
 			security.Exchange = constants.DERIBIT
-			if i.SettlementPeriod == "perpetual" {
-				security.SecurityType = enum.SecurityType_CRYPTO_PERP
-			} else {
-				security.SecurityType = enum.SecurityType_CRYPTO_FUT
-				security.MaturityDate = utils.MilliToTimestamp(i.ExpirationTimestamp)
-			}
-			security.MakerFee = &wrapperspb.DoubleValue{Value: i.MakerCommission}
-			security.TakerFee = &wrapperspb.DoubleValue{Value: i.TakerCommission}
+
+			security.MakerFee = wrapperspb.Double(i.MakerCommission)
+			security.TakerFee = wrapperspb.Double(i.TakerCommission)
 
 			security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
-			security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: i.TickSize}
-			security.RoundLot = &wrapperspb.DoubleValue{Value: i.ContractSize}
+			security.MinPriceIncrement = wrapperspb.Double(i.TickSize)
+			security.RoundLot = wrapperspb.Double(i.ContractSize)
 			security.IsInverse = true
 
 			securities = append(securities, &security)

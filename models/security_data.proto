@@ -54,6 +54,7 @@ message Security {
     models.Protocol protocol = 22;
     models.Chain chain = 23;
     google.protobuf.DoubleValue price = 26;
+    google.protobuf.DoubleValue strike_price = 27;
 }
 
 message Order {
