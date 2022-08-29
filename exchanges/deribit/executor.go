@@ -193,9 +193,6 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 
 		for _, i := range res.Result {
-			if i.Kind == "option" {
-				continue
-			}
 			security := models.Security{}
 			if i.Kind == "future" {
 				if i.SettlementPeriod == "perpetual" {

@@ -479,7 +479,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 					Stats: []*models.Stat{{
 						Timestamp: utils.MilliToTimestamp(uint64(f.Timestamp.UnixNano() / 1000000)),
 						StatType:  models.StatType_OpenInterest,
-						Value:     float64(*f.OpenInterest),
+						Value:     float64(*f.OpenInterest), //TODO / 1e4,
 					}},
 					SeqNum: state.instrumentData.seqNum + 1,
 				})

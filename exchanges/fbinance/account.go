@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
 	"math"
+	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -1127,7 +1128,8 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 
 	ws := fbinance.NewAuthWebsocket(listenKey.ListenKey)
 	// TODO Dialer
-	if err := ws.Connect(state.client.Transport.(*http.Transport).DialContext); err != nil {
+	dl := net.DefaultResolver
+	if err := ws.Connect(dl.Dial); err != nil {
 		return fmt.Errorf("error connecting to fbinance websocket: %v", err)
 	}
 

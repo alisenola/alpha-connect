@@ -176,9 +176,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 
 func (state *Listener) Clean(context actor.Context) error {
 	if state.ws != nil {
-		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
+		state.ws.Disconnect()
 	}
 
 	if state.socketTicker != nil {
@@ -191,7 +189,7 @@ func (state *Listener) Clean(context actor.Context) error {
 
 func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if state.ws != nil {
-		_ = state.ws.Disconnect()
+		state.ws.Disconnect()
 	}
 
 	ws := deribit.NewWebsocket()
@@ -203,7 +201,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if os.Getenv("DERIBIT_KEY") != "" {
 		fmt.Println("SUBSCRIBE RAW")
 		interval = deribit.Interval0ms
-		if _, err := ws.Auth(&xchangerModels.APICredentials{
+		if err := ws.Auth(&xchangerModels.APICredentials{
 			APIKey:    os.Getenv("DERIBIT_KEY"),
 			APISecret: os.Getenv("DERIBIT_SECRET"),
 		}); err != nil {
@@ -258,16 +256,18 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			Bid:      false,
 		}
 	}
-	if len(update.Asks) == 0 || len(update.Bids) == 0 {
-		return fmt.Errorf("empty bid or ask")
-	}
 	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
 	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	bestAsk := update.Asks[0].Price
-	depth := int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-
-	if depth > 10000 {
-		depth = 10000
+	depth := 10000
+	if len(update.Asks) > 0 {
+		bestAsk := update.Asks[0].Price
+		depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+		if depth > 10000 {
+			depth = 10000
+		}
+		if depth < 100 {
+			depth = 100
+		}
 	}
 
 	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
@@ -547,12 +547,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-
-	if time.Since(state.lastPingTime) > 10*time.Second {
-		// "Ping" by resubscribing to the topic
-		_ = state.ws.Ping()
-		state.lastPingTime = time.Now()
-	}
 
 	if state.ws.Err != nil || !state.ws.Connected {
 		if state.ws.Err != nil {
