@@ -980,6 +980,25 @@ func (accnt *Account) GetPositions() []*models.Position {
 	return positions
 }
 
+func (accnt *Account) GetPosition(securityID uint64) *models.Position {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	if pos, ok := accnt.positions[securityID]; ok {
+		p := &models.Position{
+			Account:    accnt.Name,
+			Instrument: accnt.securities[securityID].GetInstrument(),
+			Cross:      false,
+		}
+		if pp := pos.GetPosition(); pp != nil {
+			p.Quantity = pp.Quantity
+			p.Cost = pp.Cost
+		}
+		return p
+	} else {
+		return nil
+	}
+}
+
 func (accnt *Account) GetAllPositions() []*models.Position {
 	accnt.RLock()
 	defer accnt.RUnlock()
