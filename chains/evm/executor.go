@@ -50,7 +50,7 @@ type Executor struct {
 	rpc            string
 }
 
-func NewExecutor(registry registry.PublicRegistryClient, rpc string) actor.Actor {
+func NewExecutor(registry registry.StaticClient, rpc string) actor.Actor {
 	e := &Executor{
 		protocolAssets: nil,
 		logger:         nil,

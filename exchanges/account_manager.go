@@ -19,7 +19,7 @@ import (
 type AccountManager struct {
 	config.Account
 	db              *gorm.DB
-	registry        registry.PublicRegistryClient
+	registry        registry.StaticClient
 	client          *http.Client
 	account         *account.Account
 	execSubscribers map[uint64]*actor.PID
@@ -31,13 +31,13 @@ type AccountManager struct {
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient, client *http.Client) actor.Producer {
+func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Producer {
 	return func() actor.Actor {
 		return NewAccountManager(config, account, db, registry, client)
 	}
 }
 
-func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.PublicRegistryClient, client *http.Client) actor.Actor {
+func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Actor {
 	return &AccountManager{
 		Account:  config,
 		account:  account,

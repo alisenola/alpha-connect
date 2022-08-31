@@ -21,7 +21,7 @@ import (
 
 type Executor struct {
 	*config.Config
-	registry       registry.PublicRegistryClient
+	registry       registry.StaticClient
 	executors      map[uint32]*actor.PID // A map from protocol ID to executor
 	protocolAssets map[uint64]*models.ProtocolAsset
 	alSubscribers  map[uint64]*actor.PID // A map from request ID to asset list subscriber
@@ -30,13 +30,13 @@ type Executor struct {
 	strict         bool
 }
 
-func NewExecutorProducer(cfg *config.Config, registry registry.PublicRegistryClient) actor.Producer {
+func NewExecutorProducer(cfg *config.Config, registry registry.StaticClient) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfg, registry)
 	}
 }
 
-func NewExecutor(cfg *config.Config, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(cfg *config.Config, registry registry.StaticClient) actor.Actor {
 	return &Executor{
 		Config:   cfg,
 		registry: registry,

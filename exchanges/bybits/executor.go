@@ -35,7 +35,7 @@ type Executor struct {
 	logger       *log.Logger
 }
 
-func NewExecutor(dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(dialerPool *xutils.DialerPool, registry registry.StaticClient) actor.Actor {
 	e := &Executor{}
 	e.DialerPool = dialerPool
 	e.Registry = registry

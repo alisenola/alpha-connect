@@ -139,7 +139,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
 	}
-	rgstr := registry.NewPublicRegistryClient(conn)
+	rgstr := registry.NewStaticClient(conn)
 	if state.cfg.StaticLoader {
 		staticLoader := context.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
 		_, err = context.RequestFuture(staticLoader, &utils.Ready{}, 10*time.Second).Result()

@@ -25,7 +25,7 @@ type ExecutorConfig struct {
 	Exchanges               []*xchangerModels.Exchange
 	Accounts                []*account.Account
 	DialerPool              *xchangerUtils.DialerPool
-	Registry                registry.PublicRegistryClient
+	Registry                registry.StaticClient
 	OpenseaCredentials      *xchangerModels.APICredentials
 	DB                      *gorm.DB
 	StrictExchange          bool
@@ -68,7 +68,7 @@ type Executor interface {
 type BaseExecutor struct {
 	Config                   *config.Config
 	DialerPool               *xchangerUtils.DialerPool
-	Registry                 registry.PublicRegistryClient
+	Registry                 registry.StaticClient
 	AccountClients           map[string]*http.Client
 	SecuritiesLock           sync.RWMutex
 	Securities               map[uint64]*models.Security

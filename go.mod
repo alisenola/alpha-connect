@@ -12,7 +12,7 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.7.5
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
-	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220714092106-829bce1ff174
+	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220831115838-7a48937389e8
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220728095318-cdee2054f4c6
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20220728130521-0cc95f984b5f

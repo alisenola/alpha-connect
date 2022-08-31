@@ -44,10 +44,10 @@ type Executor struct {
 	sabi           *sabi.ABI
 	eabi           *abi.ABI
 	logger         *log.Logger
-	registry       registry.PublicRegistryClient
+	registry       registry.StaticClient
 }
 
-func NewExecutor(registry registry.PublicRegistryClient, protocol *xmodels.Protocol) actor.Actor {
+func NewExecutor(registry registry.StaticClient, protocol *xmodels.Protocol) actor.Actor {
 	return &Executor{
 		protocolAssets: nil,
 		logger:         nil,

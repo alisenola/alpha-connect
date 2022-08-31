@@ -32,7 +32,7 @@ import (
 type Executor struct {
 	*config.Config
 	db                       *gorm.DB
-	registry                 registry.PublicRegistryClient
+	registry                 registry.StaticClient
 	dialerPool               *xchangerUtils.DialerPool
 	accountClients           map[string]map[string]*http.Client
 	accountManagers          map[string]*actor.PID
@@ -47,13 +47,13 @@ type Executor struct {
 	strict                   bool
 }
 
-func NewExecutorProducer(cfg *config.Config, registry registry.PublicRegistryClient) actor.Producer {
+func NewExecutorProducer(cfg *config.Config, registry registry.StaticClient) actor.Producer {
 	return func() actor.Actor {
 		return NewExecutor(cfg, registry)
 	}
 }
 
-func NewExecutor(cfg *config.Config, registry registry.PublicRegistryClient) actor.Actor {
+func NewExecutor(cfg *config.Config, registry registry.StaticClient) actor.Actor {
 	return &Executor{
 		Config:   cfg,
 		registry: registry,

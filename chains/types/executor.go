@@ -28,7 +28,7 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
-	Registry registry.PublicRegistryClient
+	Registry registry.StaticClient
 	Chains   []*models2.Chain
 }
 

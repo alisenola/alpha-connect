@@ -34,7 +34,7 @@ type AccountListener struct {
 	ws                    *ftx.Websocket
 	executorManager       *actor.PID
 	logger                *log.Logger
-	registry              registry.PublicRegistryClient
+	registry              registry.StaticClient
 	checkAccountTicker    *time.Ticker
 	checkSocketTicker     *time.Ticker
 	checkExpirationTicker *time.Ticker
@@ -44,13 +44,13 @@ type AccountListener struct {
 	db                    *gorm.DB
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.StaticClient, db *gorm.DB, readOnly bool) actor.Producer {
 	return func() actor.Actor {
 		return NewAccountListener(account, registry, db, readOnly)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, readOnly bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.StaticClient, db *gorm.DB, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		registry:        registry,

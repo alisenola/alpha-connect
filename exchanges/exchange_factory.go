@@ -59,7 +59,7 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	return accnt, nil
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.StaticClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.BITMEX.ID:
 		return func() actor.Actor { return bitmex.NewAccountListener(account) }
@@ -80,7 +80,7 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Publ
 	}
 }
 
-func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+func NewAccountReconcileProducer(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
 		return fbinance.NewAccountReconcileProducer(account, registry, db)
@@ -171,7 +171,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	}
 }
 
-func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Config, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Producer {
+func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Config, dialerPool *xutils.DialerPool, registry registry.StaticClient, accountClients map[string]*http.Client) actor.Producer {
 	switch exchange.ID {
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewExecutor(dialerPool, registry) }

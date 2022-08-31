@@ -23,7 +23,7 @@ type Executor interface {
 }
 
 type BaseExecutor struct {
-	Registry  registry.PublicRegistryClient
+	Registry  registry.StaticClient
 	Protocols []*models2.Protocol
 }
 

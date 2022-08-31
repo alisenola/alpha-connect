@@ -10,7 +10,7 @@ import (
 	models2 "gitlab.com/alphaticks/xchanger/models"
 )
 
-func NewProtocolExecutorProducer(protocol *models2.Protocol, registry registry.PublicRegistryClient) actor.Producer {
+func NewProtocolExecutorProducer(protocol *models2.Protocol, registry registry.StaticClient) actor.Producer {
 	switch protocol.ID {
 	case constants.ERC20.ID:
 		return func() actor.Actor { return erc20.NewExecutor(registry, protocol) }

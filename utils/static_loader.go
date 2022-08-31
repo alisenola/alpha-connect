@@ -17,18 +17,18 @@ type checkStatic struct{}
 type Ready struct{}
 
 type StaticLoader struct {
-	registry registry.PublicRegistryClient
+	registry registry.StaticClient
 	logger   *log.Logger
 	ticker   *time.Ticker
 }
 
-func NewStaticLoaderProducer(rgstry registry.PublicRegistryClient) actor.Producer {
+func NewStaticLoaderProducer(rgstry registry.StaticClient) actor.Producer {
 	return func() actor.Actor {
 		return NewStaticLoader(rgstry)
 	}
 }
 
-func NewStaticLoader(rgstry registry.PublicRegistryClient) actor.Actor {
+func NewStaticLoader(rgstry registry.StaticClient) actor.Actor {
 	return &StaticLoader{
 		registry: rgstry,
 	}

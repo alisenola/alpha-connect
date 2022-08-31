@@ -117,7 +117,7 @@ type Executor struct {
 	config              *config.Config
 }
 
-func NewExecutor(config *config.Config, dialerPool *xutils.DialerPool, registry registry.PublicRegistryClient, accountClients map[string]*http.Client) actor.Actor {
+func NewExecutor(config *config.Config, dialerPool *xutils.DialerPool, registry registry.StaticClient, accountClients map[string]*http.Client) actor.Actor {
 	ex := &Executor{
 		queryRunners: nil,
 		logger:       nil,

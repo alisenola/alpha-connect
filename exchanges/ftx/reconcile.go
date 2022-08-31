@@ -28,7 +28,7 @@ type AccountReconcile struct {
 	logger           *log.Logger
 	securities       map[uint64]*registry.Security
 	symbToSecs       map[string]*registry.Security
-	registry         registry.PublicRegistryClient
+	registry         registry.StaticClient
 	positions        map[uint64]*account.Position
 	db               *gorm.DB
 	lastDepositTs    uint64
@@ -37,13 +37,13 @@ type AccountReconcile struct {
 	lastTradeTs      uint64
 }
 
-func NewAccountReconcileProducer(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Producer {
+func NewAccountReconcileProducer(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Producer {
 	return func() actor.Actor {
 		return NewAccountReconcile(account, registry, db)
 	}
 }
 
-func NewAccountReconcile(account *models.Account, registry registry.PublicRegistryClient, db *gorm.DB) actor.Actor {
+func NewAccountReconcile(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Actor {
 	return &AccountReconcile{
 		account:  account,
 		db:       db,

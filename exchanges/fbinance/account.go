@@ -36,7 +36,7 @@ type AccountListener struct {
 	ws                      *fbinance.AuthWebsocket
 	executorManager         *actor.PID
 	logger                  *log.Logger
-	registry                registry.PublicRegistryClient
+	registry                registry.StaticClient
 	checkAccountTicker      *time.Ticker
 	checkSocketTicker       *time.Ticker
 	refreshKeyTicker        *time.Ticker
@@ -47,13 +47,13 @@ type AccountListener struct {
 	db                      *gorm.DB
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, strict bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.StaticClient, db *gorm.DB, client *http.Client, strict bool) actor.Producer {
 	return func() actor.Actor {
 		return NewAccountListener(account, registry, db, client, strict)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.StaticClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:         account,
 		readOnly:        readOnly,

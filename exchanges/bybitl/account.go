@@ -32,7 +32,7 @@ type AccountListener struct {
 	bybitlExecutor          *actor.PID
 	ws                      *bybitl.Websocket
 	logger                  *log.Logger
-	registry                registry.PublicRegistryClient
+	registry                registry.StaticClient
 	checkAccountTicker      *time.Ticker
 	checkSocketTicker       *time.Ticker
 	refreshMarkPricesTicker *time.Ticker
@@ -43,13 +43,13 @@ type AccountListener struct {
 	db                      *gorm.DB
 }
 
-func NewAccountListenerProducer(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
+func NewAccountListenerProducer(account *account.Account, registry registry.StaticClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Producer {
 	return func() actor.Actor {
 		return NewAccountListener(account, registry, db, client, readOnly)
 	}
 }
 
-func NewAccountListener(account *account.Account, registry registry.PublicRegistryClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
+func NewAccountListener(account *account.Account, registry registry.StaticClient, db *gorm.DB, client *http.Client, readOnly bool) actor.Actor {
 	return &AccountListener{
 		account:  account,
 		readOnly: readOnly,
