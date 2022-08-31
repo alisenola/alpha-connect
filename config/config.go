@@ -45,6 +45,7 @@ func LoadConfig() (*Config, error) {
 			{Chain: 42161, Endpoint: "wss://arb-mainnet.g.alchemy.com/v2/aFDxH7pilsr6I5Ifqp59wVNu_0pd9PaC"},
 		},
 		RegistryAddress: "registry.alphaticks.io:8021",
+		StaticLoader:    true,
 	}
 	if err := viper.Unmarshal(C); err != nil {
 		return nil, fmt.Errorf("error unmarshalling config: %v", err)
