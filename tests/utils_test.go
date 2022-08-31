@@ -16,7 +16,7 @@ func TestCaptureStatics(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	registryAddress := "registry.alphaticks.io:8001"
+	registryAddress := "registry.alphaticks.io:8021"
 	if os.Getenv("REGISTRY_ADDRESS") != "" {
 		registryAddress = os.Getenv("REGISTRY_ADDRESS")
 	}

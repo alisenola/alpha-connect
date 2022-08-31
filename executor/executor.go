@@ -131,11 +131,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()),
 	)
 
-	registryAddress := "registry.alphaticks.io:8001"
-	if state.cfg.RegistryAddress != "" {
-		registryAddress = state.cfg.RegistryAddress
-	}
-	conn, err := grpc.Dial(registryAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial(state.cfg.RegistryAddress, grpc.WithInsecure())
 	if err != nil {
 		return fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 
 func TestMainExecutor(t *testing.T) {
 	var C = config.Config{
-		RegistryAddress: "registry.alphaticks.io:8001",
+		RegistryAddress: "registry.alphaticks.io:8021",
 		Exchanges:       []string{"uniswapv3"},
 		Protocols:       []string{"ERC-721"},
 	}
