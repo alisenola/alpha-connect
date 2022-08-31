@@ -140,10 +140,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 		return fmt.Errorf("error connecting to public registry gRPC endpoint: %v", err)
 	}
 	rgstr := registry.NewPublicRegistryClient(conn)
-	assetLoader := context.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
-	_, err = context.RequestFuture(assetLoader, &utils.Ready{}, 10*time.Second).Result()
-	if err != nil {
-		return fmt.Errorf("error loading assets: %v", err)
+	if state.cfg.StaticLoader {
+		staticLoader := context.Spawn(actor.PropsFromProducer(utils.NewStaticLoaderProducer(rgstr)))
+		_, err = context.RequestFuture(staticLoader, &utils.Ready{}, 10*time.Second).Result()
+		if err != nil {
+			return fmt.Errorf("error loading assets: %v", err)
+		}
 	}
 
 	exProducer := exchanges.NewExecutorProducer(state.cfg, rgstr)

@@ -78,6 +78,7 @@ type Config struct {
 	OpenseaAPIKey          string
 	FBinanceWhitelistedIPs []string
 	StrictExchange         bool
+	StaticLoader           bool
 	DialerPoolInterface    string
 	DialerPoolIPs          []string
 	Accounts               []Account
