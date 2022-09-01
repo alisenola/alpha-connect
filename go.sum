@@ -66,6 +66,7 @@ github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 h1:jEsFZ9d/ieJGVrx3
 github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2/go.mod h1:5GMOSqaYxNWwuVRWyampTPJEntwz7Mj9J8v1a7gSU2E=
 github.com/asynkron/protoactor-go v0.0.0-20220616142548-afd2d973a1d1 h1:6F78LldraDX6+Pv7H73+q+Q2nN8nqPfdz9ihks4kr5U=
 github.com/asynkron/protoactor-go v0.0.0-20220616142548-afd2d973a1d1/go.mod h1:OnIxGbrnX2NFZaOolL4Z3mlSC3ERyqWnz9mepxvdCj0=
+github.com/aws/aws-sdk-go v1.43.12 h1:wOdx6+reSDpUBFEuJDA6edCrojzy8rOtMzhS2rD9+7M=
 github.com/aws/aws-sdk-go v1.43.12/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
@@ -273,6 +274,8 @@ github.com/holiman/uint256 v1.2.0 h1:gpSYcPLWGv4sG43I2mVLiDZCNDh/EpGjSk8tmtxitHM
 github.com/huin/goupnp v1.0.3 h1:N8No57ls+MnjlB+JPiCVSOyy/ot7MJTqlo7rn+NYSqQ=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
+github.com/improbable-eng/grpc-web v0.11.0 h1:drkI/L8GnHWtWeAZFB7bEUQz9bZqOf/X8Dhvsm2uV7Y=
+github.com/improbable-eng/grpc-web v0.11.0/go.mod h1:6hRR09jOEG81ADP5wCQju1z71g6OL4eEvELdran/3cs=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1 h1:i+RDz65UE+mmpjTfyz0MoVTnzeYxroil2G82ki7MGG8=
@@ -327,6 +330,7 @@ github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.1.4 h1:tHnRBy1i5F2Dh8BAFxqFzxKqqvezXrL2OW1TnX+Mlas=
 github.com/jinzhu/now v1.1.4/go.mod h1:d3SSVoowX0Lcu0IBviAWJpolVfI5UJVZZ7cO71lE/z8=
+github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
@@ -389,6 +393,8 @@ github.com/melaurent/gotickfile v0.0.0-20210111153942-2a7b4a47af2e/go.mod h1:23I
 github.com/melaurent/gotickfile v0.0.0-20220126102058-08e9bfcfc230/go.mod h1:gp3nuKLqLH//+C5qXGloMwLYhbviQPbLMCSJwCctz9U=
 github.com/melaurent/gotickfile v0.0.0-20220210143804-428af9922408 h1:JHn0zEFQyqEm4TTzGMsKwyhXX3QeVkDp8d5VOqtY4Ns=
 github.com/melaurent/gotickfile v0.0.0-20220210143804-428af9922408/go.mod h1:gp3nuKLqLH//+C5qXGloMwLYhbviQPbLMCSJwCctz9U=
+github.com/melaurent/gotickfile v0.0.0-20220717080531-a4471992e2ff h1:L13nZhZRNcNaqV0qpzHI22AWNeTnFDihTO/MGIJaqQA=
+github.com/melaurent/gotickfile v0.0.0-20220717080531-a4471992e2ff/go.mod h1:gp3nuKLqLH//+C5qXGloMwLYhbviQPbLMCSJwCctz9U=
 github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408 h1:9fEWnqnE1hya370TbhWeDYlfi6ky+Tr6yyJHhXGeqKc=
 github.com/melaurent/gotickfile/v2 v2.0.0-20220210143804-428af9922408/go.mod h1:Dt5mccSJGQUKF379dP5t7LsB77P3XU2eQ/vtwbpFjQ0=
 github.com/melaurent/kafero v1.2.4-0.20200218222929-17fb17df7ed1/go.mod h1:m6A5SX8eAQhkEBq7ZdqEAJEKHaO+FDnVnYB6OeO9/lw=
@@ -470,6 +476,7 @@ github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6So
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rs/cors v1.7.0 h1:+88SsELBHx5r+hZ8TCkggzSstaWNbDvThkVK8H6f9ik=
+github.com/rs/cors v1.7.0/go.mod h1:gFx+x8UowdsKA9AchylcLynDq+nNFfI8FkUZdN/jGCU=
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/zerolog v1.13.0/go.mod h1:YbFCdg8HfsridGWAh22vktObvhZbQsZXe4/zB0OKkWU=
 github.com/rs/zerolog v1.15.0/go.mod h1:xYTKnLHcpfU2225ny5qZjxnj9NvkumZYjJHlAThCjNc=
@@ -569,6 +576,10 @@ gitlab.com/alphaticks/tickfunctors v0.0.0-20220728130521-0cc95f984b5f h1:QZgC4yh
 gitlab.com/alphaticks/tickfunctors v0.0.0-20220728130521-0cc95f984b5f/go.mod h1:eRokb31rfAhBs2gQhJl5k3JTfYfUKuFeuAedn98W7CQ=
 gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b h1:E24MuDEqPcs7Iq4uVTMgofX6yqZZYLVAlS+EYI2zFUk=
 gitlab.com/alphaticks/tickstore v0.0.0-20220513083712-c1094c2c956b/go.mod h1:OC9NFoqEa1xECBnW5Ltz+nmw7+86Yidwa/RaIcauDDs=
+gitlab.com/alphaticks/tickstore v0.0.0-20220802044048-4db420c95bef h1:UaJSbxX+1WbPAAiGR2cYlMbOUEamdO3x548KGctKpHs=
+gitlab.com/alphaticks/tickstore v0.0.0-20220802044048-4db420c95bef/go.mod h1:jaF2n9H+CwLv/QJHqpaRvZDLNfwBMXSJFh+EbaJ2fns=
+gitlab.com/alphaticks/tickstore v0.0.0-20220901092337-ef8e6e30a146 h1:i9Bfvgw7dblB5sjhQ5+EdUpdJzJtSeDFaSehr6//aQE=
+gitlab.com/alphaticks/tickstore v0.0.0-20220901092337-ef8e6e30a146/go.mod h1:jaF2n9H+CwLv/QJHqpaRvZDLNfwBMXSJFh+EbaJ2fns=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9 h1:FO32ST4Nhp4ZNpNTyTbVNt+DvH8UTUNZugV+wnlBrR8=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9/go.mod h1:dMH10SCRtgZwiLvMh5sBEheCm+3XOulKGbm9RJxikI4=
 gitlab.com/alphaticks/tickstore-grpc v0.0.0-20211204075923-5ffd39706d88/go.mod h1:/+tT4LKD0XX4mck/lEnfVuXeIqbQcQksKZHH/DCv48k=
@@ -581,6 +592,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220824122932-045e409de53c h1:rit6AJf4JoL
 gitlab.com/alphaticks/xchanger v0.0.0-20220824122932-045e409de53c/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
 gitlab.com/alphaticks/xchanger v0.0.0-20220829120235-4826cf388251 h1:gQKsnH8jjy1HJk0GaHv8NEuuyb8HfTVt3HhM3oZr4W8=
 gitlab.com/alphaticks/xchanger v0.0.0-20220829120235-4826cf388251/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
+gitlab.com/alphaticks/xchanger v0.0.0-20220901113203-602f27af6258 h1:Z8xgja3fnxEeFS/OmQorSjvr2zI2Rr+Bzr45x6TfF1U=
+gitlab.com/alphaticks/xchanger v0.0.0-20220901113203-602f27af6258/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
