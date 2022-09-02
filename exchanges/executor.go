@@ -1300,7 +1300,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 					IdleConnTimeout:       60 * time.Second,
 					TLSHandshakeTimeout:   10 * time.Second,
 					ExpectContinueTimeout: 1 * time.Second,
-					MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+					//MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
 				},
 			}
 		}

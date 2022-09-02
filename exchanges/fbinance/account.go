@@ -1118,14 +1118,6 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf(listenKey.Message)
 	}
 
-	req, _, err = fbinance.RefreshListenKey(state.account.ApiCredentials)
-	if err != nil {
-		return fmt.Errorf("error getting refresh listen key request: %v", err)
-	}
-	if err := utils.PerformJSONRequest(state.client, req, nil); err != nil {
-		return fmt.Errorf("error refreshing listen key: %v", err)
-	}
-
 	ws := fbinance.NewAuthWebsocket(listenKey.ListenKey)
 	// TODO Dialer
 	dl := net.DefaultResolver
