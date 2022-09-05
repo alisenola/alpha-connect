@@ -209,6 +209,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 					security.SecuritySubType = wrapperspb.String(enum.SecuritySubType_PUT)
 				}
 				security.StrikePrice = wrapperspb.Double(i.Strike)
+				security.MaturityDate = utils.MilliToTimestamp(i.ExpirationTimestamp)
 			} else {
 				// Skip combos
 				continue
