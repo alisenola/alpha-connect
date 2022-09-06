@@ -103,6 +103,7 @@ func (state *Executor) Clean(context actor.Context) error {
 
 func (state *Executor) UpdateSecurityList(context actor.Context) error {
 
+	return nil
 	var securities []*models.Security
 
 	query, variables := uniswap.GetPoolDefinitionsQuery(graphql.ID(""))
