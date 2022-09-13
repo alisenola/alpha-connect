@@ -604,6 +604,8 @@ gitlab.com/alphaticks/xchanger v0.0.0-20220905090950-23faa8e46f41 h1:jRUPezeZfjj
 gitlab.com/alphaticks/xchanger v0.0.0-20220905090950-23faa8e46f41/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
 gitlab.com/alphaticks/xchanger v0.0.0-20220906115214-6a9f07c39fe5 h1:yxyMn/JE3/z25Bi6fIFF/8WUEFtl1n5bfLngqv49KQ0=
 gitlab.com/alphaticks/xchanger v0.0.0-20220906115214-6a9f07c39fe5/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
+gitlab.com/alphaticks/xchanger v0.0.0-20220913083500-f4aa8d3c764a h1:g+txFE+E/rgcCLE6c7DfrAFJ6xj9c+jkKtnGjXY11Dg=
+gitlab.com/alphaticks/xchanger v0.0.0-20220913083500-f4aa8d3c764a/go.mod h1:WCNTTPQ2miypAM3v6CQ+PFM7hFQJmoWhOYV1rUhSUNM=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.mongodb.org/mongo-driver v1.9.1 h1:m078y9v7sBItkt1aaoe2YlvWEXcD263e1a4E1fBrJ1c=
 go.mongodb.org/mongo-driver v1.9.1/go.mod h1:0sQWfOeY63QTntERDJJ/0SuKK0T1uVSgKCuAROlKEPY=
