@@ -101,8 +101,8 @@ func (lt *LiveStore) NewTickWriter(measurement string, tags map[string]string, f
 }
 
 func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, error) {
-	sel := parsing.Selector{}
-	if err := parsing.SelectorParser.ParseString(qs.Selector, &sel); err != nil {
+	sel, err := parsing.SelectorParser.ParseString("", qs.Selector)
+	if err != nil {
 		return nil, fmt.Errorf("error parsing selector string: %v", err)
 	}
 
@@ -123,7 +123,7 @@ func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, er
 	lt.RLock()
 	defer lt.RUnlock()
 	if lt.index == nil {
-		return NewLiveQuery(lt.as, lt.executor, sel, nil)
+		return NewLiveQuery(lt.as, lt.executor, *sel, nil)
 	}
 	inputSecurities, err := lt.index.Query(queryTags)
 	if err != nil {
@@ -174,7 +174,7 @@ func (lt *LiveStore) NewQuery(qs *types.QuerySettings) (types.TickstoreQuery, er
 		feeds[sec.SecurityID] = feed
 	}
 
-	q, err := NewLiveQuery(lt.as, lt.executor, sel, feeds)
+	q, err := NewLiveQuery(lt.as, lt.executor, *sel, feeds)
 	if err != nil {
 		return nil, fmt.Errorf("error constructing new live query: %v", err)
 	}

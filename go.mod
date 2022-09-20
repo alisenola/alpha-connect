@@ -15,11 +15,11 @@ require (
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20220831115838-7a48937389e8
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20220728095318-cdee2054f4c6
-	gitlab.com/alphaticks/tickfunctors v0.0.0-20220728130521-0cc95f984b5f
-	gitlab.com/alphaticks/tickstore v0.0.0-20220901092337-ef8e6e30a146
+	gitlab.com/alphaticks/tickfunctors v0.0.0-20220916150806-90f816584f1d
+	gitlab.com/alphaticks/tickstore v0.0.0-20220919114311-a95aba397201
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20220224110819-dca07c81edd9
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
-	gitlab.com/alphaticks/tickstore-types v0.0.0-20220308115016-e21ae2e9810d
+	gitlab.com/alphaticks/tickstore-types v0.0.0-20220916121331-7f45c1e5d605
 	gitlab.com/alphaticks/xchanger v0.0.0-20220913083500-f4aa8d3c764a
 	go.mongodb.org/mongo-driver v1.9.1
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
@@ -35,6 +35,7 @@ require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/Workiva/go-datastructures v1.0.53 // indirect
 	github.com/alecthomas/participle v0.4.1 // indirect
+	github.com/alecthomas/participle/v2 v2.0.0-beta.5 // indirect
 	github.com/armon/go-proxyproto v0.0.0-20210323213023-7e956b284f0a // indirect
 	github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 // indirect
 	github.com/aws/aws-sdk-go v1.43.12 // indirect

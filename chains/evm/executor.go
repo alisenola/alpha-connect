@@ -161,6 +161,7 @@ func (state *Executor) OnEVMContractCallRequest(context actor.Context) error {
 		res := &messages.EVMContractCallResponse{
 			RequestID:  req.RequestID,
 			ResponseID: uint64(time.Now().UnixNano()),
+			Success:    false,
 		}
 
 		out, err := state.client.CallContract(goContext.Background(), req.Msg, big.NewInt(int64(req.BlockNumber)))
