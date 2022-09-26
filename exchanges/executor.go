@@ -480,8 +480,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
 		account, err := NewAccount(&models.Account{
-			Name:     accntCfg.Name,
-			Exchange: exch,
+			Portfolio: accntCfg.Portfolio,
+			Name:      accntCfg.Name,
+			Exchange:  exch,
 			ApiCredentials: &xmodels.APICredentials{
 				APIKey:    accntCfg.ApiKey,
 				APISecret: accntCfg.ApiSecret,
@@ -1275,8 +1276,9 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 	}
 
 	if _, ok := state.accountManagers[req.Account.Name]; ok {
+		portfolio := GetPortfolio(req.Account.Portfolio)
 		context.Respond(&commands.GetAccountResponse{
-			Account: Portfolio.GetAccount(req.Account.Name),
+			Account: portfolio.GetAccount(req.Account.Name),
 		})
 	} else {
 		exch, ok := constants.GetExchangeByName(req.Account.Exchange)
@@ -1324,7 +1326,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 		state.accountManagers[req.Account.Name] = context.Spawn(props)
 		context.Respond(&commands.GetAccountResponse{
-			Account: Portfolio.GetAccount(req.Account.Name),
+			Account: account,
 		})
 	}
 	return nil

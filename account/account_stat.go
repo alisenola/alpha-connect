@@ -8,49 +8,6 @@ import (
 
 // TODO what about updating securities ?
 
-func (accnt *Account) Value(model modeling.Market) float64 {
-	accnt.RLock()
-	defer accnt.RUnlock()
-	value := 0.
-	for k, v := range accnt.balances {
-		pp, ok := model.GetPairPrice(k, accnt.quoteCurrency.ID)
-		if ok {
-			value += (float64(v) / accnt.MarginPrecision) * pp
-		}
-	}
-
-	if accnt.MarginCurrency != nil {
-		marginPrice, ok := model.GetPairPrice(accnt.MarginCurrency.ID, accnt.quoteCurrency.ID)
-		if !ok {
-			panic("no price for margin currency")
-		}
-		for k, p := range accnt.positions {
-			if p.rawSize == 0 {
-				continue
-			}
-			cost := float64(p.cost) / p.marginPrecision
-			size := float64(p.rawSize) / p.lotPrecision
-			factor := size * p.multiplier
-			var exp float64
-			if p.inverse {
-				exp = -1
-			} else {
-				exp = 1
-			}
-			pp, ok := model.GetPrice(k)
-			if !ok {
-				panic("no price for position")
-			}
-			value -= (cost - math.Pow(pp, exp)*factor) * marginPrice
-		}
-
-		margin := float64(accnt.margin) / accnt.MarginPrecision
-		value += margin * marginPrice
-	}
-
-	return math.Max(value, 0.)
-}
-
 func (accnt *Account) AddSampleValues(model modeling.MarketModel, time uint64, values []float64) {
 	accnt.RLock()
 	defer accnt.RUnlock()
@@ -123,6 +80,20 @@ func (accnt *Account) GetELROnMarketBuy(securityID uint64, model modeling.Market
 
 func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.MarketModel, time uint64, values []float64, value, price, quantity, maxQuantity float64) (float64, *COrder) {
 	return accnt.securities[securityID].GetELROnMarketSell(model, time, values, value, price, quantity, maxQuantity)
+}
+
+func (accnt *Account) GetExposure(asset uint32, model modeling.Market) float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	exposure := float64(accnt.balances[asset]) / accnt.MarginPrecision
+	for _, pos := range accnt.baseToPositions[asset] {
+		markPrice, ok := model.GetPrice(pos.ID)
+		if !ok {
+			panic("no price for position")
+		}
+		exposure += pos.GetExposure(markPrice)
+	}
+	return exposure
 }
 
 func (accnt *Account) GetLeverage(model modeling.Market) float64 {

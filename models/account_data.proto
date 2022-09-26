@@ -6,9 +6,10 @@ option go_package = "gitlab.com/alphaticks/alpha-connect/models";
 import "gitlab.com/alphaticks/xchanger/models/xchanger.proto";
 
 message Account {
-    string name = 1;
-    models.Exchange exchange = 2;
-    models.APICredentials api_credentials = 3;
-    models.STARKCredentials stark_credentials = 4;
-    models.ECDSACredentials ecdsa_credentials = 5;
+    string portfolio = 1;
+    string name = 2;
+    models.Exchange exchange = 3;
+    models.APICredentials api_credentials = 4;
+    models.STARKCredentials stark_credentials = 5;
+    models.ECDSACredentials ecdsa_credentials = 6;
 }

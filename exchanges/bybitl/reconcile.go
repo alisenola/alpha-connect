@@ -94,7 +94,7 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	state.positions = make(map[uint64]*account.Position)
 	for _, sec := range state.securities {
 		if sec.SecurityType == "CRPERP" {
-			state.positions[sec.SecurityId] = account.NewPosition(
+			state.positions[sec.SecurityId] = account.NewPosition(sec.SecurityId,
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}
@@ -314,7 +314,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	state.positions = make(map[uint64]*account.Position)
 	for _, sec := range state.securities {
 		if sec.SecurityType == "CRPERP" {
-			state.positions[sec.SecurityId] = account.NewPosition(
+			state.positions[sec.SecurityId] = account.NewPosition(sec.SecurityId,
 				sec.IsInverse, 1e8, 1e8, 1e8, 1, 0, 0)
 		}
 	}

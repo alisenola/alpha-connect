@@ -45,17 +45,27 @@ import (
 )
 
 // TODO sample size config
-var Portfolio = account.NewPortfolio(300)
+var portfolios = make(map[string]*account.Portfolio)
+
+func GetPortfolio(ID string) *account.Portfolio {
+	portfolio, ok := portfolios[ID]
+	if !ok {
+		portfolio = account.NewPortfolio(100)
+		portfolios[ID] = portfolio
+	}
+	return portfolio
+}
 
 func NewAccount(accountInfo *models.Account) (*account.Account, error) {
-	if accnt := Portfolio.GetAccount(accountInfo.Name); accnt != nil {
+	portfolio := GetPortfolio(accountInfo.Portfolio)
+	if accnt := portfolio.GetAccount(accountInfo.Name); accnt != nil {
 		return accnt, nil
 	}
 	accnt, err := account.NewAccount(accountInfo)
 	if err != nil {
 		return nil, err
 	}
-	Portfolio.AddAccount(accnt)
+	portfolio.AddAccount(accnt)
 	return accnt, nil
 }
 

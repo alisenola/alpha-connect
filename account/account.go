@@ -80,6 +80,7 @@ type Account struct {
 	ordersClID      map[string]*Order
 	securities      map[uint64]Security
 	symbolToSec     map[string]Security
+	baseToPositions map[uint32][]*Position
 	positions       map[uint64]*Position
 	balances        map[uint32]int64
 	assets          map[uint32]*xchangerModels.Asset
@@ -100,6 +101,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		ordersClID:      make(map[string]*Order),
 		securities:      make(map[uint64]Security),
 		positions:       make(map[uint64]*Position),
+		baseToPositions: make(map[uint32][]*Position),
 		balances:        make(map[uint32]int64),
 		assets:          make(map[uint32]*xchangerModels.Asset),
 		margin:          0,
@@ -153,6 +155,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.securities = make(map[uint64]Security)
 	accnt.symbolToSec = make(map[string]Security)
 	accnt.positions = make(map[uint64]*Position)
+	accnt.baseToPositions = make(map[uint32][]*Position)
 	accnt.balances = make(map[uint32]int64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
 	accnt.takerFee = takerFee
@@ -194,6 +197,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
+			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
 			if err != nil {

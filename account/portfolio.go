@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"math"
 )
@@ -42,13 +43,26 @@ func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.Name] = account
 }
 
-func (p *Portfolio) Value(model modeling.Market) float64 {
+func (p *Portfolio) Value(model modeling.Market) (float64, error) {
 	value := 0.
 	for _, exch := range p.accountPortfolios {
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
-	return value
+	return value, nil
+}
+
+func (p *Portfolio) GetExposure(asset uint32, model modeling.Market) float64 {
+	var exposure float64 = 0
+	for _, exch := range p.accountPortfolios {
+		exposure += exch.GetExposure(asset, model)
+	}
+
+	return exposure
 }
 
 /*
@@ -63,7 +77,7 @@ func (p *Portfolio) GetAsset(asset uint32) float64 {
 */
 
 // Return the expected log return
-func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) (float64, error) {
 	N := p.sampleSize
 
 	var value float64 = 0
@@ -75,7 +89,11 @@ func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) f
 	// We need to ensure consistent sample prices across the computation
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
 	// TODO what to do if value is 0 ?
@@ -86,7 +104,7 @@ func (p *Portfolio) ExpectedLogReturn(model modeling.MarketModel, time uint64) f
 		expectedLogReturn += math.Log(values[i] / value)
 	}
 
-	return expectedLogReturn / float64(N)
+	return expectedLogReturn / float64(N), nil
 }
 
 /*
@@ -129,7 +147,7 @@ func (p *Portfolio) ExpectedLogReturnOnCancel(time uint64, exchange uint64, inst
 }
 */
 
-func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) (float64, error) {
 	N := p.sampleSize
 	var value float64 = 0
 	values := make([]float64, N)
@@ -139,16 +157,20 @@ func (p *Portfolio) GetELR(model modeling.MarketModel, time uint64) float64 {
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 	elr := 0.
 	for i := 0; i < N; i++ {
 		elr += math.Log(values[i] / value)
 	}
-	return elr / float64(N)
+	return elr / float64(N), nil
 }
 
-func (p *Portfolio) GetELROnCancelBid(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelBid(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) (float64, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -159,14 +181,18 @@ func (p *Portfolio) GetELROnCancelBid(accountID string, securityID uint64, order
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnCancelBid(securityID, orderID, model, time, values, value)
+	return target.GetELROnCancelBid(securityID, orderID, model, time, values, value), nil
 }
 
-func (p *Portfolio) GetELROnCancelAsk(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) float64 {
+func (p *Portfolio) GetELROnCancelAsk(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64) (float64, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -177,14 +203,18 @@ func (p *Portfolio) GetELROnCancelAsk(accountID string, securityID uint64, order
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnCancelAsk(securityID, orderID, model, time, values, value)
+	return target.GetELROnCancelAsk(securityID, orderID, model, time, values, value), nil
 }
 
-func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -195,14 +225,19 @@ func (p *Portfolio) GetELROnLimitBid(accountID string, securityID uint64, model 
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 	target := p.accountPortfolios[accountID]
+	elr, o := target.GetELROnLimitBid(securityID, model, time, values, value, prices, queues, maxQuantity)
 
-	return target.GetELROnLimitBid(securityID, model, time, values, value, prices, queues, maxQuantity)
+	return elr, o, nil
 }
 
-func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -214,19 +249,24 @@ func (p *Portfolio) GetELROnLimitAsk(accountID string, securityID uint64, model 
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
 	target := p.accountPortfolios[accountID]
+	elr, o := target.GetELROnLimitAsk(securityID, model, time, values, value, prices, queues, maxQuantity)
 
-	return target.GetELROnLimitAsk(securityID, model, time, values, value, prices, queues, maxQuantity)
+	return elr, o, nil
 }
 
 // We make multiple assumptions here. At each level, we assume the expectedMatch will be what will be set as order quantity
 // This assumption kind of make sense, as if, in case of bid, the expected match is big at one level, might as well place the order
 // at the level bellow to get a higher spread.
 // When at ask, a // TODO think more about that
-func (p *Portfolio) GetELROnLimitBidChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitBidChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 	var value float64 = 0
@@ -237,14 +277,19 @@ func (p *Portfolio) GetELROnLimitBidChange(accountID string, securityID uint64, 
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnLimitBidChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
+	elr, o := target.GetELROnLimitBidChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
+	return elr, o, nil
 }
 
-func (p *Portfolio) GetELROnLimitAskChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnLimitAskChange(accountID string, securityID uint64, orderID string, model modeling.MarketModel, time uint64, prices []float64, queues []float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -256,15 +301,20 @@ func (p *Portfolio) GetELROnLimitAskChange(accountID string, securityID uint64, 
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnLimitAskChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
+	elr, o := target.GetELROnLimitAskChange(securityID, orderID, model, time, values, value, prices, queues, maxQuantity)
+	return elr, o, nil
 }
 
-func (p *Portfolio) GetELROnMarketBuy(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnMarketBuy(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -276,15 +326,20 @@ func (p *Portfolio) GetELROnMarketBuy(accountID string, securityID uint64, model
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
 	target := p.accountPortfolios[accountID]
 
-	return target.GetELROnMarketBuy(securityID, model, time, values, value, price, quantity, maxQuantity)
+	elr, o := target.GetELROnMarketBuy(securityID, model, time, values, value, price, quantity, maxQuantity)
+	return elr, o, nil
 }
 
-func (p *Portfolio) GetELROnMarketSell(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
+func (p *Portfolio) GetELROnMarketSell(accountID string, securityID uint64, model modeling.MarketModel, time uint64, price float64, quantity float64, maxQuantity float64) (float64, *COrder, error) {
 	// Need to compute the expected log return
 	N := p.sampleSize
 
@@ -296,10 +351,15 @@ func (p *Portfolio) GetELROnMarketSell(accountID string, securityID uint64, mode
 
 	for _, exch := range p.accountPortfolios {
 		exch.AddSampleValues(model, time, values)
-		value += exch.Value(model)
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error while computing net margin: %v", err)
+		}
+		value += v
 	}
 
 	target := p.accountPortfolios[accountID]
+	elr, o := target.GetELROnMarketSell(securityID, model, time, values, value, price, quantity, maxQuantity)
 
-	return target.GetELROnMarketSell(securityID, model, time, values, value, price, quantity, maxQuantity)
+	return elr, o, nil
 }

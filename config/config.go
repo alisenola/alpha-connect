@@ -91,6 +91,7 @@ type Config struct {
 }
 
 type Account struct {
+	Portfolio string
 	Name      string
 	Exchange  string
 	ID        string

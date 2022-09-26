@@ -7,6 +7,7 @@ import (
 )
 
 type Position struct {
+	ID              uint64
 	inverse         bool
 	tickPrecision   float64
 	lotPrecision    float64
@@ -20,8 +21,9 @@ type Position struct {
 	markPrice       *float64
 }
 
-func NewPosition(inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
+func NewPosition(ID uint64, inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
 	return &Position{
+		ID:              ID,
 		inverse:         inverse,
 		tickPrecision:   tp,
 		lotPrecision:    lp,
@@ -147,6 +149,13 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 func (pos *Position) Funding(markPrice, fee float64) int64 {
 	size := float64(pos.rawSize) / pos.lotPrecision
 	return int64(math.Floor(size * markPrice * pos.marginPrecision * math.Abs(pos.multiplier) * fee))
+}
+
+func (pos *Position) GetExposure(markPrice float64) float64 {
+	if pos.inverse {
+		markPrice = 1. / markPrice
+	}
+	return float64(pos.rawSize) / pos.lotPrecision * markPrice * pos.multiplier
 }
 
 func (pos *Position) GetPosition() *models.Position {
