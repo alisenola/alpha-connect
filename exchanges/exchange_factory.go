@@ -42,12 +42,16 @@ import (
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
 	"net/http"
+	"sync"
 )
 
 // TODO sample size config
 var portfolios = make(map[string]*account.Portfolio)
+var portfolioMx = &sync.Mutex{}
 
 func GetPortfolio(ID string) *account.Portfolio {
+	portfolioMx.Lock()
+	defer portfolioMx.Unlock()
 	portfolio, ok := portfolios[ID]
 	if !ok {
 		portfolio = account.NewPortfolio(100)
