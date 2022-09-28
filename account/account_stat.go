@@ -82,16 +82,15 @@ func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.Marke
 	return accnt.securities[securityID].GetELROnMarketSell(model, time, values, value, price, quantity, maxQuantity)
 }
 
-func (accnt *Account) GetExposure(asset uint32, model modeling.Market) float64 {
+func (accnt *Account) GetExposure(asset uint32) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	exposure := float64(accnt.balances[asset]) / accnt.MarginPrecision
 	for _, pos := range accnt.baseToPositions[asset] {
-		markPrice, ok := model.GetPrice(pos.ID)
-		if !ok {
-			panic("no price for position")
+		if pos.rawSize == 0 {
+			continue
 		}
-		exposure += pos.GetExposure(markPrice)
+		exposure += pos.Size()
 	}
 	return exposure
 }
@@ -121,6 +120,29 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
+func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
+	margin := accnt.GetMargin(model)
+	accnt.RLock()
+	defer accnt.RUnlock()
+
+	usedMargin := 0.
+	for k, p := range accnt.positions {
+		if p.rawSize == 0 {
+			continue
+		}
+		price, ok := model.GetPrice(k)
+		if !ok {
+			panic("no price for position")
+		}
+		if p.inverse {
+			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / price) * math.Abs(p.multiplier)
+		} else {
+			usedMargin += (float64(p.rawSize) / p.lotPrecision) * price * math.Abs(p.multiplier)
+		}
+	}
+	return margin*leverage - usedMargin
+}
+
 func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
 	netMargin := accnt.GetMargin(model)
 	accnt.RLock()
@@ -147,51 +169,6 @@ func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
 	}
 
 	return math.Max(netMargin, 0.), nil
-}
-
-func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
-	availableMargin := accnt.GetMargin(model)
-	accnt.RLock()
-	defer accnt.RUnlock()
-	availableMargin *= leverage
-	//fmt.Println("AV MARGIN", availableMargin)
-	for k, p := range accnt.positions {
-		// Entry price not defined if size = 0, division by 0 !
-		if p.rawSize == 0 {
-			continue
-		}
-		exitPrice, ok := model.GetPrice(k)
-		if !ok {
-			panic("no price for position")
-		}
-		cost := float64(p.cost) / accnt.MarginPrecision
-
-		if p.inverse {
-			unrealizedPnL := (1./exitPrice)*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
-			// Cannot use unrealized profit in margin
-			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
-			// Remove leveraged entry value and add PnL
-			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
-		} else {
-			unrealizedPnL := exitPrice*p.multiplier*(float64(p.rawSize)/p.lotPrecision) - cost
-			// Cannot use unrealized profit in margin
-			// TODO ? unrealizedPnL = math.Min(unrealizedPnL, 0)
-			// Remove leveraged entry value and add PnL
-			//fmt.Println("REMOVE 1", availableMargin)
-			availableMargin = availableMargin - math.Abs(cost) + unrealizedPnL
-		}
-	}
-
-	// TODO remove open order from av margin
-	/*
-		for k, o := range accnt.ordersID {
-			if (o.OrderType == models.OrderType_Limit) && (o.OrderStatus == models.OrderStatus_PendingNew || o.OrderStatus == models.OrderStatus_PendingReplace || o.OrderStatus == models.OrderStatus_PartiallyFilled || o.OrderStatus == models.OrderStatus_New) {
-
-			}
-		}
-	*/
-
-	return math.Max(availableMargin, 0.)
 }
 
 // TODO improve speed of that one, called often

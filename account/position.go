@@ -151,11 +151,8 @@ func (pos *Position) Funding(markPrice, fee float64) int64 {
 	return int64(math.Floor(size * markPrice * pos.marginPrecision * math.Abs(pos.multiplier) * fee))
 }
 
-func (pos *Position) GetExposure(markPrice float64) float64 {
-	if pos.inverse {
-		markPrice = 1. / markPrice
-	}
-	return float64(pos.rawSize) / pos.lotPrecision * markPrice * pos.multiplier
+func (pos *Position) Size() float64 {
+	return float64(pos.rawSize) / pos.lotPrecision
 }
 
 func (pos *Position) GetPosition() *models.Position {

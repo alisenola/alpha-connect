@@ -1284,7 +1284,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		exch, ok := constants.GetExchangeByName(req.Account.Exchange)
 		if !ok {
 			context.Respond(&commands.GetAccountResponse{
-				Err: fmt.Errorf("unknown exchange"),
+				Err: fmt.Errorf("unknown exchange: %s", req.Account.Exchange),
 			})
 			return nil
 		}

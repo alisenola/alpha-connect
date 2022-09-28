@@ -43,6 +43,16 @@ func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.Name] = account
 }
 
+func (p *Portfolio) GetMargin(model modeling.Market) (float64, error) {
+	value := 0.
+	for _, exch := range p.accountPortfolios {
+		v := exch.GetMargin(model)
+		value += v
+	}
+
+	return value, nil
+}
+
 func (p *Portfolio) Value(model modeling.Market) (float64, error) {
 	value := 0.
 	for _, exch := range p.accountPortfolios {
@@ -56,10 +66,10 @@ func (p *Portfolio) Value(model modeling.Market) (float64, error) {
 	return value, nil
 }
 
-func (p *Portfolio) GetExposure(asset uint32, model modeling.Market) float64 {
+func (p *Portfolio) GetExposure(asset uint32) float64 {
 	var exposure float64 = 0
 	for _, exch := range p.accountPortfolios {
-		exposure += exch.GetExposure(asset, model)
+		exposure += exch.GetExposure(asset)
 	}
 
 	return exposure
