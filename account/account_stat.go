@@ -112,20 +112,20 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 			panic("no price for position")
 		}
 		if p.inverse {
-			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / exitPrice) * math.Abs(p.multiplier)
+			usedMargin += (math.Abs(float64(p.rawSize)) / p.lotPrecision) * (1. / exitPrice) * p.multiplier
 		} else {
-			usedMargin += (float64(p.rawSize) / p.lotPrecision) * exitPrice * math.Abs(p.multiplier)
+			usedMargin += (math.Abs(float64(p.rawSize)) / p.lotPrecision) * exitPrice * p.multiplier
 		}
 	}
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
-func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64) float64 {
+func (accnt *Account) GetMarginInfo(model modeling.Market) (float64, float64, float64) {
 	margin := accnt.GetMargin(model)
 	accnt.RLock()
 	defer accnt.RUnlock()
 
-	usedMargin := 0.
+	var longMargin, shortMargin float64
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
 			continue
@@ -135,12 +135,22 @@ func (accnt *Account) GetAvailableMargin(model modeling.Market, leverage float64
 			panic("no price for position")
 		}
 		if p.inverse {
-			usedMargin += (float64(p.rawSize) / p.lotPrecision) * (1. / price) * math.Abs(p.multiplier)
+			notional := (float64(p.rawSize) / p.lotPrecision) * (1. / price) * p.multiplier
+			if notional < 0 {
+				shortMargin -= notional
+			} else {
+				longMargin += notional
+			}
 		} else {
-			usedMargin += (float64(p.rawSize) / p.lotPrecision) * price * math.Abs(p.multiplier)
+			notional := (float64(p.rawSize) / p.lotPrecision) * price * p.multiplier
+			if notional < 0 {
+				shortMargin -= notional
+			} else {
+				longMargin += notional
+			}
 		}
 	}
-	return margin*leverage - usedMargin
+	return margin, longMargin, shortMargin
 }
 
 func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
