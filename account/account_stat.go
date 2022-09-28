@@ -120,8 +120,7 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
-func (accnt *Account) GetMarginInfo(model modeling.Market) (float64, float64, float64) {
-	margin := accnt.GetMargin(model)
+func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64) {
 	accnt.RLock()
 	defer accnt.RUnlock()
 
@@ -150,7 +149,7 @@ func (accnt *Account) GetMarginInfo(model modeling.Market) (float64, float64, fl
 			}
 		}
 	}
-	return margin, longMargin, shortMargin
+	return longMargin, shortMargin
 }
 
 func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
