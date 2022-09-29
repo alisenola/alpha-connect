@@ -82,7 +82,7 @@ func (accnt *Account) GetELROnMarketSell(securityID uint64, model modeling.Marke
 	return accnt.securities[securityID].GetELROnMarketSell(model, time, values, value, price, quantity, maxQuantity)
 }
 
-func (accnt *Account) GetExposure(asset uint32) float64 {
+func (accnt *Account) GetAssetExposure(asset uint32) float64 {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	exposure := float64(accnt.balances[asset]) / accnt.MarginPrecision
@@ -93,6 +93,22 @@ func (accnt *Account) GetExposure(asset uint32) float64 {
 		exposure += pos.Size()
 	}
 	return exposure
+}
+
+func (accnt *Account) GetAssetExposures() map[uint32]float64 {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	exposures := make(map[uint32]float64)
+	for k, v := range accnt.balances {
+		exposures[k] = float64(v) / accnt.MarginPrecision
+	}
+	for k, pos := range accnt.baseToPositions {
+		for _, p := range pos {
+			exposures[k] += p.Size()
+		}
+	}
+
+	return exposures
 }
 
 func (accnt *Account) GetLeverage(model modeling.Market) float64 {

@@ -3,6 +3,7 @@ package account
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
+	"gitlab.com/alphaticks/alpha-connect/models"
 	"math"
 )
 
@@ -39,14 +40,44 @@ func (p *Portfolio) GetAccount(ID string) *Account {
 	return p.accountPortfolios[ID]
 }
 
+func (p *Portfolio) GetAccounts() []*Account {
+	var accounts = make([]*Account, 0, len(p.accountPortfolios))
+	for _, account := range p.accountPortfolios {
+		accounts = append(accounts, account)
+	}
+	return accounts
+}
+
+func (p *Portfolio) GetPositions() []*models.Position {
+	var positions []*models.Position
+	for _, exch := range p.accountPortfolios {
+		positions = append(positions, exch.GetPositions()...)
+	}
+
+	return positions
+}
+
 func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.Name] = account
 }
 
-func (p *Portfolio) GetMargin(model modeling.Market) (float64, error) {
+func (p *Portfolio) GetMargin(model modeling.Market) float64 {
 	value := 0.
 	for _, exch := range p.accountPortfolios {
 		v := exch.GetMargin(model)
+		value += v
+	}
+
+	return value
+}
+
+func (p *Portfolio) GetNetMargin(model modeling.Market) (float64, error) {
+	value := 0.
+	for _, exch := range p.accountPortfolios {
+		v, err := exch.GetNetMargin(model)
+		if err != nil {
+			return 0, fmt.Errorf("error getting net margin: %v", err)
+		}
 		value += v
 	}
 
@@ -66,13 +97,25 @@ func (p *Portfolio) Value(model modeling.Market) (float64, error) {
 	return value, nil
 }
 
-func (p *Portfolio) GetExposure(asset uint32) float64 {
+func (p *Portfolio) GetAssetExposure(asset uint32) float64 {
 	var exposure float64 = 0
 	for _, exch := range p.accountPortfolios {
-		exposure += exch.GetExposure(asset)
+		exposure += exch.GetAssetExposure(asset)
 	}
 
 	return exposure
+}
+
+func (p *Portfolio) GetAssetExposures() map[uint32]float64 {
+	exposures := make(map[uint32]float64)
+	for _, exch := range p.accountPortfolios {
+		tmp := exch.GetAssetExposures()
+		for asset, exposure := range tmp {
+			exposures[asset] += exposure
+		}
+	}
+
+	return exposures
 }
 
 /*
