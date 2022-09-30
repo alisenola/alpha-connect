@@ -1307,8 +1307,9 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			}
 		}
 		account, err := NewAccount(&models.Account{
-			Name:     req.Account.Name,
-			Exchange: exch,
+			Name:      req.Account.Name,
+			Portfolio: req.Account.Portfolio,
+			Exchange:  exch,
 			ApiCredentials: &xmodels.APICredentials{
 				APIKey:    req.Account.ApiKey,
 				APISecret: req.Account.ApiSecret,
