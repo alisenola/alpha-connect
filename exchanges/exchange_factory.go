@@ -51,6 +51,8 @@ var accounts = make(map[string]*account.Account)
 var portfolioMx = &sync.Mutex{}
 
 func GetAccount(name string) *account.Account {
+	portfolioMx.Lock()
+	defer portfolioMx.Unlock()
 	return accounts[name]
 }
 
@@ -65,19 +67,28 @@ func GetPortfolio(ID string) *account.Portfolio {
 	return portfolio
 }
 
+func getPortfolio(ID string) *account.Portfolio {
+	portfolio, ok := portfolios[ID]
+	if !ok {
+		portfolio = account.NewPortfolio(100)
+		portfolios[ID] = portfolio
+	}
+	return portfolio
+}
+
 func NewAccount(accountInfo *models.Account) (*account.Account, error) {
-	portfolio := GetPortfolio(accountInfo.Portfolio)
 	portfolioMx.Lock()
 	defer portfolioMx.Unlock()
-	if accnt := portfolio.GetAccount(accountInfo.Name); accnt != nil {
-		return accnt, nil
+	acc, ok := accounts[accountInfo.Name]
+	if ok {
+		return acc, nil
 	}
 	accnt, err := account.NewAccount(accountInfo)
 	if err != nil {
 		return nil, err
 	}
 	accounts[accnt.Name] = accnt
-	portfolio.AddAccount(accnt)
+	getPortfolio(accountInfo.Portfolio).AddAccount(accnt)
 	return accnt, nil
 }
 
