@@ -1275,12 +1275,8 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		return nil
 	}
 
-	if _, ok := state.accountManagers[req.Account.Name]; ok {
-		portfolio := GetPortfolio(req.Account.Portfolio)
-		context.Respond(&commands.GetAccountResponse{
-			Account: portfolio.GetAccount(req.Account.Name),
-		})
-	} else {
+	account := GetAccount(req.Account.Name)
+	if account == nil {
 		exch, ok := constants.GetExchangeByName(req.Account.Exchange)
 		if !ok {
 			context.Respond(&commands.GetAccountResponse{
@@ -1306,7 +1302,8 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 				},
 			}
 		}
-		account, err := NewAccount(&models.Account{
+		var err error
+		account, err = NewAccount(&models.Account{
 			Name:      req.Account.Name,
 			Portfolio: req.Account.Portfolio,
 			Exchange:  exch,
@@ -1326,10 +1323,10 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
 		state.accountManagers[req.Account.Name] = context.Spawn(props)
-		context.Respond(&commands.GetAccountResponse{
-			Account: account,
-		})
 	}
+	context.Respond(&commands.GetAccountResponse{
+		Account: account,
+	})
 	return nil
 }
 

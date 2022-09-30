@@ -47,7 +47,12 @@ import (
 
 // TODO sample size config
 var portfolios = make(map[string]*account.Portfolio)
+var accounts = make(map[string]*account.Account)
 var portfolioMx = &sync.Mutex{}
+
+func GetAccount(name string) *account.Account {
+	return accounts[name]
+}
 
 func GetPortfolio(ID string) *account.Portfolio {
 	portfolioMx.Lock()
@@ -62,6 +67,8 @@ func GetPortfolio(ID string) *account.Portfolio {
 
 func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	portfolio := GetPortfolio(accountInfo.Portfolio)
+	portfolioMx.Lock()
+	defer portfolioMx.Unlock()
 	if accnt := portfolio.GetAccount(accountInfo.Name); accnt != nil {
 		return accnt, nil
 	}
@@ -69,6 +76,7 @@ func NewAccount(accountInfo *models.Account) (*account.Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	accounts[accnt.Name] = accnt
 	portfolio.AddAccount(accnt)
 	return accnt, nil
 }
