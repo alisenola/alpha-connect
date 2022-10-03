@@ -69,6 +69,7 @@ func LoadConfig() (*Config, error) {
 	if os.Getenv("FBINANCE_WHITELISTED_IPS") != "" {
 		C.FBinanceWhitelistedIPs = strings.Split(os.Getenv("FBINANCE_WHITELISTED_IPS"), ",")
 	}
+	fmt.Println(C.FBinanceWhitelistedIPs)
 
 	return C, nil
 }

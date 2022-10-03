@@ -247,7 +247,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		addr := strings.Split(d.LocalAddr.String(), ":")[0]
 		for _, str := range state.config.FBinanceWhitelistedIPs {
-			splits := strings.Split(str, ":")
+			splits := strings.Split(str, "=>")
+			fmt.Println("SPLITS", splits)
 			if len(splits) == 2 && splits[0] == addr {
 				fmt.Println("PRIVATE", addr, splits[1])
 				qr.endpoint = splits[1]
