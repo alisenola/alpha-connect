@@ -29,7 +29,9 @@ func LoadConfig() (*Config, error) {
 			_ = f.Close()
 		}
 	} else {
-		_ = viper.ReadInConfig() // Find and read the config file
+		if err := viper.ReadInConfig(); err != nil {
+			return nil, fmt.Errorf("error reading config file: %v", err)
+		} // Find and read the config file
 		//if err != nil {             // Handle errors reading the config file
 		//	return nil, fmt.Errorf("fatal error config file: %s \n", err)
 		//}

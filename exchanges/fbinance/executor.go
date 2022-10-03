@@ -105,7 +105,7 @@ func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration 
 type QueryRunner struct {
 	client          *http.Client
 	globalRateLimit *exchanges.RateLimit
-	private         bool
+	endpoint        string
 }
 
 type Executor struct {
@@ -241,18 +241,19 @@ func (state *Executor) Initialize(context actor.Context) error {
 			},
 			Timeout: 10 * time.Second,
 		}
-		private := false
-		for _, addr := range state.config.FBinanceWhitelistedIPs {
-			if strings.Split(d.LocalAddr.String(), ":")[0] == addr {
-				fmt.Println("PRIVATE", addr)
-				private = true
-			}
-		}
-		state.queryRunners = append(state.queryRunners, &QueryRunner{
+		qr := &QueryRunner{
 			client:          client,
 			globalRateLimit: nil,
-			private:         private,
-		})
+		}
+		addr := strings.Split(d.LocalAddr.String(), ":")[0]
+		for _, str := range state.config.FBinanceWhitelistedIPs {
+			splits := strings.Split(str, ":")
+			if len(splits) == 2 && splits[0] == addr {
+				fmt.Println("PRIVATE", addr, splits[1])
+				qr.endpoint = splits[1]
+			}
+		}
+		state.queryRunners = append(state.queryRunners, qr)
 	}
 
 	state.accountRateLimits = make(map[string]*AccountRateLimit)
@@ -1245,9 +1246,9 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		}
 
 		var request *http.Request
-		if qr.private {
+		if qr.endpoint != "" {
 			var err error
-			request, _, err = fbinance.NewOrder(params, req.Account.ApiCredentials, fbinance.PrivateURL)
+			request, _, err = fbinance.NewOrder(params, req.Account.ApiCredentials, qr.endpoint)
 			if err != nil {
 				state.logger.Warn("error building request", log.Error(err))
 				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
@@ -1350,9 +1351,9 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 		qr := state.getQueryRunner(true)
 		var request *http.Request
-		if qr.private {
+		if qr.endpoint != "" {
 			var err error
-			request, _, err = fbinance.CancelOrder(params, req.Account.ApiCredentials, fbinance.PrivateURL)
+			request, _, err = fbinance.CancelOrder(params, req.Account.ApiCredentials, qr.endpoint)
 			if err != nil {
 				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
 				context.Send(sender, response)
