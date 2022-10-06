@@ -245,15 +245,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 			client:          client,
 			globalRateLimit: nil,
 		}
-		addr := strings.Split(d.LocalAddr.String(), ":")[0]
-		for _, str := range state.config.FBinanceWhitelistedIPs {
-			splits := strings.Split(str, "=>")
-			fmt.Println("SPLITS", splits)
-			if len(splits) == 2 && splits[0] == addr {
-				fmt.Println("PRIVATE", addr, splits[1])
-				qr.endpoint = splits[1]
+		if d.LocalAddr != nil {
+			addr := strings.Split(d.LocalAddr.String(), ":")[0]
+			for _, str := range state.config.FBinanceWhitelistedIPs {
+				splits := strings.Split(str, "=>")
+				fmt.Println("SPLITS", splits)
+				if len(splits) == 2 && splits[0] == addr {
+					fmt.Println("PRIVATE", addr, splits[1])
+					qr.endpoint = splits[1]
+				}
 			}
 		}
+
 		state.queryRunners = append(state.queryRunners, qr)
 	}
 
@@ -437,14 +440,49 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 		Success:    false,
 	}
 	go func() {
-		symbol, rej := state.InstrumentToSymbol(msg.Instrument)
-		if rej != nil {
-			response.RejectionReason = *rej
-			context.Send(sender, response)
-			return
-		}
+		symbol, _ := state.InstrumentToSymbol(msg.Instrument)
 		for _, stat := range msg.Statistics {
 			switch stat {
+			case models.StatType_MarkPrice:
+				request, weight, err := fbinance.GetPremiumIndex("")
+				if err != nil {
+					response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+					context.Send(sender, response)
+					return
+				}
+
+				qr := state.getQueryRunner(false)
+				if qr == nil {
+					response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+					context.Send(sender, response)
+					return
+				}
+
+				qr.globalRateLimit.Request(weight)
+
+				var data []fbinance.PremiumIndex
+				err = xutils.PerformJSONRequest(qr.client, request, &data)
+				if err != nil {
+					state.logger.Warn("error fetching mark prices", log.Error(err))
+					response.RejectionReason = messages.RejectionReason_HTTPError
+					context.Send(sender, response)
+					return
+				}
+				for _, mp := range data {
+					if symbol != "" && mp.Symbol != symbol {
+						continue
+					}
+					sec := state.SymbolToSecurity(mp.Symbol)
+					if sec != nil {
+						response.Statistics = append(response.Statistics, &models.Stat{
+							Timestamp:  utils.MilliToTimestamp(uint64(mp.Time)),
+							StatType:   models.StatType_MarkPrice,
+							Value:      mp.MarkPrice,
+							SecurityID: sec.SecurityID,
+						})
+					}
+				}
+
 			case models.StatType_OpenInterest:
 				request, weight, err := fbinance.GetOpenInterest(symbol)
 				if err != nil {

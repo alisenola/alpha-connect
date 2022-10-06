@@ -71,6 +71,7 @@ type Security interface {
 	GetELROnLimitAskChange(ID string, model modeling.MarketModel, time uint64, values []float64, value float64, prices []float64, queues []float64, maxBase float64) (float64, *COrder)
 	GetELROnMarketBuy(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder)
 	GetELROnMarketSell(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder)
+	Clone() Security
 }
 
 type Account struct {
@@ -756,7 +757,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 	sec := accnt.securities[order.Instrument.SecurityID.Value]
 	lotPrecision := sec.GetLotPrecision()
 
-	fmt.Println("FILL", order.OrderID, price, quantity, order.LeavesQuantity, lotPrecision)
+	//fmt.Println("FILL", order.OrderID, price, quantity, order.LeavesQuantity, lotPrecision)
 	rawFillQuantity := int64(math.Round(quantity * lotPrecision))
 	rawLeavesQuantity := int64(math.Round(order.LeavesQuantity * lotPrecision))
 	if rawFillQuantity > rawLeavesQuantity {
@@ -1167,4 +1168,43 @@ func (accnt *Account) Compare(other *Account) bool {
 	}
 
 	return true
+}
+
+func (accnt *Account) Clone() *Account {
+	accnt.RLock()
+	defer accnt.RUnlock()
+	clone := &Account{
+		ordersID:        make(map[string]*Order),
+		ordersClID:      make(map[string]*Order),
+		securities:      make(map[uint64]Security),
+		symbolToSec:     make(map[string]Security),
+		baseToPositions: make(map[uint32][]*Position),
+		positions:       make(map[uint64]*Position),
+		balances:        make(map[uint32]int64),
+		assets:          make(map[uint32]*xchangerModels.Asset),
+		margin:          accnt.margin,
+		MarginCurrency:  accnt.MarginCurrency,
+		MarginPrecision: accnt.MarginPrecision,
+		quoteCurrency:   accnt.quoteCurrency,
+		takerFee:        accnt.takerFee,
+		makerFee:        accnt.makerFee,
+		expirationLimit: accnt.expirationLimit,
+	}
+	// TODO clone orders ?
+	for k, v := range accnt.positions {
+		clone.positions[k] = v.Clone()
+	}
+	for k, v := range accnt.securities {
+		clone.securities[k] = v.Clone()
+		clone.symbolToSec[v.GetSecurity().Symbol] = clone.securities[k]
+		base := v.GetSecurity().Underlying.ID
+		if _, ok := clone.positions[k]; ok {
+			clone.baseToPositions[base] = append(clone.baseToPositions[base], clone.positions[k])
+		}
+	}
+	for k, v := range accnt.balances {
+		clone.balances[k] = v
+	}
+
+	return clone
 }

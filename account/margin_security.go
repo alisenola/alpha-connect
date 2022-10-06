@@ -884,3 +884,26 @@ func (sec *MarginSecurity) GetELROnMarketSell(model modeling.MarketModel, time u
 	sec.Unlock()
 	return maxExpectedLogReturn, maxOrder
 }
+
+func (sec *MarginSecurity) Clone() Security {
+	sec.Lock()
+	defer sec.Unlock()
+	return &MarginSecurity{
+		RWMutex:             sync.RWMutex{},
+		Security:            sec.Security,
+		lotPrecision:        math.Ceil(1. / sec.RoundLot.Value),
+		marginCurrency:      sec.marginCurrency,
+		modelCurrency:       sec.modelCurrency,
+		openBidOrders:       make(map[string]*COrder), // TODO clone ?
+		openAskOrders:       make(map[string]*COrder), // TODO clone ?
+		size:                0.,
+		sampleValueChange:   nil,
+		sampleMatchBid:      nil,
+		sampleMatchAsk:      nil,
+		sampleMarginPrice:   nil,
+		sampleSecurityPrice: nil,
+		sampleTime:          0,
+		makerFee:            sec.makerFee,
+		takerFee:            sec.takerFee,
+	}
+}

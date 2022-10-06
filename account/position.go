@@ -179,3 +179,21 @@ func (pos *Position) Sync(cost, size float64) {
 func (pos *Position) UpdateMarkPrice(price float64) {
 	pos.markPrice = &price
 }
+
+func (pos *Position) Clone() *Position {
+	clone := &Position{
+		ID:              pos.ID,
+		inverse:         pos.inverse,
+		tickPrecision:   pos.tickPrecision,
+		lotPrecision:    pos.lotPrecision,
+		marginPrecision: pos.marginPrecision,
+		multiplier:      pos.multiplier,
+		makerFee:        pos.makerFee,
+		takerFee:        pos.takerFee,
+		cost:            pos.cost,
+		rawSize:         pos.rawSize,
+		cross:           pos.cross,
+		markPrice:       pos.markPrice,
+	}
+	return clone
+}

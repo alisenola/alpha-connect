@@ -668,3 +668,24 @@ func (sec *SpotSecurity) GetELROnMarketBuy(model modeling.MarketModel, time uint
 func (sec *SpotSecurity) GetELROnMarketSell(model modeling.MarketModel, time uint64, values []float64, value float64, price float64, quantity float64, maxQuantity float64) (float64, *COrder) {
 	return 0, nil
 }
+
+func (sec *SpotSecurity) Clone() Security {
+	sec.Lock()
+	defer sec.Unlock()
+	return &SpotSecurity{
+		RWMutex:           sync.RWMutex{},
+		Security:          sec.Security,
+		lotPrecision:      math.Ceil(1. / sec.RoundLot.Value),
+		openBidOrders:     make(map[string]*COrder),
+		openAskOrders:     make(map[string]*COrder),
+		modelCurrency:     sec.modelCurrency,
+		sampleValueChange: nil,
+		sampleBasePrice:   nil,
+		sampleQuotePrice:  nil,
+		sampleMatchBid:    nil,
+		sampleMatchAsk:    nil,
+		sampleTime:        0,
+		makerFee:          sec.makerFee,
+		takerFee:          sec.takerFee,
+	}
+}
