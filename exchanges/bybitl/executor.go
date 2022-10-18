@@ -623,11 +623,11 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 			}
 
 			sec := state.SymbolToSecurity(t.Symbol)
-			if sec != nil {
+			if sec != nil && t.MarkPrice.Float64() != nil {
 				response.Statistics = append(response.Statistics, &models.Stat{
 					Timestamp:  timestamppb.Now(),
 					SecurityID: sec.SecurityID,
-					Value:      t.MarkPrice,
+					Value:      *t.MarkPrice.Float64(),
 					StatType:   models.StatType_MarkPrice,
 				})
 			}
