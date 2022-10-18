@@ -149,6 +149,9 @@ func (state *PublicExecutor) UpdateSecurityList(context actor.Context) error {
 
 	var securities []*models.Security
 	for _, product := range products {
+		if product.Status != "online" {
+			continue
+		}
 		baseCurrency, ok := constants.GetAssetBySymbol(product.BaseCurrency)
 		if !ok {
 			continue
