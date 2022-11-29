@@ -89,7 +89,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		dataER := rpc.NewDataER(ctx, str)
+		lstr, err := data.NewLiveStore(as, executorActor)
+		if err != nil {
+			panic(err)
+		}
+		dataER := rpc.NewDataER(str, lstr)
 
 		go func() {
 			err := dataServer.Serve(lis)

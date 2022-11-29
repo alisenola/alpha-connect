@@ -87,6 +87,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 	state.symbToSecs = make(map[string]*registry.Security)
 	securityMap := make(map[uint64]*registry.Security)
 	for _, sec := range res.Securities {
+		if strings.Contains(sec.Symbol, "SETTLED") {
+			continue
+		}
 		securityMap[sec.SecurityId] = sec
 		state.symbToSecs[sec.Symbol] = sec
 	}
@@ -144,6 +147,33 @@ func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) e
 
 func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	var transactions []*extypes.Transaction
+	assets := make(map[uint32]float64)
+	prices := make(map[uint32]float64)
+	prices[0] = 1
+
+	lastNav := 0.
+	cumPerf := 1.
+	var movements []*extypes.Movement
+	state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
+	for i, m := range movements {
+		assets[m.AssetID] += m.Quantity
+		ignore := false
+		if m.Transaction.Type == "DEPOSIT" || m.Transaction.Type == "WITHDRAWAL" {
+			ignore = true
+		}
+		nav := 0.
+		for _, a := range assets {
+			nav += a
+		}
+		if !ignore {
+			cumPerf *= nav / lastNav
+		}
+		lastNav = nav
+		if i%1000 == 0 {
+			fmt.Println(fmt.Sprintf("%f, %f", nav, cumPerf))
+		}
+	}
+
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
 		if tr.Type == "TRADE" {
@@ -155,8 +185,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				} else {
 					state.positions[secID].Buy(tr.Fill.Price, tr.Fill.Quantity, false)
 				}
-			} else {
-				fmt.Println("NOT FOUND", uint64(tr.Fill.SecurityID))
 			}
 			tradeID, err := strconv.ParseUint(strings.Split(tr.ExecutionID, "-")[0], 10, 64)
 			if err != nil {
@@ -190,7 +218,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
-			fmt.Println("KAST", state.lastTradeID[sec.SecurityId])
+			fmt.Println("LAST", sec.SecurityId, state.lastTradeID[sec.SecurityId])
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,
 				Filter: &messages.TradeCaptureReportFilter{
@@ -253,7 +281,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 
 				tradeIDInt, _ := strconv.ParseUint(strings.Split(trd.TradeID, "-")[0], 10, 64)
 				if tx := state.db.Create(tr); tx.Error != nil {
-					return fmt.Errorf("error inserting: %v", err)
+					return fmt.Errorf("error inserting transaction: %v", tx.Error)
 				}
 				state.lastTradeID[secID] = tradeIDInt
 				progress = true
@@ -400,7 +428,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				}},
 			}
 			if tx := state.db.Create(tr); tx.Error != nil {
-				return fmt.Errorf("error inserting: %v", err)
+				return fmt.Errorf("error inserting funding: %v", tx.Error)
 			}
 			state.lastFundingTs = uint64(ts.UnixNano() / 1000000)
 			progress = true
@@ -450,7 +478,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				}},
 			}
 			if tx := state.db.Create(tr); tx.Error != nil {
-				return fmt.Errorf("error inserting: %v", err)
+				return fmt.Errorf("error inserting deposit: %v", tx.Error)
 			}
 			progress = true
 			state.lastDepositTs = uint64(ts.UnixNano() / 1000000)
@@ -500,7 +528,7 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 				}},
 			}
 			if tx := state.db.Create(tr); tx.Error != nil {
-				return fmt.Errorf("error inserting: %v", err)
+				return fmt.Errorf("error inserting withdrawal: %v", err)
 			}
 			progress = true
 			state.lastWithdrawalTs = uint64(ts.UnixNano() / 1000000)

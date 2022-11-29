@@ -61,6 +61,7 @@ type LiveQuery struct {
 	groupID       uint64
 	functor       parsing.Functor
 	deltas        *gotickfile.TickDeltas
+	deltaType     reflect.Type
 	nextDeadline  *time.Time
 	err           error
 }
@@ -93,6 +94,12 @@ func NewLiveQuery(as *actor.ActorSystem, executor *actor.PID, sel parsing.Select
 		f.receiver = receiver
 		lq.subscriptions[f.requestID] = f
 	}
+
+	_, dltType, err := ConstructFunctor(lq.functor)
+	if err != nil {
+		return nil, err
+	}
+	lq.deltaType = dltType
 
 	return lq, nil
 }
@@ -336,6 +343,16 @@ func (lq *LiveQuery) Read() (uint64, tickobjects.TickObject, uint64) {
 	lq.RLock()
 	defer lq.RUnlock()
 	return lq.tick, lq.objects[lq.groupID], lq.groupID
+}
+
+func (lq *LiveQuery) ReadDeltas() (uint64, *gotickfile.TickDeltas, uint64) {
+	lq.RLock()
+	defer lq.RUnlock()
+	return lq.tick, lq.deltas, lq.groupID
+}
+
+func (lq *LiveQuery) DeltaType() reflect.Type {
+	return lq.deltaType
 }
 
 func (lq *LiveQuery) Tags() map[string]string {

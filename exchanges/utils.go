@@ -7,6 +7,10 @@ import (
 	"net"
 )
 
+func GetExchangesExecutor(as *actor.ActorSystem) *actor.PID {
+	return actor.NewPID(as.Address(), "executor/exchanges")
+}
+
 func GetExchangeExecutor(as *actor.ActorSystem, exchange *models.Exchange) *actor.PID {
 	return actor.NewPID(as.Address(), "executor/exchanges/"+exchange.Name+"_executor")
 }

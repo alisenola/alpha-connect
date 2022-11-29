@@ -3,6 +3,7 @@ package executor_test
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/config"
+	"gitlab.com/alphaticks/alpha-connect/models/commands"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"testing"
 	"time"
@@ -12,6 +13,43 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
+
+func BenchmarkSwitch(t *testing.B) {
+	var msg interface{} = &messages.UnipoolV3DataRequest{}
+	for i := 0; i < t.N; i++ {
+		switch msg.(type) {
+		case *messages.AccountDataRequest,
+			*messages.MarketDataRequest,
+			*messages.UnipoolV3DataRequest,
+			*messages.MarketStatisticsRequest,
+			*messages.HistoricalUnipoolV3DataRequest,
+			*messages.HistoricalFundingRatesRequest,
+			*messages.HistoricalLiquidationsRequest,
+			*messages.HistoricalSalesRequest,
+			*messages.SecurityDefinitionRequest,
+			*messages.SecurityListRequest,
+			*messages.SecurityList,
+			*messages.MarketableProtocolAssetList,
+			*messages.MarketableProtocolAssetListRequest,
+			*messages.MarketableProtocolAssetDefinitionRequest,
+			*messages.AccountMovementRequest,
+			*messages.AccountInformationRequest,
+			*messages.TradeCaptureReportRequest,
+			*messages.PositionsRequest,
+			*messages.BalancesRequest,
+			*messages.OrderStatusRequest,
+			*messages.NewOrderSingleRequest,
+			*messages.NewOrderBulkRequest,
+			*messages.OrderReplaceRequest,
+			*messages.OrderBulkReplaceRequest,
+			*messages.OrderCancelRequest,
+			*messages.OrderMassCancelRequest,
+			*commands.GetAccountRequest:
+		default:
+
+		}
+	}
+}
 
 func TestMainExecutor(t *testing.T) {
 	var C = config.Config{

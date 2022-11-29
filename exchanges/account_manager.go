@@ -233,7 +233,7 @@ func (state *AccountManager) OnPositionsRequest(context actor.Context) error {
 func (state *AccountManager) OnBalancesRequest(context actor.Context) error {
 	request := context.Message().(*messages.BalancesRequest)
 	if state.listener == nil {
-		context.Respond(&messages.AccountDataResponse{
+		context.Respond(&messages.BalanceList{
 			RequestID:       request.RequestID,
 			Success:         false,
 			RejectionReason: messages.RejectionReason_AccountListenerDisabled,

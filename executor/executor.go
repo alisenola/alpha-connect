@@ -38,7 +38,7 @@ func NewExecutor(cfg *config.Config) actor.Actor {
 	}
 }
 
-// TODO this implementation can easily lead to forgetting adding new messages
+// TODO this implementation can easily lead to forgetting adding new messages + not efficient
 func (state *Executor) Receive(context actor.Context) {
 	msg := context.Message()
 	switch msg.(type) {

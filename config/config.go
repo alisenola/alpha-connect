@@ -3,9 +3,60 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
+	"gitlab.com/alphaticks/tickstore-go-client/config"
 	"os"
 	"strings"
 )
+
+type Config struct {
+	ActorAddress           string
+	ActorAdvertisedAddress string
+	RegistryAddress        string
+	DataStoreAddress       string
+	MonitorStoreAddress    string
+	DataServerAddress      string
+	OpenseaAPIKey          string
+	FBinanceWhitelistedIPs []string
+	StrictExchange         bool
+	StaticLoader           bool
+	DialerPoolInterface    string
+	DialerPoolIPs          []string
+	Accounts               []Account
+	Exchanges              []string
+	Protocols              []string
+	ChainRPCs              []ChainRPC
+	DB                     *DataBase
+	MonitorStore           config.StoreClient
+}
+
+type Account struct {
+	Portfolio        string
+	Name             string
+	Exchange         string
+	ID               string
+	ApiKey           string
+	ApiSecret        string
+	Reconcile        bool
+	Listen           bool
+	ReadOnly         bool
+	MonitorPortfolio bool
+	MonitorOrders    bool
+	SOCKS5           string
+}
+
+type DataBase struct {
+	Migrate          bool
+	PostgresHost     string
+	PostgresUser     string
+	PostgresPassword string
+	PostgresDB       string
+	PostgresPort     string
+}
+
+type ChainRPC struct {
+	Chain    uint32
+	Endpoint string
+}
 
 func LoadConfig() (*Config, error) {
 	// Allow overwrite
@@ -30,7 +81,9 @@ func LoadConfig() (*Config, error) {
 		}
 	} else {
 		if err := viper.ReadInConfig(); err != nil {
-			return nil, fmt.Errorf("error reading config file: %v", err)
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				return nil, fmt.Errorf("error reading config file: %v", err)
+			}
 		} // Find and read the config file
 		//if err != nil {             // Handle errors reading the config file
 		//	return nil, fmt.Errorf("fatal error config file: %s \n", err)
@@ -72,50 +125,4 @@ func LoadConfig() (*Config, error) {
 	fmt.Println(C.FBinanceWhitelistedIPs)
 
 	return C, nil
-}
-
-type Config struct {
-	ActorAddress           string
-	ActorAdvertisedAddress string
-	RegistryAddress        string
-	DataStoreAddress       string
-	DataServerAddress      string
-	OpenseaAPIKey          string
-	FBinanceWhitelistedIPs []string
-	StrictExchange         bool
-	StaticLoader           bool
-	DialerPoolInterface    string
-	DialerPoolIPs          []string
-	Accounts               []Account
-	Exchanges              []string
-	Protocols              []string
-	ChainRPCs              []ChainRPC
-	DB                     *DataBase
-}
-
-type Account struct {
-	Portfolio string
-	Name      string
-	Exchange  string
-	ID        string
-	ApiKey    string
-	ApiSecret string
-	Reconcile bool
-	Listen    bool
-	ReadOnly  bool
-	SOCKS5    string
-}
-
-type DataBase struct {
-	Migrate          bool
-	PostgresHost     string
-	PostgresUser     string
-	PostgresPassword string
-	PostgresDB       string
-	PostgresPort     string
-}
-
-type ChainRPC struct {
-	Chain    uint32
-	Endpoint string
 }

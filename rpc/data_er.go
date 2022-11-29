@@ -3,10 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/data"
 	_ "gitlab.com/alphaticks/tickfunctors/market"
 	"gitlab.com/alphaticks/tickstore-grpc"
+	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore/query"
 	"gitlab.com/alphaticks/tickstore/readers"
 	"io"
@@ -17,16 +17,16 @@ import (
 
 type DataER struct {
 	tickstore_grpc.UnimplementedStoreServer
-	ctx    *actor.RootContext
-	store  *data.StorageClient
-	Logger *log.Logger
+	storage *data.StorageClient
+	live    *data.LiveStore
+	Logger  *log.Logger
 }
 
-func NewDataER(ctx *actor.RootContext, store *data.StorageClient) *DataER {
+func NewDataER(storage *data.StorageClient, live *data.LiveStore) *DataER {
 	return &DataER{
-		ctx:    ctx,
-		store:  store,
-		Logger: nil,
+		storage: storage,
+		live:    live,
+		Logger:  nil,
 	}
 }
 
@@ -77,12 +77,12 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 		done = true
 	}()
 
-	var freq int64 = 0
+	var freq int64 = 60000
 	if sampler := qr.GetTickSampler(); sampler != nil {
 		freq = int64(sampler.Interval)
 	}
 
-	str, _, err := s.store.GetStore(freq)
+	str, _, err := s.storage.GetStore(freq)
 	if err != nil {
 		return fmt.Errorf("error getting store: %v", err)
 	}
@@ -103,10 +103,29 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 		return fmt.Errorf("error compiling query: %v", err)
 	}
 
-	q, err := str.Query(qs)
+	var q, lq types.TickstoreQuery
+	q, err = str.Query(qs)
 	if err != nil {
 		return fmt.Errorf("error querying store: %v", err)
 	}
+	if qr.Streaming && qr.To > uint64(time.Now().UnixMilli()) {
+		// start live query
+		lqs := types.NewQuerySettings(
+			types.WithFrom(qr.From),
+			types.WithTo(qr.To),
+			types.WithSelector(qr.Selector))
+		if sampler != nil {
+			switch sampler := sampler.(type) {
+			case *tickstore_grpc.StoreQueryRequest_TickSampler:
+				lqs.Sampler = readers.NewTickSampler(sampler.TickSampler.Interval)
+			}
+		}
+		lq, err = s.live.NewQuery(lqs)
+		if err != nil {
+			return fmt.Errorf("error creating live query: %v", err)
+		}
+	}
+
 	defer func() {
 		fmt.Println("CLOSING QUERY")
 		_ = q.Close()
@@ -131,18 +150,19 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 			// The first event has to be a snapshot. So send snapshot if not seen objectID yet
 			if _, ok := objects[groupID]; !ok {
 				objects[groupID] = true
+				_, obj, _ := q.Read()
+				snapshot := obj.ToSnapshot()
 				event = &tickstore_grpc.StoreQueryTick{
 					Tick:    tick,
 					GroupId: groupID,
 					Event: &tickstore_grpc.StoreQueryTick_Snapshot{
 						Snapshot: &tickstore_grpc.StoreQuerySnapshot{
 							Tags:     q.Tags(),
-							Snapshot: q.TickObject().ToSnapshot(),
+							Snapshot: snapshot,
 						},
 					},
 				}
 			} else {
-				// TODO BUG HERERE !!
 				typ := q.DeltaType()
 				buff := make([]byte, int(typ.Size())*deltas.Len)
 				for i := 0; i < len(buff); i++ {
@@ -158,7 +178,6 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 			}
 
 			events = append(events, event)
-
 			// Reset the deadline
 			q.SetNextDeadline(endTime)
 		}
@@ -179,6 +198,9 @@ func (s *DataER) Query(qr *tickstore_grpc.StoreQueryRequest, stream tickstore_gr
 
 		if q.Err() != nil {
 			if q.Err() == io.EOF {
+				if lq != nil {
+					q = lq
+				}
 				return nil
 			} else {
 				return q.Err()

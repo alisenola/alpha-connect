@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/melaurent/kafero"
 	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
+	"gitlab.com/alphaticks/tickstore-go-client/config"
 	types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/tickstore/storage"
 	"gitlab.com/alphaticks/tickstore/store"
@@ -53,21 +54,19 @@ var shardDurations = map[int64]uint64{
 }
 
 type StorageClient struct {
-	stores       map[int64]*store.Store
-	address      string
-	opts         []grpc.DialOption
-	measurements map[string]string
-	cacheDir     string
+	stores   map[int64]*store.Store
+	address  string
+	opts     []grpc.DialOption
+	cacheDir string
 }
 
 // Lazy loading
 func NewStorageClient(cacheDir string, address string, opts ...grpc.DialOption) (*StorageClient, error) {
 	s := &StorageClient{
-		stores:       make(map[int64]*store.Store),
-		address:      address,
-		opts:         opts,
-		measurements: make(map[string]string),
-		cacheDir:     cacheDir,
+		stores:   make(map[int64]*store.Store),
+		address:  address,
+		opts:     opts,
+		cacheDir: cacheDir,
 	}
 	s.stores[DATA_CLIENT_LIVE] = nil
 	s.stores[DATA_CLIENT_WEB3] = nil
@@ -109,7 +108,7 @@ func (s *StorageClient) GetStore(freq int64) (*store.Store, int64, error) {
 			true,
 			true,
 			true,
-			false)
+			true)
 		if err != nil {
 			return nil, 0, fmt.Errorf("error starting cache storage: %v", err)
 		}
@@ -153,20 +152,18 @@ func (s *StorageClient) Close() error {
 	}
 }
 
-type StoreClient struct {
-	stores       map[int64]*tickstore_go_client.RemoteClient
-	address      string
-	opts         []grpc.DialOption
-	measurements map[string]string
+type MultiStoreClient struct {
+	stores  map[int64]*tickstore_go_client.RemoteClient
+	address string
+	config  config.StoreClient
 }
 
 // Lazy loading
-func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, error) {
-	s := &StoreClient{
-		stores:       make(map[int64]*tickstore_go_client.RemoteClient),
-		address:      address,
-		opts:         opts,
-		measurements: make(map[string]string),
+func NewMultiStoreClient(address string, config config.StoreClient) (*MultiStoreClient, error) {
+	s := &MultiStoreClient{
+		stores:  make(map[int64]*tickstore_go_client.RemoteClient),
+		address: address,
+		config:  config,
 	}
 	s.stores[DATA_CLIENT_WEB3] = nil
 	s.stores[DATA_CLIENT_LIVE] = nil
@@ -178,7 +175,7 @@ func NewStoreClient(address string, opts ...grpc.DialOption) (*StoreClient, erro
 	return s, nil
 }
 
-func (s *StoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error) {
+func (s *MultiStoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error) {
 	var minScore int64 = math.MaxInt64
 	var cfreq int64
 	if freq == DATA_CLIENT_LIVE || freq == DATA_CLIENT_WEB3 {
@@ -196,7 +193,9 @@ func (s *StoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error
 	}
 	if s.stores[cfreq] == nil {
 		// Construct store
-		str, err := tickstore_go_client.NewRemoteClient(s.address+":"+ports[cfreq], s.opts...)
+		cfg := s.config
+		cfg.Address = s.address + ":" + ports[cfreq]
+		str, err := tickstore_go_client.NewRemoteClient(cfg)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -206,6 +205,6 @@ func (s *StoreClient) GetClient(freq int64) (types.TickstoreClient, int64, error
 	return s.stores[cfreq], cfreq, nil
 }
 
-func (s *StoreClient) Close() error {
+func (s *MultiStoreClient) Close() error {
 	return nil
 }
