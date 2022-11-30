@@ -98,6 +98,7 @@ func LoadConfig() (*Config, error) {
 			{Chain: 10, Endpoint: "wss://opt-mainnet.g.alchemy.com/v2/MAdidiXxtFnW5b4q9pTmBLcTW73SHoMN"},
 			{Chain: 147, Endpoint: "wss://polygon-mainnet.g.alchemy.com/v2/PYNN12EJrMrmlxWjy9KZyrYK6GHrErCM"},
 			{Chain: 42161, Endpoint: "wss://arb-mainnet.g.alchemy.com/v2/aFDxH7pilsr6I5Ifqp59wVNu_0pd9PaC"},
+			{Chain: 1337, Endpoint: "http://127.0.0.1:7545"}, // Ganache
 		},
 		RegistryAddress: "registry.alphaticks.io:8021",
 		StaticLoader:    true,
