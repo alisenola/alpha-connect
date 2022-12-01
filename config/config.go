@@ -93,7 +93,7 @@ func LoadConfig() (*Config, error) {
 	C := &Config{
 		ChainRPCs: []ChainRPC{
 			{Chain: 1, Endpoint: "wss://eth-mainnet.alchemyapi.io/v2/4kjvftiD6NzHc6kkD1ih3-5wilV--3mz"},
-			{Chain: 5, Endpoint: "http://127.0.0.1:9545"},
+			{Chain: 5, Endpoint: "wss://eth-goerli.g.alchemy.com/v2/YYQHtZhi0iJfppMa41Xj3sUmWuKMxhOf"},
 			{Chain: 6, Endpoint: "wss://zksync2-testnet.zksync.dev/ws"},
 			{Chain: 10, Endpoint: "wss://opt-mainnet.g.alchemy.com/v2/MAdidiXxtFnW5b4q9pTmBLcTW73SHoMN"},
 			{Chain: 147, Endpoint: "wss://polygon-mainnet.g.alchemy.com/v2/PYNN12EJrMrmlxWjy9KZyrYK6GHrErCM"},

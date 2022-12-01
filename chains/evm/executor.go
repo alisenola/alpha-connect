@@ -280,6 +280,7 @@ func (state *Executor) OnEVMLogsSubscribeRequest(context actor.Context) error {
 	ch := make(chan types.Log)
 	sub, err := state.client.SubscribeFilterLogs(goContext.Background(), req.Query, ch)
 	if err != nil {
+		state.logger.Warn("error subscribing to logs", log.Error(err))
 		res.RejectionReason = messages.RejectionReason_RPCError
 		context.Respond(res)
 		return nil
