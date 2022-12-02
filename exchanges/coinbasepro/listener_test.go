@@ -15,13 +15,14 @@ func TestMarketData(t *testing.T) {
 	}
 	exTests.LoadStatics(t)
 	tests.MarketData(t, tests.MDTest{
-		Symbol:            "LINK-USD",
+		Symbol:            "BTC-USDT",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.COINBASEPRO,
-		MinPriceIncrement: 0.001,
+		MinPriceIncrement: 0.01,
 		RoundLot:          1e-08,
 		HasMaturityDate:   false,
 		IsInverse:         false,
 		Status:            models.InstrumentStatus_Trading,
+		IgnoreSizeResidue: true,
 	})
 }

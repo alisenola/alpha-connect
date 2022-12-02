@@ -529,32 +529,75 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 	}
 
 	orderID := binary.LittleEndian.Uint64(orderUUID.Bytes()[0:8])
-
+	var deltas []*gmodels.OrderBookLevel
 	if instr.orderBook.HasOrder(orderID) {
-		obOrder := &gmodels.Order{
-			Price:    order.Price,
-			Quantity: order.NewSize,
-			Bid:      order.Side == "buy",
-			ID:       orderID,
-		}
-		// TODO can an order change price ? here we assume not
-		//lastRawOrder := state.instruments[order.ProductID].orderBook.GetRawOrder(obOrder.ID)
+		fmt.Println("change order", orderID, order, order.NewSize)
+		if order.Price != nil {
+			// This is a simple size change or self trade prevention
+			obOrder := &gmodels.Order{
+				Price:    *order.Price,
+				Quantity: order.NewSize,
+				Bid:      order.Side == "buy",
+				ID:       orderID,
+			}
+			// TODO can an order change price ? here we assume not
+			//lastRawOrder := state.instruments[order.ProductID].orderBook.GetRawOrder(obOrder.ID)
 
-		instr.orderBook.UpdateOrder(obOrder)
+			instr.orderBook.UpdateOrder(obOrder)
 
-		newOrder := instr.orderBook.GetOrder(obOrder.ID)
+			newOrder := instr.orderBook.GetOrder(obOrder.ID)
 
-		var quantity float64
-		if order.Side == "buy" {
-			quantity = instr.orderBook.GetBid(newOrder.Price)
+			var quantity float64
+			if order.Side == "buy" {
+				quantity = instr.orderBook.GetBid(newOrder.Price)
+			} else {
+				quantity = instr.orderBook.GetAsk(newOrder.Price)
+			}
+
+			levelDelta := &gmodels.OrderBookLevel{
+				Price:    newOrder.Price,
+				Quantity: quantity,
+				Bid:      order.Side == "buy",
+			}
+			deltas = []*gmodels.OrderBookLevel{levelDelta}
 		} else {
-			quantity = instr.orderBook.GetAsk(newOrder.Price)
-		}
+			// Need to take into account change of price
 
-		levelDelta := &gmodels.OrderBookLevel{
-			Price:    newOrder.Price,
-			Quantity: quantity,
-			Bid:      order.Side == "buy",
+			// Cancel old order
+			instr.orderBook.DeleteOrder(orderID)
+
+			var oldQuantity float64
+			if order.Side == "buy" {
+				oldQuantity = instr.orderBook.GetBid(*order.OldPrice)
+			} else {
+				oldQuantity = instr.orderBook.GetAsk(*order.OldPrice)
+			}
+			obOrder := &gmodels.Order{
+				Price:    *order.NewPrice,
+				Quantity: order.NewSize,
+				Bid:      order.Side == "buy",
+				ID:       orderID,
+			}
+			instr.orderBook.AddOrder(obOrder)
+
+			var newQuantity float64
+			if order.Side == "buy" {
+				newQuantity = instr.orderBook.GetBid(*order.NewPrice)
+			} else {
+				newQuantity = instr.orderBook.GetAsk(*order.NewPrice)
+			}
+
+			// TODO can squash if price are the same
+			deltas = []*gmodels.OrderBookLevel{{
+				Price:    *order.OldPrice,
+				Quantity: oldQuantity,
+				Bid:      order.Side == "buy",
+			}, {
+				Price:    *order.NewPrice,
+				Quantity: newQuantity,
+				Bid:      order.Side == "buy",
+			},
+			}
 		}
 
 		ts := uint64(order.Time.UnixNano()) / 1000000
@@ -564,7 +607,7 @@ func (state *Listener) onChangeOrder(order coinbasepro.WSChangeOrder, context ac
 		}
 		// SEND DELTA //
 		obDelta := &models.OBL2Update{
-			Levels:    []*gmodels.OrderBookLevel{levelDelta},
+			Levels:    deltas,
 			Timestamp: utils.MilliToTimestamp(ts),
 			Trade:     false,
 		}
