@@ -253,6 +253,12 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		pos.Sync(p.Cost, p.Quantity)
 
 		accnt.securities[p.Instrument.SecurityID.Value].UpdatePositionSize(p.Quantity)
+		if p.MarkPrice != nil {
+			pos.UpdateMarkPrice(p.MarkPrice.Value)
+		}
+		if p.MaxNotionalValue != nil {
+			pos.UpdateMaxNotionalValue(p.MaxNotionalValue.Value)
+		}
 		// TODO cross
 		//sec.Position.Cross = p.Cross
 	}
