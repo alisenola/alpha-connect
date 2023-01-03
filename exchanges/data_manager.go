@@ -20,19 +20,21 @@ type DataManager struct {
 	listener    *actor.PID
 	security    *models.Security
 	dialerPool  *utils.DialerPool
+	wsPool      *utils.WebsocketPool
 	logger      *log.Logger
 }
 
-func NewDataManagerProducer(security *models.Security, dialerPool *utils.DialerPool) actor.Producer {
+func NewDataManagerProducer(security *models.Security, dialerPool *utils.DialerPool, wsPool *utils.WebsocketPool) actor.Producer {
 	return func() actor.Actor {
-		return NewDataManager(security, dialerPool)
+		return NewDataManager(security, dialerPool, wsPool)
 	}
 }
 
-func NewDataManager(security *models.Security, dialerPool *utils.DialerPool) actor.Actor {
+func NewDataManager(security *models.Security, dialerPool *utils.DialerPool, wsPool *utils.WebsocketPool) actor.Actor {
 	return &DataManager{
 		security:   security,
 		dialerPool: dialerPool,
+		wsPool:     wsPool,
 		logger:     nil,
 	}
 }
@@ -115,7 +117,7 @@ func (state *DataManager) Initialize(context actor.Context) error {
 		log.String("type", reflect.TypeOf(*state).String()))
 
 	state.subscribers = make(map[uint64]*actor.PID)
-	producer := NewInstrumentListenerProducer(state.security.SecurityID, state.security.Exchange.ID, state.dialerPool)
+	producer := NewInstrumentListenerProducer(state.security.SecurityID, state.security.Exchange.ID, state.dialerPool, state.wsPool)
 	if producer == nil {
 		return fmt.Errorf("error getting instrument listener")
 	}

@@ -208,3 +208,7 @@ func (accnt *Account) UpdateBidOrderQueue(securityID uint64, orderID string, que
 func (accnt *Account) UpdateMarkPrice(securityID uint64, price float64) {
 	accnt.positions[securityID].UpdateMarkPrice(price)
 }
+
+func (accnt *Account) UpdateMaxNotionalValue(securityID uint64, value float64) {
+	accnt.positions[securityID].UpdateMaxNotionalValue(value)
+}

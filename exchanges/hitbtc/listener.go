@@ -13,7 +13,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
@@ -33,11 +33,11 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws                *hitbtc.Websocket
+	sink              *xutils.WebsocketSink
+	wsPool            *xutils.WebsocketPool
 	security          *models.Security
 	securityID        uint64
 	executor          *actor.PID
-	dialerPool        *xchangerUtils.DialerPool
 	instrumentData    *InstrumentData
 	logger            *log.Logger
 	lastPingTime      time.Time
@@ -45,16 +45,16 @@ type Listener struct {
 	socketTicker      *time.Ticker
 }
 
-func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, wsPool *xutils.WebsocketPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(securityID, dialerPool)
+		return NewListener(securityID, wsPool)
 	}
 }
 
-func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, wsPool *xutils.WebsocketPool) actor.Actor {
 	return &Listener{
 		securityID: securityID,
-		dialerPool: dialerPool,
+		wsPool:     wsPool,
 	}
 }
 
@@ -172,10 +172,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) Clean(context actor.Context) error {
-	if state.ws != nil {
-		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
 	}
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
@@ -186,30 +184,34 @@ func (state *Listener) Clean(context actor.Context) error {
 }
 
 func (state *Listener) subscribeInstrument(context actor.Context) error {
-	if state.ws != nil {
-		_ = state.ws.Disconnect()
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
 	}
 
-	ws := hitbtc.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to hitbtc websocket: %v", err)
+	sink, err := state.wsPool.Subscribe(state.security.Symbol)
+	if err != nil {
+		return fmt.Errorf("error subscribing to websocket: %v", err)
 	}
 
-	if err := ws.SubscribeOrderBook(state.security.Symbol); err != nil {
-		return fmt.Errorf("error subscribing to orderbook")
+	msg, err := sink.ReadMessage()
+	if err != nil {
+		return fmt.Errorf("error reading message: %v", err)
 	}
 
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-
-	snapshot, ok := ws.Msg.Message.(hitbtc.WSSnapshotOrderBook)
+	snapshot, ok := msg.Message.(hitbtc.WSSnapshotOrderBook)
 	if !ok {
-		return fmt.Errorf("was expecting WSSnapshotOrderBook, got %s", reflect.TypeOf(ws.Msg.Message).String())
+		msg, err := sink.ReadMessage()
+		if err != nil {
+			return fmt.Errorf("error reading message: %v", err)
+		}
+		snapshot, ok = msg.Message.(hitbtc.WSSnapshotOrderBook)
+		if !ok {
+			return fmt.Errorf("was expecting WSSnapshotOrderBook, got %s", reflect.TypeOf(msg.Message).String())
+		}
 	}
 
 	bids, asks := snapshot.ToBidAsk()
-
+	fmt.Println("SNAPSHOT", len(bids), len(asks))
 	//estAsk := float64(asks[0].Price) / float64(state.instruments[obData.Symbol].instrument.TickPrecision)
 	// Allow a 10% price variation
 	//depth := int(((bestAsk * 1.1) - bestAsk) * float64(state.instruments[obData.Symbol].instrument.TickPrecision))
@@ -224,23 +226,25 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if ob.Crossed() {
 		return fmt.Errorf("crossed order book")
 	}
-	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
+	ts := uint64(msg.ClientTime.UnixNano()) / 1000000
 	state.instrumentData.orderBook = ob
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateSequence = snapshot.Sequence
 
-	if err := ws.SubscribeTrades(state.security.Symbol); err != nil {
-		return fmt.Errorf("error subscribing to trades")
-	}
+	state.sink = sink
 
-	state.ws = ws
-
-	go func(ws *hitbtc.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(pid, ws.Msg)
+	go func(sink *xutils.WebsocketSink, pid *actor.PID) {
+		for {
+			msg, err := sink.ReadMessage()
+			fmt.Println("READ MESSAGE", reflect.TypeOf(msg.Message), err)
+			if err != nil {
+				context.Send(pid, msg)
+			} else {
+				return
+			}
 		}
-	}(ws, context.Self())
+	}(sink, context.Self())
 
 	return nil
 }
@@ -413,23 +417,22 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 func (state *Listener) checkSockets(context actor.Context) error {
 
-	if time.Since(state.lastPingTime) > 10*time.Second {
-		_ = state.ws.Ping()
-		state.lastPingTime = time.Now()
-	}
-
 	/*
-		if time.Now().Sub(state.lastSubscribeTime) > 1*time.Minute {
-			_ = state.obWs.SubscribeOrderBook(state.security.Symbol)
-			_ = state.tradeWs.SubscribeTrades(state.security.Symbol)
-			state.lastSubscribeTime = time.Now()
+		if time.Since(state.lastPingTime) > 10*time.Second {
+			_ = state.ws.Ping()
+			state.lastPingTime = time.Now()
 		}
+
+
+			if time.Now().Sub(state.lastSubscribeTime) > 1*time.Minute {
+				_ = state.obWs.SubscribeOrderBook(state.security.Symbol)
+				_ = state.tradeWs.SubscribeTrades(state.security.Symbol)
+				state.lastSubscribeTime = time.Now()
+			}
 	*/
 
-	if state.ws.Err != nil || !state.ws.Connected {
-		if state.ws.Err != nil {
-			state.logger.Info("error on ob socket", log.Error(state.ws.Err))
-		}
+	if state.sink.Error() != nil {
+		state.logger.Info("error on ob socket", log.Error(state.sink.Error()))
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}

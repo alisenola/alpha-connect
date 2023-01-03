@@ -135,7 +135,7 @@ func NewPaperAccountListenerProducer(account *account.Account) actor.Producer {
 	}
 }
 
-func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerPool *utils.DialerPool) actor.Producer {
+func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerPool *utils.DialerPool, wsPool *utils.WebsocketPool) actor.Producer {
 	switch exchangeID {
 	case constants.BINANCE.ID:
 		return func() actor.Actor { return binance.NewListener(securityID, dialerPool) }
@@ -158,7 +158,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewListener(securityID, dialerPool) }
 	case constants.HITBTC.ID:
-		return func() actor.Actor { return hitbtc.NewListener(securityID, dialerPool) }
+		return func() actor.Actor { return hitbtc.NewListener(securityID, wsPool) }
 	case constants.KRAKEN.ID:
 		return func() actor.Actor { return kraken.NewListener(securityID, dialerPool) }
 	case constants.OKCOIN.ID:

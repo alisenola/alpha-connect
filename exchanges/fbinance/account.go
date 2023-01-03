@@ -1182,6 +1182,9 @@ func (state *AccountListener) refreshMarkPrices(context actor.Context) error {
 			if p.MarkPrice != nil {
 				state.account.UpdateMarkPrice(p.Instrument.SecurityID.Value, p.MarkPrice.Value)
 			}
+			if p.MaxNotionalValue != nil {
+				state.account.UpdateMaxNotionalValue(p.Instrument.SecurityID.Value, p.MaxNotionalValue.Value)
+			}
 		}
 	})
 	return nil

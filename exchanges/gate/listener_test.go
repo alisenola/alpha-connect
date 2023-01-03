@@ -19,7 +19,7 @@ func TestMarketData(t *testing.T) {
 		Symbol:            "BTC_USDT",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
 		Exchange:          constants.GATE,
-		MinPriceIncrement: 0.01,
+		MinPriceIncrement: 0.1,
 		RoundLot:          1e-04,
 		HasMaturityDate:   false,
 		IsInverse:         false,

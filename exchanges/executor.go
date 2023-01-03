@@ -7,6 +7,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"golang.org/x/net/proxy"
 	"net"
@@ -34,6 +35,7 @@ type Executor struct {
 	db                       *gorm.DB
 	registry                 registry.StaticClient
 	dialerPool               *xchangerUtils.DialerPool
+	wsPools                  map[uint32]*xchangerUtils.WebsocketPool
 	accountClients           map[string]map[string]*http.Client
 	accountManagers          map[string]*actor.PID
 	executors                map[uint32]*actor.PID                      // A map from exchange ID to executor
@@ -272,6 +274,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.instruments = make(map[uint64]*actor.PID)
 	state.slSubscribers = make(map[uint64]*actor.PID)
 	state.accountManagers = make(map[string]*actor.PID)
+	state.wsPools = make(map[uint32]*xchangerUtils.WebsocketPool)
 
 	var dialerPool *xchangerUtils.DialerPool
 	interfaceName := state.DialerPoolInterface
@@ -617,7 +620,26 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool), actor.WithSupervisor(
+		var wsp *xchangerUtils.WebsocketPool
+		var err error
+		if sec.Exchange.ID == constants.HITBTC.ID {
+			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
+				wsp, err = hitbtc.NewWebsocketPool(state.dialerPool)
+				// TODO logging
+				if err != nil {
+					context.Respond(&messages.MarketDataResponse{
+						RequestID:       request.RequestID,
+						Success:         false,
+						RejectionReason: messages.RejectionReason_Other,
+					})
+					return nil
+				}
+				state.wsPools[sec.Exchange.ID] = wsp
+			}
+			wsp = state.wsPools[sec.Exchange.ID]
+		}
+
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool, wsp), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid
@@ -641,7 +663,7 @@ func (state *Executor) OnUnipoolV3DataRequest(context actor.Context) error {
 	if pid, ok := state.instruments[sec.SecurityID]; ok {
 		context.Forward(pid)
 	} else {
-		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool), actor.WithSupervisor(
+		props := actor.PropsFromProducer(NewDataManagerProducer(sec, state.dialerPool, nil), actor.WithSupervisor(
 			utils.NewExponentialBackoffStrategy(100*time.Second, time.Second, time.Second)))
 		pid := context.Spawn(props)
 		state.instruments[sec.SecurityID] = pid

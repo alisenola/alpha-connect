@@ -7,34 +7,36 @@ import (
 )
 
 type Position struct {
-	ID              uint64
-	inverse         bool
-	tickPrecision   float64
-	lotPrecision    float64
-	marginPrecision float64
-	multiplier      float64
-	makerFee        float64
-	takerFee        float64
-	cost            int64
-	rawSize         int64
-	cross           bool
-	markPrice       *float64
+	ID               uint64
+	inverse          bool
+	tickPrecision    float64
+	lotPrecision     float64
+	marginPrecision  float64
+	multiplier       float64
+	makerFee         float64
+	takerFee         float64
+	cost             int64
+	rawSize          int64
+	cross            bool
+	markPrice        *float64
+	maxNotionalValue *float64
 }
 
 func NewPosition(ID uint64, inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
 	return &Position{
-		ID:              ID,
-		inverse:         inverse,
-		tickPrecision:   tp,
-		lotPrecision:    lp,
-		marginPrecision: mp,
-		multiplier:      mul,
-		makerFee:        maker,
-		takerFee:        taker,
-		cost:            0,
-		rawSize:         0,
-		cross:           false,
-		markPrice:       nil,
+		ID:               ID,
+		inverse:          inverse,
+		tickPrecision:    tp,
+		lotPrecision:     lp,
+		marginPrecision:  mp,
+		multiplier:       mul,
+		makerFee:         maker,
+		takerFee:         taker,
+		cost:             0,
+		rawSize:          0,
+		cross:            false,
+		markPrice:        nil,
+		maxNotionalValue: nil,
 	}
 }
 
@@ -180,20 +182,25 @@ func (pos *Position) UpdateMarkPrice(price float64) {
 	pos.markPrice = &price
 }
 
+func (pos *Position) UpdateMaxNotionalValue(value float64) {
+	pos.maxNotionalValue = &value
+}
+
 func (pos *Position) Clone() *Position {
 	clone := &Position{
-		ID:              pos.ID,
-		inverse:         pos.inverse,
-		tickPrecision:   pos.tickPrecision,
-		lotPrecision:    pos.lotPrecision,
-		marginPrecision: pos.marginPrecision,
-		multiplier:      pos.multiplier,
-		makerFee:        pos.makerFee,
-		takerFee:        pos.takerFee,
-		cost:            pos.cost,
-		rawSize:         pos.rawSize,
-		cross:           pos.cross,
-		markPrice:       pos.markPrice,
+		ID:               pos.ID,
+		inverse:          pos.inverse,
+		tickPrecision:    pos.tickPrecision,
+		lotPrecision:     pos.lotPrecision,
+		marginPrecision:  pos.marginPrecision,
+		multiplier:       pos.multiplier,
+		makerFee:         pos.makerFee,
+		takerFee:         pos.takerFee,
+		cost:             pos.cost,
+		rawSize:          pos.rawSize,
+		cross:            pos.cross,
+		markPrice:        pos.markPrice,
+		maxNotionalValue: pos.maxNotionalValue,
 	}
 	return clone
 }

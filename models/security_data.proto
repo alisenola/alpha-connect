@@ -81,6 +81,7 @@ message Position {
     bool cross = 4;
     double cost = 5;
     google.protobuf.DoubleValue mark_price = 6;
+    google.protobuf.DoubleValue max_notional_value = 7;
 }
 
 message Balance {
