@@ -1244,6 +1244,16 @@ func (state *AccountListener) checkAccount(context actor.Context) error {
 		}
 	}
 
+	// Update
+	for _, p := range pos2 {
+		if p.MarkPrice != nil {
+			state.account.UpdateMarkPrice(p.Instrument.SecurityID.Value, p.MarkPrice.Value)
+		}
+		if p.MaxNotionalValue != nil {
+			state.account.UpdateMaxNotionalValue(p.Instrument.SecurityID.Value, p.MaxNotionalValue.Value)
+		}
+	}
+
 	if err := state.account.CheckExpiration(); err != nil {
 		return fmt.Errorf("error checking expired orders: %v", err)
 	}

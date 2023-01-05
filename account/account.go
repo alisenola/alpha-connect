@@ -1004,6 +1004,9 @@ func (accnt *Account) GetPosition(securityID uint64) *models.Position {
 			p.Quantity = pp.Quantity
 			p.Cost = pp.Cost
 		}
+		if pos.maxNotionalValue != nil {
+			p.MaxNotionalValue = wrapperspb.Double(*pos.maxNotionalValue)
+		}
 		return p
 	} else {
 		return nil
