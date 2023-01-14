@@ -106,6 +106,17 @@ func (p *Portfolio) GetAssetExposure(asset uint32) float64 {
 	return exposure
 }
 
+func (p *Portfolio) GetSideExposure(model modeling.Market) (float64, float64) {
+	var longMargin, shortMargin float64
+	for _, exch := range p.accountPortfolios {
+		l, s := exch.GetSideExposure(model)
+		longMargin += l
+		shortMargin += s
+	}
+
+	return longMargin, shortMargin
+}
+
 func (p *Portfolio) GetAssetExposures() map[uint32]float64 {
 	exposures := make(map[uint32]float64)
 	for _, exch := range p.accountPortfolios {
