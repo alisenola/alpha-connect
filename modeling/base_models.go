@@ -34,7 +34,7 @@ type MarketModel interface {
 
 type AllocationModel interface {
 	Model
-	GetAllocations(margin float64) map[uint64]float64
+	GetAllocations(margin, bias float64) map[uint64]float64
 	GetAllocationDelta(ID uint64, margin, bias, size, cost float64) (float64, bool)
 }
 
