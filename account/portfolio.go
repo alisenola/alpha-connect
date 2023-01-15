@@ -106,15 +106,18 @@ func (p *Portfolio) GetAssetExposure(asset uint32) float64 {
 	return exposure
 }
 
-func (p *Portfolio) GetSideExposure(model modeling.Market) (float64, float64) {
+func (p *Portfolio) GetSideExposure(model modeling.Market) (float64, float64, error) {
 	var longMargin, shortMargin float64
 	for _, exch := range p.accountPortfolios {
-		l, s := exch.GetSideExposure(model)
+		l, s, err := exch.GetSideExposure(model)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error while computing side exposure: %v", err)
+		}
 		longMargin += l
 		shortMargin += s
 	}
 
-	return longMargin, shortMargin
+	return longMargin, shortMargin, nil
 }
 
 func (p *Portfolio) GetAssetExposures() map[uint32]float64 {

@@ -136,7 +136,7 @@ func (accnt *Account) GetLeverage(model modeling.Market) float64 {
 	return usedMargin / (float64(availableMargin) / accnt.MarginPrecision)
 }
 
-func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64) {
+func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64, error) {
 	accnt.RLock()
 	defer accnt.RUnlock()
 
@@ -147,7 +147,7 @@ func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64) 
 		}
 		price, ok := model.GetPrice(k)
 		if !ok {
-			panic("no price for position")
+			return 0, 0, fmt.Errorf("no price for position")
 		}
 		if p.inverse {
 			notional := (float64(p.rawSize) / p.lotPrecision) * (1. / price) * p.multiplier
@@ -165,10 +165,11 @@ func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64) 
 			}
 		}
 	}
-	return longMargin, shortMargin
+	return longMargin, shortMargin, nil
 }
 
 func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
+
 	netMargin := accnt.GetMargin(model)
 	accnt.RLock()
 	defer accnt.RUnlock()
