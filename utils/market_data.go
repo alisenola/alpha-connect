@@ -12,9 +12,14 @@ import (
 	"time"
 )
 
+type SpawnStopContext interface {
+	actor.SpawnerContext
+	Stop(pid *actor.PID)
+}
+
 type MarketDataContext struct {
 	sync.RWMutex
-	ctx      actor.Context
+	ctx      SpawnStopContext
 	receiver *actor.PID
 	OBL2     *gorderbook.OrderBookL2
 	Stats    map[models.StatType]float64
@@ -28,7 +33,7 @@ func (s *MarketDataContext) Close() {
 	s.receiver = nil
 }
 
-type MarketData struct {
+type MarketDataReceiver struct {
 	seqNum       uint64
 	securityID   uint64
 	executor     *actor.PID
@@ -39,23 +44,23 @@ type MarketData struct {
 
 type checkTimeout struct{}
 
-func NewMarketDataContext(parent actor.Context, executor *actor.PID, securityID uint64) *MarketDataContext {
+func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64) *MarketDataContext {
 	ctx := &MarketDataContext{
 		ctx:   parent,
 		Stats: make(map[models.StatType]float64),
 	}
-	ctx.receiver = parent.Spawn(actor.PropsFromProducer(NewMarketDataProducer(executor, securityID, ctx)))
+	ctx.receiver = parent.Spawn(actor.PropsFromProducer(NewMarketDataReceiverProducer(executor, securityID, ctx)))
 	return ctx
 }
 
-func NewMarketDataProducer(executor *actor.PID, securityID uint64, ctx *MarketDataContext) actor.Producer {
+func NewMarketDataReceiverProducer(executor *actor.PID, securityID uint64, ctx *MarketDataContext) actor.Producer {
 	return func() actor.Actor {
-		return NewMarketData(executor, securityID, ctx)
+		return NewMarketDataReceiver(executor, securityID, ctx)
 	}
 }
 
-func NewMarketData(executor *actor.PID, securityID uint64, ctx *MarketDataContext) actor.Actor {
-	return &MarketData{
+func NewMarketDataReceiver(executor *actor.PID, securityID uint64, ctx *MarketDataContext) actor.Actor {
+	return &MarketDataReceiver{
 		seqNum:     0,
 		executor:   executor,
 		securityID: securityID,
@@ -63,7 +68,7 @@ func NewMarketData(executor *actor.PID, securityID uint64, ctx *MarketDataContex
 	}
 }
 
-func (state *MarketData) Receive(context actor.Context) {
+func (state *MarketDataReceiver) Receive(context actor.Context) {
 	switch context.Message().(type) {
 	case *actor.Started:
 		if err := state.Initialize(context); err != nil {
@@ -89,7 +94,7 @@ func (state *MarketData) Receive(context actor.Context) {
 	}
 }
 
-func (state *MarketData) Initialize(context actor.Context) error {
+func (state *MarketDataReceiver) Initialize(context actor.Context) error {
 	state.ctx.receiver = context.Self()
 	tmp, err := context.RequestFuture(state.executor, &messages.MarketDataRequest{
 		RequestID:  rand.Uint64(),
@@ -104,7 +109,9 @@ func (state *MarketData) Initialize(context actor.Context) error {
 		panic(err)
 	}
 	mdres := tmp.(*messages.MarketDataResponse)
-
+	if !mdres.Success {
+		return fmt.Errorf("failed to subscribe to market data: %s", mdres.RejectionReason.String())
+	}
 	state.ctx.Lock()
 	defer state.ctx.Unlock()
 
@@ -150,7 +157,7 @@ func (state *MarketData) Initialize(context actor.Context) error {
 	return nil
 }
 
-func (state *MarketData) OnMarketDataIncrementalRefresh(context actor.Context) error {
+func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Context) error {
 	refresh := context.Message().(*messages.MarketDataIncrementalRefresh)
 	if state.seqNum >= refresh.SeqNum {
 		return nil
@@ -177,6 +184,6 @@ func (state *MarketData) OnMarketDataIncrementalRefresh(context actor.Context) e
 	return nil
 }
 
-func (state *MarketData) onCheckTimeout(context actor.Context) error {
+func (state *MarketDataReceiver) onCheckTimeout(context actor.Context) error {
 	return nil
 }

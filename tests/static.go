@@ -1,3 +1,6 @@
+package tests
+
+var AssetsJSON = []byte(`
 {
   "1": {
     "ID": 1,
@@ -3365,3 +3368,52 @@
     "symbol": "EGLD"
   }
 }
+`)
+
+var ChainsJSON = []byte(`
+{
+  "1": {
+    "ID": 1,
+    "name": "Ethereum Mainnet",
+    "type": "EVM"
+  },
+  "5": {
+    "ID": 5,
+    "name": "Starknet Mainnet",
+    "type": "SVM"
+  },
+  "6": {
+    "ID": 6,
+    "name": "ZKSync",
+    "type": "ZKEVM"
+  }
+}`)
+
+var ProtocolsJSON = []byte(`
+{
+  "1": {
+    "ID": 1,
+    "name": "ERC-20"
+  },
+  "2": {
+    "ID": 2,
+    "name": "ERC-721"
+  },
+  "4": {
+    "ID": 4,
+    "name": "ERC-20"
+  },
+  "5": {
+    "ID": 5,
+    "name": "ERC-721"
+  },
+  "6": {
+    "ID": 6,
+    "name": "ERC-20"
+  },
+  "7": {
+    "ID": 7,
+    "name": "ERC-721"
+  }
+}
+`)

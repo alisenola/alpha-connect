@@ -26,7 +26,7 @@ type Config struct {
 	Protocols              []string
 	ChainRPCs              []ChainRPC
 	DB                     *DataBase
-	MonitorStore           config.StoreClient
+	Store                  *config.StoreClient
 }
 
 type Account struct {
@@ -41,6 +41,7 @@ type Account struct {
 	ReadOnly         bool
 	MonitorPortfolio bool
 	MonitorOrders    bool
+	OpeningDate      string
 	SOCKS5           string
 }
 

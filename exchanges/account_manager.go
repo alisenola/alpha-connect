@@ -8,6 +8,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gorm.io/gorm"
 	"net/http"
 	"reflect"
@@ -18,6 +19,7 @@ import (
 
 type AccountManager struct {
 	config.Account
+	store           tickstore_types.TickstoreClient
 	db              *gorm.DB
 	registry        registry.StaticClient
 	client          *http.Client
@@ -31,16 +33,17 @@ type AccountManager struct {
 	paperTrading    bool
 }
 
-func NewAccountManagerProducer(config config.Account, account *account.Account, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Producer {
+func NewAccountManagerProducer(config config.Account, account *account.Account, store tickstore_types.TickstoreClient, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountManager(config, account, db, registry, client)
+		return NewAccountManager(config, account, store, db, registry, client)
 	}
 }
 
-func NewAccountManager(config config.Account, account *account.Account, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Actor {
+func NewAccountManager(config config.Account, account *account.Account, store tickstore_types.TickstoreClient, db *gorm.DB, registry registry.StaticClient, client *http.Client) actor.Actor {
 	return &AccountManager{
 		Account:  config,
 		account:  account,
+		store:    store,
 		db:       db,
 		registry: registry,
 		client:   client,
@@ -154,7 +157,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 	}
 
 	if state.Reconcile && state.db != nil {
-		reconcileProducer := NewAccountReconcileProducer(state.account.Account, state.registry, state.db)
+		reconcileProducer := NewAccountReconcileProducer(state.Account, state.account.Account, state.registry, state.store, state.db)
 		if reconcileProducer != nil {
 			props := actor.PropsFromProducer(reconcileProducer)
 			state.reconcile = context.Spawn(props)

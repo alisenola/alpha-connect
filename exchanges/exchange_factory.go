@@ -36,6 +36,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/upbit"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/xchanger/constants"
 	models2 "gitlab.com/alphaticks/xchanger/models"
 	"gitlab.com/alphaticks/xchanger/utils"
@@ -113,10 +114,10 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Stat
 	}
 }
 
-func NewAccountReconcileProducer(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Producer {
+func NewAccountReconcileProducer(accountCfg config.Account, account *models.Account, registry registry.StaticClient, store tickstore_types.TickstoreClient, db *gorm.DB) actor.Producer {
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
-		return fbinance.NewAccountReconcileProducer(account, registry, db)
+		return fbinance.NewAccountReconcileProducer(accountCfg, account, registry, store, db)
 	case constants.FTX.ID:
 		return ftx.NewAccountReconcileProducer(account, registry, db)
 	case constants.BYBITL.ID:

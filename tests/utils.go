@@ -7,24 +7,13 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/executor"
 	"gitlab.com/alphaticks/xchanger/constants"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	"io/ioutil"
-	"os"
-	"path"
 	"testing"
 	"time"
 )
 
 func LoadStatics(t *testing.T) {
-	pwd, _ := os.Getwd()
-	for path.Base(pwd) != "alpha-connect" {
-		pwd = path.Dir(pwd)
-	}
-	b, err := ioutil.ReadFile(pwd + "/tests/static/assets.json")
-	if err != nil {
-		t.Fatalf("failed to load assets: %v", err)
-	}
 	assets := make(map[uint32]*xchangerModels.Asset)
-	err = json.Unmarshal(b, &assets)
+	err := json.Unmarshal(AssetsJSON, &assets)
 	if err != nil {
 		t.Fatalf("error parsing assets: %v", err)
 	}
@@ -32,12 +21,8 @@ func LoadStatics(t *testing.T) {
 		t.Fatalf("error loading assets: %v", err)
 	}
 
-	b, err = ioutil.ReadFile(pwd + "/tests/static/protocols.json")
-	if err != nil {
-		t.Fatalf("failed to load protocols: %v", err)
-	}
 	prtcls := make(map[uint32]*xchangerModels.Protocol)
-	err = json.Unmarshal(b, &prtcls)
+	err = json.Unmarshal(ProtocolsJSON, &prtcls)
 	if err != nil {
 		t.Fatalf("error parsing protocols: %v", err)
 	}
@@ -45,12 +30,8 @@ func LoadStatics(t *testing.T) {
 		t.Fatalf("error loading protocols: %v", err)
 	}
 
-	b, err = ioutil.ReadFile(pwd + "/tests/static/chains.json")
-	if err != nil {
-		t.Fatalf("failed to load chains: %v", err)
-	}
 	chns := make(map[uint32]*xchangerModels.Chain)
-	err = json.Unmarshal(b, &chns)
+	err = json.Unmarshal(ChainsJSON, &chns)
 	if err != nil {
 		t.Fatalf("error parsing chains: %v", err)
 	}

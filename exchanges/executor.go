@@ -6,6 +6,9 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	_ "gitlab.com/alphaticks/tickfunctors/market/portfolio"
+	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
+	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
@@ -32,6 +35,7 @@ import (
 
 type Executor struct {
 	*config.Config
+	store                    tickstore_types.TickstoreClient
 	db                       *gorm.DB
 	registry                 registry.StaticClient
 	dialerPool               *xchangerUtils.DialerPool
@@ -315,6 +319,18 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 	state.dialerPool = dialerPool
 
+	if state.Store != nil {
+		client, err := tickstore_go_client.NewRemoteClient(*state.Store)
+		if err != nil {
+			return fmt.Errorf("error creating monitor store client: %v", err)
+		}
+		state.store = client
+		// register measurements
+		if err := state.store.RegisterMeasurement("portfolio", "PortfolioTracker"); err != nil {
+			return fmt.Errorf("error registering portfolio measurement: %v", err)
+		}
+	}
+
 	if state.DB != nil {
 		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Shanghai",
 			state.DB.PostgresHost,
@@ -496,7 +512,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
 		client := state.accountClients[exch.Name][accntCfg.Name]
-		producer := NewAccountManagerProducer(accntCfg, account, state.db, state.registry, client)
+		producer := NewAccountManagerProducer(accntCfg, account, state.store, state.db, state.registry, client)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
@@ -1338,7 +1354,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
-		producer := NewAccountManagerProducer(*req.Account, account, state.db, state.registry, state.accountClients[exch.Name][req.Account.Name])
+		producer := NewAccountManagerProducer(*req.Account, account, state.store, state.db, state.registry, state.accountClients[exch.Name][req.Account.Name])
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", req.Account.Exchange)
 		}

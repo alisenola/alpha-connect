@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
+	"github.com/melaurent/gotickfile/v2"
 	"gitlab.com/alphaticks/alpha-connect/account"
+	"gitlab.com/alphaticks/alpha-connect/config"
 	extypes "gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
+	"gitlab.com/alphaticks/tickfunctors/market/portfolio"
+	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
@@ -19,18 +23,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 type reconcile struct{}
 
 type AccountReconcile struct {
 	extypes.BaseReconcile
+	accountCfg       config.Account
 	account          *models.Account
 	dbAccount        *extypes.Account
 	executor         *actor.PID
 	logger           *log.Logger
 	securities       map[uint64]*registry.Security
 	symbToSecs       map[string]*registry.Security
+	store            tickstore_types.TickstoreClient
 	db               *gorm.DB
 	registry         registry.StaticClient
 	positions        map[uint64]*account.Position
@@ -41,17 +48,19 @@ type AccountReconcile struct {
 	reconcileTicker  *time.Ticker
 }
 
-func NewAccountReconcileProducer(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Producer {
+func NewAccountReconcileProducer(accountCfg config.Account, account *models.Account, registry registry.StaticClient, store tickstore_types.TickstoreClient, db *gorm.DB) actor.Producer {
 	return func() actor.Actor {
-		return NewAccountReconcile(account, registry, db)
+		return NewAccountReconcile(accountCfg, account, registry, store, db)
 	}
 }
 
-func NewAccountReconcile(account *models.Account, registry registry.StaticClient, db *gorm.DB) actor.Actor {
+func NewAccountReconcile(accountCfg config.Account, account *models.Account, registry registry.StaticClient, store tickstore_types.TickstoreClient, db *gorm.DB) actor.Actor {
 	return &AccountReconcile{
-		account:  account,
-		db:       db,
-		registry: registry,
+		accountCfg: accountCfg,
+		account:    account,
+		store:      store,
+		db:         db,
+		registry:   registry,
 	}
 }
 
@@ -154,24 +163,74 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	lastNav := 0.
 	cumPerf := 1.
 	var movements []*extypes.Movement
-	state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
-	for i, m := range movements {
-		assets[m.AssetID] += m.Quantity
-		ignore := false
-		if m.Transaction.Type == "DEPOSIT" || m.Transaction.Type == "WITHDRAWAL" {
-			ignore = true
+	// get all movements, write in account store
+	if state.store != nil {
+		tags := map[string]string{"account": state.account.Name}
+		lastPortfolioEventTime, err := state.store.GetLastEventTime("portfolio", tags)
+		if err != nil {
+			return fmt.Errorf("error getting last portfolio event time: %v", err)
 		}
-		nav := 0.
-		for _, a := range assets {
-			nav += a
+		var writer tickstore_types.TickstoreWriter
+		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
+		tracker := &portfolio.PortfolioTracker{}
+		state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
+		for i, m := range movements {
+			tick := uint64(m.Transaction.Time.UnixMilli())
+			var delta portfolio.PortfolioTrackerDelta
+			switch messages.AccountMovementType(m.Reason) {
+			case messages.AccountMovementType_Deposit, messages.AccountMovementType_Withdrawal:
+				delta = portfolio.NewTransferDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_FundingFee:
+				delta = portfolio.NewFundingDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_RealizedPnl:
+				delta = portfolio.NewRealizedPnLDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_Commission:
+				delta = portfolio.NewCommissionDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_WelcomeBonus:
+				delta = portfolio.NewWelcomeBonusDelta(uint64(m.AssetID), m.Quantity)
+			}
+			tickDelta := gotickfile.TickDeltas{
+				Pointer: unsafe.Pointer(&delta),
+				Len:     1,
+			}
+			if err := tracker.ProcessDeltas(tickDelta); err != nil {
+				return fmt.Errorf("error applying delta: %v", err)
+			}
+			if tick > lastPortfolioEventTime {
+				if writer == nil {
+					writer, err = state.store.NewTickWriter("portfolio", tags, time.Second)
+					if err != nil {
+						return fmt.Errorf("error creating portfolio writer: %v", err)
+					}
+					if err := writer.WriteObject(tick, tracker); err != nil {
+						return fmt.Errorf("error writing portfolio: %v", err)
+					}
+				} else {
+					// Need to write deltas otherwise, always discontinuous portfolio (DeltasTo is discontinuous)
+					if err := writer.WriteDeltas(tick, tickDelta); err != nil {
+						return fmt.Errorf("error writing portfolio: %v", err)
+					}
+				}
+				fmt.Println("WRITE")
+			}
+			assets[m.AssetID] += m.Quantity
+			ignore := false
+			if m.Transaction.Type == "DEPOSIT" || m.Transaction.Type == "WITHDRAWAL" {
+				ignore = true
+			}
+			nav := 0.
+			for _, a := range assets {
+				nav += a
+			}
+			if !ignore {
+				cumPerf *= nav / lastNav
+			}
+			lastNav = nav
+			if i%1000 == 0 {
+				fmt.Println(fmt.Sprintf("%s, %f, %f", m.Transaction.Time.String(), nav, cumPerf))
+			}
 		}
-		if !ignore {
-			cumPerf *= nav / lastNav
-		}
-		lastNav = nav
-		if i%1000 == 0 {
-			fmt.Println(fmt.Sprintf("%f, %f", nav, cumPerf))
-		}
+		writer.Close()
 	}
 
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
@@ -359,6 +418,9 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			return fmt.Errorf("error finding last funding transaction: %v", tx.Error)
 		}
 		state.lastFundingTs = uint64(tr.Time.UnixNano() / 1000000)
+	} else {
+		t, _ := time.Parse("2006-01-02", state.accountCfg.OpeningDate)
+		state.lastFundingTs = uint64(t.UnixMilli())
 	}
 
 	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "DEPOSIT").Count(&cnt)
@@ -372,6 +434,9 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			return fmt.Errorf("error finding last deposit transaction: %v", tx.Error)
 		}
 		state.lastDepositTs = uint64(tr.Time.UnixNano() / 1000000)
+	} else {
+		t, _ := time.Parse("2006-01-02", state.accountCfg.OpeningDate)
+		state.lastDepositTs = uint64(t.UnixMilli())
 	}
 
 	tx = state.db.Model(&extypes.Transaction{}).Where("account_id=?", state.dbAccount.ID).Where("type=?", "WITHDRAWAL").Count(&cnt)
@@ -385,6 +450,9 @@ func (state *AccountReconcile) reconcileMovements(context actor.Context) error {
 			return fmt.Errorf("error finding last withdrawal transaction: %v", tx.Error)
 		}
 		state.lastWithdrawalTs = uint64(tr.Time.UnixNano() / 1000000)
+	} else {
+		t, _ := time.Parse("2006-01-02", state.accountCfg.OpeningDate)
+		state.lastWithdrawalTs = uint64(t.UnixMilli())
 	}
 
 	// Get last account movement
