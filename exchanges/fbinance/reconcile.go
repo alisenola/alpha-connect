@@ -174,7 +174,7 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
 		tracker := &portfolio.PortfolioTracker{}
 		state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
-		for i, m := range movements {
+		for _, m := range movements {
 			tick := uint64(m.Transaction.Time.UnixMilli())
 			var delta portfolio.PortfolioTrackerDelta
 			switch messages.AccountMovementType(m.Reason) {
@@ -226,11 +226,10 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 				cumPerf *= nav / lastNav
 			}
 			lastNav = nav
-			if i%1000 == 0 {
-				fmt.Println(fmt.Sprintf("%s, %f, %f", m.Transaction.Time.String(), nav, cumPerf))
-			}
 		}
-		writer.Close()
+		if writer != nil {
+			writer.Close()
+		}
 	}
 
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)

@@ -23,7 +23,8 @@ type ExPubTest struct {
 
 func ExPub(t *testing.T, tc ExPubTest) {
 	C := &config.Config{
-		Exchanges: []string{tc.Instrument.Exchange.Name},
+		Exchanges:       []string{tc.Instrument.Exchange.Name},
+		RegistryAddress: "registry.alphaticks.io:8021",
 	}
 	as, executor, cleaner := tests.StartExecutor(t, C)
 	defer cleaner()

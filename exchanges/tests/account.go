@@ -68,7 +68,8 @@ func AccntTest(t *testing.T, tc AccountTest) {
 			Listen:    true,
 			ReadOnly:  false,
 		}},
-		Exchanges: []string{tc.Account.Exchange.Name},
+		Exchanges:       []string{tc.Account.Exchange.Name},
+		RegistryAddress: "registry.alphaticks.io:8021",
 	}
 	as, executor, cleaner := tests.StartExecutor(t, C)
 	defer cleaner()

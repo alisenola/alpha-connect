@@ -388,8 +388,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 					Transport: &http.Transport{
 						Proxy:                 http.ProxyFromEnvironment,
 						DialContext:           dialSocksProxy.(proxy.ContextDialer).DialContext,
-						IdleConnTimeout:       60 * time.Second,
-						TLSHandshakeTimeout:   10 * time.Second,
+						IdleConnTimeout:       5 * time.Second,
+						TLSHandshakeTimeout:   5 * time.Second,
 						ExpectContinueTimeout: 1 * time.Second,
 						MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
 					},

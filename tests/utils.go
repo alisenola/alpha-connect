@@ -42,8 +42,8 @@ func LoadStatics(t *testing.T) {
 
 func StartExecutor(t *testing.T, cfg *config.Config) (*actor.ActorSystem, *actor.PID, func()) {
 	LoadStatics(t)
-	config := actor.Config{DeadLetterThrottleInterval: time.Second, DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
-	as := actor.NewActorSystemWithConfig(&config)
+	aconfig := actor.Config{DeadLetterThrottleInterval: time.Second, DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
+	as := actor.NewActorSystemWithConfig(&aconfig)
 	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfg)), "executor")
 	return as, exec, func() { _ = as.Root.PoisonFuture(exec).Wait() }
 }
