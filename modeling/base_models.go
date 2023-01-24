@@ -34,8 +34,9 @@ type MarketModel interface {
 
 type AllocationModel interface {
 	Model
-	GetAllocations(allocations, risks *sync.Map, margin, cost float64) map[uint64]float64
-	GetAllocationDelta(ID uint64, allocations, risks *sync.Map, margin, cost float64) (float64, bool)
+	Solve(allocs, limits *sync.Map, margin float64) error
+	GetAllocations(allocations *sync.Map, margin, cost float64) map[uint64]float64
+	GetAllocationDelta(ID uint64, allocations *sync.Map, margin, cost float64) (float64, bool)
 }
 
 type LongShortModel interface {
