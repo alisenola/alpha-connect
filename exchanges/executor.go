@@ -518,7 +518,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		props := actor.PropsFromProducer(producer, actor.WithSupervisor(
 			actor.NewExponentialBackoffStrategy(100*time.Second, time.Second)))
-		state.accountManagers[accntCfg.Name] = context.Spawn(props)
+		state.accountManagers[accntCfg.Name], err = context.SpawnNamed(props, accntCfg.Name+"_account")
 	}
 
 	return nil

@@ -153,7 +153,11 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 		}
 
 		props := actor.PropsFromProducer(listenerProducer)
-		state.listener = context.Spawn(props)
+		listener, err := context.SpawnNamed(props, "listener")
+		if err != nil {
+			return fmt.Errorf("error spawning account listener: %s", err)
+		}
+		state.listener = listener
 	}
 
 	if state.Reconcile && state.db != nil {
