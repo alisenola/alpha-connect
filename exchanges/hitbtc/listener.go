@@ -238,7 +238,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		for {
 			msg, err := sink.ReadMessage()
 			fmt.Println("READ MESSAGE", reflect.TypeOf(msg.Message), err)
-			if err != nil {
+			if err == nil {
 				context.Send(pid, msg)
 			} else {
 				return
