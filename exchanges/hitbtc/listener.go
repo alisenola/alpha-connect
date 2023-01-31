@@ -237,7 +237,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	go func(sink *xutils.WebsocketSink, pid *actor.PID) {
 		for {
 			msg, err := sink.ReadMessage()
-			fmt.Println("READ MESSAGE", reflect.TypeOf(msg.Message), err)
 			if err == nil {
 				context.Send(pid, msg)
 			} else {
