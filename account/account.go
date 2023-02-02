@@ -35,6 +35,11 @@ func IsOpen(status models.OrderStatus) bool {
 		status == models.OrderStatus_PartiallyFilled
 }
 
+const (
+	CacheMargin    = 0
+	CacheNetMargin = 0
+)
+
 type Order struct {
 	*models.Order
 	lastEventTime          time.Time
@@ -74,6 +79,11 @@ type Security interface {
 	Clone() Security
 }
 
+type CacheValue struct {
+	time  uint64
+	value float64
+}
+
 type Account struct {
 	sync.RWMutex
 	*models.Account
@@ -92,6 +102,7 @@ type Account struct {
 	takerFee        *float64
 	makerFee        *float64
 	expirationLimit time.Duration
+	cache           map[int]CacheValue
 }
 
 func NewAccount(account *models.Account) (*Account, error) {
@@ -108,6 +119,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		margin:          0,
 		quoteCurrency:   quoteCurrency,
 		expirationLimit: 1 * time.Minute,
+		cache:           make(map[int]CacheValue),
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
