@@ -21,6 +21,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/ftx"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/ftxus"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gate"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/gatef"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gemini"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/hitbtc"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobi"
@@ -194,6 +195,8 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 		return func() actor.Actor { return okexp.NewListener(securityID, dialerPool) }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewListener(securityID, dialerPool) }
+	case constants.GATEF.ID:
+		return func() actor.Actor { return gatef.NewListener(securityID, dialerPool) }
 	case constants.UNISWAPV3.ID:
 		return func() actor.Actor { return v3.NewListener(securityID, dialerPool) }
 		/*
@@ -263,6 +266,8 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Conf
 		return func() actor.Actor { return okexp.NewExecutor(dialerPool, registry) }
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewExecutor(dialerPool, registry) }
+	case constants.GATEF.ID:
+		return func() actor.Actor { return gatef.NewExecutor(dialerPool, registry) }
 	case constants.UNISWAPV3.ID:
 		return func() actor.Actor { return v3.NewExecutor(dialerPool, registry) }
 	case constants.OPENSEA.ID:

@@ -164,73 +164,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 	cumPerf := 1.
 	var movements []*extypes.Movement
 	// get all movements, write in account store
-	if state.store != nil {
-		tags := map[string]string{"account": state.account.Name}
-		lastPortfolioEventTime, err := state.store.GetLastEventTime("portfolio", tags)
-		if err != nil {
-			return fmt.Errorf("error getting last portfolio event time: %v", err)
-		}
-		var writer tickstore_types.TickstoreWriter
-		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
-		tracker := &portfolio.PortfolioTracker{}
-		state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
-		for _, m := range movements {
-			tick := uint64(m.Transaction.Time.UnixMilli())
-			var delta portfolio.PortfolioTrackerDelta
-			switch messages.AccountMovementType(m.Reason) {
-			case messages.AccountMovementType_Deposit, messages.AccountMovementType_Withdrawal:
-				delta = portfolio.NewTransferDelta(uint64(m.AssetID), m.Quantity)
-			case messages.AccountMovementType_FundingFee:
-				delta = portfolio.NewFundingDelta(uint64(m.AssetID), m.Quantity)
-			case messages.AccountMovementType_RealizedPnl:
-				delta = portfolio.NewRealizedPnLDelta(uint64(m.AssetID), m.Quantity)
-			case messages.AccountMovementType_Commission:
-				delta = portfolio.NewCommissionDelta(uint64(m.AssetID), m.Quantity)
-			case messages.AccountMovementType_WelcomeBonus:
-				delta = portfolio.NewWelcomeBonusDelta(uint64(m.AssetID), m.Quantity)
-			}
-			tickDelta := gotickfile.TickDeltas{
-				Pointer: unsafe.Pointer(&delta),
-				Len:     1,
-			}
-			if err := tracker.ProcessDeltas(tickDelta); err != nil {
-				return fmt.Errorf("error applying delta: %v", err)
-			}
-			if tick > lastPortfolioEventTime {
-				if writer == nil {
-					writer, err = state.store.NewTickWriter("portfolio", tags, time.Second)
-					if err != nil {
-						return fmt.Errorf("error creating portfolio writer: %v", err)
-					}
-					if err := writer.WriteObject(tick, tracker); err != nil {
-						return fmt.Errorf("error writing portfolio: %v", err)
-					}
-				} else {
-					// Need to write deltas otherwise, always discontinuous portfolio (DeltasTo is discontinuous)
-					if err := writer.WriteDeltas(tick, tickDelta); err != nil {
-						return fmt.Errorf("error writing portfolio: %v", err)
-					}
-				}
-				fmt.Println("WRITE")
-			}
-			assets[m.AssetID] += m.Quantity
-			ignore := false
-			if m.Transaction.Type == "DEPOSIT" || m.Transaction.Type == "WITHDRAWAL" {
-				ignore = true
-			}
-			nav := 0.
-			for _, a := range assets {
-				nav += a
-			}
-			if !ignore {
-				cumPerf *= nav / lastNav
-			}
-			lastNav = nav
-		}
-		if writer != nil {
-			writer.Close()
-		}
-	}
 
 	state.db.Debug().Model(&extypes.Transaction{}).Joins("Fill").Where(`"transactions"."account_id"=?`, state.dbAccount.ID).Order("time asc, execution_id asc").Find(&transactions)
 	for _, tr := range transactions {
@@ -397,6 +330,74 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			}
 		} else if p1.GetPosition() != nil {
 			return fmt.Errorf("%s not in exec", p1.GetPosition().Instrument.Symbol)
+		}
+	}
+
+	if state.store != nil {
+		tags := map[string]string{"account": state.account.Name}
+		lastPortfolioEventTime, err := state.store.GetLastEventTime("portfolio", tags)
+		if err != nil {
+			return fmt.Errorf("error getting last portfolio event time: %v", err)
+		}
+		var writer tickstore_types.TickstoreWriter
+		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
+		tracker := &portfolio.PortfolioTracker{}
+		state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
+		for _, m := range movements {
+			tick := uint64(m.Transaction.Time.UnixMilli())
+			var delta portfolio.PortfolioTrackerDelta
+			switch messages.AccountMovementType(m.Reason) {
+			case messages.AccountMovementType_Deposit, messages.AccountMovementType_Withdrawal:
+				delta = portfolio.NewTransferDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_FundingFee:
+				delta = portfolio.NewFundingDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_RealizedPnl:
+				delta = portfolio.NewRealizedPnLDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_Commission:
+				delta = portfolio.NewCommissionDelta(uint64(m.AssetID), m.Quantity)
+			case messages.AccountMovementType_WelcomeBonus:
+				delta = portfolio.NewWelcomeBonusDelta(uint64(m.AssetID), m.Quantity)
+			}
+			tickDelta := gotickfile.TickDeltas{
+				Pointer: unsafe.Pointer(&delta),
+				Len:     1,
+			}
+			if err := tracker.ProcessDeltas(tickDelta); err != nil {
+				return fmt.Errorf("error applying delta: %v", err)
+			}
+			if tick > lastPortfolioEventTime {
+				if writer == nil {
+					writer, err = state.store.NewTickWriter("portfolio", tags, time.Second)
+					if err != nil {
+						return fmt.Errorf("error creating portfolio writer: %v", err)
+					}
+					if err := writer.WriteObject(tick, tracker); err != nil {
+						return fmt.Errorf("error writing portfolio: %v", err)
+					}
+				} else {
+					// Need to write deltas otherwise, always discontinuous portfolio (DeltasTo is discontinuous)
+					if err := writer.WriteDeltas(tick, tickDelta); err != nil {
+						return fmt.Errorf("error writing portfolio: %v", err)
+					}
+				}
+				fmt.Println("WRITE")
+			}
+			assets[m.AssetID] += m.Quantity
+			ignore := false
+			if m.Transaction.Type == "DEPOSIT" || m.Transaction.Type == "WITHDRAWAL" {
+				ignore = true
+			}
+			nav := 0.
+			for _, a := range assets {
+				nav += a
+			}
+			if !ignore {
+				cumPerf *= nav / lastNav
+			}
+			lastNav = nav
+		}
+		if writer != nil {
+			writer.Close()
 		}
 	}
 
