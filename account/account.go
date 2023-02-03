@@ -1035,6 +1035,9 @@ func (accnt *Account) GetAllPositions() []*models.Position {
 			Instrument: accnt.securities[k].GetInstrument(),
 			Cross:      false,
 		}
+		if pos.markPrice != nil {
+			p.MarkPrice = wrapperspb.Double(*pos.markPrice)
+		}
 		if pp := pos.GetPosition(); pp != nil {
 			p.Quantity = pp.Quantity
 			p.Cost = pp.Cost
