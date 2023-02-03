@@ -1,7 +1,6 @@
 package fbinance
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
@@ -997,7 +996,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		if udata.Execution == nil {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
-		b, _ := json.Marshal(udata.Execution)
+		//b, _ := json.Marshal(udata.Execution)
 		//fmt.Println("ORDER_TRADE_UPDATE", string(b))
 		exec := udata.Execution
 		switch exec.ExecutionType {
@@ -1062,7 +1061,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			}
 		}
 	case fbinance.ACCOUNT_UPDATE:
-		b, _ := json.Marshal(udata.Account)
+		//b, _ := json.Marshal(udata.Account)
 		//fmt.Println("ACCOUNT UPDATE", string(b))
 		var reason messages.AccountMovementType
 		switch udata.Account.Reason {
