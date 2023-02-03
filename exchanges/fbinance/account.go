@@ -843,7 +843,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 				response := res.(*messages.OrderCancelResponse)
 
 				if response.Success {
-					fmt.Println("CONFIRM CANCEL", ID)
 					report, err := state.account.ConfirmCancelOrder(ID)
 					if err != nil {
 						panic(err)
@@ -999,7 +998,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 			return fmt.Errorf("received ORDER_TRADE_UPDATE with no execution data")
 		}
 		b, _ := json.Marshal(udata.Execution)
-		fmt.Println("ORDER_TRADE_UPDATE", string(b))
+		//fmt.Println("ORDER_TRADE_UPDATE", string(b))
 		exec := udata.Execution
 		switch exec.ExecutionType {
 		case fbinance.ET_NEW:
@@ -1064,7 +1063,7 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 		}
 	case fbinance.ACCOUNT_UPDATE:
 		b, _ := json.Marshal(udata.Account)
-		fmt.Println("ACCOUNT UPDATE", string(b))
+		//fmt.Println("ACCOUNT UPDATE", string(b))
 		var reason messages.AccountMovementType
 		switch udata.Account.Reason {
 		case "DEPOSIT":
@@ -1191,7 +1190,6 @@ func (state *AccountListener) refreshMarkPrices(context actor.Context) error {
 }
 
 func (state *AccountListener) checkAccount(context actor.Context) error {
-	fmt.Println("CHECKING ACCOUNT !")
 	state.account.CleanOrders()
 
 	pos1 := state.account.GetPositions()
