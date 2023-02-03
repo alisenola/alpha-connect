@@ -3,6 +3,7 @@ package account
 import (
 	"fmt"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
+	"gitlab.com/alphaticks/xchanger/constants"
 	"math"
 )
 
@@ -143,7 +144,8 @@ func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64, 
 	var longExposure, shortExposure float64
 	if accnt.MarginCurrency != nil {
 		for k, b := range accnt.balances {
-			if k == accnt.MarginCurrency.ID {
+			// Ignore stable coins for long exposure calculation
+			if k == accnt.MarginCurrency.ID || k == constants.USDC.ID || k == constants.TETHER.ID || k == constants.BUSD.ID {
 				continue
 			} else {
 				pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
