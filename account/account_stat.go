@@ -140,7 +140,20 @@ func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64, 
 	accnt.RLock()
 	defer accnt.RUnlock()
 
-	var longMargin, shortMargin float64
+	var longExposure, shortExposure float64
+	if accnt.MarginCurrency != nil {
+		for k, b := range accnt.balances {
+			if k == accnt.MarginCurrency.ID {
+				continue
+			} else {
+				pp, ok := model.GetPairPrice(k, accnt.MarginCurrency.ID)
+				if ok {
+					longExposure += (float64(b) / accnt.MarginPrecision) * pp
+				}
+			}
+		}
+	}
+
 	for k, p := range accnt.positions {
 		if p.rawSize == 0 {
 			continue
@@ -152,20 +165,20 @@ func (accnt *Account) GetSideExposure(model modeling.Market) (float64, float64, 
 		if p.inverse {
 			notional := (float64(p.rawSize) / p.lotPrecision) * (1. / price) * p.multiplier
 			if notional < 0 {
-				shortMargin -= notional
+				shortExposure -= notional
 			} else {
-				longMargin += notional
+				longExposure += notional
 			}
 		} else {
 			notional := (float64(p.rawSize) / p.lotPrecision) * price * p.multiplier
 			if notional < 0 {
-				shortMargin -= notional
+				shortExposure -= notional
 			} else {
-				longMargin += notional
+				longExposure += notional
 			}
 		}
 	}
-	return longMargin, shortMargin, nil
+	return longExposure, shortExposure, nil
 }
 
 func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {

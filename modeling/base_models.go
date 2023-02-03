@@ -144,7 +144,16 @@ func (m *MarketAllocationModel) GetPrice(ID uint64) (float64, bool) {
 
 func (m *MarketAllocationModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	ID := uint64(base)<<32 | uint64(quote)
-	return m.GetPrice(ID)
+	if m.PriceModel != nil {
+		p, ok := m.PriceModel.GetPrice(ID)
+		if ok {
+			return p, ok
+		} else {
+			return m.MarketMap.GetPrice(ID)
+		}
+	} else {
+		return m.MarketMap.GetPrice(ID)
+	}
 }
 
 type MarketLongShortModel struct {
