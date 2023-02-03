@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,10 +20,12 @@ type SpawnStopContext interface {
 
 type MarketDataContext struct {
 	sync.RWMutex
-	ctx      SpawnStopContext
-	receiver *actor.PID
-	OBL2     *gorderbook.OrderBookL2
-	Stats    map[models.StatType]float64
+	ctx       SpawnStopContext
+	receiver  *actor.PID
+	OBL2      *gorderbook.OrderBookL2
+	Stats     map[models.StatType]float64
+	TradeFlag int32
+	BookFlag  int32
 }
 
 func (s *MarketDataContext) Close() {
@@ -177,6 +180,13 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 		state.ctx.Stats[s.StatType] = s.Value
 	}
 	state.ctx.Unlock()
+	// if trade event, put trade flag to 1
+	if len(refresh.Trades) > 0 {
+		atomic.CompareAndSwapInt32(&state.ctx.TradeFlag, 0, 1)
+	}
+	if refresh.UpdateL2 != nil {
+		atomic.CompareAndSwapInt32(&state.ctx.BookFlag, 0, 1)
+	}
 	if crossed {
 		return fmt.Errorf("crossed ob")
 	}
