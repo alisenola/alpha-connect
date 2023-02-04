@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -24,8 +23,8 @@ type MarketDataContext struct {
 	receiver  *actor.PID
 	OBL2      *gorderbook.OrderBookL2
 	Stats     map[models.StatType]float64
-	TradeFlag int32
-	BookFlag  int32
+	TradeCond *sync.Cond
+	BookCond  *sync.Cond
 }
 
 func (s *MarketDataContext) Close() {
@@ -49,8 +48,10 @@ type checkTimeout struct{}
 
 func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64) *MarketDataContext {
 	ctx := &MarketDataContext{
-		ctx:   parent,
-		Stats: make(map[models.StatType]float64),
+		ctx:       parent,
+		Stats:     make(map[models.StatType]float64),
+		TradeCond: sync.NewCond(&sync.Mutex{}),
+		BookCond:  sync.NewCond(&sync.Mutex{}),
 	}
 	ctx.receiver = parent.Spawn(actor.PropsFromProducer(NewMarketDataReceiverProducer(executor, securityID, ctx)))
 	return ctx
@@ -182,10 +183,10 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 	state.ctx.Unlock()
 	// if trade event, put trade flag to 1
 	if len(refresh.Trades) > 0 {
-		atomic.CompareAndSwapInt32(&state.ctx.TradeFlag, 0, 1)
+		state.ctx.TradeCond.Broadcast()
 	}
 	if refresh.UpdateL2 != nil {
-		atomic.CompareAndSwapInt32(&state.ctx.BookFlag, 0, 1)
+		state.ctx.BookCond.Broadcast()
 	}
 	if crossed {
 		return fmt.Errorf("crossed ob")
