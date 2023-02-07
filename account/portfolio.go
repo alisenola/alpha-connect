@@ -66,6 +66,14 @@ func (p *Portfolio) GetAllPositions() []*models.Position {
 	return positions
 }
 
+func (p *Portfolio) GetBalances() []*models.Balance {
+	var balances []*models.Balance
+	for _, accnt := range p.accountPortfolios {
+		balances = append(balances, accnt.GetBalances()...)
+	}
+	return balances
+}
+
 func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.Name] = account
 }

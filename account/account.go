@@ -278,7 +278,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.margin = 0
 	for _, b := range balances {
 		accnt.assets[b.Asset.ID] = b.Asset
-		accnt.balances[b.Asset.ID] = int64(math.Round(b.Quantity * accnt.MarginPrecision))
+		accnt.balances[b.Asset.ID] += int64(math.Round(b.Quantity * accnt.MarginPrecision))
 	}
 	if accnt.MarginCurrency != nil {
 		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
