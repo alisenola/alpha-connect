@@ -57,6 +57,15 @@ func (p *Portfolio) GetPositions() []*models.Position {
 	return positions
 }
 
+func (p *Portfolio) GetAllPositions() []*models.Position {
+	var positions []*models.Position
+	for _, exch := range p.accountPortfolios {
+		positions = append(positions, exch.GetAllPositions()...)
+	}
+
+	return positions
+}
+
 func (p *Portfolio) AddAccount(account *Account) {
 	p.accountPortfolios[account.Name] = account
 }
