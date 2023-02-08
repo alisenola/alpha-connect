@@ -1198,6 +1198,7 @@ func (accnt *Account) Clone() *Account {
 	accnt.RLock()
 	defer accnt.RUnlock()
 	clone := &Account{
+		Account:         accnt.Account,
 		ordersID:        make(map[string]*Order),
 		ordersClID:      make(map[string]*Order),
 		securities:      make(map[uint64]Security),
