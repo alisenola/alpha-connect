@@ -164,3 +164,11 @@ type SVMTransactionByHashResponse struct {
 	Success         bool
 	RejectionReason RejectionReason
 }
+
+func (x *NewOrderSingleRequest) GetPriority() int8 {
+	return int8(x.RequestPriority)
+}
+
+func (x *OrderCancelRequest) GetPriority() int8 {
+	return int8(x.RequestPriority)
+}

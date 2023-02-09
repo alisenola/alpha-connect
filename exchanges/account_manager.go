@@ -152,7 +152,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 			}
 		}
 
-		props := actor.PropsFromProducer(listenerProducer)
+		props := actor.PropsFromProducer(listenerProducer, actor.WithMailbox(actor.UnboundedPriorityMpsc()))
 		listener, err := context.SpawnNamed(props, "listener")
 		if err != nil {
 			return fmt.Errorf("error spawning account listener: %s", err)

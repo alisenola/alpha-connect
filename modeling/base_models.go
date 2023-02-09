@@ -108,7 +108,7 @@ func (m *MarketMap) GetPrice(ID uint64) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	p, ok := m.prices[ID]
-	if !ok {
+	if !ok && m.priceModel != nil {
 		p, ok = m.priceModel.GetPrice(ID)
 	}
 	return p, ok
@@ -119,7 +119,7 @@ func (m *MarketMap) GetPairPrice(base, quote uint32) (float64, bool) {
 	defer m.RUnlock()
 	ID := uint64(base)<<32 | uint64(quote)
 	p, ok := m.prices[ID]
-	if !ok {
+	if !ok && m.priceModel != nil {
 		p, ok = m.priceModel.GetPrice(ID)
 	}
 	return p, ok

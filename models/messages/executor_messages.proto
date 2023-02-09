@@ -487,6 +487,7 @@ message NewOrderSingleRequest {
     NewOrder order = 3;
     ResponseType response_type = 4;
     google.protobuf.Timestamp expire = 5;
+    int32 request_priority = 6;
 }
 
 message NewOrderSingleResponse {
@@ -558,6 +559,7 @@ message OrderCancelRequest {
     models.Instrument instrument = 4;
     models.Account account = 5;
     ResponseType response_type = 6;
+    int32 request_priority = 7;
 }
 
 message OrderCancelResponse {
