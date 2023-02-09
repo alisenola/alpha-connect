@@ -77,13 +77,18 @@ type BuyTradeModel interface {
 
 type MarketMap struct {
 	sync.RWMutex
-	prices map[uint64]float64
+	prices     map[uint64]float64
+	priceModel PriceModel
 }
 
 func NewMarketMap() *MarketMap {
 	return &MarketMap{
 		prices: make(map[uint64]float64),
 	}
+}
+
+func (m *MarketMap) SetPriceModel(model PriceModel) {
+	m.priceModel = model
 }
 
 func (m *MarketMap) SetPrice(ID uint64, p float64) {
@@ -103,6 +108,9 @@ func (m *MarketMap) GetPrice(ID uint64) (float64, bool) {
 	m.RLock()
 	defer m.RUnlock()
 	p, ok := m.prices[ID]
+	if !ok {
+		p, ok = m.priceModel.GetPrice(ID)
+	}
 	return p, ok
 }
 
@@ -111,6 +119,9 @@ func (m *MarketMap) GetPairPrice(base, quote uint32) (float64, bool) {
 	defer m.RUnlock()
 	ID := uint64(base)<<32 | uint64(quote)
 	p, ok := m.prices[ID]
+	if !ok {
+		p, ok = m.priceModel.GetPrice(ID)
+	}
 	return p, ok
 }
 
