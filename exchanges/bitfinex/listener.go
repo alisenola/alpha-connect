@@ -589,7 +589,7 @@ func (state *Listener) onMarketDataResponse(context actor.Context) error {
 	msg := context.Message().(*messages.MarketDataResponse)
 	if !msg.Success {
 		// We want to converge towards the right value,
-		if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded {
+		if msg.RejectionReason == messages.RejectionReason_IPRateLimitExceeded {
 			fbdLock.Lock()
 			fbd = time.Duration(float64(fbd) * 1.01)
 			fbdLock.Unlock()

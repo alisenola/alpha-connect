@@ -290,7 +290,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 
 		qr := state.getQueryRunner()
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}
@@ -416,7 +416,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 		qr := state.getQueryRunner()
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}
@@ -496,7 +496,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 		qr := state.getQueryRunner()
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}
@@ -551,7 +551,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	if ar.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_AccountRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -559,7 +559,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	go func() {
 		qr := state.getQueryRunner()
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}
@@ -676,7 +676,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 		qr := state.getQueryRunner()
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}

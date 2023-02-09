@@ -243,7 +243,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -411,7 +411,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		positionList.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		positionList.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(positionList)
 		return nil
 	}
@@ -505,7 +505,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		balanceList.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		balanceList.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(balanceList)
 		return nil
 	}
@@ -585,7 +585,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -663,7 +663,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -734,7 +734,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
@@ -823,7 +823,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 	}
 
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}

@@ -604,7 +604,7 @@ func (state *Listener) updateOpenInterest(context actor.Context) error {
 		msg := res.(*messages.MarketStatisticsResponse)
 		if !msg.Success {
 			// We want to converge towards the right value,
-			if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
+			if msg.RejectionReason == messages.RejectionReason_IPRateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
 				oidLock.Lock()
 				oid = time.Duration(float64(oid) * 1.01)
 				oidLock.Unlock()

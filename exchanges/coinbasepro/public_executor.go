@@ -212,7 +212,7 @@ func (state *PublicExecutor) OnMarketDataRequest(context actor.Context) error {
 		Success:    false,
 	}
 	if state.rateLimit.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}

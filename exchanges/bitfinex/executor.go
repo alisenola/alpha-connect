@@ -270,7 +270,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	qr := state.getQueryRunner("OB")
 
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}

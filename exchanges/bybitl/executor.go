@@ -486,7 +486,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	if qr == nil {
 		response.Success = false
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -598,7 +598,7 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	}
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -660,7 +660,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -740,7 +740,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -833,7 +833,7 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 
 		qr := state.getQueryRunner(false, false)
 		if qr == nil {
-			response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 			context.Send(sender, response)
 			return
 		}
@@ -935,7 +935,7 @@ func (state *Executor) onFundingMovementRequest(context actor.Context) error {
 	}
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -1050,7 +1050,7 @@ func (state *Executor) onDepositMovementRequest(context actor.Context) error {
 	}
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -1176,7 +1176,7 @@ func (state *Executor) onWithdrawalMovementRequest(context actor.Context) error 
 
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return err
 	}
@@ -1384,7 +1384,7 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 	}
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -1557,7 +1557,7 @@ func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(false, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -1664,7 +1664,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	}
 
 	if ar.IsOrderRateLimited(symbol) {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_AccountRateLimitExceeded
 		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextOrderRequest(symbol, 1))
 		context.Send(sender, response)
 		return nil
@@ -1687,7 +1687,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(true, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(false, weight))
 		context.Send(sender, response)
 		return nil
@@ -1782,7 +1782,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	}
 	qr := state.getQueryRunner(true, true)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		response.RateLimitDelay = durationpb.New(state.durationBeforeNextRequest(true, weight))
 		context.Send(sender, response)
 		return nil
@@ -1858,7 +1858,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(true, true)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}
@@ -1895,7 +1895,7 @@ func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 
 	qr := state.getQueryRunner(true, false)
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Send(sender, response)
 		return nil
 	}

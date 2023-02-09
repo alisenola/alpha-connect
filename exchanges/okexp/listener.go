@@ -563,7 +563,7 @@ func (state *Listener) updateLiquidations(context actor.Context) error {
 		msg := res.(*messages.HistoricalLiquidationsResponse)
 		if !msg.Success {
 			// We want to converge towards the right value,
-			if msg.RejectionReason == messages.RejectionReason_RateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
+			if msg.RejectionReason == messages.RejectionReason_IPRateLimitExceeded || msg.RejectionReason == messages.RejectionReason_HTTPError {
 				liqdLock.Lock()
 				liqd = time.Duration(float64(liqd) * 1.01)
 				liqdLock.Unlock()

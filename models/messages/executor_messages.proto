@@ -51,7 +51,7 @@ enum RejectionReason {
     InvalidRequest = 12;
     ExchangeAPIError = 13;
     InvalidOrder = 14;
-    RateLimitExceeded = 15;
+    AccountRateLimitExceeded = 15;
     UnsupportedSubscription = 16;
     MissingInstrument = 17;
     HTTPError = 18;
@@ -76,6 +76,7 @@ enum RejectionReason {
     AccountListenerDisabled = 37;
     InvalidJumpDestination = 38;
     UnknownInstrument = 39;
+    IPRateLimitExceeded = 40;
 }
 
 enum ResponseType {

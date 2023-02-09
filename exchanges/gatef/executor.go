@@ -244,7 +244,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	request.Header.Add("Cache-Control", "no-cache, private, max-age=0")
 	qr := state.getQueryRunner()
 	if qr == nil {
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}

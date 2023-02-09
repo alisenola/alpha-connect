@@ -264,7 +264,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 
 	if qr == nil {
 		response.Success = false
-		response.RejectionReason = messages.RejectionReason_RateLimitExceeded
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
 		context.Respond(response)
 		return nil
 	}
