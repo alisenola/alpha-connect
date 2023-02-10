@@ -46,7 +46,7 @@ import (
 // The global rate limit is per IP and the orderRateLimit is per
 // account.
 
-var MakerFees = map[int]float64{
+var VIPMakerFees = map[int]float64{
 	0: 0.0002,
 	1: 0.00016,
 	2: 0.00014,
@@ -58,7 +58,14 @@ var MakerFees = map[int]float64{
 	8: 0.00002,
 	9: 0,
 }
-var TakerFees = map[int]float64{
+
+var MMMAkerFees = map[int]float64{
+	1: -0.00001,
+	2: -0.00002,
+	3: -0.00003,
+}
+
+var VIPTakerFees = map[int]float64{
 	0: 0.0004,
 	1: 0.0004,
 	2: 0.00035,
@@ -72,14 +79,16 @@ var TakerFees = map[int]float64{
 }
 
 type AccountRateLimit struct {
-	second *exchanges.RateLimit
-	minute *exchanges.RateLimit
+	second  *exchanges.RateLimit
+	minute  *exchanges.RateLimit
+	account string
 }
 
-func NewAccountRateLimit(second, minute *exchanges.RateLimit) *AccountRateLimit {
+func NewAccountRateLimit(account string, second, minute *exchanges.RateLimit) *AccountRateLimit {
 	return &AccountRateLimit{
-		second: second,
-		minute: minute,
+		second:  second,
+		minute:  minute,
+		account: account,
 	}
 }
 
@@ -106,12 +115,13 @@ type QueryRunner struct {
 	client          *http.Client
 	globalRateLimit *exchanges.RateLimit
 	endpoint        string
+	address         string
 }
 
 type Executor struct {
 	extypes.BaseExecutor
 	accountRateLimits   map[string]*AccountRateLimit
-	newAccountRateLimit func() *AccountRateLimit
+	newAccountRateLimit func(string) *AccountRateLimit
 	queryRunners        []*QueryRunner
 	logger              *log.Logger
 	config              *config.Config
@@ -179,7 +189,7 @@ func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRa
 				if err != nil {
 					state.logger.Warn("error parsing rate limit " + match[1])
 				} else {
-					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					state.logger.Info(fmt.Sprintf("updated %s rate limit for %s to %d", match[2], ar.account, limit))
 					ar.minute.SetLimit(int(limit))
 				}
 			case "TEN_SECONDS":
@@ -187,7 +197,7 @@ func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRa
 				if err != nil {
 					state.logger.Warn("error parsing rate limit " + match[1])
 				} else {
-					state.logger.Info(fmt.Sprintf("updated %s rate limit to %d", match[2], limit))
+					state.logger.Info(fmt.Sprintf("updated %s rate limit for %s to %d", match[2], ar.account, limit))
 					ar.second.SetLimit(int(limit))
 				}
 			default:
@@ -204,7 +214,7 @@ func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRa
 			if err != nil {
 				state.logger.Warn("error parsing rate limit " + match[1])
 			} else {
-				state.logger.Info(fmt.Sprintf("updated global rate limit to %d", limit))
+				state.logger.Info(fmt.Sprintf("updated global rate limit for %s to %d", qr.address, limit))
 				qr.globalRateLimit.SetLimit(int(limit))
 			}
 		}
@@ -247,6 +257,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 		}
 		if d.LocalAddr != nil {
 			addr := strings.Split(d.LocalAddr.String(), ":")[0]
+			qr.address = addr
 			for _, str := range state.config.FBinanceWhitelistedIPs {
 				splits := strings.Split(str, "=>")
 				fmt.Println("SPLITS", splits)
@@ -292,14 +303,14 @@ func (state *Executor) Initialize(context actor.Context) error {
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 			for _, q := range state.queryRunners {
-				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*0.9), time.Minute)
+				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*10), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
 				q.globalRateLimit.Request(weight * 10)
 			}
 		}
 	}
-	state.newAccountRateLimit = func() *AccountRateLimit {
-		return NewAccountRateLimit(exchanges.NewRateLimit(secondOrderLimit, secondOrderInterval), exchanges.NewRateLimit(minuteOrderLimit, minuteOrderInterval))
+	state.newAccountRateLimit = func(account string) *AccountRateLimit {
+		return NewAccountRateLimit(account, exchanges.NewRateLimit(secondOrderLimit, secondOrderInterval), exchanges.NewRateLimit(minuteOrderLimit, minuteOrderInterval))
 	}
 	if qr.globalRateLimit == nil {
 		return fmt.Errorf("unable to set rate limit")
@@ -660,8 +671,8 @@ func (state *Executor) OnAccountInformationRequest(context actor.Context) error 
 			return
 		}
 
-		makerFee := MakerFees[data.FeeTier]
-		takerFee := TakerFees[data.FeeTier]
+		makerFee := VIPMakerFees[data.FeeTier]
+		takerFee := VIPTakerFees[data.FeeTier]
 
 		fmt.Println("FEES", makerFee, takerFee)
 		response.MakerFee = &wrapperspb.DoubleValue{Value: makerFee}
@@ -1247,7 +1258,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	ar, ok := state.accountRateLimits[req.Account.Name]
 	if !ok {
-		ar = state.newAccountRateLimit()
+		ar = state.newAccountRateLimit(req.Account.Name)
 		state.accountRateLimits[req.Account.Name] = ar
 	}
 
