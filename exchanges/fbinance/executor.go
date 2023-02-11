@@ -303,7 +303,8 @@ func (state *Executor) Initialize(context actor.Context) error {
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 			for _, q := range state.queryRunners {
-				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)*10), time.Minute)
+				// TODO
+				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
 				q.globalRateLimit.Request(weight * 10)
 			}

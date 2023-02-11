@@ -618,6 +618,8 @@ gitlab.com/alphaticks/tickfunctors v0.0.0-20221114135936-98f57d32fad1 h1:LKgKhNc
 gitlab.com/alphaticks/tickfunctors v0.0.0-20221114135936-98f57d32fad1/go.mod h1:w3R8BTET0l5mNBzudDJkiJltUd+Q9yHctYGDUb+7Q74=
 gitlab.com/alphaticks/tickfunctors v0.0.0-20230120134839-cc6e46251aa0 h1:Axsijghox/ZJUGbCsuvhJMoVgeM7XpvsqCrITol3eTc=
 gitlab.com/alphaticks/tickfunctors v0.0.0-20230120134839-cc6e46251aa0/go.mod h1:w3R8BTET0l5mNBzudDJkiJltUd+Q9yHctYGDUb+7Q74=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20230210131633-dd95ed0ebf37 h1:YTut8kYfvhFOiZEkwBMNQhV4hPMojXKNgj1Huk/4Ylk=
+gitlab.com/alphaticks/tickfunctors v0.0.0-20230210131633-dd95ed0ebf37/go.mod h1:w3R8BTET0l5mNBzudDJkiJltUd+Q9yHctYGDUb+7Q74=
 gitlab.com/alphaticks/tickstore v0.0.0-20221129081907-13068eb9edbb h1:rZ7iGtg+80IB/FLRl6TR93dzDMkoaJrSGFFcRvPVpX0=
 gitlab.com/alphaticks/tickstore v0.0.0-20221129081907-13068eb9edbb/go.mod h1:dg2hohDUuW1J5WFrTWsgxenyaV8VOqc9UZr90NEovhs=
 gitlab.com/alphaticks/tickstore-go-client v0.0.0-20221125110209-03b7d247711e h1:JbJGnSlb00f9Fsbz6hU9JS9Y+WYqrGAFEGet/90D/zQ=
