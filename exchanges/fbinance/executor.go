@@ -112,10 +112,11 @@ func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration 
 }
 
 type QueryRunner struct {
-	client          *http.Client
-	globalRateLimit *exchanges.RateLimit
-	endpoint        string
-	address         string
+	client               *http.Client
+	globalRateLimit      *exchanges.RateLimit
+	globalRateLimitFound bool
+	endpoint             string
+	address              string
 }
 
 type Executor struct {
@@ -150,6 +151,10 @@ func (state *Executor) getQueryRunner(force bool) *QueryRunner {
 			qr = q
 			break
 		}
+	}
+	if qr != nil && !qr.globalRateLimitFound {
+		// Update limit upward
+		qr.globalRateLimit.SetLimit(qr.globalRateLimit.GetLimit() + 1)
 	}
 	if qr == nil && force {
 		min := time.Duration(math.MaxInt64)
@@ -216,6 +221,7 @@ func (state *Executor) updateRateLimits(res fbinance.BaseResponse, ar *AccountRa
 			} else {
 				state.logger.Info(fmt.Sprintf("updated global rate limit for %s to %d", qr.address, limit))
 				qr.globalRateLimit.SetLimit(int(limit))
+				qr.globalRateLimitFound = true
 			}
 		}
 	}
