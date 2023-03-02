@@ -2,6 +2,7 @@ package account
 
 import (
 	"container/list"
+	"sync"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type fill struct {
 }
 
 type FillCollector struct {
+	sync.RWMutex
 	cutoff     int64 // drop trades older than this
 	takerFills map[uint64]*list.List
 	makerFills map[uint64]*list.List
@@ -30,6 +32,8 @@ func NewFillCollector(cutoff int64) *FillCollector {
 }
 
 func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, time int64) {
+	sc.Lock()
+	defer sc.Unlock()
 	if taker {
 		m, ok := sc.takerFills[securityID]
 		if !ok {
@@ -50,6 +54,8 @@ func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, t
 }
 
 func (sc *FillCollector) Collect(securityID uint64, price float64) {
+	sc.Lock()
+	defer sc.Unlock()
 	ts := time.Now().UnixMilli()
 	m, ok := sc.makerFills[securityID]
 	if ok {
@@ -83,8 +89,10 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 
 func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64) {
 	// TODO
-	makerMoves := make([]float64, 0, len(sc.makerMoves))
-	takerMoves := make([]float64, 0, len(sc.takerMoves))
+	sc.RLock()
+	defer sc.RUnlock()
+	makerMoves := make([]float64, 0, 10)
+	takerMoves := make([]float64, 0, 10)
 	for k, v := range sc.makerMoves {
 		makerMoves[k] = v
 	}
