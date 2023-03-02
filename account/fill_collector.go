@@ -91,8 +91,8 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64) {
 	// TODO
 	sc.RLock()
 	defer sc.RUnlock()
-	makerMoves := make([]float64, 0, 10)
-	takerMoves := make([]float64, 0, 10)
+	makerMoves := make([]float64, 10)
+	takerMoves := make([]float64, 10)
 	for k, v := range sc.makerMoves {
 		makerMoves[k] = v
 	}
