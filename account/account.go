@@ -867,7 +867,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		// TODO mutex on position ?
 		sp.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
-	accnt.fillCollector.AddFill(order.Instrument.SecurityID.Value, price, taker, time.Now().UnixMilli())
+	accnt.fillCollector.AddFill(order.Instrument.SecurityID.Value, price, order.Side == models.Side_Buy, taker, time.Now().UnixMilli())
 
 	// Add the fill to the stat collector
 

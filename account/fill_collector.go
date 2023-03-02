@@ -9,6 +9,7 @@ import (
 type fill struct {
 	price    float64
 	taker    bool
+	buy      bool
 	time     int64
 	bucketed map[int64]bool
 }
@@ -32,7 +33,7 @@ func NewFillCollector(cutoff int64) *FillCollector {
 	}
 }
 
-func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, time int64) {
+func (sc *FillCollector) AddFill(securityID uint64, price float64, buy, taker bool, time int64) {
 	sc.Lock()
 	defer sc.Unlock()
 	if taker {
@@ -42,7 +43,7 @@ func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, t
 			sc.takerFills[securityID] = m
 		}
 
-		m.PushFront(&fill{price: price, taker: taker, time: time, bucketed: make(map[int64]bool)})
+		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: time, bucketed: make(map[int64]bool)})
 	} else {
 		m, ok := sc.makerFills[securityID]
 		if !ok {
@@ -50,7 +51,7 @@ func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, t
 			sc.makerFills[securityID] = m
 		}
 
-		m.PushFront(&fill{price: price, taker: taker, time: time, bucketed: make(map[int64]bool)})
+		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: time, bucketed: make(map[int64]bool)})
 	}
 }
 
@@ -69,7 +70,13 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 			} else {
 				bucket := delta / 1000 // 1s buckets
 				if !f.bucketed[bucket] {
-					move := price/f.price - 1
+					var move float64
+					if f.buy {
+						// price down, move is negative
+						move = price/f.price - 1
+					} else {
+						move = f.price/price - 1
+					}
 					sc.makerMoves[bucket] = alpha*sc.makerMoves[bucket] + (1-alpha)*move
 					f.bucketed[bucket] = true
 				}
@@ -86,7 +93,12 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 			} else {
 				bucket := delta / 1000 // 1s buckets
 				if !f.bucketed[bucket] {
-					move := price/f.price - 1
+					var move float64
+					if f.buy {
+						move = price/f.price - 1
+					} else {
+						move = f.price/price - 1
+					}
 					sc.takerMoves[bucket] = alpha*sc.takerMoves[bucket] + (1-alpha)*move
 					f.bucketed[bucket] = true
 				}
