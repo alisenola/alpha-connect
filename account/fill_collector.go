@@ -31,44 +31,70 @@ func NewFillCollector(cutoff int64) *FillCollector {
 }
 
 func (sc *FillCollector) AddFill(securityID uint64, price float64, taker bool, time int64) {
-	m, ok := sc.takerFills[securityID]
-	if !ok {
-		m = list.New()
-		sc.takerFills[securityID] = m
-	}
+	if taker {
+		m, ok := sc.takerFills[securityID]
+		if !ok {
+			m = list.New()
+			sc.takerFills[securityID] = m
+		}
 
-	m.PushBack(&fill{price: price, taker: taker, time: time})
+		m.PushFront(&fill{price: price, taker: taker, time: time})
+	} else {
+		m, ok := sc.makerFills[securityID]
+		if !ok {
+			m = list.New()
+			sc.makerFills[securityID] = m
+		}
+
+		m.PushFront(&fill{price: price, taker: taker, time: time})
+	}
 }
 
 func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	ts := time.Now().UnixMilli()
 	m, ok := sc.makerFills[securityID]
 	if ok {
+		fmt.Println("maker q len", m.Len())
 		for e := m.Front(); e != nil; e = e.Next() {
 			f := e.Value.(*fill)
 			delta := ts - f.time
 			if delta > sc.cutoff {
+				fmt.Println("REMOVE")
 				m.Remove(e)
 			} else {
 				bucket := delta / 1000 // 1s buckets
-				if f.taker {
-					sc.takerMoves[bucket] = 0.9*sc.takerMoves[bucket] + 0.1*(price/f.price)
-				} else {
-					sc.makerMoves[bucket] = 0.9*sc.makerMoves[bucket] + 0.1*(price/f.price)
-				}
-				// TODO
+				move := price/f.price - 1
+				sc.makerMoves[bucket] = 0.99*sc.makerMoves[bucket] + 0.01*move
+			}
+		}
+	}
+	m, ok = sc.takerFills[securityID]
+	if ok {
+		fmt.Println("taker q len", m.Len())
+		for e := m.Front(); e != nil; e = e.Next() {
+			f := e.Value.(*fill)
+			delta := ts - f.time
+			if delta > sc.cutoff {
+				fmt.Println("REMOVE")
+				m.Remove(e)
+			} else {
+				bucket := delta / 1000 // 1s buckets
+				move := price/f.price - 1
+				sc.takerMoves[bucket] = 0.99*sc.takerMoves[bucket] + 0.01*move
 			}
 		}
 	}
 }
 
-func (sc *FillCollector) GetMoveAfterFill() float64 {
+func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64) {
 	// TODO
+	makerMoves := make([]float64, 0, len(sc.makerMoves))
+	takerMoves := make([]float64, 0, len(sc.takerMoves))
 	for k, v := range sc.makerMoves {
-		fmt.Println(k, v)
+		makerMoves[k] = v
 	}
 	for k, v := range sc.takerMoves {
-		fmt.Println(k, v)
+		takerMoves[k] = v
 	}
-	return 0
+	return makerMoves, takerMoves
 }

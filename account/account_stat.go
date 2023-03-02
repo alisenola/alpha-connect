@@ -230,6 +230,6 @@ func (accnt *Account) UpdateMaxNotionalValue(securityID uint64, value float64) {
 	accnt.positions[securityID].UpdateMaxNotionalValue(value)
 }
 
-func (accnt *Account) GetMoveAfterFill() float64 {
+func (accnt *Account) GetMoveAfterFill() ([]float64, []float64) {
 	return accnt.fillCollector.GetMoveAfterFill()
 }

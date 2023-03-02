@@ -121,7 +121,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		quoteCurrency:   quoteCurrency,
 		expirationLimit: 1 * time.Minute,
 		cache:           make(map[int]CacheValue),
-		fillCollector:   NewFillCollector(1000),
+		fillCollector:   NewFillCollector(10000),
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
@@ -867,7 +867,8 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		// TODO mutex on position ?
 		sp.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
-	accnt.fillCollector.AddFill(sec.GetSecurity().SecurityID, price, taker, time.Now().UnixMilli())
+	fmt.Println("ADD FILL")
+	accnt.fillCollector.AddFill(order.Instrument.SecurityID.Value, price, taker, time.Now().UnixMilli())
 
 	// Add the fill to the stat collector
 
@@ -1219,6 +1220,7 @@ func (accnt *Account) Clone() *Account {
 		takerFee:        accnt.takerFee,
 		makerFee:        accnt.makerFee,
 		expirationLimit: accnt.expirationLimit,
+		fillCollector:   NewFillCollector(accnt.fillCollector.cutoff),
 	}
 	// TODO clone orders ?
 	for k, v := range accnt.positions {
