@@ -52,9 +52,9 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 			} else {
 				bucket := delta / 1000 // 1s buckets
 				if f.taker {
-					sc.takerMoves[bucket] += price / f.price
+					sc.takerMoves[bucket] = 0.9*sc.takerMoves[bucket] + 0.1*(price/f.price)
 				} else {
-					sc.makerMoves[bucket] += price / f.price
+					sc.makerMoves[bucket] = 0.9*sc.makerMoves[bucket] + 0.1*(price/f.price)
 				}
 				// TODO
 			}
@@ -62,9 +62,13 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	}
 }
 
-func (sc *FillCollector) GetMoveAfterFill(securityID uint64) float64 {
+func (sc *FillCollector) GetMoveAfterFill() float64 {
 	// TODO
-	fmt.Println(sc.makerFills[securityID])
-	fmt.Println(sc.takerFills[securityID])
+	for k, v := range sc.makerMoves {
+		fmt.Println(k, v)
+	}
+	for k, v := range sc.takerMoves {
+		fmt.Println(k, v)
+	}
 	return 0
 }

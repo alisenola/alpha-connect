@@ -212,7 +212,6 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
-			fmt.Println(accnt.baseToPositions, s)
 			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
