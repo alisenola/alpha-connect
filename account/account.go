@@ -103,6 +103,7 @@ type Account struct {
 	makerFee        *float64
 	expirationLimit time.Duration
 	cache           map[int]CacheValue
+	fillCollector   *FillCollector
 }
 
 func NewAccount(account *models.Account) (*Account, error) {
@@ -120,6 +121,7 @@ func NewAccount(account *models.Account) (*Account, error) {
 		quoteCurrency:   quoteCurrency,
 		expirationLimit: 1 * time.Minute,
 		cache:           make(map[int]CacheValue),
+		fillCollector:   NewFillCollector(1000),
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
@@ -210,6 +212,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
+			fmt.Println(accnt.baseToPositions, s)
 			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
@@ -835,17 +838,17 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		FillQuantity:    &wrapperspb.DoubleValue{Value: quantity},
 	}
 
-	switch sec := sec.(type) {
+	switch sp := sec.(type) {
 	case *SpotSecurity:
 		if order.Side == models.Side_Buy {
-			accnt.balances[sec.Underlying.ID] += int64(math.Round(quantity * accnt.MarginPrecision))
-			accnt.balances[sec.QuoteCurrency.ID] -= int64(math.Round(quantity * price * accnt.MarginPrecision))
+			accnt.balances[sp.Underlying.ID] += int64(math.Round(quantity * accnt.MarginPrecision))
+			accnt.balances[sp.QuoteCurrency.ID] -= int64(math.Round(quantity * price * accnt.MarginPrecision))
 		} else {
-			accnt.balances[sec.Underlying.ID] -= int64(math.Round(quantity))
-			accnt.balances[sec.QuoteCurrency.ID] += int64(math.Round(quantity * price * accnt.MarginPrecision))
+			accnt.balances[sp.Underlying.ID] -= int64(math.Round(quantity))
+			accnt.balances[sp.QuoteCurrency.ID] += int64(math.Round(quantity * price * accnt.MarginPrecision))
 		}
 	case *MarginSecurity:
-		pos := accnt.positions[sec.SecurityID]
+		pos := accnt.positions[sp.SecurityID]
 		// Margin
 		//fmt.Println("MARGIN POS", float64(pos.cost) / accnt.MarginPrecision, float64(pos.rawSize) / accnt.MarginPrecision)
 		var fee, cost int64
@@ -863,8 +866,11 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		er.FeeBasis = messages.FeeBasis_Percentage
 		er.FeeType = messages.FeeType_ExchangeFees
 		// TODO mutex on position ?
-		sec.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
+		sp.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
+	accnt.fillCollector.AddFill(sec.GetSecurity().SecurityID, price, taker, time.Now().UnixMilli())
+
+	// Add the fill to the stat collector
 
 	return er, nil
 }

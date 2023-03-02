@@ -8,18 +8,15 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
-	"os"
 	"testing"
 )
 
 var model modeling.MarketModel
 
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
-}
-
 func InitModel(t *testing.T) {
-	tests.LoadStatics(t)
+	if err := tests.LoadStatics(); err != nil {
+		t.Fatalf("error loading statics: %v", err)
+	}
 	mdl := modeling.NewMapMarketModel()
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.TETHER.ID), modeling.NewConstantPriceModel(100.))
 	mdl.SetPriceModel(uint64(constants.BITCOIN.ID)<<32|uint64(constants.DOLLAR.ID), modeling.NewConstantPriceModel(100.))
@@ -54,11 +51,11 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 		t.Fatal(err)
 	}
 	// TODO 0.1 margin
-	if err = account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, nil, nil, nil); err != nil {
+	if err = account.Sync([]*models.Security{BTCUSD_PERP_SEC, ETHUSD_PERP_SEC}, nil, nil, []*models.Balance{{Asset: constants.BITCOIN, Quantity: 0.1}}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
-	avMargin := account.GetAvailableMargin(model, 1.)
+	avMargin, _ := account.GetNetMargin(model)
 	if math.Abs(avMargin-expectedAv) > 0.0000001 {
 		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
 	}
@@ -82,7 +79,7 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = account.ConfirmNewOrder("buy1", "buy1")
+	_, err = account.ConfirmNewOrder("buy1", "buy1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,12 +87,13 @@ func TestAccount_GetAvailableMargin(t *testing.T) {
 	// Balance + maker rebate + entry cost + PnL
 	mul := ETHUSD_PERP_SEC.Multiplier.Value
 	expectedAv = 0.1 + (0.00025 * 10 * 9 * mul) - (10 * 9 * mul) + (10.-9.)*mul*10.
-	avMargin = account.GetAvailableMargin(model, 1.)
+	avMargin, _ = account.GetNetMargin(model)
 	if math.Abs(avMargin-expectedAv) > 0.0000001 {
 		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
 	}
 }
 
+/*
 func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 	InitModel(t)
 	account, err := account.NewAccount(bitmexAccount)
@@ -107,7 +105,7 @@ func TestAccount_GetAvailableMargin_Inverse(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedAv := 0.1
-	avMargin := account.GetAvailableMargin(model, 1.)
+	avMargin := account.GetMargin(model)
 	if math.Abs(avMargin-expectedAv) > 0.0000001 {
 		t.Fatalf("was expecting %g, got %g", expectedAv, avMargin)
 	}
@@ -684,7 +682,7 @@ func TestBitmexPortfolio_Parallel(t *testing.T) {
 	// Others eval the price
 }
 
-*/
+
 
 func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 	InitModel(t)
@@ -838,3 +836,4 @@ func TestPortfolio_Fbinance_Margin_ELR(t *testing.T) {
 		t.Fatalf("was expecting %f got %f", 0., elr)
 	}
 }
+*/

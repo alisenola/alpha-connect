@@ -1,6 +1,7 @@
 package binance
 
 import (
+	goContext "context"
 	"errors"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
@@ -247,7 +248,20 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		securities = append(securities, &security)
 	}
 
-	state.SyncSecurities(securities, nil)
+	var historicalSecurities []*registry.Security
+	if state.Registry != nil {
+		rres, err := state.Registry.Securities(goContext.Background(), &registry.SecuritiesRequest{
+			Filter: &registry.SecurityFilter{
+				ExchangeId: []uint32{constants.BINANCE.ID},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error fetching historical securities: %v", err)
+		}
+		historicalSecurities = rres.Securities
+	}
+
+	state.SyncSecurities(securities, historicalSecurities)
 
 	context.Send(context.Parent(), &messages.SecurityList{
 		ResponseID: uint64(time.Now().UnixNano()),
@@ -325,6 +339,536 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		response.SnapshotL2 = snapshot
 		response.SeqNum = data.LastUpdateID
 		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
+func (state *Executor) OnAccountMovementRequest(context actor.Context) error {
+	fmt.Println("ON TRADE ACCOUNT MOVEMENT REQUEST !!!!")
+	msg := context.Message().(*messages.AccountMovementRequest)
+	switch msg.Type {
+	case messages.AccountMovementType_Deposit:
+		return state.onDepositHistoryRequest(context)
+	case messages.AccountMovementType_Withdrawal:
+		return state.onWithdrawalHistoryRequest(context)
+	case messages.AccountMovementType_Exchange:
+		return state.onConvertHistoryRequest(context)
+	}
+	return nil
+}
+
+func (state *Executor) onDepositHistoryRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountMovementRequest)
+	sender := context.Sender()
+	response := &messages.AccountMovementResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	ut1Params := binance.NewUserUniversalTransferHistoryRequest(binance.FUNDING_MAIN)
+	ut2Params := binance.NewUserUniversalTransferHistoryRequest(binance.UMFUTURE_MAIN)
+	adParams := binance.NewAccountDepositHistoryRequest()
+	var startTime, endTime *time.Time
+
+	if msg.Filter != nil {
+		if msg.Filter.From != nil {
+			v := msg.Filter.From.AsTime()
+			startTime = &v
+		}
+		if msg.Filter.To != nil {
+			v := msg.Filter.To.AsTime()
+			if startTime != nil && v.Sub(*startTime) > 80*24*time.Hour {
+				v = startTime.Add(80 * 24 * time.Hour)
+			}
+			endTime = &v
+		}
+	}
+	if startTime != nil {
+		ut1Params.SetStartTime(uint64(startTime.UnixMilli()))
+		ut2Params.SetStartTime(uint64(startTime.UnixMilli()))
+		adParams.SetStartTime(uint64(startTime.UnixMilli()))
+		fmt.Println("from", startTime.String())
+	}
+	if endTime != nil {
+		ut1Params.SetEndTime(uint64(endTime.UnixMilli()))
+		ut2Params.SetEndTime(uint64(endTime.UnixMilli()))
+		adParams.SetEndTime(uint64(endTime.UnixMilli()))
+		fmt.Println("to", endTime.String())
+	}
+	adParams.SetLimit(1000)
+	accountDepositRequest, weight, err := binance.GetAccountDepositHistory(adParams, msg.Account.ApiCredentials)
+	if err != nil {
+		response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+		context.Send(sender, response)
+		return nil
+	}
+	universalTransferRequest1, weight, err := binance.GetUserUniversalTransferHistory(ut1Params, msg.Account.ApiCredentials)
+	if err != nil {
+		response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+		context.Send(sender, response)
+		return nil
+	}
+	universalTransferRequest2, weight, err := binance.GetUserUniversalTransferHistory(ut2Params, msg.Account.ApiCredentials)
+	if err != nil {
+		response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr.globalRateLimit.Request(weight)
+	var depositData []binance.DepositData
+	var universalTransferResponse1 binance.UniversalTransferResponse
+	var universalTransferResponse2 binance.UniversalTransferResponse
+	if client, ok := state.AccountClients[msg.Account.Name]; ok {
+		if err := xutils.PerformJSONRequest(client, accountDepositRequest, &depositData); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+		if err := xutils.PerformJSONRequest(client, universalTransferRequest1, &universalTransferResponse1); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+		if err := xutils.PerformJSONRequest(client, universalTransferRequest2, &universalTransferResponse2); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+	} else {
+		if err := xutils.PerformJSONRequest(qr.client, accountDepositRequest, &depositData); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+		if err := xutils.PerformJSONRequest(qr.client, universalTransferRequest1, &universalTransferResponse1); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+		if err := xutils.PerformJSONRequest(qr.client, universalTransferRequest2, &universalTransferResponse2); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+	}
+
+	var movements []*messages.AccountMovement
+	for _, t := range depositData {
+		fmt.Println("DEPOSIT HISTORY", t)
+		asset, ok := constants.GetAssetBySymbol(t.Coin)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.Coin)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		mvt := messages.AccountMovement{
+			Asset:      asset,
+			Change:     t.Amount,
+			MovementID: fmt.Sprintf("%s", t.TxId),
+			Time:       utils.MilliToTimestamp(t.InsertTime),
+			Type:       messages.AccountMovementType_Deposit,
+		}
+		movements = append(movements, &mvt)
+	}
+	fmt.Println("UNIVERSAL TRANSFER TOTAL", universalTransferResponse1.Total)
+	for _, t := range universalTransferResponse1.Rows {
+		fmt.Println("TRANSFER HISTORY", t)
+		asset, ok := constants.GetAssetBySymbol(t.Asset)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.Asset)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		mvt := messages.AccountMovement{
+			Asset:      asset,
+			Change:     t.Amount,
+			MovementID: fmt.Sprintf("%d", t.TranId),
+			Time:       utils.MilliToTimestamp(t.Timestamp),
+			Type:       messages.AccountMovementType_Deposit,
+		}
+		movements = append(movements, &mvt)
+	}
+	for _, t := range universalTransferResponse2.Rows {
+		fmt.Println("TRANSFER HISTORY", t)
+		asset, ok := constants.GetAssetBySymbol(t.Asset)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.Asset)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		mvt := messages.AccountMovement{
+			Asset:      asset,
+			Change:     t.Amount,
+			MovementID: fmt.Sprintf("%d", t.TranId),
+			Time:       utils.MilliToTimestamp(t.Timestamp),
+			Type:       messages.AccountMovementType_Deposit,
+		}
+		movements = append(movements, &mvt)
+	}
+	response.Success = true
+	sort.Slice(movements, func(i, j int) bool {
+		return movements[i].Time.AsTime().Before(movements[j].Time.AsTime())
+	})
+	response.Movements = movements
+	context.Send(sender, response)
+	return nil
+}
+
+func (state *Executor) onWithdrawalHistoryRequest(context actor.Context) error {
+	msg := context.Message().(*messages.AccountMovementRequest)
+	sender := context.Sender()
+	response := &messages.AccountMovementResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	utParams := binance.NewUserUniversalTransferHistoryRequest(binance.MAIN_UMFUTURE)
+	var startTime, endTime *time.Time
+	if msg.Filter != nil {
+		if msg.Filter.From != nil {
+			v := msg.Filter.From.AsTime()
+			startTime = &v
+		}
+		if msg.Filter.To != nil {
+			v := msg.Filter.To.AsTime()
+			if startTime != nil && v.Sub(*startTime) > 80*24*time.Hour {
+				v = startTime.Add(80 * 24 * time.Hour)
+			}
+			endTime = &v
+		}
+	}
+	if startTime != nil {
+		utParams.SetStartTime(uint64(startTime.UnixMilli()))
+		fmt.Println("from", startTime.String())
+	}
+	if endTime != nil {
+		utParams.SetEndTime(uint64(endTime.UnixMilli()))
+		fmt.Println("to", endTime.String())
+	}
+	universalTransferRequest, weight, err := binance.GetUserUniversalTransferHistory(utParams, msg.Account.ApiCredentials)
+	if err != nil {
+		response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr.globalRateLimit.Request(weight)
+	var universalTransferResponse binance.UniversalTransferResponse
+	if client, ok := state.AccountClients[msg.Account.Name]; ok {
+		if err := xutils.PerformJSONRequest(client, universalTransferRequest, &universalTransferResponse); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+	} else {
+		if err := xutils.PerformJSONRequest(qr.client, universalTransferRequest, &universalTransferResponse); err != nil {
+			state.logger.Warn("error fetching account movement", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+	}
+
+	var movements []*messages.AccountMovement
+	fmt.Println("UNIVERSAL TRANSFER TOTAL", universalTransferResponse.Total)
+	for _, t := range universalTransferResponse.Rows {
+		fmt.Println("TRANSFER HISTORY", t, utils.MilliToTimestamp(t.Timestamp).AsTime().String())
+		asset, ok := constants.GetAssetBySymbol(t.Asset)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.Asset)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		mvt := messages.AccountMovement{
+			Asset:      asset,
+			Change:     -t.Amount,
+			MovementID: fmt.Sprintf("%d", t.TranId),
+			Time:       utils.MilliToTimestamp(t.Timestamp),
+			Type:       messages.AccountMovementType_Withdrawal,
+		}
+		movements = append(movements, &mvt)
+	}
+	response.Success = true
+	sort.Slice(movements, func(i, j int) bool {
+		return movements[i].Time.AsTime().Before(movements[j].Time.AsTime())
+	})
+	response.Movements = movements
+	context.Send(sender, response)
+	return nil
+}
+
+func (state *Executor) onConvertHistoryRequest(context actor.Context) error {
+	fmt.Println("ON ACCOUNT Convert REQUEST !!!!")
+	msg := context.Message().(*messages.AccountMovementRequest)
+	sender := context.Sender()
+
+	response := &messages.AccountMovementResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	var startTime, endTime *time.Time
+	cParams := binance.NewConvertTradeHistoryRequest()
+	if msg.Filter != nil {
+		if msg.Filter.From != nil {
+			v := msg.Filter.From.AsTime()
+			startTime = &v
+		}
+		if msg.Filter.To != nil {
+			v := msg.Filter.To.AsTime()
+			if startTime != nil && v.Sub(*startTime) > 80*24*time.Hour {
+				v = startTime.Add(29 * 24 * time.Hour)
+			}
+			endTime = &v
+		}
+		if startTime != nil {
+			cParams.SetStartTime(uint64(startTime.UnixMilli()))
+			fmt.Println("from", startTime.String())
+		}
+		if endTime != nil {
+			cParams.SetEndTime(uint64(endTime.UnixMilli()))
+			fmt.Println("to", endTime.String())
+		}
+	}
+
+	request, weight, err := binance.GetConvertTradeHistory(cParams, msg.Account.ApiCredentials)
+	if err != nil {
+		response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+		context.Send(sender, response)
+		return nil
+	}
+
+	qr := state.getQueryRunner()
+	if qr == nil {
+		response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+		context.Send(sender, response)
+		return nil
+	}
+	qr.globalRateLimit.Request(weight)
+	var cdata binance.ConvertTradeHistoryResponse
+	if client, ok := state.AccountClients[msg.Account.Name]; ok {
+		if err := xutils.PerformJSONRequest(client, request, &cdata); err != nil {
+			state.logger.Warn("error fetching account trades", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+		}
+	} else {
+		if err := xutils.PerformJSONRequest(qr.client, request, &cdata); err != nil {
+			state.logger.Warn("error fetching account trades", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+		}
+	}
+	var movements []*messages.AccountMovement
+	fmt.Println(cdata)
+	for _, t := range cdata.List {
+		to, ok := constants.GetAssetBySymbol(t.ToAsset)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.ToAsset)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		from, ok := constants.GetAssetBySymbol(t.FromAsset)
+		if !ok {
+			state.logger.Warn("unknown asset " + t.FromAsset)
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return nil
+		}
+		movements = append(movements, &messages.AccountMovement{
+			Asset:      from,
+			Change:     -t.FromAmount,
+			MovementID: fmt.Sprintf("from-%s-%d", t.QuoteId, t.OrderId),
+			Time:       utils.MilliToTimestamp(t.CreateTime),
+			Type:       messages.AccountMovementType_Exchange,
+		})
+		movements = append(movements, &messages.AccountMovement{
+			Asset:      to,
+			Change:     t.ToAmount,
+			MovementID: fmt.Sprintf("to-%s-%d", t.QuoteId, t.OrderId),
+			Time:       utils.MilliToTimestamp(t.CreateTime),
+			Type:       messages.AccountMovementType_Exchange,
+		})
+	}
+	response.Success = true
+	response.Movements = movements
+	context.Send(sender, response)
+	return nil
+}
+
+func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error {
+	fmt.Println("ON TRADE CAPTURE REPORT REQUEST !!!!")
+	msg := context.Message().(*messages.TradeCaptureReportRequest)
+	sender := context.Sender()
+
+	response := &messages.TradeCaptureReport{
+		RequestID: msg.RequestID,
+		Success:   false,
+	}
+
+	go func() {
+		symbol := ""
+		var from, to *uint64
+		var fromID string
+		if msg.Filter != nil {
+			if msg.Filter.Side != nil || msg.Filter.OrderID != nil || msg.Filter.ClientOrderID != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+				context.Send(sender, response)
+				return
+			}
+
+			if msg.Filter.Instrument != nil {
+				s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+				if rej != nil {
+					response.RejectionReason = *rej
+					context.Send(sender, response)
+					return
+				}
+				symbol = s
+			}
+		}
+
+		if msg.Filter.From != nil {
+			ms := uint64(msg.Filter.From.Seconds*1000) + uint64(msg.Filter.From.Nanos/1000000)
+			from = &ms
+		}
+		if msg.Filter.To != nil {
+			ms := uint64(msg.Filter.To.Seconds*1000) + uint64(msg.Filter.To.Nanos/1000000)
+			to = &ms
+		}
+		if msg.Filter.FromID != nil {
+			fromID = msg.Filter.FromID.Value
+		}
+		tParams := binance.NewAccountTradeListRequest(symbol)
+		// If from is not set, but to is set,
+		// If from is set, but to is not set, ok
+
+		if fromID != "" {
+			fromIDInt, _ := strconv.ParseUint(fromID, 10, 64)
+			tParams.SetFromID(fromIDInt)
+		} else {
+			if from == nil || *from == 0 {
+				tParams.SetFromID(0)
+			} else {
+				tParams.SetStartTime(*from)
+				if to != nil {
+					if *to-*from > (7 * 24 * 60 * 60 * 1000) {
+						*to = *from + (7 * 24 * 60 * 60 * 1000)
+					}
+					tParams.SetEndTime(*to)
+				}
+			}
+		}
+
+		trequest, weight, err := binance.GetAccountTradeList(tParams, msg.Account.ApiCredentials)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+		qr := state.getQueryRunner()
+		if qr == nil {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		qr.globalRateLimit.Request(weight)
+		var tdata []binance.TradeData
+		if client, ok := state.AccountClients[msg.Account.Name]; ok {
+			if err := xutils.PerformJSONRequest(client, trequest, &tdata); err != nil {
+				state.logger.Warn("error fetching account trades", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		} else {
+			if err := xutils.PerformJSONRequest(qr.client, trequest, &tdata); err != nil {
+				state.logger.Warn("error fetching account trades", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+		}
+		var mtrades []*models.TradeCapture
+		for _, t := range tdata {
+			sec := state.SymbolToHistoricalSecurity(t.Symbol)
+			if sec == nil {
+				state.logger.Info("unknown symbol", log.String("symbol", t.Symbol))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+			quantity := t.Quantity
+			if !t.IsBuyer {
+				quantity *= -1
+			}
+			asset, ok := constants.GetAssetBySymbol(t.CommissionAsset)
+			if !ok {
+				state.logger.Warn("unknown asset " + t.CommissionAsset)
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+			trd := models.TradeCapture{
+				Type:            models.TradeType_Regular,
+				Price:           t.Price,
+				Quantity:        quantity,
+				Commission:      t.Commission,
+				CommissionAsset: asset,
+				TradeID:         fmt.Sprintf("%d-%d", t.ID, t.OrderID),
+				Instrument: &models.Instrument{
+					Exchange:   constants.BINANCE,
+					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityId},
+				},
+				Trade_LinkID:    nil,
+				OrderID:         &wrapperspb.StringValue{Value: fmt.Sprintf("%d", t.OrderID)},
+				TransactionTime: utils.MilliToTimestamp(t.Time),
+			}
+
+			if t.IsBuyer {
+				trd.Side = models.Side_Buy
+			} else {
+				trd.Side = models.Side_Sell
+			}
+			mtrades = append(mtrades, &trd)
+		}
+
+		response.Success = true
+		response.Trades = mtrades
 		context.Send(sender, response)
 	}()
 

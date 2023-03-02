@@ -223,8 +223,13 @@ func (accnt *Account) UpdateBidOrderQueue(securityID uint64, orderID string, que
 
 func (accnt *Account) UpdateMarkPrice(securityID uint64, price float64) {
 	accnt.positions[securityID].UpdateMarkPrice(price)
+	accnt.fillCollector.Collect(securityID, price)
 }
 
 func (accnt *Account) UpdateMaxNotionalValue(securityID uint64, value float64) {
 	accnt.positions[securityID].UpdateMaxNotionalValue(value)
+}
+
+func (accnt *Account) GetMoveAfterFill(securityID uint64) float64 {
+	return accnt.fillCollector.GetMoveAfterFill(securityID)
 }

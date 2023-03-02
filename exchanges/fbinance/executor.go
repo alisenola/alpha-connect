@@ -935,12 +935,20 @@ func (state *Executor) OnTradeCaptureReportRequest(context actor.Context) error 
 			if t.Side == fbinance.SELL_ODER {
 				quantity *= -1
 			}
+			asset, ok := constants.GetAssetBySymbol(t.CommissionAsset)
+			if !ok {
+				state.logger.Warn("unknown asset " + t.CommissionAsset)
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
 			trd := models.TradeCapture{
-				Type:       models.TradeType_Regular,
-				Price:      t.Price,
-				Quantity:   quantity,
-				Commission: t.Commission,
-				TradeID:    fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
+				Type:            models.TradeType_Regular,
+				Price:           t.Price,
+				Quantity:        quantity,
+				Commission:      t.Commission,
+				CommissionAsset: asset,
+				TradeID:         fmt.Sprintf("%d-%d", t.TradeID, t.OrderID),
 				Instrument: &models.Instrument{
 					Exchange:   constants.FBINANCE,
 					Symbol:     &wrapperspb.StringValue{Value: t.Symbol},

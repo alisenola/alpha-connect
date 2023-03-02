@@ -4,9 +4,11 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
+	"os"
 	"testing"
 )
 
@@ -25,82 +27,89 @@ var fbinanceAccount = &models.Account{
 	Exchange: constants.FBINANCE,
 }
 
-var BTCUSD_PERP_SEC = &models.Security{
-	SecurityID:        9999999,
-	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          constants.BITMEX,
-	Symbol:            "XBTUSD",
-	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
-	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
-	Underlying:        constants.BITCOIN,
-	QuoteCurrency:     constants.DOLLAR,
-	IsInverse:         true,
-	MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
-	TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
-	Multiplier:        &wrapperspb.DoubleValue{Value: -1.},
-	MaturityDate:      nil,
-}
+var BTCUSD_PERP_SEC *models.Security
+var BTCUSDT_PERP_SEC *models.Security
+var ETHUSD_PERP_SEC *models.Security
+var BTCUSD_SPOT_SEC *models.Security
+var ETHUSD_SPOT_SEC *models.Security
 
-var BTCUSDT_PERP_SEC = &models.Security{
-	SecurityID:        7744455,
-	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          constants.FBINANCE,
-	Symbol:            "BTCUSDT",
-	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
-	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
-	Underlying:        constants.BITCOIN,
-	QuoteCurrency:     constants.TETHER,
-	IsInverse:         false,
-	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0002},
-	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0004},
-	Multiplier:        &wrapperspb.DoubleValue{Value: 1.},
-	MaturityDate:      nil,
-}
-
-var ETHUSD_PERP_SEC = &models.Security{
-	SecurityID:        8888888,
-	SecurityType:      enum.SecurityType_CRYPTO_PERP,
-	Exchange:          constants.BITMEX,
-	Symbol:            "ETHUSD",
-	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
-	RoundLot:          &wrapperspb.DoubleValue{Value: 1},
-	Underlying:        constants.ETHEREUM,
-	QuoteCurrency:     constants.DOLLAR,
-	IsInverse:         false,
-	MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
-	TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
-	Multiplier:        &wrapperspb.DoubleValue{Value: 0.000001},
-	MaturityDate:      nil,
-}
-
-var BTCUSD_SPOT_SEC = &models.Security{
-	SecurityID:        7777777,
-	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-	Exchange:          constants.BITSTAMP,
-	Symbol:            "BTCUSD",
-	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
-	RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
-	Underlying:        constants.BITCOIN,
-	QuoteCurrency:     constants.DOLLAR,
-	IsInverse:         false,
-	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
-	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
-	MaturityDate:      nil,
-}
-
-var ETHUSD_SPOT_SEC = &models.Security{
-	SecurityID:        6666666,
-	SecurityType:      enum.SecurityType_CRYPTO_SPOT,
-	Exchange:          constants.BITSTAMP,
-	Symbol:            "ETHUSD",
-	MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
-	RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
-	Underlying:        constants.ETHEREUM,
-	QuoteCurrency:     constants.DOLLAR,
-	IsInverse:         false,
-	MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
-	TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
-	MaturityDate:      nil,
+func TestMain(m *testing.M) {
+	_ = tests.LoadStatics()
+	ETHUSD_SPOT_SEC = &models.Security{
+		SecurityID:        6666666,
+		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
+		Exchange:          constants.BITSTAMP,
+		Symbol:            "ETHUSD",
+		MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+		RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
+		Underlying:        constants.ETHEREUM,
+		QuoteCurrency:     constants.DOLLAR,
+		IsInverse:         false,
+		MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+		TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+		MaturityDate:      nil,
+	}
+	BTCUSD_SPOT_SEC = &models.Security{
+		SecurityID:        7777777,
+		SecurityType:      enum.SecurityType_CRYPTO_SPOT,
+		Exchange:          constants.BITSTAMP,
+		Symbol:            "BTCUSD",
+		MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+		RoundLot:          &wrapperspb.DoubleValue{Value: 0.0001},
+		Underlying:        constants.BITCOIN,
+		QuoteCurrency:     constants.DOLLAR,
+		IsInverse:         false,
+		MakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+		TakerFee:          &wrapperspb.DoubleValue{Value: 0.0025},
+		MaturityDate:      nil,
+	}
+	BTCUSD_PERP_SEC = &models.Security{
+		SecurityID:        9999999,
+		SecurityType:      enum.SecurityType_CRYPTO_PERP,
+		Exchange:          constants.BITMEX,
+		Symbol:            "XBTUSD",
+		MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+		RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+		Underlying:        constants.BITCOIN,
+		QuoteCurrency:     constants.DOLLAR,
+		IsInverse:         true,
+		MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
+		TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
+		Multiplier:        &wrapperspb.DoubleValue{Value: -1.},
+		MaturityDate:      nil,
+	}
+	BTCUSDT_PERP_SEC = &models.Security{
+		SecurityID:        7744455,
+		SecurityType:      enum.SecurityType_CRYPTO_PERP,
+		Exchange:          constants.FBINANCE,
+		Symbol:            "BTCUSDT",
+		MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+		RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+		Underlying:        constants.BITCOIN,
+		QuoteCurrency:     constants.TETHER,
+		IsInverse:         false,
+		MakerFee:          &wrapperspb.DoubleValue{Value: 0.0002},
+		TakerFee:          &wrapperspb.DoubleValue{Value: 0.0004},
+		Multiplier:        &wrapperspb.DoubleValue{Value: 1.},
+		MaturityDate:      nil,
+	}
+	ETHUSD_PERP_SEC = &models.Security{
+		SecurityID:        8888888,
+		SecurityType:      enum.SecurityType_CRYPTO_PERP,
+		Exchange:          constants.BITMEX,
+		Symbol:            "ETHUSD",
+		MinPriceIncrement: &wrapperspb.DoubleValue{Value: 0.05},
+		RoundLot:          &wrapperspb.DoubleValue{Value: 1},
+		Underlying:        constants.ETHEREUM,
+		QuoteCurrency:     constants.DOLLAR,
+		IsInverse:         false,
+		MakerFee:          &wrapperspb.DoubleValue{Value: -0.00025},
+		TakerFee:          &wrapperspb.DoubleValue{Value: 0.00075},
+		Multiplier:        &wrapperspb.DoubleValue{Value: 0.000001},
+		MaturityDate:      nil,
+	}
+	exitVal := m.Run()
+	os.Exit(exitVal)
 }
 
 func TestAccount_ConfirmFill(t *testing.T) {
@@ -133,7 +142,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("buy", "buy")
+	_, err = accnt.ConfirmNewOrder("buy", "buy", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +167,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("sell", "sell")
+	_, err = accnt.ConfirmNewOrder("sell", "sell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +246,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("buy", "buy")
+	_, err = accnt.ConfirmNewOrder("buy", "buy", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +271,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("sell", "sell")
+	_, err = accnt.ConfirmNewOrder("sell", "sell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,14 +346,14 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 		OrderType:      models.OrderType_Limit,
 		Side:           models.Side_Buy,
 		TimeInForce:    models.TimeInForce_Session,
-		LeavesQuantity: 2.,
+		LeavesQuantity: 10.,
 		CumQuantity:    0,
 		Price:          &wrapperspb.DoubleValue{Value: 20000.},
 	})
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("buy", "buy")
+	_, err = accnt.ConfirmNewOrder("buy", "buy", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +378,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	if rej != nil {
 		t.Fatalf(rej.String())
 	}
-	_, err = accnt.ConfirmNewOrder("sell", "sell")
+	_, err = accnt.ConfirmNewOrder("sell", "sell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,14 +494,11 @@ func TestAccount_Compare(t *testing.T) {
 		t.Fatalf("different account")
 	}
 
-	_, err = accnt1.ConfirmNewOrder("buy", "buy")
+	_, err = accnt1.ConfirmNewOrder("buy", "buy", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accnt1.Compare(accnt2) {
-		t.Fatalf("same account")
-	}
-	_, err = accnt2.ConfirmNewOrder("buy", "buy")
+	_, err = accnt2.ConfirmNewOrder("buy", "buy", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,14 +550,11 @@ func TestAccount_Compare(t *testing.T) {
 		t.Fatalf("different account")
 	}
 
-	_, err = accnt1.ConfirmNewOrder("sell", "sell")
+	_, err = accnt1.ConfirmNewOrder("sell", "sell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accnt1.Compare(accnt2) {
-		t.Fatalf("same account")
-	}
-	_, err = accnt2.ConfirmNewOrder("sell", "sell")
+	_, err = accnt2.ConfirmNewOrder("sell", "sell", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -117,6 +117,8 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Stat
 
 func NewAccountReconcileProducer(accountCfg config.Account, account *models.Account, registry registry.StaticClient, store tickstore_types.TickstoreClient, db *gorm.DB) actor.Producer {
 	switch account.Exchange.ID {
+	case constants.BINANCE.ID:
+		return binance.NewAccountReconcileProducer(accountCfg, account, registry, store, db)
 	case constants.FBINANCE.ID:
 		return fbinance.NewAccountReconcileProducer(accountCfg, account, registry, store, db)
 	case constants.FTX.ID:

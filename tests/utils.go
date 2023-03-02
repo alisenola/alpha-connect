@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/executor"
@@ -11,37 +12,40 @@ import (
 	"time"
 )
 
-func LoadStatics(t *testing.T) {
+func LoadStatics() error {
 	assets := make(map[uint32]*xchangerModels.Asset)
 	err := json.Unmarshal(AssetsJSON, &assets)
 	if err != nil {
-		t.Fatalf("error parsing assets: %v", err)
+		return fmt.Errorf("error parsing assets: %v", err)
 	}
 	if err := constants.LoadAssets(assets); err != nil {
-		t.Fatalf("error loading assets: %v", err)
+		return fmt.Errorf("error loading assets: %v", err)
 	}
 
 	prtcls := make(map[uint32]*xchangerModels.Protocol)
 	err = json.Unmarshal(ProtocolsJSON, &prtcls)
 	if err != nil {
-		t.Fatalf("error parsing protocols: %v", err)
+		return fmt.Errorf("error parsing protocols: %v", err)
 	}
 	if err := constants.LoadProtocols(prtcls); err != nil {
-		t.Fatalf("error loading protocols: %v", err)
+		return fmt.Errorf("error loading protocols: %v", err)
 	}
 
 	chns := make(map[uint32]*xchangerModels.Chain)
 	err = json.Unmarshal(ChainsJSON, &chns)
 	if err != nil {
-		t.Fatalf("error parsing chains: %v", err)
+		return fmt.Errorf("error parsing chains: %v", err)
 	}
 	if err := constants.LoadChains(chns); err != nil {
-		t.Fatalf("error loading chains: %v", err)
+		return fmt.Errorf("error loading chains: %v", err)
 	}
+	return nil
 }
 
 func StartExecutor(t *testing.T, cfg *config.Config) (*actor.ActorSystem, *actor.PID, func()) {
-	LoadStatics(t)
+	if err := LoadStatics(); err != nil {
+		t.Fatalf("error loading statics: %v", err)
+	}
 	aconfig := actor.Config{DeadLetterThrottleInterval: time.Second, DeveloperSupervisionLogging: true, DeadLetterRequestLogging: true}
 	as := actor.NewActorSystemWithConfig(&aconfig)
 	exec, _ := as.Root.SpawnNamed(actor.PropsFromProducer(executor.NewExecutorProducer(cfg)), "executor")
