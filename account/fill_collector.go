@@ -2,7 +2,6 @@ package account
 
 import (
 	"container/list"
-	"fmt"
 	"time"
 )
 
@@ -54,12 +53,10 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	ts := time.Now().UnixMilli()
 	m, ok := sc.makerFills[securityID]
 	if ok {
-		fmt.Println("maker q len", m.Len())
 		for e := m.Front(); e != nil; e = e.Next() {
 			f := e.Value.(*fill)
 			delta := ts - f.time
 			if delta > sc.cutoff {
-				fmt.Println("REMOVE")
 				m.Remove(e)
 			} else {
 				bucket := delta / 1000 // 1s buckets
@@ -70,12 +67,10 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	}
 	m, ok = sc.takerFills[securityID]
 	if ok {
-		fmt.Println("taker q len", m.Len())
 		for e := m.Front(); e != nil; e = e.Next() {
 			f := e.Value.(*fill)
 			delta := ts - f.time
 			if delta > sc.cutoff {
-				fmt.Println("REMOVE")
 				m.Remove(e)
 			} else {
 				bucket := delta / 1000 // 1s buckets
