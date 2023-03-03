@@ -145,7 +145,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 			buyMakerMoves[i] += mv
 		}
 	}
-	for i := range sc.buyMakerMoves {
+	for i := range buyMakerMoves {
 		buyMakerMoves[i] /= float64(len(sc.buyMakerMoves))
 	}
 
@@ -154,7 +154,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 			buyTakerMoves[i] += mv
 		}
 	}
-	for i := range sc.buyTakerMoves {
+	for i := range buyTakerMoves {
 		buyTakerMoves[i] /= float64(len(sc.buyTakerMoves))
 	}
 
@@ -163,7 +163,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 			sellMakerMoves[i] += mv
 		}
 	}
-	for i := range sc.sellMakerMoves {
+	for i := range sellMakerMoves {
 		sellMakerMoves[i] /= float64(len(sc.sellMakerMoves))
 	}
 
@@ -172,7 +172,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 			sellTakerMoves[i] += mv
 		}
 	}
-	for i := range sc.sellTakerMoves {
+	for i := range sellTakerMoves {
 		sellTakerMoves[i] /= float64(len(sc.sellTakerMoves))
 	}
 
