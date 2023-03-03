@@ -63,6 +63,10 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	alpha := 0.99
 	m := sc.makerFills[securityID]
 	for e := m.Front(); e != nil; e = e.Next() {
+		if e.Value == nil {
+			m.Remove(e)
+			continue
+		}
 		f := e.Value.(*fill)
 		delta := ts - f.time
 		if delta >= sc.cutoff {
@@ -70,14 +74,8 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 		} else {
 			bucket := delta / 1000 // 1s buckets
 			if !f.bucketed[bucket] {
-				var move float64
 				if f.buy {
-					// price down, move is negative
-					move = price/f.price - 1
-				} else {
-					move = f.price/price - 1
-				}
-				if f.buy {
+					move := price/f.price - 1
 					buyMoves, ok := sc.buyMakerMoves[securityID]
 					if !ok {
 						buyMoves = make(map[int64][2]float64)
@@ -85,6 +83,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 					}
 					buyMoves[bucket] = [2]float64{alpha*buyMoves[bucket][0] + (1-alpha)*move, float64(ts)}
 				} else {
+					move := f.price/price - 1
 					sellMoves, ok := sc.sellMakerMoves[securityID]
 					if !ok {
 						sellMoves = make(map[int64][2]float64)
@@ -98,6 +97,10 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	}
 	m = sc.takerFills[securityID]
 	for e := m.Front(); e != nil; e = e.Next() {
+		if e.Value == nil {
+			m.Remove(e)
+			continue
+		}
 		f := e.Value.(*fill)
 		delta := ts - f.time
 		if delta >= sc.cutoff {
@@ -105,13 +108,8 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 		} else {
 			bucket := delta / 1000 // 1s buckets
 			if !f.bucketed[bucket] {
-				var move float64
 				if f.buy {
-					move = price/f.price - 1
-				} else {
-					move = f.price/price - 1
-				}
-				if f.buy {
+					move := price/f.price - 1
 					buyMoves, ok := sc.buyTakerMoves[securityID]
 					if !ok {
 						buyMoves = make(map[int64][2]float64)
@@ -119,6 +117,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 					}
 					buyMoves[bucket] = [2]float64{alpha*buyMoves[bucket][0] + (1-alpha)*move, float64(ts)}
 				} else {
+					move := f.price/price - 1
 					sellMoves, ok := sc.sellTakerMoves[securityID]
 					if !ok {
 						sellMoves = make(map[int64][2]float64)
