@@ -47,6 +47,8 @@ func NewFillCollector(cutoff int64, securityIDs []uint64) *FillCollector {
 }
 
 func (sc *FillCollector) AddFill(securityID uint64, price float64, buy, taker bool, time int64) {
+	sc.Lock()
+	defer sc.Unlock()
 	if taker {
 		m := sc.takerFills[securityID]
 		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: time, bucketed: make(map[int64]bool)})
