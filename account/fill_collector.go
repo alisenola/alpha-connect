@@ -60,7 +60,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	sc.Lock()
 	defer sc.Unlock()
 	ts := time.Now().UnixMilli()
-	alpha := 0.5
+	alpha := 0.99
 	m := sc.makerFills[securityID]
 	for e := m.Front(); e != nil; e = e.Next() {
 		f := e.Value.(*fill)
@@ -195,3 +195,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 	}
 	return buyMakerMoves, buyTakerMoves, sellMakerMoves, sellTakerMoves
 }
+
+// 100
+// 200
+// you will have weight of 0.01 and 0.005, so one will weight for 0.66 and the other for 0.33
