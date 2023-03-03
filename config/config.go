@@ -43,6 +43,7 @@ type Account struct {
 	MonitorOrders    bool
 	OpeningDate      string
 	SOCKS5           string
+	FillCollector    bool
 }
 
 type DataBase struct {

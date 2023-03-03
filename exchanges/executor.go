@@ -3,6 +3,7 @@ package exchanges
 import (
 	"errors"
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
@@ -49,6 +50,7 @@ type Executor struct {
 	instruments              map[uint64]*actor.PID // A map from security ID to market manager
 	slSubscribers            map[uint64]*actor.PID // A map from request ID to security list subscribers
 	malSubscribers           map[uint64]*actor.PID // A map from request ID to protocolAssets list subscribers
+	fillCollectors           map[uint32]*account.FillCollector
 	logger                   *log.Logger
 	strict                   bool
 }
@@ -498,7 +500,11 @@ func (state *Executor) Initialize(context actor.Context) error {
 		if !ok {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
-		account, err := NewAccount(&models.Account{
+		var fc *account.FillCollector
+		if accntCfg.FillCollector {
+			fc = state.getFillCollector(exch)
+		}
+		accnt, err := NewAccount(&models.Account{
 			Portfolio: accntCfg.Portfolio,
 			Name:      accntCfg.Name,
 			Exchange:  exch,
@@ -507,12 +513,12 @@ func (state *Executor) Initialize(context actor.Context) error {
 				APISecret: accntCfg.ApiSecret,
 				AccountID: accntCfg.ID,
 			},
-		})
+		}, fc)
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
 		client := state.accountClients[exch.Name][accntCfg.Name]
-		producer := NewAccountManagerProducer(accntCfg, account, state.store, state.db, state.registry, client)
+		producer := NewAccountManagerProducer(accntCfg, accnt, state.store, state.db, state.registry, client)
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
@@ -522,6 +528,21 @@ func (state *Executor) Initialize(context actor.Context) error {
 	}
 
 	return nil
+}
+
+func (state *Executor) getFillCollector(exch *xmodels.Exchange) *account.FillCollector {
+	if fc, ok := state.fillCollectors[exch.ID]; ok {
+		return fc
+	}
+	secIDs := make([]uint64, len(state.symbToSecs[exch.ID]))
+	i := 0
+	for _, sec := range state.symbToSecs[exch.ID] {
+		secIDs[i] = sec.SecurityID
+		i += 1
+	}
+	fc := account.NewFillCollector(1000, secIDs)
+	state.fillCollectors[exch.ID] = fc
+	return fc
 }
 
 func (state *Executor) Clean(context actor.Context) error {
@@ -1313,8 +1334,8 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		return nil
 	}
 
-	account := GetAccount(req.Account.Name)
-	if account == nil {
+	accnt := GetAccount(req.Account.Name)
+	if accnt == nil {
 		exch, ok := constants.GetExchangeByName(req.Account.Exchange)
 		if !ok {
 			context.Respond(&commands.GetAccountResponse{
@@ -1341,7 +1362,11 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 			}
 		}
 		var err error
-		account, err = NewAccount(&models.Account{
+		var fc *account.FillCollector
+		if req.Account.FillCollector {
+			fc = state.getFillCollector(exch)
+		}
+		accnt, err = NewAccount(&models.Account{
 			Name:      req.Account.Name,
 			Portfolio: req.Account.Portfolio,
 			Exchange:  exch,
@@ -1350,11 +1375,11 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 				APISecret: req.Account.ApiSecret,
 				AccountID: req.Account.ID,
 			},
-		})
+		}, fc)
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
-		producer := NewAccountManagerProducer(*req.Account, account, state.store, state.db, state.registry, state.accountClients[exch.Name][req.Account.Name])
+		producer := NewAccountManagerProducer(*req.Account, accnt, state.store, state.db, state.registry, state.accountClients[exch.Name][req.Account.Name])
 		if producer == nil {
 			return fmt.Errorf("unknown exchange %s", req.Account.Exchange)
 		}
@@ -1363,7 +1388,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		state.accountManagers[req.Account.Name] = context.Spawn(props)
 	}
 	context.Respond(&commands.GetAccountResponse{
-		Account: account,
+		Account: accnt,
 	})
 	return nil
 }
