@@ -7,12 +7,11 @@ import (
 )
 
 type fill struct {
-	securityID uint64
-	price      float64
-	taker      bool
-	buy        bool
-	time       int64
-	bucketed   map[int64]bool
+	price    float64
+	taker    bool
+	buy      bool
+	time     int64
+	bucketed map[int64]bool
 }
 
 type FillCollector struct {
@@ -79,17 +78,17 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 					move = f.price/price - 1
 				}
 				if f.buy {
-					buyMoves, ok := sc.buyMakerMoves[f.securityID]
+					buyMoves, ok := sc.buyMakerMoves[securityID]
 					if !ok {
 						buyMoves = make(map[int64]float64)
-						sc.buyMakerMoves[f.securityID] = buyMoves
+						sc.buyMakerMoves[securityID] = buyMoves
 					}
 					buyMoves[bucket] = alpha*buyMoves[bucket] + (1-alpha)*move
 				} else {
-					sellMoves, ok := sc.sellMakerMoves[f.securityID]
+					sellMoves, ok := sc.sellMakerMoves[securityID]
 					if !ok {
 						sellMoves = make(map[int64]float64)
-						sc.sellMakerMoves[f.securityID] = sellMoves
+						sc.sellMakerMoves[securityID] = sellMoves
 					}
 					sellMoves[bucket] = alpha*sellMoves[bucket] + (1-alpha)*move
 				}
@@ -113,17 +112,17 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 					move = f.price/price - 1
 				}
 				if f.buy {
-					buyMoves, ok := sc.buyTakerMoves[f.securityID]
+					buyMoves, ok := sc.buyTakerMoves[securityID]
 					if !ok {
 						buyMoves = make(map[int64]float64)
-						sc.buyTakerMoves[f.securityID] = buyMoves
+						sc.buyTakerMoves[securityID] = buyMoves
 					}
 					buyMoves[bucket] = alpha*buyMoves[bucket] + (1-alpha)*move
 				} else {
-					sellMoves, ok := sc.sellTakerMoves[f.securityID]
+					sellMoves, ok := sc.sellTakerMoves[securityID]
 					if !ok {
 						sellMoves = make(map[int64]float64)
-						sc.sellTakerMoves[f.securityID] = sellMoves
+						sc.sellTakerMoves[securityID] = sellMoves
 					}
 					sellMoves[bucket] = alpha*sellMoves[bucket] + (1-alpha)*move
 				}

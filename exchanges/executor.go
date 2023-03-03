@@ -281,7 +281,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 	state.slSubscribers = make(map[uint64]*actor.PID)
 	state.accountManagers = make(map[string]*actor.PID)
 	state.wsPools = make(map[uint32]*xchangerUtils.WebsocketPool)
-
+	state.fillCollectors = make(map[uint32]*account.FillCollector)
 	var dialerPool *xchangerUtils.DialerPool
 	interfaceName := state.DialerPoolInterface
 	ips := state.DialerPoolIPs
@@ -501,7 +501,9 @@ func (state *Executor) Initialize(context actor.Context) error {
 			return fmt.Errorf("unknown exchange %s", accntCfg.Exchange)
 		}
 		var fc *account.FillCollector
+		fmt.Println("fill collector enabled for ", accntCfg.FillCollector, accntCfg.Name)
 		if accntCfg.FillCollector {
+			fmt.Println("fill collector enabled for ", accntCfg.Name)
 			fc = state.getFillCollector(exch)
 		}
 		accnt, err := NewAccount(&models.Account{
@@ -1364,6 +1366,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 		var err error
 		var fc *account.FillCollector
 		if req.Account.FillCollector {
+			fmt.Println("fill collector enabled for ", req.Account.Name)
 			fc = state.getFillCollector(exch)
 		}
 		accnt, err = NewAccount(&models.Account{
