@@ -140,33 +140,41 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 	buyTakerMoves := make([]float64, 10)
 	sellMakerMoves := make([]float64, 10)
 	sellTakerMoves := make([]float64, 10)
-	for k, v := range sc.buyMakerMoves {
-		sum := 0.0
-		for _, mv := range v {
-			sum += mv
+	for _, v := range sc.buyMakerMoves {
+		for i, mv := range v {
+			buyMakerMoves[i] += mv
 		}
-		buyMakerMoves[k] = sum / float64(len(v))
 	}
-	for k, v := range sc.buyTakerMoves {
-		sum := 0.0
-		for _, mv := range v {
-			sum += mv
+	for i := range sc.buyMakerMoves {
+		buyMakerMoves[i] /= float64(len(sc.buyMakerMoves))
+	}
+
+	for _, v := range sc.buyTakerMoves {
+		for i, mv := range v {
+			buyTakerMoves[i] += mv
 		}
-		buyTakerMoves[k] = sum / float64(len(v))
 	}
-	for k, v := range sc.sellMakerMoves {
-		sum := 0.0
-		for _, mv := range v {
-			sum += mv
+	for i := range sc.buyTakerMoves {
+		buyTakerMoves[i] /= float64(len(sc.buyTakerMoves))
+	}
+
+	for _, v := range sc.sellMakerMoves {
+		for i, mv := range v {
+			sellMakerMoves[i] += mv
 		}
-		sellMakerMoves[k] = sum / float64(len(v))
 	}
-	for k, v := range sc.sellTakerMoves {
-		sum := 0.0
-		for _, mv := range v {
-			sum += mv
+	for i := range sc.sellMakerMoves {
+		sellMakerMoves[i] /= float64(len(sc.sellMakerMoves))
+	}
+
+	for _, v := range sc.sellTakerMoves {
+		for i, mv := range v {
+			sellTakerMoves[i] += mv
 		}
-		sellTakerMoves[k] = sum / float64(len(v))
 	}
+	for i := range sc.sellTakerMoves {
+		sellTakerMoves[i] /= float64(len(sc.sellTakerMoves))
+	}
+
 	return buyMakerMoves, buyTakerMoves, sellMakerMoves, sellTakerMoves
 }
