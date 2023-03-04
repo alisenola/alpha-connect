@@ -46,7 +46,7 @@ func InitModel(t *testing.T) {
 
 func TestAccount_GetAvailableMargin(t *testing.T) {
 	InitModel(t)
-	account, err := account.NewAccount(bitmexAccount)
+	account, err := account.NewAccount(bitmexAccount, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

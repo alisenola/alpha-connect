@@ -2,6 +2,7 @@ package account
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -16,6 +17,7 @@ type fill struct {
 
 type FillCollector struct {
 	sync.RWMutex
+	alpha          float64
 	cutoff         int64 // drop trades older than this
 	takerFills     map[uint64]*list.List
 	makerFills     map[uint64]*list.List
@@ -25,8 +27,9 @@ type FillCollector struct {
 	sellTakerMoves map[uint64]map[int64][2]float64
 }
 
-func NewFillCollector(cutoff int64, securityIDs []uint64) *FillCollector {
+func NewFillCollector(cutoff int64, alpha float64, securityIDs []uint64) *FillCollector {
 	fc := &FillCollector{
+		alpha:          alpha,
 		cutoff:         cutoff,
 		takerFills:     make(map[uint64]*list.List),
 		makerFills:     make(map[uint64]*list.List),
@@ -62,7 +65,6 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	sc.Lock()
 	defer sc.Unlock()
 	ts := time.Now().UnixMilli()
-	alpha := 0.99
 	m := sc.makerFills[securityID]
 	for e := m.Front(); e != nil; e = e.Next() {
 		if e.Value == nil {
@@ -83,7 +85,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 						buyMoves = make(map[int64][2]float64)
 						sc.buyMakerMoves[securityID] = buyMoves
 					}
-					buyMoves[bucket] = [2]float64{alpha*buyMoves[bucket][0] + (1-alpha)*move, float64(ts)}
+					buyMoves[bucket] = [2]float64{sc.alpha*buyMoves[bucket][0] + (1-sc.alpha)*move, float64(ts)}
 				} else {
 					move := f.price/price - 1
 					sellMoves, ok := sc.sellMakerMoves[securityID]
@@ -91,7 +93,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 						sellMoves = make(map[int64][2]float64)
 						sc.sellMakerMoves[securityID] = sellMoves
 					}
-					sellMoves[bucket] = [2]float64{alpha*sellMoves[bucket][0] + (1-alpha)*move, float64(ts)}
+					sellMoves[bucket] = [2]float64{sc.alpha*sellMoves[bucket][0] + (1-sc.alpha)*move, float64(ts)}
 				}
 				f.bucketed[bucket] = true
 			}
@@ -117,7 +119,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 						buyMoves = make(map[int64][2]float64)
 						sc.buyTakerMoves[securityID] = buyMoves
 					}
-					buyMoves[bucket] = [2]float64{alpha*buyMoves[bucket][0] + (1-alpha)*move, float64(ts)}
+					buyMoves[bucket] = [2]float64{sc.alpha*buyMoves[bucket][0] + (1-sc.alpha)*move, float64(ts)}
 				} else {
 					move := f.price/price - 1
 					sellMoves, ok := sc.sellTakerMoves[securityID]
@@ -125,7 +127,7 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 						sellMoves = make(map[int64][2]float64)
 						sc.sellTakerMoves[securityID] = sellMoves
 					}
-					sellMoves[bucket] = [2]float64{alpha*sellMoves[bucket][0] + (1-alpha)*move, float64(ts)}
+					sellMoves[bucket] = [2]float64{sc.alpha*sellMoves[bucket][0] + (1-sc.alpha)*move, float64(ts)}
 				}
 				f.bucketed[bucket] = true
 			}
@@ -160,6 +162,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 		for _, v := range sc.buyTakerMoves {
 			if mv, ok := v[int64(i)]; ok {
 				w := 1 / (ts - mv[1])
+				fmt.Println("w", w, mv[0])
 				buyTakerMoves[i] += mv[0] * w
 				sum += w
 			}
