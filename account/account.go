@@ -87,41 +87,43 @@ type CacheValue struct {
 type Account struct {
 	sync.RWMutex
 	*models.Account
-	ordersID        map[string]*Order
-	ordersClID      map[string]*Order
-	securities      map[uint64]Security
-	symbolToSec     map[string]Security
-	baseToPositions map[uint32][]*Position
-	positions       map[uint64]*Position
-	balances        map[uint32]int64
-	assets          map[uint32]*xchangerModels.Asset
-	margin          int64
-	MarginCurrency  *xchangerModels.Asset
-	MarginPrecision float64
-	quoteCurrency   *xchangerModels.Asset
-	takerFee        *float64
-	makerFee        *float64
-	expirationLimit time.Duration
-	cache           map[int]CacheValue
-	fillCollector   *FillCollector
+	ordersID         map[string]*Order
+	ordersClID       map[string]*Order
+	securities       map[uint64]Security
+	symbolToSec      map[string]Security
+	baseToPositions  map[uint32][]*Position
+	positions        map[uint64]*Position
+	balances         map[uint32]int64
+	assets           map[uint32]*xchangerModels.Asset
+	margin           int64
+	MarginCurrency   *xchangerModels.Asset
+	MarginPrecision  float64
+	quoteCurrency    *xchangerModels.Asset
+	takerFee         *float64
+	makerFee         *float64
+	makerFeeOverride *float64
+	expirationLimit  time.Duration
+	cache            map[int]CacheValue
+	fillCollector    *FillCollector
 }
 
-func NewAccount(account *models.Account, fillCollector *FillCollector) (*Account, error) {
+func NewAccount(account *models.Account, fillCollector *FillCollector, makerFees *float64) (*Account, error) {
 	quoteCurrency := constants.DOLLAR
 	accnt := &Account{
-		Account:         account,
-		ordersID:        make(map[string]*Order),
-		ordersClID:      make(map[string]*Order),
-		securities:      make(map[uint64]Security),
-		positions:       make(map[uint64]*Position),
-		baseToPositions: make(map[uint32][]*Position),
-		balances:        make(map[uint32]int64),
-		assets:          make(map[uint32]*xchangerModels.Asset),
-		margin:          0,
-		quoteCurrency:   quoteCurrency,
-		expirationLimit: 1 * time.Minute,
-		cache:           make(map[int]CacheValue),
-		fillCollector:   fillCollector,
+		Account:          account,
+		ordersID:         make(map[string]*Order),
+		ordersClID:       make(map[string]*Order),
+		securities:       make(map[uint64]Security),
+		positions:        make(map[uint64]*Position),
+		baseToPositions:  make(map[uint32][]*Position),
+		balances:         make(map[uint32]int64),
+		assets:           make(map[uint32]*xchangerModels.Asset),
+		margin:           0,
+		quoteCurrency:    quoteCurrency,
+		makerFeeOverride: makerFees,
+		expirationLimit:  1 * time.Minute,
+		cache:            make(map[int]CacheValue),
+		fillCollector:    fillCollector,
 	}
 	switch account.Exchange.ID {
 	case constants.FBINANCE.ID:
@@ -174,7 +176,11 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.balances = make(map[uint32]int64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
 	accnt.takerFee = takerFee
-	accnt.makerFee = makerFee
+	if accnt.makerFeeOverride != nil {
+		accnt.makerFee = accnt.makerFeeOverride
+	} else {
+		accnt.makerFee = makerFee
+	}
 
 	var err error
 	for _, s := range securities {

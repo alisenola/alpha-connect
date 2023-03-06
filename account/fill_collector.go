@@ -2,7 +2,6 @@ package account
 
 import (
 	"container/list"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -162,7 +161,6 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 		for _, v := range sc.buyTakerMoves {
 			if mv, ok := v[int64(i)]; ok {
 				w := 1 / (ts - mv[1])
-				fmt.Println("w", w, mv[0])
 				buyTakerMoves[i] += mv[0] * w
 				sum += w
 			}

@@ -25,9 +25,10 @@ func TestFillCollector(t *testing.T) {
 	}
 	mb, tb, ms, ts := fc.GetMoveAfterFill()
 	for i := 0; i < 10; i++ {
-		// mb should be 1.0
+		// Price increased, so move after fill of buy should be positive
 		assert.InDelta(t, 1.0, mb[i], 0.1)
 		assert.InDelta(t, 1.0, tb[i], 0.1)
+		// Price increased, so move after fill of sell should be negative
 		assert.InDelta(t, -0.5, ms[i], 0.1)
 		assert.InDelta(t, -0.5, ts[i], 0.1)
 	}

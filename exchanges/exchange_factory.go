@@ -78,14 +78,14 @@ func getPortfolio(ID string) *account.Portfolio {
 	return portfolio
 }
 
-func NewAccount(accountInfo *models.Account, fillCollector *account.FillCollector) (*account.Account, error) {
+func NewAccount(accountInfo *models.Account, fillCollector *account.FillCollector, makerFees *float64) (*account.Account, error) {
 	portfolioMx.Lock()
 	defer portfolioMx.Unlock()
 	acc, ok := accounts[accountInfo.Name]
 	if ok {
 		return acc, nil
 	}
-	accnt, err := account.NewAccount(accountInfo, fillCollector)
+	accnt, err := account.NewAccount(accountInfo, fillCollector, makerFees)
 	if err != nil {
 		return nil, err
 	}

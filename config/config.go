@@ -44,6 +44,7 @@ type Account struct {
 	OpeningDate      string
 	SOCKS5           string
 	FillCollector    bool
+	MakerFees        *float64
 }
 
 type DataBase struct {

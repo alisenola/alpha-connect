@@ -515,7 +515,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 				APISecret: accntCfg.ApiSecret,
 				AccountID: accntCfg.ID,
 			},
-		}, fc)
+		}, fc, accntCfg.MakerFees)
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
@@ -1378,7 +1378,7 @@ func (state *Executor) OnGetAccountRequest(context actor.Context) error {
 				APISecret: req.Account.ApiSecret,
 				AccountID: req.Account.ID,
 			},
-		}, fc)
+		}, fc, req.Account.MakerFees)
 		if err != nil {
 			return fmt.Errorf("error creating new account: %v", err)
 		}
