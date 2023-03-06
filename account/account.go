@@ -92,6 +92,7 @@ type Account struct {
 	securities       map[uint64]Security
 	symbolToSec      map[string]Security
 	baseToPositions  map[uint32][]*Position
+	baseCount        map[uint32]int
 	positions        map[uint64]*Position
 	balances         map[uint32]int64
 	assets           map[uint32]*xchangerModels.Asset
@@ -116,6 +117,7 @@ func NewAccount(account *models.Account, fillCollector *FillCollector, makerFees
 		securities:       make(map[uint64]Security),
 		positions:        make(map[uint64]*Position),
 		baseToPositions:  make(map[uint32][]*Position),
+		baseCount:        make(map[uint32]int),
 		balances:         make(map[uint32]int64),
 		assets:           make(map[uint32]*xchangerModels.Asset),
 		margin:           0,
@@ -218,6 +220,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
+			accnt.baseCount[s.Underlying.ID] += 1
 			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
@@ -1075,6 +1078,10 @@ func (accnt *Account) GetPositionMap() map[uint64]*models.Position {
 	}
 
 	return positions
+}
+
+func (accnt *Account) GetBaseCount(id uint32) int {
+	return accnt.baseCount[id]
 }
 
 func (accnt *Account) GetBalances() []*models.Balance {
