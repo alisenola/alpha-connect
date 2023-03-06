@@ -1224,6 +1224,7 @@ func (accnt *Account) Clone() *Account {
 		securities:      make(map[uint64]Security),
 		symbolToSec:     make(map[string]Security),
 		baseToPositions: make(map[uint32][]*Position),
+		baseCount:       make(map[uint32]int),
 		positions:       make(map[uint64]*Position),
 		balances:        make(map[uint32]int64),
 		assets:          make(map[uint32]*xchangerModels.Asset),
