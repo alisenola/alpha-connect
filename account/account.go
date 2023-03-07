@@ -184,6 +184,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		accnt.makerFee = makerFee
 	}
 
+	baseCount := make(map[uint32]int)
 	var err error
 	for _, s := range securities {
 		switch s.SecurityType {
@@ -220,7 +221,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
-			accnt.baseCount[s.Underlying.ID] += 1
+			baseCount[s.Underlying.ID] += 1
 			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
@@ -231,6 +232,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 			accnt.assets[s.QuoteCurrency.ID] = s.QuoteCurrency
 		}
 	}
+	accnt.baseCount = baseCount
 
 	for _, s := range accnt.securities {
 		s.Clear()
