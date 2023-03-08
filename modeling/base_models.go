@@ -34,7 +34,7 @@ type MarketModel interface {
 
 type AllocationModel interface {
 	Model
-	Solve(allocs, limits *sync.Map, margin float64) error
+	Solve(allocs, bidDepths, askDepths, limits *sync.Map, margin float64, gamma *float64) error
 	Solved() bool
 	GetAllocations(allocations *sync.Map, margin, cost float64, gamma *float64) map[uint64]float64
 	GetAllocationDelta(ID uint64, allocations *sync.Map, margin, cost float64, gamma *float64) (float64, bool)
