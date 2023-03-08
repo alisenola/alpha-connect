@@ -128,43 +128,23 @@ func (m *MarketMap) GetPairPrice(base, quote uint32) (float64, bool) {
 type MarketAllocationModel struct {
 	sync.RWMutex
 	AllocationModel
-	PriceModel
 	*MarketMap
 }
 
-func NewMarketAllocationModel(al AllocationModel, price PriceModel) *MarketAllocationModel {
+func NewMarketAllocationModel(market *MarketMap, al AllocationModel) *MarketAllocationModel {
 	return &MarketAllocationModel{
 		AllocationModel: al,
-		PriceModel:      price,
-		MarketMap:       NewMarketMap(),
+		MarketMap:       market,
 	}
 }
 
 func (m *MarketAllocationModel) GetPrice(ID uint64) (float64, bool) {
-	if m.PriceModel != nil {
-		p, ok := m.PriceModel.GetPrice(ID)
-		if ok {
-			return p, ok
-		} else {
-			return m.MarketMap.GetPrice(ID)
-		}
-	} else {
-		return m.MarketMap.GetPrice(ID)
-	}
+	return m.MarketMap.GetPrice(ID)
 }
 
 func (m *MarketAllocationModel) GetPairPrice(base, quote uint32) (float64, bool) {
 	ID := uint64(base)<<32 | uint64(quote)
-	if m.PriceModel != nil {
-		p, ok := m.PriceModel.GetPrice(ID)
-		if ok {
-			return p, ok
-		} else {
-			return m.MarketMap.GetPrice(ID)
-		}
-	} else {
-		return m.MarketMap.GetPrice(ID)
-	}
+	return m.MarketMap.GetPrice(ID)
 }
 
 type MarketLongShortModel struct {
