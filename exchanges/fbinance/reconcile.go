@@ -217,7 +217,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		}
 		done := false
 		for !done {
-
 			fmt.Println("LAST", sec.SecurityId, state.lastTradeID[sec.SecurityId])
 			res, err := context.RequestFuture(state.executor, &messages.TradeCaptureReportRequest{
 				RequestID: 0,

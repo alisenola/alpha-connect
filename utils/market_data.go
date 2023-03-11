@@ -7,6 +7,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/gorderbook"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -19,12 +20,16 @@ type SpawnStopContext interface {
 
 type MarketDataContext struct {
 	sync.RWMutex
-	ctx       SpawnStopContext
-	receiver  *actor.PID
-	OBL2      *gorderbook.OrderBookL2
-	Stats     map[models.StatType]float64
-	TradeCond *sync.Cond
-	BookCond  *sync.Cond
+	MarketDataContextSettings
+	ctx        SpawnStopContext
+	receiver   *actor.PID
+	OBL2       *gorderbook.OrderBookL2
+	Stats      map[models.StatType]float64
+	VWAP       float64
+	vwapVolume float64
+	vwapPrice  float64
+	TradeCond  *sync.Cond
+	BookCond   *sync.Cond
 }
 
 func (s *MarketDataContext) Close() {
@@ -46,12 +51,17 @@ type MarketDataReceiver struct {
 
 type checkTimeout struct{}
 
-func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64) *MarketDataContext {
+type MarketDataContextSettings struct {
+	VWAPCoefficient float64
+}
+
+func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64, settings MarketDataContextSettings) *MarketDataContext {
 	ctx := &MarketDataContext{
-		ctx:       parent,
-		Stats:     make(map[models.StatType]float64),
-		TradeCond: sync.NewCond(&sync.Mutex{}),
-		BookCond:  sync.NewCond(&sync.Mutex{}),
+		MarketDataContextSettings: settings,
+		ctx:                       parent,
+		Stats:                     make(map[models.StatType]float64),
+		TradeCond:                 sync.NewCond(&sync.Mutex{}),
+		BookCond:                  sync.NewCond(&sync.Mutex{}),
 	}
 	ctx.receiver = parent.Spawn(actor.PropsFromProducer(NewMarketDataReceiverProducer(executor, securityID, ctx)))
 	return ctx
@@ -183,6 +193,14 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 	state.ctx.Unlock()
 	// if trade event, put trade flag to 1
 	if len(refresh.Trades) > 0 {
+		alpha := state.ctx.VWAPCoefficient
+		for _, trds := range refresh.Trades {
+			for _, trd := range trds.Trades {
+				state.ctx.vwapVolume = alpha*state.ctx.vwapVolume + (1-alpha)*math.Abs(trd.Quantity)
+				state.ctx.vwapPrice = alpha*state.ctx.vwapPrice + (1-alpha)*math.Abs(trd.Price*trd.Quantity)
+				state.ctx.VWAP = state.ctx.vwapPrice / state.ctx.vwapVolume
+			}
+		}
 		state.ctx.TradeCond.Broadcast()
 	}
 	if refresh.UpdateL2 != nil {
