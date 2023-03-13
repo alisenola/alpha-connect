@@ -2,6 +2,7 @@ package account
 
 import (
 	"container/list"
+	"math"
 	"sync"
 	"time"
 )
@@ -17,6 +18,7 @@ type fill struct {
 type FillCollector struct {
 	sync.RWMutex
 	alpha          float64
+	volumeTau      time.Duration
 	cutoff         int64 // drop trades older than this
 	takerFills     map[uint64]*list.List
 	makerFills     map[uint64]*list.List
@@ -24,11 +26,13 @@ type FillCollector struct {
 	buyTakerMoves  map[uint64]map[int64][2]float64
 	sellMakerMoves map[uint64]map[int64][2]float64
 	sellTakerMoves map[uint64]map[int64][2]float64
+	volume         map[uint64][2]float64
 }
 
-func NewFillCollector(cutoff int64, alpha float64, securityIDs []uint64) *FillCollector {
+func NewFillCollector(cutoff int64, alpha float64, volumeTau time.Duration, securityIDs []uint64) *FillCollector {
 	fc := &FillCollector{
 		alpha:          alpha,
+		volumeTau:      volumeTau,
 		cutoff:         cutoff,
 		takerFills:     make(map[uint64]*list.List),
 		makerFills:     make(map[uint64]*list.List),
@@ -36,6 +40,7 @@ func NewFillCollector(cutoff int64, alpha float64, securityIDs []uint64) *FillCo
 		buyTakerMoves:  make(map[uint64]map[int64][2]float64),
 		sellMakerMoves: make(map[uint64]map[int64][2]float64),
 		sellTakerMoves: make(map[uint64]map[int64][2]float64),
+		volume:         make(map[uint64][2]float64),
 	}
 	for _, sec := range securityIDs {
 		fc.takerFills[sec] = list.New()
@@ -48,16 +53,24 @@ func NewFillCollector(cutoff int64, alpha float64, securityIDs []uint64) *FillCo
 	return fc
 }
 
-func (sc *FillCollector) AddFill(securityID uint64, price float64, buy, taker bool, time int64) {
+func (sc *FillCollector) AddFill(securityID uint64, price, quantity float64, buy, taker bool, ts time.Time) {
 	sc.Lock()
 	defer sc.Unlock()
+	milli := ts.UnixMilli()
 	if taker {
 		m := sc.takerFills[securityID]
-		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: time, bucketed: make(map[int64]bool)})
+		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: milli, bucketed: make(map[int64]bool)})
 	} else {
 		m := sc.makerFills[securityID]
-		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: time, bucketed: make(map[int64]bool)})
+		m.PushFront(&fill{price: price, buy: buy, taker: taker, time: milli, bucketed: make(map[int64]bool)})
 	}
+	// TODO use half life to compute alpha
+
+	delta := float64(milli) - sc.volume[securityID][1]
+	w := math.Exp(-delta / float64(sc.volumeTau.Milliseconds()))
+
+	// Decay volume + add new quantity
+	sc.volume[securityID] = [2]float64{w*sc.volume[securityID][0] + price*quantity, float64(milli)}
 }
 
 func (sc *FillCollector) Collect(securityID uint64, price float64) {
@@ -134,6 +147,29 @@ func (sc *FillCollector) Collect(securityID uint64, price float64) {
 	}
 }
 
+func (sc *FillCollector) GetVolume(securityID uint64) float64 {
+	sc.RLock()
+	defer sc.RUnlock()
+	ts := float64(time.Now().UnixMilli()) + 10
+	v := sc.volume[securityID]
+	delta := ts - v[1]
+	w := math.Exp(-delta / float64(sc.volumeTau.Milliseconds()))
+	return w * v[0]
+}
+
+func (sc *FillCollector) GetVolumes() map[uint64]float64 {
+	sc.RLock()
+	defer sc.RUnlock()
+	vols := make(map[uint64]float64)
+	ts := float64(time.Now().UnixMilli()) + 10
+	for k, v := range sc.volume {
+		delta := ts - v[1]
+		w := math.Exp(-delta / float64(sc.volumeTau.Milliseconds()))
+		vols[k] = v[0] * w
+	}
+	return vols
+}
+
 func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []float64) {
 	// TODO
 	sc.RLock()
@@ -142,7 +178,7 @@ func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []
 	buyTakerMoves := make([]float64, 10)
 	sellMakerMoves := make([]float64, 10)
 	sellTakerMoves := make([]float64, 10)
-	ts := float64(time.Now().UnixMilli())
+	ts := float64(time.Now().UnixMilli()) + 10
 	for i := 0; i < 10; i++ {
 		sum := 0.
 		for _, v := range sc.buyMakerMoves {

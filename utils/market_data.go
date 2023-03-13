@@ -21,15 +21,17 @@ type SpawnStopContext interface {
 type MarketDataContext struct {
 	sync.RWMutex
 	MarketDataContextSettings
-	ctx        SpawnStopContext
-	receiver   *actor.PID
-	OBL2       *gorderbook.OrderBookL2
-	Stats      map[models.StatType]float64
-	VWAP       float64
-	vwapVolume float64
-	vwapPrice  float64
-	TradeCond  *sync.Cond
-	BookCond   *sync.Cond
+	ctx            SpawnStopContext
+	receiver       *actor.PID
+	OBL2           *gorderbook.OrderBookL2
+	Stats          map[models.StatType]float64
+	VWAP           float64
+	lastVolumeTime time.Time
+	Volume         float64
+	vwapVolume     float64
+	vwapPrice      float64
+	TradeCond      *sync.Cond
+	BookCond       *sync.Cond
 }
 
 func (s *MarketDataContext) Close() {
@@ -53,6 +55,7 @@ type checkTimeout struct{}
 
 type MarketDataContextSettings struct {
 	VWAPCoefficient float64
+	VolumeTau       time.Duration
 }
 
 func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64, settings MarketDataContextSettings) *MarketDataContext {
@@ -190,8 +193,8 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 	for _, s := range refresh.Stats {
 		state.ctx.Stats[s.StatType] = s.Value
 	}
-	state.ctx.Unlock()
 	// if trade event, put trade flag to 1
+	volume := 0.
 	if len(refresh.Trades) > 0 {
 		alpha := state.ctx.VWAPCoefficient
 		for _, trds := range refresh.Trades {
@@ -199,6 +202,13 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 				state.ctx.vwapVolume = alpha*state.ctx.vwapVolume + (1-alpha)*math.Abs(trd.Quantity)
 				state.ctx.vwapPrice = alpha*state.ctx.vwapPrice + (1-alpha)*math.Abs(trd.Price*trd.Quantity)
 				state.ctx.VWAP = state.ctx.vwapPrice / state.ctx.vwapVolume
+				// compute alpha from half life
+				/*
+						def halfLifeToLambda(halfLife, sampFreq):
+						    return 0.5 ** (1 / (halfLife / sampFreq))
+					w = np.exp(-(delta) / tau)
+				*/
+				volume += math.Abs(trd.Quantity * trd.Price)
 			}
 		}
 		state.ctx.TradeCond.Broadcast()
@@ -206,6 +216,15 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 	if refresh.UpdateL2 != nil {
 		state.ctx.BookCond.Broadcast()
 	}
+
+	delta := float64(time.Since(state.ctx.lastVolumeTime))
+	w := math.Exp(-delta / float64(state.ctx.VolumeTau))
+	// Decay volume + add new quantity
+	state.ctx.Volume = w * state.ctx.Volume
+	state.ctx.Volume += volume
+	state.ctx.lastVolumeTime = time.Now()
+	state.ctx.Unlock()
+
 	if crossed {
 		return fmt.Errorf("crossed ob")
 	}

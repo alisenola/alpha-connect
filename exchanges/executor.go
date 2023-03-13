@@ -542,7 +542,7 @@ func (state *Executor) getFillCollector(exch *xmodels.Exchange) *account.FillCol
 		secIDs[i] = sec.SecurityID
 		i += 1
 	}
-	fc := account.NewFillCollector(10000, 0.9, secIDs)
+	fc := account.NewFillCollector(10000, 0.9, time.Minute, secIDs)
 	state.fillCollectors[exch.ID] = fc
 	return fc
 }

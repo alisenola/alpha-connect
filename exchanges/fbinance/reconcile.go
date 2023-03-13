@@ -125,13 +125,9 @@ func (state *AccountReconcile) Initialize(context actor.Context) error {
 		return fmt.Errorf("error creating account: %v", err)
 	}
 
-	if err := state.reconcileTrades(context); err != nil {
-		return fmt.Errorf("error reconcile trade: %v", err)
+	if err := state.OnReconcile(context); err != nil {
+		return fmt.Errorf("error reconciling: %v", err)
 	}
-	if err := state.reconcileMovements(context); err != nil {
-		return fmt.Errorf("error reconcile movements: %v", err)
-	}
-
 	return nil
 }
 
@@ -141,16 +137,131 @@ func (state *AccountReconcile) Clean(context actor.Context) error {
 }
 
 func (state *AccountReconcile) OnReconcile(context actor.Context) error {
+	cutoff := time.Now()
+	if err := state.reconcileMovements(context); err != nil {
+		return fmt.Errorf("error reconcile movements: %v", err)
+	}
 	if err := state.reconcileTrades(context); err != nil {
 		return fmt.Errorf("error reconcile trade: %v", err)
 	}
-	if err := state.reconcileMovements(context); err != nil {
-		return fmt.Errorf("error reconcile movements: %v", err)
+	if err := state.saveToStore(context, cutoff); err != nil {
+		return fmt.Errorf("error saving to store: %v", err)
 	}
 	return nil
 }
 
 func (state *AccountReconcile) OnAccountMovementRequest(context actor.Context) error {
+	return nil
+}
+
+func (state *AccountReconcile) saveToStore(context actor.Context, cutoff time.Time) error {
+	// Fetch balances
+	resp, err := context.RequestFuture(state.executor, &messages.BalancesRequest{
+		Account: state.account,
+	}, 10*time.Second).Result()
+	if err != nil {
+		return fmt.Errorf("error getting positions from executor: %v", err)
+	}
+	balanceList, ok := resp.(*messages.BalanceList)
+	if !ok {
+		return fmt.Errorf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(resp).String())
+	}
+	if !balanceList.Success {
+		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
+	}
+
+	var movements []*extypes.Movement
+	assets := make(map[uint32]float64)
+	state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=? and time < ?`, state.dbAccount.ID, cutoff).Order("time asc").Find(&movements)
+	for _, m := range movements {
+		assets[m.AssetID] += m.Quantity
+	}
+	// Compare with balance list
+	for _, bal := range balanceList.Balances {
+		if assets[bal.Asset.ID] != bal.Quantity {
+			fmt.Println("DIFFERENT BALANCE", bal.Asset.Symbol, assets[bal.Asset.ID], bal.Quantity)
+			//return fmt.Errorf("different balance")
+		}
+	}
+
+	fmt.Println("SAVING TO STORE")
+
+	if state.store != nil {
+		accountedTrades := make(map[uint]bool)
+		assets := make(map[uint32]float64)
+		prices := make(map[uint32]float64)
+		prices[0] = 1
+		tags := map[string]string{"account": state.account.Name}
+		lastPortfolioEventTime, err := state.store.GetLastEventTime("portfolio",
+			map[string]string{"account": "^" + state.account.Name + "$"})
+		var writer tickstore_types.TickstoreWriter
+		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
+		tracker := portfolio.NewPortfolioTracker()
+		var deltas []portfolio.PortfolioTrackerDelta
+		var lastTick = uint64(movements[0].Transaction.Time.UnixMilli())
+		for _, m := range movements {
+			tick := uint64(m.Transaction.Time.UnixMilli())
+			if tick > lastTick {
+				tickDelta := gotickfile.TickDeltas{
+					Pointer: unsafe.Pointer(&deltas[0]),
+					Len:     len(deltas),
+				}
+				if err := tracker.ProcessDeltas(tickDelta); err != nil {
+					return fmt.Errorf("error applying delta: %v", err)
+				}
+				if tick > lastPortfolioEventTime {
+					if writer == nil {
+						writer, err = state.store.NewTickWriter("portfolio", tags, time.Second)
+						if err != nil {
+							return fmt.Errorf("error creating portfolio writer: %v", err)
+						}
+						if err := writer.WriteObject(lastTick, tracker); err != nil {
+							return fmt.Errorf("error writing portfolio: %v", err)
+						}
+					} else {
+						// Need to write deltas otherwise, always discontinuous portfolio (DeltasTo is discontinuous)
+						if err := writer.WriteDeltas(lastTick, tickDelta); err != nil {
+							return fmt.Errorf("error writing portfolio: %v", err)
+						}
+					}
+					fmt.Println("WRITE", lastTick)
+				}
+				deltas = nil
+			}
+			switch messages.AccountMovementType(m.Reason) {
+			case messages.AccountMovementType_Deposit, messages.AccountMovementType_Withdrawal:
+				deltas = append(deltas, portfolio.NewTransferDelta(uint64(m.AssetID), m.Quantity))
+			case messages.AccountMovementType_FundingFee:
+				deltas = append(deltas, portfolio.NewFundingDelta(uint64(m.AssetID), m.Quantity))
+			case messages.AccountMovementType_RealizedPnl:
+				deltas = append(deltas, portfolio.NewRealizedPnLDelta(uint64(m.AssetID), m.Quantity))
+			case messages.AccountMovementType_Commission:
+				deltas = append(deltas, portfolio.NewCommissionDelta(uint64(m.AssetID), m.Quantity))
+			case messages.AccountMovementType_WelcomeBonus:
+				deltas = append(deltas, portfolio.NewWelcomeBonusDelta(uint64(m.AssetID), m.Quantity))
+			}
+			// If it's a trade, add a transfer
+			if _, ok := accountedTrades[m.Transaction.ID]; !ok && m.Transaction.Type == "TRADE" {
+				// Fetch fill
+				var fill extypes.Fill
+				if err := state.db.Model(&extypes.Fill{}).Where("transaction_id=?", m.Transaction.ID).First(&fill).Error; err != nil {
+					return fmt.Errorf("error getting fill: %v", err)
+				}
+				sec := state.securities[uint64(fill.SecurityID)]
+				quote, ok := constants.GetAssetBySymbol(sec.QuoteCurrency)
+				if !ok {
+					return fmt.Errorf("could not find quote asset %s", sec.QuoteCurrency)
+				}
+				deltas = append(deltas, portfolio.NewTradeDelta(uint64(quote.ID), uint64(fill.SecurityID), fill.Price, fill.Quantity))
+				accountedTrades[m.Transaction.ID] = true
+			}
+			assets[m.AssetID] += m.Quantity
+			lastTick = tick
+		}
+		if writer != nil {
+			writer.Close()
+		}
+	}
 	return nil
 }
 
@@ -193,21 +304,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 		return fmt.Errorf("error getting positions: %s", positionList.RejectionReason.String())
 	}
 
-	// Fetch balances
-	resp, err = context.RequestFuture(state.executor, &messages.BalancesRequest{
-		Account: state.account,
-	}, 10*time.Second).Result()
-	if err != nil {
-		return fmt.Errorf("error getting positions from executor: %v", err)
-	}
-
-	balanceList, ok := resp.(*messages.BalanceList)
-	if !ok {
-		return fmt.Errorf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(resp).String())
-	}
-	if !balanceList.Success {
-		return fmt.Errorf("error getting balances: %s", balanceList.RejectionReason.String())
-	}
 	end := time.Now()
 
 	for _, sec := range state.securities {
@@ -346,90 +442,6 @@ func (state *AccountReconcile) reconcileTrades(context actor.Context) error {
 			}
 		} else if p1.GetPosition() != nil {
 			return fmt.Errorf("%s not in exec", p1.GetPosition().Instrument.Symbol)
-		}
-	}
-
-	var movements []*extypes.Movement
-	assets := make(map[uint32]float64)
-	state.db.Debug().Model(&extypes.Movement{}).Joins("Transaction").Where(`"movements"."account_id"=?`, state.dbAccount.ID).Order("time asc").Find(&movements)
-	for _, m := range movements {
-		assets[m.AssetID] += m.Quantity
-	}
-	// Compare with balance list
-	for _, bal := range balanceList.Balances {
-		if assets[bal.Asset.ID] != bal.Quantity {
-			fmt.Println("DIFFERENT BALANCE", bal.Asset.Symbol, assets[bal.Asset.ID], bal.Quantity)
-			//return fmt.Errorf("different balance")
-		}
-	}
-
-	if state.store != nil && false {
-		assets := make(map[uint32]float64)
-		prices := make(map[uint32]float64)
-		prices[0] = 1
-		tags := map[string]string{"account": state.account.Name}
-		lastPortfolioEventTime, err := state.store.GetLastEventTime("portfolio",
-			map[string]string{"account": "^" + state.account.Name + "$"})
-		var writer tickstore_types.TickstoreWriter
-		fmt.Println("LAST EVENT TIME", lastPortfolioEventTime)
-		tracker := portfolio.NewPortfolioTracker()
-		var deltas []portfolio.PortfolioTrackerDelta
-		var lastTick = uint64(movements[0].Transaction.Time.UnixMilli())
-		for _, m := range movements {
-			tick := uint64(m.Transaction.Time.UnixMilli())
-			if tick > lastTick {
-				tickDelta := gotickfile.TickDeltas{
-					Pointer: unsafe.Pointer(&deltas[0]),
-					Len:     len(deltas),
-				}
-				if err := tracker.ProcessDeltas(tickDelta); err != nil {
-					return fmt.Errorf("error applying delta: %v", err)
-				}
-				if tick > lastPortfolioEventTime {
-					if writer == nil {
-						writer, err = state.store.NewTickWriter("portfolio", tags, time.Second)
-						if err != nil {
-							return fmt.Errorf("error creating portfolio writer: %v", err)
-						}
-						if err := writer.WriteObject(lastTick, tracker); err != nil {
-							return fmt.Errorf("error writing portfolio: %v", err)
-						}
-					} else {
-						// Need to write deltas otherwise, always discontinuous portfolio (DeltasTo is discontinuous)
-						if err := writer.WriteDeltas(lastTick, tickDelta); err != nil {
-							return fmt.Errorf("error writing portfolio: %v", err)
-						}
-					}
-					fmt.Println("WRITE", lastTick)
-				}
-				deltas = nil
-			}
-			switch messages.AccountMovementType(m.Reason) {
-			case messages.AccountMovementType_Deposit, messages.AccountMovementType_Withdrawal:
-				deltas = append(deltas, portfolio.NewTransferDelta(uint64(m.AssetID), m.Quantity))
-			case messages.AccountMovementType_FundingFee:
-				deltas = append(deltas, portfolio.NewFundingDelta(uint64(m.AssetID), m.Quantity))
-			case messages.AccountMovementType_RealizedPnl:
-				deltas = append(deltas, portfolio.NewRealizedPnLDelta(uint64(m.AssetID), m.Quantity))
-			case messages.AccountMovementType_Commission:
-				deltas = append(deltas, portfolio.NewCommissionDelta(uint64(m.AssetID), m.Quantity))
-			case messages.AccountMovementType_WelcomeBonus:
-				deltas = append(deltas, portfolio.NewWelcomeBonusDelta(uint64(m.AssetID), m.Quantity))
-			}
-			// If it's a trade, add a transfer
-			if m.Transaction.Type == "TRADE" {
-				// Fetch fill
-				var fill extypes.Fill
-				if err := state.db.Model(&extypes.Fill{}).Where("transaction_id=?", m.Transaction.ID).First(&fill).Error; err != nil {
-					return fmt.Errorf("error getting fill: %v", err)
-				}
-				deltas = append(deltas, portfolio.NewTradeDelta(uint64(m.AssetID), uint64(fill.SecurityID), fill.Price, m.Quantity))
-			}
-			assets[m.AssetID] += m.Quantity
-			lastTick = tick
-		}
-		if writer != nil {
-			writer.Close()
 		}
 	}
 

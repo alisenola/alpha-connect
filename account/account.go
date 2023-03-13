@@ -879,7 +879,7 @@ func (accnt *Account) ConfirmFill(ID string, tradeID string, price, quantity flo
 		sp.UpdatePositionSize(float64(pos.rawSize) / pos.lotPrecision)
 	}
 	if accnt.fillCollector != nil {
-		accnt.fillCollector.AddFill(order.Instrument.SecurityID.Value, price, order.Side == models.Side_Buy, taker, time.Now().UnixMilli())
+		accnt.fillCollector.AddFill(order.Instrument.SecurityID.Value, price, quantity, order.Side == models.Side_Buy, taker, time.Now())
 	}
 
 	// Add the fill to the stat collector
