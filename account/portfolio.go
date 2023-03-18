@@ -23,12 +23,14 @@ import (
 // possible. Try to prevent any heap allocation call here ?
 
 type Portfolio struct {
+	ID                string
 	sampleSize        int
 	accountPortfolios map[string]*Account
 }
 
-func NewPortfolio(sampleSize int) *Portfolio {
+func NewPortfolio(ID string, sampleSize int) *Portfolio {
 	p := &Portfolio{
+		ID:                ID,
 		sampleSize:        sampleSize,
 		accountPortfolios: make(map[string]*Account),
 	}

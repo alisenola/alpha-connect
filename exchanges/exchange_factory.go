@@ -63,7 +63,7 @@ func GetPortfolio(ID string) *account.Portfolio {
 	defer portfolioMx.Unlock()
 	portfolio, ok := portfolios[ID]
 	if !ok {
-		portfolio = account.NewPortfolio(100)
+		portfolio = account.NewPortfolio(ID, 100)
 		portfolios[ID] = portfolio
 	}
 	return portfolio
@@ -72,7 +72,7 @@ func GetPortfolio(ID string) *account.Portfolio {
 func getPortfolio(ID string) *account.Portfolio {
 	portfolio, ok := portfolios[ID]
 	if !ok {
-		portfolio = account.NewPortfolio(100)
+		portfolio = account.NewPortfolio(ID, 100)
 		portfolios[ID] = portfolio
 	}
 	return portfolio
