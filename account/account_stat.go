@@ -215,20 +215,23 @@ func (accnt *Account) GetNetMargin(model modeling.Market) (float64, error) {
 // TODO improve speed of that one, called often
 func (accnt *Account) UpdateAskOrderQueue(securityID uint64, orderID string, queue float64) {
 	accnt.RLock()
-	defer accnt.RUnlock()
-	accnt.securities[securityID].UpdateAskOrderQueue(orderID, queue)
+	sec := accnt.securities[securityID]
+	accnt.RUnlock()
+	sec.UpdateAskOrderQueue(orderID, queue)
 }
 
 func (accnt *Account) UpdateBidOrderQueue(securityID uint64, orderID string, queue float64) {
 	accnt.RLock()
-	defer accnt.RUnlock()
-	accnt.securities[securityID].UpdateBidOrderQueue(orderID, queue)
+	sec := accnt.securities[securityID]
+	accnt.RUnlock()
+	sec.UpdateBidOrderQueue(orderID, queue)
 }
 
 func (accnt *Account) UpdateMarkPrice(securityID uint64, price float64) {
 	accnt.RLock()
-	defer accnt.RUnlock()
-	accnt.positions[securityID].UpdateMarkPrice(price)
+	pos := accnt.positions[securityID]
+	accnt.RUnlock()
+	pos.UpdateMarkPrice(price)
 	if accnt.fillCollector != nil {
 		accnt.fillCollector.Collect(securityID, price)
 	}
@@ -236,8 +239,9 @@ func (accnt *Account) UpdateMarkPrice(securityID uint64, price float64) {
 
 func (accnt *Account) UpdateMaxNotionalValue(securityID uint64, value float64) {
 	accnt.RLock()
-	defer accnt.RUnlock()
-	accnt.positions[securityID].UpdateMaxNotionalValue(value)
+	pos := accnt.positions[securityID]
+	accnt.RUnlock()
+	pos.UpdateMaxNotionalValue(value)
 }
 
 func (accnt *Account) GetMoveAfterFill() ([]float64, []float64, []float64, []float64) {

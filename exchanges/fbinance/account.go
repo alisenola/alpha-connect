@@ -341,7 +341,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 			select {
 			case <-checkAccountTicker.C:
 				context.Send(pid, &checkAccount{})
-			case <-time.After(6 * time.Minute):
+			case <-time.After(2 * time.Minute):
 				if state.checkAccountTicker != checkAccountTicker {
 					return
 				}
