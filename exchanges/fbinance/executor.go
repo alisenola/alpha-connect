@@ -101,6 +101,10 @@ func (rl *AccountRateLimit) IsRateLimited() bool {
 	return rl.second.IsRateLimited() || rl.minute.IsRateLimited()
 }
 
+func (rl *AccountRateLimit) Capacity() float64 {
+	return math.Max(rl.second.Capacity(), rl.minute.Capacity())
+}
+
 func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration {
 	dur1 := rl.second.DurationBeforeNextRequest(weight)
 	dur2 := rl.minute.DurationBeforeNextRequest(weight)
@@ -309,7 +313,7 @@ func (state *Executor) Initialize(context actor.Context) error {
 			}
 		} else if rateLimit.RateLimitType == "REQUEST_WEIGHT" {
 			for _, q := range state.queryRunners {
-				// TODO
+				// TODO cannot have it adaptive bc swarm of requests create a ban
 				q.globalRateLimit = exchanges.NewRateLimit(int(float64(rateLimit.Limit)), time.Minute)
 				// Update rate limit with weight from the current exchange info fetch
 				q.globalRateLimit.Request(weight * 10)
@@ -1280,6 +1284,11 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	if ar.IsRateLimited() {
 		response.RejectionReason = messages.RejectionReason_AccountRateLimitExceeded
 		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(1))
+		context.Send(sender, response)
+		return nil
+	}
+	if ar.Capacity() > 0.9 && req.Order.IsForceMaker() {
+		response.RejectionReason = messages.RejectionReason_TakerOnly
 		context.Send(sender, response)
 		return nil
 	}
