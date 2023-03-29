@@ -102,7 +102,7 @@ func (rl *AccountRateLimit) IsRateLimited() bool {
 }
 
 func (rl *AccountRateLimit) Capacity() float64 {
-	return math.Max(rl.second.Capacity(), rl.minute.Capacity())
+	return math.Max(rl.second.GetCapacity(), rl.minute.GetCapacity())
 }
 
 func (rl *AccountRateLimit) DurationBeforeNextRequest(weight int) time.Duration {
