@@ -56,7 +56,9 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 }
 
 func AccntTest(t *testing.T, tc AccountTest) {
-	tests.LoadStatics(t)
+	if err := tests.LoadStatics(); err != nil {
+		t.Fatal(err)
+	}
 	C := &config.Config{
 		Accounts: []config.Account{{
 			Name:      tc.Account.Name,

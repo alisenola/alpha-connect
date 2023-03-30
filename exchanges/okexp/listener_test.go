@@ -13,7 +13,9 @@ func TestMarketData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	exTests.LoadStatics(t)
+	if err := exTests.LoadStatics(); err != nil {
+		t.Fatal(err)
+	}
 	tests.MarketData(t, tests.MDTest{
 		Symbol:            "BTC-USDT-SWAP",
 		SecurityType:      enum.SecurityType_CRYPTO_PERP,

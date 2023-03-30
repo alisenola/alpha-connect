@@ -15,11 +15,12 @@ func TestExecutorPublic(t *testing.T) {
 	tests.ExPub(t, tests.ExPubTest{
 		Instrument: &models.Instrument{
 			Exchange: constants.OKEXP,
-			Symbol:   &wrapperspb.StringValue{Value: "BTC-USD-SWAP"},
+			Symbol:   &wrapperspb.StringValue{Value: "BTC-USDC-SWAP"},
 		},
 		SecurityListRequest:           true,
 		MarketDataRequest:             true,
 		HistoricalLiquidationsRequest: true,
+		HistoricalFundingRateRequest:  true,
 		OpenInterestRequest:           true,
 	})
 }

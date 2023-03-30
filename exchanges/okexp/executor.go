@@ -170,7 +170,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	}
 
 	for _, pair := range perpResponse.Data {
-		splits := strings.Split(pair.Underlying, "-")
+		splits := strings.Split(pair.InstrumentID, "-")
 		baseCurrency, ok := constants.GetAssetBySymbol(splits[0])
 		if !ok {
 			//state.logger.Info("unknown symbol " + pair.BaseCurrency + " for instrument " + pair.InstrumentID)

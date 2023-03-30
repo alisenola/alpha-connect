@@ -16,6 +16,7 @@ type ExPubTest struct {
 	Instrument                    *models.Instrument
 	SecurityListRequest           bool
 	HistoricalLiquidationsRequest bool
+	HistoricalFundingRateRequest  bool
 	OpenInterestRequest           bool
 	MarketDataRequest             bool
 	MarketStatisticsRequest       bool
@@ -134,6 +135,27 @@ func ExPub(t *testing.T, tc ExPubTest) {
 			v, ok := res.(*messages.HistoricalLiquidationsResponse)
 			if !ok {
 				t.Fatalf("was expecting *messages.HistoricalLiquidationsResponse, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+		})
+	}
+
+	if tc.HistoricalFundingRateRequest {
+		t.Run("HistoricalFundingRateRequest", func(t *testing.T) {
+			res, err := as.Root.RequestFuture(executor, &messages.HistoricalFundingRatesRequest{
+				RequestID:  0,
+				Instrument: tc.Instrument,
+				From:       nil,
+				To:         nil,
+			}, 10*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := res.(*messages.HistoricalFundingRatesResponse)
+			if !ok {
+				t.Fatalf("was expecting *messages.HistoricalFundingRatesResponse, got %s", reflect.TypeOf(res).String())
 			}
 			if !v.Success {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
