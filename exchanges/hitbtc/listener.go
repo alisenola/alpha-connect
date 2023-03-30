@@ -192,6 +192,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if err != nil {
 		return fmt.Errorf("error subscribing to websocket: %v", err)
 	}
+	state.sink = sink
 
 	msg, err := sink.ReadMessage()
 	if err != nil {
@@ -231,8 +232,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	state.instrumentData.lastUpdateTime = ts
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
 	state.instrumentData.lastUpdateSequence = snapshot.Sequence
-
-	state.sink = sink
 
 	go func(sink *xutils.WebsocketSink, pid *actor.PID) {
 		for {

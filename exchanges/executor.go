@@ -11,6 +11,7 @@ import (
 	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
 	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges/gate"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"golang.org/x/net/proxy"
@@ -661,9 +662,25 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 	} else {
 		var wsp *xchangerUtils.WebsocketPool
 		var err error
-		if sec.Exchange.ID == constants.HITBTC.ID {
+		switch sec.Exchange.ID {
+		case constants.HITBTC.ID:
 			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
 				wsp, err = hitbtc.NewWebsocketPool(state.dialerPool)
+				// TODO logging
+				if err != nil {
+					context.Respond(&messages.MarketDataResponse{
+						RequestID:       request.RequestID,
+						Success:         false,
+						RejectionReason: messages.RejectionReason_Other,
+					})
+					return nil
+				}
+				state.wsPools[sec.Exchange.ID] = wsp
+			}
+			wsp = state.wsPools[sec.Exchange.ID]
+		case constants.GATE.ID:
+			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
+				wsp, err = gate.NewWebsocketPool(state.dialerPool)
 				// TODO logging
 				if err != nil {
 					context.Respond(&messages.MarketDataResponse{

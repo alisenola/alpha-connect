@@ -20,7 +20,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/gate"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 )
 
 type checkSockets struct{}
@@ -38,11 +38,10 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	obWs           *gate.Websocket
-	tradeWs        *gate.Websocket
+	sink           *xutils.WebsocketSink
+	wsPool         *xutils.WebsocketPool
 	security       *models.Security
 	securityID     uint64
-	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
@@ -51,16 +50,16 @@ type Listener struct {
 	stashedTrades  *list.List
 }
 
-func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, wsPool *xutils.WebsocketPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(securityID, dialerPool)
+		return NewListener(securityID, wsPool)
 	}
 }
 
-func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, wsPool *xutils.WebsocketPool) actor.Actor {
 	return &Listener{
 		securityID: securityID,
-		dialerPool: dialerPool,
+		wsPool:     wsPool,
 	}
 }
 
@@ -155,11 +154,8 @@ func (state *Listener) Initialize(context actor.Context) error {
 		lastAggTradeTs: 0,
 	}
 
-	if err := state.subscribeOrderBook(context); err != nil {
+	if err := state.subscribeInstrument(context); err != nil {
 		return fmt.Errorf("error subscribing to order book: %v", err)
-	}
-	if err := state.subscribeTrades(context); err != nil {
-		return fmt.Errorf("error subscribing to trades: %v", err)
 	}
 
 	socketTicker := time.NewTicker(5 * time.Second)
@@ -182,17 +178,9 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) Clean(context actor.Context) error {
-	if state.tradeWs != nil {
-		if err := state.tradeWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
-		state.tradeWs = nil
-	}
-	if state.obWs != nil {
-		if err := state.obWs.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
-		}
-		state.obWs = nil
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
@@ -202,107 +190,107 @@ func (state *Listener) Clean(context actor.Context) error {
 	return nil
 }
 
-func (state *Listener) subscribeOrderBook(context actor.Context) error {
-	if state.obWs != nil {
-		_ = state.obWs.Disconnect()
+func (state *Listener) subscribeInstrument(context actor.Context) error {
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
 	}
 
-	ws := gate.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to gate websocket: %v", err)
-	}
-
-	if err := ws.SubscribeOrderBookUpdate(state.security.Symbol, gate.FREQ_100MS); err != nil {
-		return fmt.Errorf("error subscribing to the order book: %v", err)
-	}
-	state.obWs = ws
-
-	time.Sleep(35 * time.Second)
-	fut := context.RequestFuture(
-		state.executor,
-		&messages.MarketDataRequest{
-			RequestID: uint64(time.Now().UnixNano()),
-			Subscribe: false,
-			Instrument: &models.Instrument{
-				SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
-				Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
-				Exchange:   state.security.Exchange,
-			},
-			Aggregation: models.OrderBookAggregation_L2,
-		},
-		20*time.Second)
-
-	res, err := fut.Result()
+	sink, err := state.wsPool.Subscribe(state.security.Symbol)
 	if err != nil {
-		return fmt.Errorf("error getting market data: %v", err)
+		return fmt.Errorf("error subscribing to websocket: %v", err)
 	}
+	state.sink = sink
 
-	msg, ok := res.(*messages.MarketDataResponse)
-	if !ok {
-		return fmt.Errorf("was expecting MarketDataResponse, got %s", reflect.TypeOf(msg).String())
-	}
-	if !msg.Success {
-		return fmt.Errorf("error fetching the snapshot %s", msg.RejectionReason.String())
-	}
-	if msg.SnapshotL2 == nil {
-		return fmt.Errorf("market data snapshot has no OBL2")
-	}
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	depth := 10000
-	if len(msg.SnapshotL2.Asks) > 0 {
-		bestAsk := msg.SnapshotL2.Asks[0].Price
-		depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-		if depth > 10000 {
-			depth = 10000
-		}
-	}
+	sync := func() (*gorderbook.OrderBookL2, error) {
+		fut := context.RequestFuture(
+			state.executor,
+			&messages.MarketDataRequest{
+				RequestID: uint64(time.Now().UnixNano()),
+				Subscribe: false,
+				Instrument: &models.Instrument{
+					SecurityID: &wrapperspb.UInt64Value{Value: state.security.SecurityID},
+					Symbol:     &wrapperspb.StringValue{Value: state.security.Symbol},
+					Exchange:   state.security.Exchange,
+				},
+				Aggregation: models.OrderBookAggregation_L2,
+			},
+			20*time.Second)
 
-	ob := gorderbook.NewOrderBookL2(
-		tickPrecision,
-		lotPrecision,
-		depth,
-	)
+		res, err := fut.Result()
+		if err != nil {
+			return nil, fmt.Errorf("error getting market data: %v", err)
+		}
 
-	ob.Sync(msg.SnapshotL2.Bids, msg.SnapshotL2.Asks)
-	if ob.Crossed() {
-		return fmt.Errorf("crossed orderbook")
-	}
-	state.instrumentData.lastUpdateID = msg.SeqNum
-	state.instrumentData.lastUpdateTime = utils.TimestampToMilli(msg.SnapshotL2.Timestamp)
-	ws.ReadMessage()
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading first message: %v", ws.Err)
-	}
-	firstMsg, ok := ws.Msg.Message.(gate.WSSpotOrderBookUpdate)
-	if !ok {
-		return fmt.Errorf("incorrect message type for first message: %v", reflect.TypeOf(ws.Msg.Message).String())
-	}
-	hb := false
-	sync := false
-	for !sync {
-		if !hb {
-			if err := ws.Ping(); err != nil {
-				return fmt.Errorf("error ping request: %v", err)
-			}
-			hb = true
-		}
-		if !ws.ReadMessage() {
-			return fmt.Errorf("error reading message: %v", ws.Err)
-		}
-		obUpdate, ok := ws.Msg.Message.(gate.WSSpotOrderBookUpdate)
+		mdres, ok := res.(*messages.MarketDataResponse)
 		if !ok {
-			if _, ok := ws.Msg.Message.(gate.WSPong); ok {
-				hb = false
+			return nil, fmt.Errorf("was expecting MarketDataResponse, got %s", reflect.TypeOf(res).String())
+		}
+		//fmt.Println("GOT MD")
+		if !mdres.Success {
+			return nil, fmt.Errorf("error fetching the snapshot %s", mdres.RejectionReason.String())
+		}
+		if mdres.SnapshotL2 == nil {
+			return nil, fmt.Errorf("market data snapshot has no OBL2")
+		}
+		tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+		lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
+		depth := 10000
+		if len(mdres.SnapshotL2.Asks) > 0 {
+			bestAsk := mdres.SnapshotL2.Asks[0].Price
+			depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+			if depth > 10000 {
+				depth = 10000
 			}
+		}
 
-			context.Send(context.Self(), ws.Msg)
+		ob := gorderbook.NewOrderBookL2(
+			tickPrecision,
+			lotPrecision,
+			depth,
+		)
+
+		ob.Sync(mdres.SnapshotL2.Bids, mdres.SnapshotL2.Asks)
+		if ob.Crossed() {
+			return nil, fmt.Errorf("crossed orderbook")
 		}
-		if obUpdate.LastUpdateId < msg.SeqNum+1 {
+		state.instrumentData.lastUpdateID = mdres.SeqNum
+		state.instrumentData.lastUpdateTime = utils.TimestampToMilli(mdres.SnapshotL2.Timestamp)
+		return ob, nil
+	}
+
+	ob, err := sync()
+	if err != nil {
+		return fmt.Errorf("error syncing order book: %v", err)
+	}
+	//fmt.Println("SEQ", state.instrumentData.lastUpdateID)
+	//fmt.Println(ob)
+	msg, err := sink.ReadMessage()
+	if err != nil {
+		return fmt.Errorf("error reading message: %v", err)
+	}
+	synced := false
+	for !synced {
+		msg, err = sink.ReadMessage()
+		if err != nil {
+			return fmt.Errorf("error reading message: %v", err)
+		}
+		obUpdate, ok := msg.Message.(gate.WSSpotOrderBookUpdate)
+		if !ok {
+			context.Send(context.Self(), msg)
+		}
+		for state.instrumentData.lastUpdateID+1 < obUpdate.FirstUpdateId {
+			// We missed some updates, snapshot is too old
+			//fmt.Println("syncing again.....", state.instrumentData.lastUpdateID+1, obUpdate.FirstUpdateId)
+			time.Sleep(5 * time.Second)
+			ob, err = sync()
+			if err != nil {
+				return fmt.Errorf("error syncing order book: %v", err)
+			}
+			//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, obUpdate.FirstUpdateId)
+		}
+		if obUpdate.LastUpdateId <= state.instrumentData.lastUpdateID {
+			// We already have this update, snapshot is too new
 			continue
-		}
-		if msg.SeqNum+1 < firstMsg.FirstUpdateId {
-			return fmt.Errorf("error in order book ID %d %d", msg.SeqNum, firstMsg.FirstUpdateId)
 		}
 
 		bids, asks := obUpdate.ToBidAsk()
@@ -312,53 +300,25 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		for _, ask := range asks {
 			ob.UpdateOrderBookLevel(ask)
 		}
+		//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, obUpdate.FirstUpdateId, obUpdate.LastUpdateId)
+		//fmt.Println(ob)
 		state.instrumentData.lastUpdateID = obUpdate.LastUpdateId
-		state.instrumentData.lastUpdateTime = uint64(ws.Msg.ClientTime.UnixNano() / 1000000)
-		sync = true
+		state.instrumentData.lastUpdateTime = uint64(msg.ClientTime.UnixNano() / 1000000)
+		synced = true
 	}
 	state.instrumentData.orderBook = ob
 	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
-	state.obWs = ws
 
-	go func(ws *gate.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(pid, ws.Msg)
+	go func(sink *xutils.WebsocketSink, pid *actor.PID) {
+		for {
+			msg, err := sink.ReadMessage()
+			if err == nil {
+				context.Send(pid, msg)
+			} else {
+				return
+			}
 		}
-	}(ws, context.Self())
-
-	return nil
-}
-
-func (state *Listener) subscribeTrades(context actor.Context) error {
-	if state.tradeWs != nil {
-		_ = state.tradeWs.Disconnect()
-	}
-
-	ws := gate.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to gate websocket: %v", err)
-	}
-
-	if err := ws.Subscribe([]string{state.security.Symbol}, gate.WSSpotTradesChannel); err != nil {
-		return fmt.Errorf("error subscribing to the trades: %v", err)
-	}
-
-	if !ws.ReadMessage() {
-		return fmt.Errorf("error reading message: %v", ws.Err)
-	}
-
-	_, ok := ws.Msg.Message.(gate.WSSubscription)
-	if !ok {
-		return fmt.Errorf("expected trade data, got %s", reflect.TypeOf(ws.Msg.Message).String())
-	}
-
-	state.tradeWs = ws
-
-	go func(ws *gate.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(pid, ws.Msg)
-		}
-	}(ws, context.Self())
+	}(sink, context.Self())
 
 	return nil
 }
@@ -433,11 +393,13 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			})
 
 	case gate.WSSpotOrderBookUpdate:
-		if state.obWs == nil || msg.WSID != state.obWs.ID {
+		// TODO old message ?
+		if state.sink == nil {
 			return nil
 		}
 		symbol := res.CurrencyPair
 		// Check depth continuity
+		//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, res.FirstUpdateId)
 		if state.instrumentData.lastUpdateID+1 != res.FirstUpdateId {
 			return fmt.Errorf("got wrong sequence ID for %s: %d, %d",
 				symbol, state.instrumentData.lastUpdateID, res.FirstUpdateId)
@@ -469,7 +431,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 		if state.instrumentData.orderBook.Crossed() {
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
-			return state.subscribeOrderBook(context)
+			return state.subscribeInstrument(context)
 		}
 
 		state.instrumentData.lastUpdateID = res.LastUpdateId
@@ -487,26 +449,9 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-	if time.Since(state.lastPingTime) > 5*time.Second {
-		_ = state.obWs.Ping()
-		_ = state.tradeWs.Ping()
-		state.lastPingTime = time.Now()
-	}
-
-	if state.obWs.Err != nil || !state.obWs.Connected {
-		if state.obWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.obWs.Err))
-		}
-		if err := state.subscribeOrderBook(context); err != nil {
-			return fmt.Errorf("error subscribing to instrument: %v", err)
-		}
-	}
-
-	if state.tradeWs.Err != nil || !state.tradeWs.Connected {
-		if state.tradeWs.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.tradeWs.Err))
-		}
-		if err := state.subscribeTrades(context); err != nil {
+	if state.sink.Error() != nil {
+		state.logger.Info("error on ob socket", log.Error(state.sink.Error()))
+		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}
 	}
