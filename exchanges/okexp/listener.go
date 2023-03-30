@@ -388,7 +388,6 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		state.instrumentData.seqNum += 1
 
 	case okex.WSFundingRateUpdate:
-		fmt.Println("FUNDING RATE UPDATE")
 		fundData := msg.Message.(okex.WSFundingRateUpdate)
 		refresh := &messages.MarketDataIncrementalRefresh{
 			SeqNum: state.instrumentData.seqNum + 1,
