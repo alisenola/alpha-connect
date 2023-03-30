@@ -227,7 +227,11 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		}
 		//fmt.Println("GOT MD")
 		if !mdres.Success {
-			return nil, fmt.Errorf("error fetching the snapshot %s", mdres.RejectionReason.String())
+			if mdres.RejectionReason == messages.RejectionReason_IPRateLimitExceeded {
+				return nil, nil
+			} else {
+				return nil, fmt.Errorf("error fetching the snapshot %s", mdres.RejectionReason.String())
+			}
 		}
 		if mdres.SnapshotL2 == nil {
 			return nil, fmt.Errorf("market data snapshot has no OBL2")
