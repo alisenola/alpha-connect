@@ -163,7 +163,11 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.Symbol = pair.ID
 		security.Underlying = baseCurrency
 		security.QuoteCurrency = quoteCurrency
-		security.Status = models.InstrumentStatus_Trading
+		if pair.TradeStatus == "tradable" {
+			security.Status = models.InstrumentStatus_Trading
+		} else {
+			security.Status = models.InstrumentStatus_Disabled
+		}
 		security.Exchange = constants.GATE
 		security.SecurityType = enum.SecurityType_CRYPTO_SPOT
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
