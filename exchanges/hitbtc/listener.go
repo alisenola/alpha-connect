@@ -174,6 +174,7 @@ func (state *Listener) Initialize(context actor.Context) error {
 func (state *Listener) Clean(context actor.Context) error {
 	if state.sink != nil {
 		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
@@ -186,6 +187,7 @@ func (state *Listener) Clean(context actor.Context) error {
 func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if state.sink != nil {
 		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
 
 	sink, err := state.wsPool.Subscribe(state.security.Symbol)
