@@ -193,6 +193,7 @@ func (state *Listener) Clean(context actor.Context) error {
 func (state *Listener) subscribeInstrument(context actor.Context) error {
 	if state.sink != nil {
 		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
 
 	sink, err := state.wsPool.Subscribe(state.security.Symbol)
@@ -268,13 +269,9 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 	}
 	//fmt.Println("SEQ", state.instrumentData.lastUpdateID)
 	//fmt.Println(ob)
-	msg, err := sink.ReadMessage()
-	if err != nil {
-		return fmt.Errorf("error reading message: %v", err)
-	}
 	synced := false
 	for !synced {
-		msg, err = sink.ReadMessage()
+		msg, err := sink.ReadMessage()
 		if err != nil {
 			return fmt.Errorf("error reading message: %v", err)
 		}
