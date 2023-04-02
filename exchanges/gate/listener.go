@@ -279,6 +279,10 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if !ok {
 			context.Send(context.Self(), msg)
 		}
+		if obUpdate.LastUpdateId <= state.instrumentData.lastUpdateID {
+			// We already have this update, snapshot is too new
+			continue
+		}
 		for state.instrumentData.lastUpdateID+1 < obUpdate.FirstUpdateId {
 			// We missed some updates, snapshot is too old
 			//fmt.Println("syncing again.....", state.instrumentData.lastUpdateID+1, obUpdate.FirstUpdateId)
@@ -288,10 +292,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 				return fmt.Errorf("error syncing order book: %v", err)
 			}
 			//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, obUpdate.FirstUpdateId)
-		}
-		if obUpdate.LastUpdateId <= state.instrumentData.lastUpdateID {
-			// We already have this update, snapshot is too new
-			continue
 		}
 
 		bids, asks := obUpdate.ToBidAsk()
