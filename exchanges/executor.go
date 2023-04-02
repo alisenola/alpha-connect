@@ -678,7 +678,7 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 				state.wsPools[sec.Exchange.ID] = wsp
 			}
 			wsp = state.wsPools[sec.Exchange.ID]
-		case constants.GATE.ID:
+		case constants.GATE.ID, constants.GATEF.ID:
 			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
 				wsp, err = gate.NewWebsocketPool(state.dialerPool)
 				// TODO logging

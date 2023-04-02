@@ -198,7 +198,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	case constants.GATE.ID:
 		return func() actor.Actor { return gate.NewListener(securityID, wsPool) }
 	case constants.GATEF.ID:
-		return func() actor.Actor { return gatef.NewListener(securityID, dialerPool) }
+		return func() actor.Actor { return gatef.NewListener(securityID, wsPool) }
 	case constants.UNISWAPV3.ID:
 		return func() actor.Actor { return v3.NewListener(securityID, dialerPool) }
 		/*
