@@ -401,6 +401,10 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		symbol := res.CurrencyPair
 		// Check depth continuity
 		//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, res.FirstUpdateId)
+		if res.LastUpdateId <= state.instrumentData.lastUpdateID {
+			// We already have this update
+			return nil
+		}
 		if state.instrumentData.lastUpdateID+1 != res.FirstUpdateId {
 			return fmt.Errorf("got wrong sequence ID for %s: %d, %d",
 				symbol, state.instrumentData.lastUpdateID, res.FirstUpdateId)
