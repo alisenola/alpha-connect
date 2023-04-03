@@ -278,6 +278,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		obUpdate, ok := msg.Message.(gate.WSSpotOrderBookUpdate)
 		if !ok {
 			context.Send(context.Self(), msg)
+			continue
 		}
 		for state.instrumentData.lastUpdateID+1 < obUpdate.FirstUpdateId {
 			// We missed some updates, snapshot is too old
