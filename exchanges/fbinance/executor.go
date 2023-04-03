@@ -1352,7 +1352,6 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		fmt.Println("PERFORM", time.Since(start))
 		if data.Code != 0 {
 			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(fmt.Errorf("%d: %s", data.Code, data.Message)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
@@ -1367,6 +1366,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
+		response.NetworkRtt = durationpb.New(time.Since(start))
 		response.Success = true
 		response.OrderStatus = *status
 		response.CumQuantity = data.CumQuantity

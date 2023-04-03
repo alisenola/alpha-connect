@@ -627,6 +627,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 							}
 						}
 						reqResponse.Success = true
+						reqResponse.NetworkRtt = response.NetworkRtt
 					} else {
 						nReport, _ := state.account.RejectNewOrder(order.ClientOrderID, response.RejectionReason)
 						if nReport != nil {
