@@ -4,13 +4,10 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"gitlab.com/alphaticks/xchanger/exchanges/gate"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
 	"reflect"
 	"time"
-
-	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
@@ -18,6 +15,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/gorderbook"
+	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/gatef"
@@ -227,7 +225,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if !ok {
 			return nil, fmt.Errorf("was expecting MarketDataResponse, got %s", reflect.TypeOf(res).String())
 		}
-		//fmt.Println("GOT MD")
 		if !mdres.Success {
 			if mdres.RejectionReason == messages.RejectionReason_IPRateLimitExceeded {
 				return nil, nil
@@ -254,7 +251,6 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 			lotPrecision,
 			depth,
 		)
-
 		ob.Sync(mdres.SnapshotL2.Bids, mdres.SnapshotL2.Asks)
 		if ob.Crossed() {
 			return nil, fmt.Errorf("crossed orderbook")
@@ -276,7 +272,7 @@ func (state *Listener) subscribeInstrument(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error reading message: %v", err)
 		}
-		obUpdate, ok := msg.Message.(gate.WSSpotOrderBookUpdate)
+		obUpdate, ok := msg.Message.(gatef.WSFuturesOrderBookUpdate)
 		if !ok {
 			context.Send(context.Self(), msg)
 		}
@@ -359,20 +355,20 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 
 	case gatef.WSFuturesTrade:
 
-		var aggregateID = uint64(res.CreateTimeMs) * 10
+		var aggregatefID = uint64(res.CreateTimeMs) * 10
 		if res.Size < 0 {
-			aggregateID += 1
+			aggregatefID += 1
 		}
 
 		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregateID {
+		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregatefID {
 			if state.instrumentData.lastAggTradeTs >= ts {
 				ts = state.instrumentData.lastAggTradeTs + 1
 			}
 			aggTrade := &models.AggregatedTrade{
 				Bid:         res.Size < 0,
 				Timestamp:   utils.MilliToTimestamp(ts),
-				AggregateID: aggregateID,
+				AggregateID: aggregatefID,
 				Trades:      nil,
 			}
 			state.instrumentData.aggTrade = aggTrade
@@ -399,7 +395,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		if state.sink == nil {
 			return nil
 		}
-		symbol := res.CurrencyPair
+		symbol := res.Contract
 		// Check depth continuity
 		//fmt.Println("SEQ", state.instrumentData.lastUpdateID+1, res.FirstUpdateId)
 		if res.LastUpdateId <= state.instrumentData.lastUpdateID {
@@ -437,6 +433,7 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 			state.instrumentData.orderBook.UpdateOrderBookLevel(ask)
 		}
 
+		//fmt.Println(state.instrumentData.orderBook)
 		if state.instrumentData.orderBook.Crossed() {
 			state.logger.Info("crossed orderbook", log.Error(errors.New("crossed")))
 			return state.subscribeInstrument(context)
