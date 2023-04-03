@@ -78,6 +78,7 @@ enum RejectionReason {
     UnknownInstrument = 39;
     IPRateLimitExceeded = 40;
     TakerOnly = 41;
+    RejectedOrder = 42;
 }
 
 enum ResponseType {
@@ -571,6 +572,7 @@ message OrderCancelResponse {
     bool success = 3;
     RejectionReason rejection_reason = 4;
     google.protobuf.Duration rate_limit_delay = 5;
+    google.protobuf.Duration network_rtt = 6;
 }
 
 message OrderMassCancelRequest {

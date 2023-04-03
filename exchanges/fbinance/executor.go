@@ -1446,6 +1446,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 
 		qr.globalRateLimit.Request(1)
 		var data fbinance.OrderData
+		start := time.Now()
 		if err := xutils.PerformJSONRequest(qr.client, request, &data); err != nil {
 			state.logger.Warn("error cancelling order", log.Error(err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
@@ -1460,12 +1461,15 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 				response.RejectionReason = messages.RejectionReason_InvalidRequest
 			} else if data.Code == -2011 && data.Message == "Unknown order sent." {
 				response.RejectionReason = messages.RejectionReason_UnknownOrder
+			} else if data.Code == -5022 {
+				response.RejectionReason = messages.RejectionReason_RejectedOrder
 			}
 			context.Send(sender, response)
 			state.updateRateLimits(data.BaseResponse, nil, qr)
 			return
 		}
 
+		response.NetworkRtt = durationpb.New(time.Since(start))
 		response.Success = true
 		context.Send(sender, response)
 	}()
