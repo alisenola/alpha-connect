@@ -852,6 +852,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 						state.seqNum += 1
 						context.Send(context.Parent(), report)
 					}
+					reqResponse.NetworkRtt = response.NetworkRtt
 					reqResponse.Success = true
 				} else {
 					fmt.Println("REJECT CANCEL", ID)
