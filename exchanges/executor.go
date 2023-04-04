@@ -19,7 +19,6 @@ import (
 	"golang.org/x/net/proxy"
 	"net"
 	"net/http"
-	"os"
 	"reflect"
 	"runtime"
 	"time"
