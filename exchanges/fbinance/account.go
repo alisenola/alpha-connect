@@ -794,6 +794,8 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	} else if req.OrderID != nil {
 		ID = req.OrderID.Value
 	}
+	// forward to executor directly
+	fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 	fmt.Println("CANCELING ", ID)
 	report, rej := state.account.CancelOrder(ID)
 	if rej != nil {
@@ -818,9 +820,7 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 		report.SeqNum = state.seqNum + 1
 		state.seqNum += 1
 		context.Send(context.Parent(), report)
-
 		if report.ExecutionType == messages.ExecutionType_PendingCancel {
-			fut := context.RequestFuture(state.fbinanceExecutor, req, 10*time.Second)
 			context.ReenterAfter(fut, func(res interface{}, err error) {
 				if req.ResponseType == messages.ResponseType_Result {
 					defer context.Send(sender, reqResponse)
