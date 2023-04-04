@@ -14,11 +14,9 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/deribit"
-	xchangerModels "gitlab.com/alphaticks/xchanger/models"
-	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -40,27 +38,27 @@ type InstrumentData struct {
 }
 
 type Listener struct {
-	ws             *deribit.Websocket
+	sink           *xutils.WebsocketSink
+	wsPool         *xutils.WebsocketPool
 	security       *models.Security
 	securityID     uint64
 	executor       *actor.PID
-	dialerPool     *xchangerUtils.DialerPool
 	instrumentData *InstrumentData
 	logger         *log.Logger
 	lastPingTime   time.Time
 	socketTicker   *time.Ticker
 }
 
-func NewListenerProducer(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Producer {
+func NewListenerProducer(securityID uint64, wsPool *xutils.WebsocketPool) actor.Producer {
 	return func() actor.Actor {
-		return NewListener(securityID, dialerPool)
+		return NewListener(securityID, wsPool)
 	}
 }
 
-func NewListener(securityID uint64, dialerPool *xchangerUtils.DialerPool) actor.Actor {
+func NewListener(securityID uint64, wsPool *xutils.WebsocketPool) actor.Actor {
 	return &Listener{
 		securityID: securityID,
-		dialerPool: dialerPool,
+		wsPool:     wsPool,
 	}
 }
 
@@ -175,10 +173,10 @@ func (state *Listener) Initialize(context actor.Context) error {
 }
 
 func (state *Listener) Clean(context actor.Context) error {
-	if state.ws != nil {
-		state.ws.Disconnect()
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
-
 	if state.socketTicker != nil {
 		state.socketTicker.Stop()
 		state.socketTicker = nil
@@ -188,120 +186,91 @@ func (state *Listener) Clean(context actor.Context) error {
 }
 
 func (state *Listener) subscribeInstrument(context actor.Context) error {
-	if state.ws != nil {
-		state.ws.Disconnect()
+	if state.sink != nil {
+		state.wsPool.Unsubscribe(state.security.Symbol, state.sink)
+		state.sink = nil
 	}
 
-	ws := deribit.NewWebsocket()
-	err := ws.Connect(state.dialerPool.GetDialer())
+	sink, err := state.wsPool.Subscribe(state.security.Symbol)
 	if err != nil {
-		return err
+		return fmt.Errorf("error subscribing to websocket: %v", err)
 	}
-	var interval string
-	if os.Getenv("DERIBIT_KEY") != "" {
-		fmt.Println("SUBSCRIBE RAW")
-		interval = deribit.Interval0ms
-		if _, err := ws.Auth(&xchangerModels.APICredentials{
-			APIKey:    os.Getenv("DERIBIT_KEY"),
-			APISecret: os.Getenv("DERIBIT_SECRET"),
-		}); err != nil {
-			return err
+	state.sink = sink
+
+	synced := false
+
+	for !synced {
+		msg, err := sink.ReadMessage()
+		if err != nil {
+			return fmt.Errorf("error reading message: %v", err)
 		}
-		if !ws.ReadMessage() {
-			return ws.Err
-		}
-		_, ok := ws.Msg.Message.(deribit.Auth)
+
+		update, ok := msg.Message.(deribit.OrderBookUpdate)
 		if !ok {
-			return fmt.Errorf("error casting message to Auth")
+			context.Send(context.Self(), msg)
+			continue
 		}
-	} else {
-		interval = deribit.Interval100ms
-	}
-
-	if _, err := ws.SubscribeOrderBook(state.security.Symbol, interval); err != nil {
-		return err
-	}
-
-	if !ws.ReadMessage() {
-		return ws.Err
-	}
-	_, ok := ws.Msg.Message.(deribit.Subscription)
-	if !ok {
-		return fmt.Errorf("error casting message to Subscription")
-	}
-
-	if !ws.ReadMessage() {
-		return ws.Err
-	}
-
-	update, ok := ws.Msg.Message.(deribit.OrderBookUpdate)
-	if !ok {
-		return fmt.Errorf("error casting message to OrderBookUpdate")
-	}
-
-	var bids, asks []*gmodels.OrderBookLevel
-	bids = make([]*gmodels.OrderBookLevel, len(update.Bids))
-	for i, bid := range update.Bids {
-		bids[i] = &gmodels.OrderBookLevel{
-			Price:    bid.Price,
-			Quantity: bid.Quantity,
-			Bid:      true,
+		if update.Type != "snapshot" {
+			// Don't stash the message because it must be an older update than the upcoming snapshot
+			continue
 		}
-	}
-	asks = make([]*gmodels.OrderBookLevel, len(update.Asks))
-	for i, ask := range update.Asks {
-		asks[i] = &gmodels.OrderBookLevel{
-			Price:    ask.Price,
-			Quantity: ask.Quantity,
-			Bid:      false,
+		var bids, asks []*gmodels.OrderBookLevel
+		bids = make([]*gmodels.OrderBookLevel, len(update.Bids))
+		for i, bid := range update.Bids {
+			bids[i] = &gmodels.OrderBookLevel{
+				Price:    bid.Price,
+				Quantity: bid.Quantity,
+				Bid:      true,
+			}
 		}
-	}
-	tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
-	lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
-	depth := 10000
-	if len(update.Asks) > 0 {
-		bestAsk := update.Asks[0].Price
-		depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
-		if depth > 10000 {
-			depth = 10000
+		asks = make([]*gmodels.OrderBookLevel, len(update.Asks))
+		for i, ask := range update.Asks {
+			asks[i] = &gmodels.OrderBookLevel{
+				Price:    ask.Price,
+				Quantity: ask.Quantity,
+				Bid:      false,
+			}
 		}
-		if depth < 100 {
-			depth = 100
+		tickPrecision := uint64(math.Ceil(1. / state.security.MinPriceIncrement.Value))
+		lotPrecision := uint64(math.Ceil(1. / state.security.RoundLot.Value))
+		depth := 10000
+		if len(update.Asks) > 0 {
+			bestAsk := update.Asks[0].Price
+			depth = int(((bestAsk * 1.1) - bestAsk) * float64(tickPrecision))
+			if depth > 10000 {
+				depth = 10000
+			}
+			if depth < 100 {
+				depth = 100
+			}
 		}
-	}
-
-	ts := uint64(ws.Msg.ClientTime.UnixNano()) / 1000000
-
-	ob := gorderbook.NewOrderBookL2(
-		tickPrecision,
-		lotPrecision,
-		depth,
-	)
-
-	ob.Sync(bids, asks)
-	if ob.Crossed() {
-		return fmt.Errorf("crossed orderbook")
-	}
-	state.instrumentData.orderBook = ob
-	state.instrumentData.seqNum = uint64(time.Now().UnixNano())
-	state.instrumentData.lastUpdateTime = ts
-	state.instrumentData.lastUpdateID = update.ChangeID
-
-	if _, err := ws.SubscribeTrade(state.security.Symbol, interval); err != nil {
-		return fmt.Errorf("error subscribing to trade stream: %v", err)
-	}
-
-	if _, err := ws.SubscribeTicker(state.security.Symbol, interval); err != nil {
-		return fmt.Errorf("error subscribing to ticker stream: %v", err)
-	}
-
-	state.ws = ws
-
-	go func(ws *deribit.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(pid, ws.Msg)
+		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
+		ob := gorderbook.NewOrderBookL2(
+			tickPrecision,
+			lotPrecision,
+			depth,
+		)
+		ob.Sync(bids, asks)
+		if ob.Crossed() {
+			return fmt.Errorf("crossed orderbook")
 		}
-	}(ws, context.Self())
+		state.instrumentData.orderBook = ob
+		state.instrumentData.seqNum = uint64(time.Now().UnixNano())
+		state.instrumentData.lastUpdateTime = ts
+		state.instrumentData.lastUpdateID = update.ChangeID
+		synced = true
+	}
+
+	go func(sink *xutils.WebsocketSink, pid *actor.PID) {
+		for {
+			msg, err := sink.ReadMessage()
+			if err == nil {
+				context.Send(pid, msg)
+			} else {
+				return
+			}
+		}
+	}(sink, context.Self())
 
 	return nil
 }
@@ -547,11 +516,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *Listener) checkSockets(context actor.Context) error {
-
-	if state.ws.Err != nil || !state.ws.Connected {
-		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
-		}
+	if state.sink.Error() != nil {
+		state.logger.Info("error on ob socket", log.Error(state.sink.Error()))
 		if err := state.subscribeInstrument(context); err != nil {
 			return fmt.Errorf("error subscribing to instrument: %v", err)
 		}

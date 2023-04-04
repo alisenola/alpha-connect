@@ -55,6 +55,7 @@ message Security {
     models.Chain chain = 23;
     google.protobuf.DoubleValue price = 26;
     google.protobuf.DoubleValue strike_price = 27;
+    models.Asset strike_currency = 28;
 }
 
 message Order {

@@ -16,6 +16,8 @@ type Config struct {
 	MonitorStoreAddress    string
 	DataServerAddress      string
 	OpenseaAPIKey          string
+	DeribitAPIKey          string
+	DeribitAPISecret       string
 	FBinanceWhitelistedIPs []string
 	StrictExchange         bool
 	StaticLoader           bool
@@ -125,6 +127,12 @@ func LoadConfig() (*Config, error) {
 	}
 	if os.Getenv("FBINANCE_WHITELISTED_IPS") != "" {
 		C.FBinanceWhitelistedIPs = strings.Split(os.Getenv("FBINANCE_WHITELISTED_IPS"), ",")
+	}
+	if os.Getenv("DERIBIT_API_KEY") != "" {
+		C.DeribitAPIKey = os.Getenv("DERIBIT_API_KEY")
+	}
+	if os.Getenv("DERIBIT_API_SECRET") != "" {
+		C.DeribitAPISecret = os.Getenv("DERIBIT_API_SECRET")
 	}
 	fmt.Println(C.FBinanceWhitelistedIPs)
 

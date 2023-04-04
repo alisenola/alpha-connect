@@ -209,7 +209,9 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 					security.SecuritySubType = wrapperspb.String(enum.SecuritySubType_PUT)
 				}
 				security.StrikePrice = wrapperspb.Double(i.Strike)
+				security.StrikeCurrency = constants.DOLLAR
 				security.MaturityDate = utils.MilliToTimestamp(i.ExpirationTimestamp)
+				//fmt.Println(fmt.Sprintf("OPTION: %+v", i))
 			} else {
 				// Skip combos
 				continue
@@ -226,11 +228,13 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 				continue
 			}
 			security.Underlying = baseCurrency
+
 			quoteCurrency, ok := constants.GetAssetBySymbol(i.QuoteCurrency)
 			if !ok {
 				continue
 			}
 			security.QuoteCurrency = quoteCurrency
+
 			security.Exchange = constants.DERIBIT
 
 			security.MakerFee = wrapperspb.Double(i.MakerCommission)

@@ -170,7 +170,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	case constants.OKEX.ID:
 		return func() actor.Actor { return okex.NewListener(securityID, dialerPool) }
 	case constants.DERIBIT.ID:
-		return func() actor.Actor { return deribit.NewListener(securityID, dialerPool) }
+		return func() actor.Actor { return deribit.NewListener(securityID, wsPool) }
 	case constants.HUOBI.ID:
 		return func() actor.Actor { return huobi.NewListener(securityID, dialerPool) }
 	case constants.HUOBIP.ID:

@@ -11,6 +11,7 @@ import (
 	tickstore_go_client "gitlab.com/alphaticks/tickstore-go-client"
 	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gitlab.com/alphaticks/xchanger/constants"
+	"gitlab.com/alphaticks/xchanger/exchanges/deribit"
 	"gitlab.com/alphaticks/xchanger/exchanges/gate"
 	"gitlab.com/alphaticks/xchanger/exchanges/gatef"
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/net/proxy"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"runtime"
 	"time"
@@ -697,6 +699,28 @@ func (state *Executor) OnMarketDataRequest(context actor.Context) error {
 		case constants.GATEF.ID:
 			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
 				wsp, err = gatef.NewWebsocketPool(constants.TETHER, state.dialerPool)
+				// TODO logging
+				if err != nil {
+					context.Respond(&messages.MarketDataResponse{
+						RequestID:       request.RequestID,
+						Success:         false,
+						RejectionReason: messages.RejectionReason_Other,
+					})
+					return nil
+				}
+				state.wsPools[sec.Exchange.ID] = wsp
+			}
+			wsp = state.wsPools[sec.Exchange.ID]
+		case constants.DERIBIT.ID:
+			if _, ok := state.wsPools[sec.Exchange.ID]; !ok {
+				var creds *xmodels.APICredentials
+				if state.DeribitAPIKey != "" {
+					creds = &xmodels.APICredentials{
+						APIKey:    state.DeribitAPIKey,
+						APISecret: state.DeribitAPISecret,
+					}
+				}
+				wsp, err = deribit.NewWebsocketPool(creds, state.dialerPool)
 				// TODO logging
 				if err != nil {
 					context.Respond(&messages.MarketDataResponse{
