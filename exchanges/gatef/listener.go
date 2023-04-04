@@ -353,43 +353,43 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
-	case gatef.WSFuturesTrade:
-
-		var aggregatefID = uint64(res.CreateTimeMs) * 10
-		if res.Size < 0 {
-			aggregatefID += 1
-		}
-
-		ts := uint64(msg.ClientTime.UnixNano() / 1000000)
-		if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregatefID {
-			if state.instrumentData.lastAggTradeTs >= ts {
-				ts = state.instrumentData.lastAggTradeTs + 1
+	case []gatef.WSFuturesTrade:
+		for _, trade := range res {
+			var aggregatefID = uint64(trade.CreateTimeMs) * 10
+			if trade.Size < 0 {
+				aggregatefID += 1
 			}
-			aggTrade := &models.AggregatedTrade{
-				Bid:         res.Size < 0,
-				Timestamp:   utils.MilliToTimestamp(ts),
-				AggregateID: aggregatefID,
-				Trades:      nil,
+
+			ts := uint64(msg.ClientTime.UnixNano() / 1000000)
+			if state.instrumentData.aggTrade == nil || state.instrumentData.aggTrade.AggregateID != aggregatefID {
+				if state.instrumentData.lastAggTradeTs >= ts {
+					ts = state.instrumentData.lastAggTradeTs + 1
+				}
+				aggTrade := &models.AggregatedTrade{
+					Bid:         trade.Size < 0,
+					Timestamp:   utils.MilliToTimestamp(ts),
+					AggregateID: aggregatefID,
+					Trades:      nil,
+				}
+				state.instrumentData.aggTrade = aggTrade
+				state.instrumentData.lastAggTradeTs = ts
+
+				// Stash the aggTrade
+				state.stashedTrades.PushBack(aggTrade)
 			}
-			state.instrumentData.aggTrade = aggTrade
-			state.instrumentData.lastAggTradeTs = ts
-
-			// Stash the aggTrade
-			state.stashedTrades.PushBack(aggTrade)
-			// start the timer on trade creation, it will publish the trade in 20 ms
-			go func(pid *actor.PID) {
-				time.Sleep(20 * time.Millisecond)
-				context.Send(pid, &postAggTrade{})
-			}(context.Self())
+			state.instrumentData.aggTrade.Trades = append(
+				state.instrumentData.aggTrade.Trades,
+				&models.Trade{
+					Price:    trade.Price,
+					Quantity: math.Abs(trade.Size),
+					ID:       trade.Id,
+				})
 		}
-
-		state.instrumentData.aggTrade.Trades = append(
-			state.instrumentData.aggTrade.Trades,
-			&models.Trade{
-				Price:    res.Price,
-				Quantity: math.Abs(res.Size),
-				ID:       res.Id,
-			})
+		// start the timer on trade creation, it will publish the trade in 20 ms
+		go func(pid *actor.PID) {
+			time.Sleep(20 * time.Millisecond)
+			context.Send(pid, &postAggTrade{})
+		}(context.Self())
 
 	case gatef.WSFuturesOrderBookUpdate:
 		if state.sink == nil {
