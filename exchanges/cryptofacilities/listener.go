@@ -1,4 +1,4 @@
-package cryptofacilities
+package krakenf
 
 import (
 	"container/list"
@@ -13,7 +13,7 @@ import (
 	gmodels "gitlab.com/alphaticks/gorderbook/gorderbook.models"
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
+	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"math"
@@ -38,8 +38,8 @@ type InstrumentData struct {
 // No ID for the deltas..
 
 type Listener struct {
-	obWs           *cryptofacilities.Websocket
-	tradeWs        *cryptofacilities.Websocket
+	obWs           *krakenf.Websocket
+	tradeWs        *krakenf.Websocket
 	security       *models.Security
 	securityID     uint64
 	dialerPool     *xchangerUtils.DialerPool
@@ -209,15 +209,15 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		_ = state.obWs.Disconnect()
 	}
 
-	ws := cryptofacilities.NewWebsocket()
+	ws := krakenf.NewWebsocket()
 	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to websocket: %v", err)
 	}
 
-	if err := ws.Subscribe([]string{state.security.Symbol}, cryptofacilities.WSBookFeed); err != nil {
+	if err := ws.Subscribe([]string{state.security.Symbol}, krakenf.WSBookFeed); err != nil {
 		return fmt.Errorf("error subscribing to OBL2 stream: %v", err)
 	}
-	if err := ws.Subscribe(nil, cryptofacilities.WSHeartBeatFeed); err != nil {
+	if err := ws.Subscribe(nil, krakenf.WSHeartBeatFeed); err != nil {
 		return fmt.Errorf("error subscribing to WSHeartBeatFeed stream: %v", err)
 	}
 
@@ -227,7 +227,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 		if !ws.ReadMessage() {
 			return fmt.Errorf("error reading message: %v", ws.Err)
 		}
-		obData, ok := ws.Msg.Message.(cryptofacilities.WSBookSnapshot)
+		obData, ok := ws.Msg.Message.(krakenf.WSBookSnapshot)
 		if !ok {
 			trials += 1
 			continue
@@ -277,7 +277,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 
 	state.obWs = ws
 
-	go func(ws *cryptofacilities.Websocket, pid *actor.PID) {
+	go func(ws *krakenf.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -291,20 +291,20 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 		_ = state.tradeWs.Disconnect()
 	}
 
-	ws := cryptofacilities.NewWebsocket()
+	ws := krakenf.NewWebsocket()
 	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to websocket: %v", err)
 	}
 
-	if err := ws.Subscribe([]string{state.security.Symbol}, cryptofacilities.WSTradeFeed); err != nil {
+	if err := ws.Subscribe([]string{state.security.Symbol}, krakenf.WSTradeFeed); err != nil {
 		return fmt.Errorf("error subscribing to trade stream: %v", err)
 	}
-	if err := ws.Subscribe(nil, cryptofacilities.WSHeartBeatFeed); err != nil {
+	if err := ws.Subscribe(nil, krakenf.WSHeartBeatFeed); err != nil {
 		return fmt.Errorf("error subscribing to WSHeartBeatFeed stream: %v", err)
 	}
 
 	state.tradeWs = ws
-	go func(ws *cryptofacilities.Websocket, pid *actor.PID) {
+	go func(ws *krakenf.Websocket, pid *actor.PID) {
 		for ws.ReadMessage() {
 			context.Send(pid, ws.Msg)
 		}
@@ -344,15 +344,15 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 	case error:
 		return fmt.Errorf("socket error: %v", msg)
 
-	case cryptofacilities.WSAlert:
-		err := msg.Message.(cryptofacilities.WSAlert)
+	case krakenf.WSAlert:
+		err := msg.Message.(krakenf.WSAlert)
 		return fmt.Errorf("socket error: %v", err)
 
-	case cryptofacilities.WSBookDelta:
+	case krakenf.WSBookDelta:
 		if state.obWs == nil || msg.WSID != state.obWs.ID {
 			return nil
 		}
-		obData := msg.Message.(cryptofacilities.WSBookDelta)
+		obData := msg.Message.(krakenf.WSBookDelta)
 		instr := state.instrumentData
 
 		ts := uint64(msg.ClientTime.UnixNano()) / 1000000
@@ -390,8 +390,8 @@ func (state *Listener) onWebsocketMessage(context actor.Context) error {
 		})
 		instr.seqNum += 1
 
-	case cryptofacilities.WSTrade:
-		trade := msg.Message.(cryptofacilities.WSTrade)
+	case krakenf.WSTrade:
+		trade := msg.Message.(krakenf.WSTrade)
 
 		aggID := trade.Time * 10
 		// Add one to aggregatedID if it's a sell so that
@@ -438,8 +438,8 @@ func (state *Listener) checkSockets(context actor.Context) error {
 	/*
 		if time.Now().Sub(state.lastPingTime) > 10*time.Second {
 			// "Ping" by resubscribing to the topic
-			_ = state.tradeWs.Subscribe(nil, cryptofacilities.WSHeartBeatFeed)
-			_ = state.obWs.Subscribe(nil, cryptofacilities.WSHeartBeatFeed)
+			_ = state.tradeWs.Subscribe(nil, krakenf.WSHeartBeatFeed)
+			_ = state.obWs.Subscribe(nil, krakenf.WSHeartBeatFeed)
 			state.lastPingTime = time.Now()
 		}
 

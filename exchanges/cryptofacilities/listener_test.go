@@ -1,4 +1,4 @@
-package cryptofacilities_test
+package krakenf_test
 
 import (
 	"gitlab.com/alphaticks/alpha-connect/enum"

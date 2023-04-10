@@ -18,8 +18,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/deribit"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/dydx"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/fbinance"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/ftx"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/ftxus"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gate"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gatef"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/gemini"
@@ -102,10 +100,6 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Stat
 		return func() actor.Actor { return binance.NewAccountListener(account, nil, nil) }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewAccountListener(account, registry, db, client, readOnly) }
-	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewAccountListener(account, registry, db, readOnly) }
-	case constants.FTXUS.ID:
-		return func() actor.Actor { return ftxus.NewAccountListener(account) }
 	case constants.DYDX.ID:
 		return func() actor.Actor { return dydx.NewAccountListener(account, nil, nil) }
 	case constants.BYBITL.ID:
@@ -121,8 +115,6 @@ func NewAccountReconcileProducer(accountCfg config.Account, account *models.Acco
 		return binance.NewAccountReconcileProducer(accountCfg, account, registry, store, db)
 	case constants.FBINANCE.ID:
 		return fbinance.NewAccountReconcileProducer(accountCfg, account, registry, store, db)
-	case constants.FTX.ID:
-		return ftx.NewAccountReconcileProducer(account, registry, db)
 	case constants.BYBITL.ID:
 		return bybitl.NewAccountReconcileProducer(account, registry, db)
 	default:
@@ -152,13 +144,9 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewListener(securityID, dialerPool) }
 	case constants.CRYPTOFACILITIES.ID:
-		return func() actor.Actor { return cryptofacilities.NewListener(securityID, dialerPool) }
+		return func() actor.Actor { return krakenf.NewListener(securityID, dialerPool) }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewListener(securityID, dialerPool) }
-	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewListener(securityID, dialerPool) }
-	case constants.FTXUS.ID:
-		return func() actor.Actor { return ftxus.NewListener(securityID, dialerPool) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewListener(securityID, dialerPool) }
 	case constants.HITBTC.ID:
@@ -223,13 +211,9 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Conf
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewExecutor() }
 	case constants.CRYPTOFACILITIES.ID:
-		return func() actor.Actor { return cryptofacilities.NewExecutor() }
+		return func() actor.Actor { return krakenf.NewExecutor() }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewExecutor(config, dialerPool, registry, accountClients) }
-	case constants.FTX.ID:
-		return func() actor.Actor { return ftx.NewExecutor(dialerPool, registry) }
-	case constants.FTXUS.ID:
-		return func() actor.Actor { return ftxus.NewExecutor(dialerPool, registry) }
 	case constants.GEMINI.ID:
 		return func() actor.Actor { return gemini.NewExecutor() }
 	case constants.HITBTC.ID:

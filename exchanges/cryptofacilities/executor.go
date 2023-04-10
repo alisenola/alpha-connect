@@ -1,4 +1,4 @@
-package cryptofacilities
+package krakenf
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/utils"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
-	"gitlab.com/alphaticks/xchanger/exchanges/cryptofacilities"
+	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"io/ioutil"
@@ -79,7 +79,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	if state.rateLimit.IsRateLimited() {
 		return fmt.Errorf("rate limited")
 	}
-	request, _, err := cryptofacilities.GetInstruments()
+	request, _, err := krakenf.GetInstruments()
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 	}
 
-	var instrumentResponse cryptofacilities.InstrumentResponse
+	var instrumentResponse krakenf.InstrumentResponse
 	err = json.Unmarshal(response, &instrumentResponse)
 	if err != nil {
 		err = fmt.Errorf("error decoding query response: %v", err)
@@ -135,7 +135,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		underlying := strings.ToUpper(strings.Split(instrument.Symbol, "_")[1])
 		baseSymbol := underlying[:3]
-		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
+		if sym, ok := krakenf.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
 			baseSymbol = sym
 		}
 		baseCurrency, ok := constants.GetAssetBySymbol(baseSymbol)
@@ -144,7 +144,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 
 		quoteSymbol := underlying[3:]
-		if sym, ok := cryptofacilities.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
+		if sym, ok := krakenf.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
 			quoteSymbol = sym
 		}
 		quoteCurrency, ok := constants.GetAssetBySymbol(quoteSymbol)
