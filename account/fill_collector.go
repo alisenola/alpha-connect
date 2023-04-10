@@ -170,6 +170,41 @@ func (sc *FillCollector) GetVolumes() map[uint64]float64 {
 	return vols
 }
 
+func (sc *FillCollector) GetSecurityMoveAfterFill(securityID uint64) ([]float64, []float64, []float64, []float64) {
+	// TODO
+	sc.RLock()
+	defer sc.RUnlock()
+	buyMakerMoves := make([]float64, 10)
+	buyTakerMoves := make([]float64, 10)
+	sellMakerMoves := make([]float64, 10)
+	sellTakerMoves := make([]float64, 10)
+	for i := 0; i < 10; i++ {
+		v := sc.buyMakerMoves[securityID]
+		if mv, ok := v[int64(i)]; ok {
+			buyMakerMoves[i] = mv[0]
+		}
+	}
+	for i := 0; i < 10; i++ {
+		v := sc.buyTakerMoves[securityID]
+		if mv, ok := v[int64(i)]; ok {
+			buyTakerMoves[i] = mv[0]
+		}
+	}
+	for i := 0; i < 10; i++ {
+		v := sc.sellMakerMoves[securityID]
+		if mv, ok := v[int64(i)]; ok {
+			sellMakerMoves[i] += mv[0]
+		}
+	}
+	for i := 0; i < 10; i++ {
+		v := sc.sellTakerMoves[securityID]
+		if mv, ok := v[int64(i)]; ok {
+			sellTakerMoves[i] += mv[0]
+		}
+	}
+	return buyMakerMoves, buyTakerMoves, sellMakerMoves, sellTakerMoves
+}
+
 func (sc *FillCollector) GetMoveAfterFill() ([]float64, []float64, []float64, []float64) {
 	// TODO
 	sc.RLock()
