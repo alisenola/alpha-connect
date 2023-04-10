@@ -251,6 +251,13 @@ func (accnt *Account) GetMoveAfterFill() ([]float64, []float64, []float64, []flo
 	return accnt.fillCollector.GetMoveAfterFill()
 }
 
+func (accnt *Account) GetSecurityMoveAfterFill(securityID uint64) ([]float64, []float64, []float64, []float64) {
+	if accnt.fillCollector == nil {
+		return nil, nil, nil, nil
+	}
+	return accnt.fillCollector.GetSecurityMoveAfterFill(securityID)
+}
+
 func (accnt *Account) GetVolume(securityID uint64) float64 {
 	if accnt.fillCollector == nil {
 		return 0.
