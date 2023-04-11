@@ -14,7 +14,7 @@ type Market interface {
 
 type Model interface {
 	Forward(selector int, tick, objectID uint64, object tickobjects.TickObject) error
-	Backward()
+	Backward(tick uint64, target interface{})
 	Ready() bool
 	Frequency() uint64
 	GetSelectors() []string
@@ -178,7 +178,7 @@ func (m *MapMarketModel) Forward(selector int, tick, objectID uint64, object tic
 	return nil
 }
 
-func (m *MapMarketModel) Backward() {
+func (m *MapMarketModel) Backward(_ uint64, _ interface{}) {
 	return
 }
 
@@ -305,7 +305,7 @@ func (m *ConstantPriceModel) Forward(selector int, tick uint64, objectID uint64,
 	return nil
 }
 
-func (m *ConstantPriceModel) Backward() {
+func (m *ConstantPriceModel) Backward(_ uint64, _ interface{}) {
 
 }
 
@@ -410,7 +410,7 @@ func (m *ConstantTradeModel) Forward(selector int, tick uint64, objectID uint64,
 	return nil
 }
 
-func (m *ConstantTradeModel) Backward() {
+func (m *ConstantTradeModel) Backward(_ uint64, _ interface{}) {
 
 }
 
