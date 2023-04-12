@@ -151,6 +151,14 @@ func (p *Portfolio) GetAssetExposures() map[uint32]float64 {
 	return exposures
 }
 
+func (p *Portfolio) GetSessionPnL(securityID uint64) float64 {
+	pnl := 0.
+	for _, a := range p.accountPortfolios {
+		pnl += a.GetSessionPnL(securityID)
+	}
+	return pnl
+}
+
 /*
 func (p *Portfolio) GetAsset(asset uint32) float64 {
 	value := 0.
