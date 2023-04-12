@@ -248,7 +248,11 @@ func (accnt *Account) GetSessionPnL(securityID uint64) float64 {
 	accnt.RLock()
 	pos := accnt.positions[securityID]
 	accnt.RUnlock()
-	return pos.GetSessionPnL()
+	if pos != nil {
+		return pos.GetSessionPnL()
+	} else {
+		return 0.
+	}
 }
 
 func (accnt *Account) GetMoveAfterFill() ([]float64, []float64, []float64, []float64) {
