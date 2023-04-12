@@ -173,7 +173,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 	accnt.ordersClID = make(map[string]*Order)
 	accnt.securities = make(map[uint64]Security)
 	accnt.symbolToSec = make(map[string]Security)
-	accnt.positions = make(map[uint64]*Position)
+	positionsm := make(map[uint64]*Position)
 	accnt.baseToPositions = make(map[uint32][]*Position)
 	accnt.balances = make(map[uint32]int64)
 	accnt.assets = make(map[uint32]*xchangerModels.Asset)
@@ -212,7 +212,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 			if s.MinPriceIncrement == nil || s.RoundLot == nil {
 				return fmt.Errorf("security is missing MinPriceIncrement or RoundLot")
 			}
-			accnt.positions[s.SecurityID] = &Position{
+			pos := &Position{
 				inverse:         s.IsInverse,
 				tickPrecision:   math.Ceil(1. / s.MinPriceIncrement.Value),
 				lotPrecision:    math.Ceil(1. / s.RoundLot.Value),
@@ -221,8 +221,12 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 				makerFee:        posMakerFee,
 				takerFee:        posTakerFee,
 			}
+			if oldPos, ok := accnt.positions[s.SecurityID]; ok {
+				pos.sessionPnL = oldPos.sessionPnL
+			}
+			positionsm[s.SecurityID] = pos
 			baseCount[s.Underlying.ID] += 1
-			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], accnt.positions[s.SecurityID])
+			accnt.baseToPositions[s.Underlying.ID] = append(accnt.baseToPositions[s.Underlying.ID], positionsm[s.SecurityID])
 		case enum.SecurityType_CRYPTO_SPOT:
 			accnt.securities[s.SecurityID], err = NewSpotSecurity(s, accnt.quoteCurrency, makerFee, takerFee)
 			if err != nil {
@@ -256,11 +260,9 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 			}
 		}
 	}
+	accnt.positions = positionsm
 
-	// Reset positions
-	for _, pos := range accnt.positions {
-		pos.Sync(0, 0)
-	}
+	// Sync positions
 	for _, p := range positions {
 		if p.Account != accnt.Name {
 			return fmt.Errorf("got position for wrong account ID")

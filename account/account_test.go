@@ -113,7 +113,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestAccount_ConfirmFill(t *testing.T) {
-	accnt, err := account.NewAccount(bitmexAccount, nil)
+	accnt, err := account.NewAccount(bitmexAccount, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestAccount_ConfirmFill(t *testing.T) {
 }
 
 func TestAccount_ConfirmFill_Inverse(t *testing.T) {
-	accnt, err := account.NewAccount(bitmexAccount, nil)
+	accnt, err := account.NewAccount(bitmexAccount, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestAccount_ConfirmFill_Inverse(t *testing.T) {
 func TestAccount_ConfirmFill_Replace(t *testing.T) {
 	// Post a matching limit order and post a replace right after
 
-	accnt, err := account.NewAccount(bitmexAccount, nil)
+	accnt, err := account.NewAccount(bitmexAccount, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestAccount_ConfirmFill_Replace(t *testing.T) {
 }
 
 func TestAccount_Compare(t *testing.T) {
-	accnt1, err := account.NewAccount(bitmexAccount, nil)
+	accnt1, err := account.NewAccount(bitmexAccount, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +437,7 @@ func TestAccount_Compare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	accnt2, err := account.NewAccount(bitmexAccount, nil)
+	accnt2, err := account.NewAccount(bitmexAccount, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

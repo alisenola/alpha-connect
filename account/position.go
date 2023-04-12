@@ -20,6 +20,7 @@ type Position struct {
 	cross            bool
 	markPrice        *float64
 	maxNotionalValue *float64
+	sessionPnL       int64
 }
 
 func NewPosition(ID uint64, inverse bool, tp, lp, mp, mul, maker, taker float64) *Position {
@@ -37,6 +38,7 @@ func NewPosition(ID uint64, inverse bool, tp, lp, mp, mul, maker, taker float64)
 		cross:            false,
 		markPrice:        nil,
 		maxNotionalValue: nil,
+		sessionPnL:       0,
 	}
 }
 
@@ -100,6 +102,9 @@ func (pos *Position) Buy(price, quantity float64, taker bool) (int64, int64) {
 		pos.rawSize += rawFillQuantity
 	}
 
+	pos.sessionPnL -= fee
+	pos.sessionPnL -= realizedCost
+
 	return fee, realizedCost
 }
 
@@ -145,6 +150,9 @@ func (pos *Position) Sell(price, quantity float64, taker bool) (int64, int64) {
 		pos.rawSize -= rawFillQuantity
 	}
 
+	pos.sessionPnL -= fee
+	pos.sessionPnL -= realizedCost
+
 	return fee, realizedCost
 }
 
@@ -155,6 +163,10 @@ func (pos *Position) Funding(markPrice, fee float64) int64 {
 
 func (pos *Position) Size() float64 {
 	return float64(pos.rawSize) / pos.lotPrecision
+}
+
+func (pos *Position) GetSessionPnL() float64 {
+	return float64(pos.sessionPnL) / pos.marginPrecision
 }
 
 func (pos *Position) GetPosition() *models.Position {

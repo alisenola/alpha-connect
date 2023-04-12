@@ -244,6 +244,13 @@ func (accnt *Account) UpdateMaxNotionalValue(securityID uint64, value float64) {
 	pos.UpdateMaxNotionalValue(value)
 }
 
+func (accnt *Account) GetSessionPnL(securityID uint64) float64 {
+	accnt.RLock()
+	pos := accnt.positions[securityID]
+	accnt.RUnlock()
+	return pos.GetSessionPnL()
+}
+
 func (accnt *Account) GetMoveAfterFill() ([]float64, []float64, []float64, []float64) {
 	if accnt.fillCollector == nil {
 		return nil, nil, nil, nil
