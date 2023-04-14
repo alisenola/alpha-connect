@@ -10,11 +10,11 @@ require (
 	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
 	github.com/satori/go.uuid v1.2.0
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20221107145043-34c9e3fc850a
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
-	gitlab.com/alphaticks/gorderbook v0.0.0-20221114135905-ab5913a7a6d7
+	gitlab.com/alphaticks/gorderbook v0.0.0-20230414075805-9b6afa2f0499
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20230210131633-dd95ed0ebf37
 	gitlab.com/alphaticks/tickstore v0.0.0-20221129081907-13068eb9edbb
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20230120160008-9a4caa621693

@@ -13,7 +13,7 @@ type Market interface {
 }
 
 type Model interface {
-	Forward(selector int, tick, objectID uint64, object tickobjects.TickObject) error
+	Forward(selector int, tick, objectID uint64, object interface{}) error
 	Backward(tick uint64, target interface{})
 	Ready() bool
 	Frequency() uint64
