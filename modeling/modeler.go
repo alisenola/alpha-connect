@@ -148,9 +148,9 @@ func (state *Modeler) startQueries(context actor.Context) error {
 		go func(i int, q types.TickstoreQuery) {
 			for q.Err() == nil {
 				for q.Next() {
-					tick, obj, groupID := q.Read()
+					tick, obj, _ := q.Read()
 					//fmt.Println(i, state.selectors[i], obj.(tickobjects.Float64Object).Float64())
-					if err := state.model.Forward(i, tick, groupID, obj); err != nil {
+					if err := state.model.Forward(i, tick, obj); err != nil {
 						_ = q.Close()
 					}
 				}
@@ -184,8 +184,8 @@ func (state *Modeler) restartQuery(idx int) error {
 	go func(i int, q types.TickstoreQuery) {
 		for q.Err() == nil {
 			for q.Next() {
-				tick, obj, groupID := q.Read()
-				if err := state.model.Forward(i, tick, groupID, obj); err != nil {
+				tick, obj, _ := q.Read()
+				if err := state.model.Forward(i, tick, obj); err != nil {
 					_ = q.Close()
 				}
 			}
