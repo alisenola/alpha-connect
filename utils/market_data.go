@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+type FlowStat interface {
+	Apply(tick uint64, posFlow, negFlow float64) float64
+}
+
 type SpawnStopContext interface {
 	actor.SpawnerContext
 	Stop(pid *actor.PID)
@@ -32,6 +36,8 @@ type MarketDataContext struct {
 	vwapPrice      float64
 	TradeCond      *sync.Cond
 	BookCond       *sync.Cond
+	customStats    map[models.StatType]func(ob *gorderbook.OrderBookL2) float64
+	flowStats      map[models.StatType]func(stat, posFlow, negFlow float64) float64
 }
 
 func (s *MarketDataContext) Close() {
@@ -56,6 +62,7 @@ type checkTimeout struct{}
 type MarketDataContextSettings struct {
 	VWAPCoefficient float64
 	VolumeTau       time.Duration
+	FlowStats       map[models.StatType]FlowStat
 }
 
 func NewMarketDataContext(parent SpawnStopContext, executor *actor.PID, securityID uint64, settings MarketDataContextSettings) *MarketDataContext {
@@ -185,11 +192,14 @@ func (state *MarketDataReceiver) OnMarketDataIncrementalRefresh(context actor.Co
 	var crossed bool
 	state.ctx.Lock()
 	if refresh.UpdateL2 != nil {
-		for _, l := range refresh.UpdateL2.Levels {
-			state.ctx.OBL2.UpdateOrderBookLevel(l)
+		tick := uint64(refresh.UpdateL2.Timestamp.AsTime().UnixMilli())
+		posFlow, negFlow := state.ctx.OBL2.UpdateOrderBookLevelsWithFlow(refresh.UpdateL2.Levels)
+		for st, s := range state.ctx.FlowStats {
+			state.ctx.Stats[st] = s.Apply(tick, posFlow, negFlow)
 		}
 		crossed = state.ctx.OBL2.Crossed()
 	}
+
 	for _, s := range refresh.Stats {
 		state.ctx.Stats[s.StatType] = s.Value
 	}

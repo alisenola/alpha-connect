@@ -301,7 +301,7 @@ func (m *ConstantPriceModel) GetSelectors() []string {
 	return nil
 }
 
-func (m *ConstantPriceModel) Forward(selector int, tick uint64, objectID uint64, object tickobjects.TickObject) error {
+func (m *ConstantPriceModel) Forward(selector int, tick uint64, object interface{}) error {
 	return nil
 }
 
