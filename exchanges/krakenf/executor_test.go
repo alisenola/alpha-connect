@@ -14,7 +14,7 @@ func TestExecutorPublic(t *testing.T) {
 	}
 	tests.ExPub(t, tests.ExPubTest{
 		Instrument: &models.Instrument{
-			Exchange: constants.CRYPTOFACILITIES,
+			Exchange: constants.KRAKENF,
 			Symbol:   &wrapperspb.StringValue{Value: "pi_xbtusd"},
 		},
 		SecurityListRequest: true,

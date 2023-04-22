@@ -135,20 +135,14 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		}
 		underlying := strings.ToUpper(strings.Split(instrument.Symbol, "_")[1])
 		baseSymbol := underlying[:3]
-		if sym, ok := krakenf.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[baseSymbol]; ok {
-			baseSymbol = sym
-		}
-		baseCurrency, ok := constants.GetAssetBySymbol(baseSymbol)
-		if !ok {
+		baseCurrency := SymbolToAsset(baseSymbol)
+		if baseCurrency == nil {
 			continue
 		}
 
 		quoteSymbol := underlying[3:]
-		if sym, ok := krakenf.CRYPTOFACILITIES_SYMBOL_TO_GLOBAL_SYMBOL[quoteSymbol]; ok {
-			quoteSymbol = sym
-		}
-		quoteCurrency, ok := constants.GetAssetBySymbol(quoteSymbol)
-		if !ok {
+		quoteCurrency := SymbolToAsset(quoteSymbol)
+		if quoteCurrency == nil {
 			continue
 		}
 		security := models.Security{}
@@ -160,25 +154,32 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		} else {
 			security.Status = models.InstrumentStatus_Disabled
 		}
-		security.Exchange = constants.CRYPTOFACILITIES
+		security.Exchange = constants.KRAKENF
 		splits := strings.Split(instrument.Symbol, "_")
 		switch splits[0] {
 		case "pv":
 			// Perpetual vanilla
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.IsInverse = false
+			// TODO check multiplier
+			security.Multiplier = wrapperspb.Double(1)
 		case "pi":
 			// Perpetual inverse
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.IsInverse = true
+			// TODO check multiplier
+			security.Multiplier = wrapperspb.Double(1)
 		case "pf":
 			// Perpetual flexible
 			security.SecurityType = enum.SecurityType_CRYPTO_PERP
 			security.IsInverse = false
+			// TODO check multiplier
+			security.Multiplier = wrapperspb.Double(1)
 		case "fv":
 			// Future vanilla
 			security.SecurityType = enum.SecurityType_CRYPTO_FUT
 			security.IsInverse = false
+			security.Multiplier = wrapperspb.Double(1)
 			year := time.Now().Format("2006")
 			date, err := time.Parse("20060102", year+splits[2][2:])
 			if err != nil {
@@ -189,6 +190,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 			// Future inverse
 			security.SecurityType = enum.SecurityType_CRYPTO_FUT
 			security.IsInverse = true
+			security.Multiplier = wrapperspb.Double(1)
 			year := time.Now().Format("2006")
 			date, err := time.Parse("20060102", year+splits[2][2:])
 			if err != nil {

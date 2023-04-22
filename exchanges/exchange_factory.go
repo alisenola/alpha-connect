@@ -14,7 +14,6 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybitl"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/bybits"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/coinbasepro"
-	"gitlab.com/alphaticks/alpha-connect/exchanges/cryptofacilities"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/deribit"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/dydx"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/fbinance"
@@ -27,6 +26,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobil"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/huobip"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/kraken"
+	"gitlab.com/alphaticks/alpha-connect/exchanges/krakenf"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okcoin"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okex"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/okexp"
@@ -104,6 +104,8 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Stat
 		return func() actor.Actor { return dydx.NewAccountListener(account, nil, nil) }
 	case constants.BYBITL.ID:
 		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, client, readOnly) }
+	case constants.KRAKENF.ID:
+		return func() actor.Actor { return krakenf.NewAccountListener(account, registry, db, client, readOnly) }
 	default:
 		return nil
 	}
@@ -143,7 +145,7 @@ func NewInstrumentListenerProducer(securityID uint64, exchangeID uint32, dialerP
 		return func() actor.Actor { return bitstamp.NewListenerL3(securityID, dialerPool) }
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewListener(securityID, dialerPool) }
-	case constants.CRYPTOFACILITIES.ID:
+	case constants.KRAKENF.ID:
 		return func() actor.Actor { return krakenf.NewListener(securityID, dialerPool) }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewListener(securityID, dialerPool) }
@@ -210,7 +212,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Conf
 		return func() actor.Actor { return bitstamp.NewExecutor() }
 	case constants.COINBASEPRO.ID:
 		return func() actor.Actor { return coinbasepro.NewExecutor() }
-	case constants.CRYPTOFACILITIES.ID:
+	case constants.KRAKENF.ID:
 		return func() actor.Actor { return krakenf.NewExecutor() }
 	case constants.FBINANCE.ID:
 		return func() actor.Actor { return fbinance.NewExecutor(config, dialerPool, registry, accountClients) }

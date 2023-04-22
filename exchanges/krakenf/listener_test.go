@@ -13,11 +13,11 @@ func TestMarketData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	exTests.LoadStatics(t)
+	exTests.LoadStatics()
 	tests.MarketData(t, tests.MDTest{
 		Symbol:            "pi_xbtusd",
 		SecurityType:      enum.SecurityType_CRYPTO_PERP,
-		Exchange:          constants.CRYPTOFACILITIES,
+		Exchange:          constants.KRAKENF,
 		MinPriceIncrement: 0.5,
 		RoundLot:          1,
 		HasMaturityDate:   false,

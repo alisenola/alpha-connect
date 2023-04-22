@@ -251,6 +251,7 @@ func (accnt *Account) Sync(securities []*models.Security, orders []*models.Order
 		}
 		accnt.ordersID[o.OrderID] = ord
 		accnt.ordersClID[o.ClientOrderID] = ord
+		fmt.Println("ORDER SECURITY", o.Instrument)
 		// Add orders to security
 		if (o.OrderStatus == models.OrderStatus_New || o.OrderStatus == models.OrderStatus_PartiallyFilled) && o.OrderType == models.OrderType_Limit {
 			if o.Side == models.Side_Buy {

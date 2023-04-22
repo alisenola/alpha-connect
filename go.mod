@@ -3,14 +3,6 @@ module gitlab.com/alphaticks/alpha-connect
 go 1.18
 
 require (
-	github.com/asynkron/protoactor-go v0.0.0-20221002142108-880b460fcd1f
-	github.com/ethereum/go-ethereum v1.10.19
-	github.com/go-playground/validator/v10 v10.2.0
-	github.com/melaurent/gotickfile/v2 v2.0.0-20220717080531-a4471992e2ff
-	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
-	github.com/satori/go.uuid v1.2.0
-	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.8.2
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20221107145043-34c9e3fc850a
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
@@ -20,16 +12,26 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20230120160008-9a4caa621693
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20221107131845-5b49f942c54f
-	gitlab.com/alphaticks/xchanger v0.0.0-20230406120603-ab495ced7c34
+	gitlab.com/alphaticks/xchanger v0.0.0-20230421131655-20e4763b6489
+	gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d // indirect
+	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
+)
+
+require (
+	github.com/asynkron/protoactor-go v0.0.0-20221002142108-880b460fcd1f
+	github.com/ethereum/go-ethereum v1.10.19
+	github.com/go-playground/validator/v10 v10.2.0
+	github.com/melaurent/gotickfile/v2 v2.0.0-20220717080531-a4471992e2ff
+	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
+	github.com/satori/go.uuid v1.2.0
+	github.com/spf13/viper v1.4.0
+	github.com/stretchr/testify v1.8.2
 	go.mongodb.org/mongo-driver v1.9.1
 	golang.org/x/net v0.2.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gorm.io/driver/postgres v1.3.5
 	gorm.io/gorm v1.23.6
-)
-
-require (
 	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/compute v1.12.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
@@ -125,8 +127,6 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d // indirect
-	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.7.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.30.0 // indirect
@@ -151,7 +151,7 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-//replace gitlab.com/alphaticks/xchanger => ../xchanger
+replace gitlab.com/alphaticks/xchanger => ../xchanger
 
 //replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
