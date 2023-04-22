@@ -5,33 +5,19 @@ go 1.18
 require (
 	gitlab.com/alphaticks/abigen-starknet v0.0.0-20220627142951-5a1d2fccea54
 	gitlab.com/alphaticks/alpha-public-registry-grpc v0.0.0-20221107145043-34c9e3fc850a
+	gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d // indirect
 	gitlab.com/alphaticks/go-graphql-client v0.6.1-0.20211231151627-f9c2682bee23
 	gitlab.com/alphaticks/gorderbook v0.0.0-20230414075805-9b6afa2f0499
+	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
 	gitlab.com/alphaticks/tickfunctors v0.0.0-20230210131633-dd95ed0ebf37
 	gitlab.com/alphaticks/tickstore v0.0.0-20221129081907-13068eb9edbb
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20230120160008-9a4caa621693
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20221107131845-5b49f942c54f
-	gitlab.com/alphaticks/xchanger v0.0.0-20230421131655-20e4763b6489
-	gitlab.com/alphaticks/fix42 v0.0.0-20220622092931-7ab993695f1d // indirect
-	gitlab.com/alphaticks/gostarkware v0.0.0-20211208181336-38b492644991 // indirect
+	gitlab.com/alphaticks/xchanger v0.0.0-20230422085330-fff4f3f98128
 )
 
 require (
-	github.com/asynkron/protoactor-go v0.0.0-20221002142108-880b460fcd1f
-	github.com/ethereum/go-ethereum v1.10.19
-	github.com/go-playground/validator/v10 v10.2.0
-	github.com/melaurent/gotickfile/v2 v2.0.0-20220717080531-a4471992e2ff
-	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
-	github.com/satori/go.uuid v1.2.0
-	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.8.2
-	go.mongodb.org/mongo-driver v1.9.1
-	golang.org/x/net v0.2.0
-	google.golang.org/grpc v1.51.0
-	google.golang.org/protobuf v1.28.1
-	gorm.io/driver/postgres v1.3.5
-	gorm.io/gorm v1.23.6
 	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/compute v1.12.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
@@ -43,6 +29,7 @@ require (
 	github.com/alecthomas/participle/v2 v2.0.0-beta.5 // indirect
 	github.com/armon/go-proxyproto v0.0.0-20210323213023-7e956b284f0a // indirect
 	github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 // indirect
+	github.com/asynkron/protoactor-go v0.0.0-20221002142108-880b460fcd1f
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd v0.23.4 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
@@ -59,6 +46,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/decred/dcrd/lru v1.0.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/ethereum/go-ethereum v1.10.19
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
@@ -67,6 +55,7 @@ require (
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/go-playground/validator/v10 v10.2.0
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3 // indirect
@@ -98,6 +87,8 @@ require (
 	github.com/magiconair/properties v1.8.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/melaurent/gotickfile v0.0.0-20220717080531-a4471992e2ff // indirect
+	github.com/melaurent/gotickfile/v2 v2.0.0-20220717080531-a4471992e2ff
+	github.com/melaurent/kafero v1.2.4-0.20220307151347-763aef8870e8
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/orcaman/concurrent-map v1.0.0 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
@@ -112,6 +103,7 @@ require (
 	github.com/quickfixgo/quickfix v0.6.1-0.20220621022117-efd43e2b4253 // indirect
 	github.com/quickfixgo/tag v0.0.0-20171007194743-cbb465760521 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
+	github.com/satori/go.uuid v1.2.0
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -119,6 +111,8 @@ require (
 	github.com/spf13/cast v1.3.0 // indirect
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/viper v1.4.0
+	github.com/stretchr/testify v1.8.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
@@ -127,6 +121,7 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	go.mongodb.org/mongo-driver v1.9.1
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.7.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.30.0 // indirect
@@ -137,6 +132,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.7.0 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
 	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
+	golang.org/x/net v0.2.0
 	golang.org/x/oauth2 v0.2.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
@@ -145,13 +141,17 @@ require (
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
+	google.golang.org/grpc v1.51.0
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/postgres v1.3.5
+	gorm.io/gorm v1.23.6
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-replace gitlab.com/alphaticks/xchanger => ../xchanger
+//replace gitlab.com/alphaticks/xchanger => ../xchanger
 
 //replace gitlab.com/alphaticks/gorderbook => ../gorderbook
 
