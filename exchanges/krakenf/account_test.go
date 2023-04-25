@@ -33,8 +33,8 @@ func TestAccountListener(t *testing.T) {
 		Account:             krakenfAccount,
 		Instrument:          instrument,
 		OrderStatusRequest:  true,
-		GetPositionsLimit:   false,
-		GetPositionsMarket:  false,
-		OrderReplaceRequest: false,
+		GetPositionsLimit:   true,
+		GetPositionsMarket:  true,
+		OrderReplaceRequest: true,
 	})
 }
