@@ -233,3 +233,33 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	})
 	return nil
 }
+
+func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
+	msg := context.Message().(*messages.NewOrderSingleRequest)
+	context.Respond(&messages.NewOrderSingleResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderCancelRequest)
+	context.Respond(&messages.OrderCancelResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
+
+func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderMassCancelRequest)
+	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID:       msg.RequestID,
+		Success:         false,
+		RejectionReason: messages.RejectionReason_UnsupportedRequest,
+	})
+	return nil
+}
