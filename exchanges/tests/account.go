@@ -8,8 +8,10 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/tests"
+	"gitlab.com/alphaticks/gorderbook"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -33,6 +35,8 @@ type AccountTest struct {
 type AccountTestCtx struct {
 	as       *actor.ActorSystem
 	executor *actor.PID
+	ob       *gorderbook.OrderBookL2
+	sec      *models.Security
 }
 
 func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
@@ -81,26 +85,6 @@ func AccntTest(t *testing.T, tc AccountTest) {
 		executor: executor,
 	}
 
-	if tc.AccountInformationRequest {
-		t.Run("AccountInformationRequest", func(t *testing.T) {
-			res, err := as.Root.RequestFuture(executor, &messages.AccountInformationRequest{
-				RequestID: 0,
-				Account:   tc.Account,
-			}, 10*time.Second).Result()
-			if err != nil {
-				t.Fatal(err)
-			}
-			v, ok := res.(*messages.AccountInformationResponse)
-			if !ok {
-				t.Fatalf("was expecting *messages.AccountInformationResponse, got %s", reflect.TypeOf(res).String())
-			}
-			if !v.Success {
-				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
-			}
-		})
-
-	}
-
 	// Get security def
 	res, err := as.Root.RequestFuture(executor, &messages.SecurityDefinitionRequest{
 		Instrument: tc.Instrument,
@@ -117,7 +101,10 @@ func AccntTest(t *testing.T, tc AccountTest) {
 		t.Fatal(sd.RejectionReason.String())
 	}
 
-	sec := sd.Security
+	ctx.sec = sd.Security
+	if ctx.sec.MinPriceIncrement == nil || ctx.sec.RoundLot == nil {
+		t.Fatalf("security is missing MinPriceIncrement or RoundLot")
+	}
 
 	// Get balances
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
@@ -140,7 +127,7 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	fmt.Println("BALANCES", bl.Balances, len(bl.Balances))
 	for _, bal := range bl.Balances {
 		fmt.Println(bal.Quantity)
-		if bal.Asset.ID == sec.QuoteCurrency.ID {
+		if bal.Asset.ID == ctx.sec.QuoteCurrency.ID {
 			available = bal.Quantity
 		}
 	}
@@ -149,24 +136,50 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 
 	// Get market data
-	/*
-		res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
-			RequestID:   0,
-			Instrument:  tc.Instrument,
-			Aggregation: models.OrderBookAggregation_L2,
-		}, 10*time.Second).Result()
-		if err != nil {
-			t.Fatal(err)
-		}
-		v, ok := res.(*messages.MarketDataResponse)
-		if !ok {
-			t.Fatalf("was expecting *messages.MarketDataResponse, got %s", reflect.TypeOf(res).String())
-		}
-		if !v.Success {
-			t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
-		}
+	res, err = as.Root.RequestFuture(executor, &messages.MarketDataRequest{
+		RequestID:   0,
+		Instrument:  tc.Instrument,
+		Aggregation: models.OrderBookAggregation_L2,
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, ok := res.(*messages.MarketDataResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.MarketDataResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !v.Success {
+		t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+	}
 
-	*/
+	tickPrecision := uint64(math.Ceil(1. / ctx.sec.MinPriceIncrement.Value))
+	lotPrecision := uint64(math.Ceil(1. / ctx.sec.RoundLot.Value))
+	ob := gorderbook.NewOrderBookL2(
+		tickPrecision,
+		lotPrecision,
+		10000)
+	ob.Sync(v.SnapshotL2.Bids, v.SnapshotL2.Asks)
+	ctx.ob = ob
+
+	if tc.AccountInformationRequest {
+		t.Run("AccountInformationRequest", func(t *testing.T) {
+			res, err := as.Root.RequestFuture(executor, &messages.AccountInformationRequest{
+				RequestID: 0,
+				Account:   tc.Account,
+			}, 10*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := res.(*messages.AccountInformationResponse)
+			if !ok {
+				t.Fatalf("was expecting *messages.AccountInformationResponse, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+		})
+
+	}
 
 	if tc.OrderStatusRequest {
 		OrderStatusRequest(t, ctx, tc, messages.ResponseType_Result)
@@ -270,6 +283,11 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
 	}
 
+	bb := ctx.ob.BestBid()
+	size := ctx.sec.RoundLot.Value
+	if ctx.sec.MinLimitQuantity != nil {
+		size = math.Max(size, ctx.sec.MinLimitQuantity.Value)
+	}
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
 		Account:   tc.Account,
@@ -279,8 +297,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
 			TimeInForce:           models.TimeInForce_GoodTillCancel,
-			Quantity:              0.001,
-			Price:                 &wrapperspb.DoubleValue{Value: 20000.},
+			Quantity:              size,
+			Price:                 &wrapperspb.DoubleValue{Value: bb.Price * 0.9},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
 		ResponseType: respType,
@@ -296,7 +314,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if response.Success {
 		t.Fatalf("was expecting unsucessful request")
 	}
-	fmt.Println(response.RejectionReason.String())
 
 	orderID := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Test with one order
@@ -309,8 +326,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
 			TimeInForce:           models.TimeInForce_GoodTillCancel,
-			Quantity:              0.001,
-			Price:                 &wrapperspb.DoubleValue{Value: 20000.},
+			Quantity:              size,
+			Price:                 &wrapperspb.DoubleValue{Value: bb.Price * 0.9},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
 		ResponseType: respType,
