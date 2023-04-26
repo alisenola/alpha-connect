@@ -16,6 +16,13 @@ var instrument = &models.Instrument{
 	Symbol:     wrapperspb.String("BTCUSDT"),
 }
 
+/*
+Test net credentials
+hostname: https://testnet.binancefuture.com/
+username: laurent@alphaticks.io
+password: CWX9pay_zhc8zpf0mxq
+*/
+
 var fbinanceAccount = &models.Account{
 	Exchange: constants.FBINANCE,
 	ApiCredentials: &xchangerModels.APICredentials{
@@ -33,7 +40,7 @@ func TestAccountListener(t *testing.T) {
 		Account:             fbinanceAccount,
 		Instrument:          instrument,
 		OrderStatusRequest:  true,
-		GetPositionsLimit:   false,
+		GetPositionsLimit:   true,
 		GetPositionsMarket:  false,
 		OrderReplaceRequest: false,
 	})

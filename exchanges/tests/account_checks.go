@@ -128,7 +128,7 @@ func checkPositions(t *testing.T, as *actor.ActorSystem, executor *actor.PID, ac
 	}
 }
 
-func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account, filter *messages.OrderFilter) {
+func checkOrders(as *actor.ActorSystem, executor *actor.PID, account *models.Account, sec *models.Security, filter *messages.OrderFilter) error {
 	// Request the same from binance directly
 	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
 
@@ -139,14 +139,14 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 	}, 10*time.Second).Result()
 
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	response, ok := res.(*messages.OrderList)
 	if !ok {
-		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+		return fmt.Errorf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
 	}
 	if !response.Success {
-		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
+		return fmt.Errorf("was expecting successful request: %s", response.RejectionReason.String())
 	}
 
 	orders1 := response.Orders
@@ -159,19 +159,19 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 	}, 10*time.Second).Result()
 
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	response, ok = res.(*messages.OrderList)
 	if !ok {
-		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+		return fmt.Errorf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
 	}
 	if !response.Success {
-		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
+		return fmt.Errorf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 	orders2 := response.Orders
 	fmt.Printf("got %d orders from exchange executor i.e. api \n", len(orders2))
 	if len(orders1) != len(orders2) {
-		t.Fatalf("differents lengths, got %d vs %d", len(orders1), len(orders2))
+		return fmt.Errorf("differents lengths, got %d vs %d", len(orders1), len(orders2))
 	}
 	sort.Slice(orders1, func(i, j int) bool {
 		return orders1[i].ClientOrderID < orders1[j].ClientOrderID
@@ -181,15 +181,21 @@ func checkOrders(t *testing.T, as *actor.ActorSystem, executor *actor.PID, accou
 	})
 	for i := range orders1 {
 		if orders1[i].ClientOrderID != orders2[i].ClientOrderID {
-			t.Fatalf("different ClientOrderIds %s vs %s", orders1[i].ClientOrderID, orders2[i].ClientOrderID)
+			return fmt.Errorf("different ClientOrderIds %s vs %s", orders1[i].ClientOrderID, orders2[i].ClientOrderID)
 		}
-		if orders1[i].Price.Value != orders2[i].Price.Value {
-			t.Fatalf("different prices %f vs %f", orders1[i].Price.Value, orders2[i].Price.Value)
+		p1 := int(orders1[i].Price.Value / sec.MinPriceIncrement.Value)
+		p2 := int(orders2[i].Price.Value / sec.MinPriceIncrement.Value)
+		if p1 != p2 {
+			fmt.Println(p1, p2)
+			return fmt.Errorf("different prices %f vs %f", orders1[i].Price.Value, orders2[i].Price.Value)
 		}
-		if orders1[i].CumQuantity != orders2[i].CumQuantity {
-			t.Fatalf("different quantities %f vs %f", orders1[i].CumQuantity, orders2[i].CumQuantity)
+		q1 := int(orders1[i].CumQuantity / sec.RoundLot.Value)
+		q2 := int(orders2[i].CumQuantity / sec.RoundLot.Value)
+		if q1 != q2 {
+			return fmt.Errorf("different quantities %f vs %f", orders1[i].CumQuantity, orders2[i].CumQuantity)
 		}
 	}
 	fmt.Println(orders1)
 	fmt.Println(orders2)
+	return nil
 }

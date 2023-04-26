@@ -39,7 +39,7 @@ type AccountTestCtx struct {
 	sec      *models.Security
 }
 
-func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
+func cleanOrders(ctx AccountTestCtx, tc AccountTest) error {
 	filter := &messages.OrderFilter{
 		Instrument: tc.Instrument,
 	}
@@ -48,15 +48,16 @@ func clean(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Filter:  filter,
 	}, 10*time.Second).Result()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	response, ok := res.(*messages.OrderMassCancelResponse)
 	if !ok {
-		t.Fatalf("expecting *messages.OrderMassCancelResponse, got %s", reflect.TypeOf(res).String())
+		return fmt.Errorf("expecting *messages.OrderMassCancelResponse, got %s", reflect.TypeOf(res).String())
 	}
 	if !response.Success {
-		t.Fatalf("unsuccessfull OrderMassCancelResponse: %s", response.RejectionReason.String())
+		return fmt.Errorf("unsuccessfull OrderMassCancelResponse: %s", response.RejectionReason.String())
 	}
+	return nil
 }
 
 func AccntTest(t *testing.T, tc AccountTest) {
@@ -161,6 +162,12 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	ob.Sync(v.SnapshotL2.Bids, v.SnapshotL2.Asks)
 	ctx.ob = ob
 
+	// Cancel all orders
+	if err := cleanOrders(ctx, tc); err != nil {
+		t.Fatal(err)
+	}
+	defer cleanOrders(ctx, tc)
+
 	if tc.AccountInformationRequest {
 		t.Run("AccountInformationRequest", func(t *testing.T) {
 			res, err := as.Root.RequestFuture(executor, &messages.AccountInformationRequest{
@@ -178,7 +185,6 @@ func AccntTest(t *testing.T, tc AccountTest) {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
 			}
 		})
-
 	}
 
 	if tc.OrderStatusRequest {
@@ -207,10 +213,10 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	if tc.OrderMassCancelRequest {
 		OrderMassCancelRequest(t, ctx, tc)
 	}
-	clean(t, ctx, tc)
 }
 
 func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType messages.ResponseType) {
+
 	// Test with no account
 	// TODO Finish testing
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
@@ -284,9 +290,10 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	}
 
 	bb := ctx.ob.BestBid()
-	size := ctx.sec.RoundLot.Value
+	qty := ctx.sec.RoundLot.Value
+	price := math.Round((bb.Price*0.9)/ctx.sec.MinPriceIncrement.Value) * ctx.sec.MinPriceIncrement.Value
 	if ctx.sec.MinLimitQuantity != nil {
-		size = math.Max(size, ctx.sec.MinLimitQuantity.Value)
+		qty = math.Max(qty, ctx.sec.MinLimitQuantity.Value)
 	}
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		RequestID: 0,
@@ -297,8 +304,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
 			TimeInForce:           models.TimeInForce_GoodTillCancel,
-			Quantity:              size,
-			Price:                 &wrapperspb.DoubleValue{Value: bb.Price * 0.9},
+			Quantity:              qty,
+			Price:                 &wrapperspb.DoubleValue{Value: price},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
 		ResponseType: respType,
@@ -326,8 +333,8 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
 			TimeInForce:           models.TimeInForce_GoodTillCancel,
-			Quantity:              size,
-			Price:                 &wrapperspb.DoubleValue{Value: bb.Price * 0.9},
+			Quantity:              qty,
+			Price:                 &wrapperspb.DoubleValue{Value: price},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
 		},
 		ResponseType: respType,
@@ -344,12 +351,14 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatalf("was expecting sucessful request: %s", response.RejectionReason.String())
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(4 * time.Second)
 	filter := &messages.OrderFilter{
 		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 		Instrument:  tc.Instrument,
 	}
-	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
+		t.Fatalf("error checking orders %s", err)
+	}
 
 	// Test with instrument and order status
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
@@ -377,8 +386,10 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if order.OrderStatus != models.OrderStatus_New {
 		t.Fatalf("order status not new")
 	}
-	if int(order.LeavesQuantity*1000) != 1 {
-		t.Fatalf("was expecting leaves quantity of 0.0001, got %f", order.LeavesQuantity)
+	lq := int(order.LeavesQuantity / ctx.sec.RoundLot.Value)
+	q := int(qty / ctx.sec.RoundLot.Value)
+	if lq != q {
+		t.Fatalf("was expecting leaves quantity of %f, got %f", qty, order.LeavesQuantity)
 	}
 	if int(order.CumQuantity) != 0 {
 		t.Fatalf("was expecting cum quantity of 0")
@@ -451,7 +462,9 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatalf("was expecting cum quantity of 0")
 	}
 
-	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
+		t.Fatalf("error checking orders %s", err)
+	}
 }
 
 func ExpiredOrder(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType messages.ResponseType) {
@@ -488,7 +501,9 @@ func ExpiredOrder(t *testing.T, ctx AccountTestCtx, tc AccountTest, respType mes
 		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 		Instrument:  tc.Instrument,
 	}
-	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
+		t.Fatalf("error checking orders %s", err)
+	}
 
 	// Test with instrument and order status
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
@@ -792,6 +807,10 @@ func GetPositionsLimit(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 
 func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	// Market sell
+	size := ctx.sec.RoundLot.Value
+	if ctx.sec.MinLimitQuantity != nil {
+		size = math.Max(size, ctx.sec.MinLimitQuantity.Value)
+	}
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
@@ -800,8 +819,8 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Limit,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_GoodTillCancel,
-			Price:         &wrapperspb.DoubleValue{Value: 28000},
-			Quantity:      0.001,
+			Price:         &wrapperspb.DoubleValue{Value: ctx.ob.BestBid().Price * 0.9},
+			Quantity:      size,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -830,8 +849,8 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
 			TimeInForce:           models.TimeInForce_GoodTillCancel,
-			Price:                 &wrapperspb.DoubleValue{Value: 80000},
-			Quantity:              0.001,
+			Price:                 &wrapperspb.DoubleValue{Value: ctx.ob.BestAsk().Price * 1.1},
+			Quantity:              size,
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ReduceOnly},
 		},
 	}, 10*time.Second).Result()
@@ -1216,7 +1235,9 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Instrument: tc.Instrument,
 		//OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
-	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
+		t.Fatal(err)
+	}
 	//Cancel all the orders
 	resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderMassCancelRequest{
 		Account: tc.Account,
@@ -1240,5 +1261,7 @@ func OrderMassCancelRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Instrument:  tc.Instrument,
 		OrderStatus: &messages.OrderStatusValue{Value: models.OrderStatus_New},
 	}
-	checkOrders(t, ctx.as, ctx.executor, tc.Account, filter)
+	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
+		t.Fatal(err)
+	}
 }
