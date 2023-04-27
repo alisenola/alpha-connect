@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -334,12 +335,79 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
-	msg := context.Message().(*messages.OrderCancelRequest)
-	context.Respond(&messages.OrderCancelResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.RejectionReason_UnsupportedRequest,
-	})
+	req := context.Message().(*messages.OrderCancelRequest)
+	sender := context.Sender()
+	response := &messages.OrderCancelResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func() {
+		symbol := ""
+		if req.Instrument != nil {
+			if req.Instrument.Symbol != nil {
+				symbol = req.Instrument.Symbol.Value
+			} else if req.Instrument.SecurityID != nil {
+				sec := state.IDToSecurity(req.Instrument.SecurityID.Value)
+				if sec == nil {
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+					context.Send(sender, response)
+					return
+				}
+				symbol = sec.Symbol
+			}
+		} else {
+			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+			context.Send(sender, response)
+			return
+		}
+		params := krakenf.NewCancelOrderRequest(symbol)
+		if req.OrderID != nil {
+			orderIDInt, err := strconv.ParseInt(req.OrderID.Value, 10, 64)
+			if err != nil {
+				response.RejectionReason = messages.RejectionReason_UnknownOrder
+				context.Send(sender, response)
+				return
+			}
+			params.SetOrderID(orderIDInt)
+		} else if req.ClientOrderID != nil {
+			params.SetOrigClientOrderID(req.ClientOrderID.Value)
+		} else {
+			response.RejectionReason = messages.RejectionReason_UnknownOrder
+			context.Send(sender, response)
+			return
+		}
+
+		var request *http.Request
+		var err error
+		request, _, err = krakenf.CancelOrder(req.Account.ApiCredentials, params)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+		var data krakenf.CancelOrderResponse
+		start := time.Now()
+		if err := xutils.PerformJSONRequest(state.client, request, &data); err != nil {
+			state.logger.Warn("error cancelling order", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.Error != "" {
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", msg.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		response.NetworkRtt = durationpb.New(time.Since(start))
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
 	return nil
 }
 
