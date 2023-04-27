@@ -3,6 +3,13 @@ package krakenf
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"net/http"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -14,13 +21,10 @@ import (
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
+	xutils "gitlab.com/alphaticks/xchanger/utils"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"io/ioutil"
-	"net/http"
-	"reflect"
-	"strings"
-	"time"
 )
 
 type Executor struct {
@@ -241,6 +245,91 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 		Success:         false,
 		RejectionReason: messages.RejectionReason_UnsupportedRequest,
 	})
+	sender := context.Sender()
+	response := &messages.NewOrderSingleResponse{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	ar := state.rateLimit
+	if ar == nil {
+		var newAr *exchanges.RateLimit
+		ar = newAr
+	}
+
+	if ar.IsRateLimited() {
+		response.RejectionReason = messages.RejectionReason_AccountRateLimitExceeded
+		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(1))
+		context.Send(sender, response)
+		return nil
+	}
+	if ar.GetCapacity() > 0.9 && msg.Order.IsForceMaker() {
+		response.RejectionReason = messages.RejectionReason_TakerOnly
+		context.Send(sender, response)
+		return nil
+	}
+
+	go func() {
+		var tickPrecision, lotPrecision int
+		sec, rej := state.InstrumentToSecurity(msg.Order.Instrument)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Send(sender, response)
+			return
+		}
+
+		tickPrecision = int(math.Ceil(math.Log10(1. / sec.MinPriceIncrement.Value)))
+		lotPrecision = int(math.Ceil(math.Log10(1. / sec.RoundLot.Value)))
+
+		params, rej := buildPostOrderRequest(sec.Symbol, msg.Order, tickPrecision, lotPrecision)
+		if rej != nil {
+			response.RejectionReason = *rej
+			context.Send(sender, response)
+			return
+		}
+
+		var request *http.Request
+		var err error
+		request, _, err = krakenf.SendOrder(msg.Account.ApiCredentials, params)
+		if err != nil {
+			state.logger.Warn("error building request", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		ar.Request(1)
+
+		var data krakenf.SendOrderResponse
+		start := time.Now()
+		if err := xutils.PerformJSONRequest(state.client, request, &data); err != nil {
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", msg.Account.Name), log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.Error != "" {
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", msg.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+		status := StatusToModel(data.SendStatus.Status)
+		if status == nil {
+			state.logger.Error(fmt.Sprintf("unknown status %s", data.SendStatus.Status))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+		response.NetworkRtt = durationpb.New(time.Since(start))
+		response.Success = true
+		response.OrderStatus = *status
+		response.OrderID = fmt.Sprintf("%s", data.SendStatus.OrderId)
+		fmt.Println("NEW SUCCESS", response.OrderID, response.OrderStatus.String())
+		context.Send(sender, response)
+	}()
+
 	return nil
 }
 

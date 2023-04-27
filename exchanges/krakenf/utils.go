@@ -2,7 +2,9 @@ package krakenf
 
 import (
 	"fmt"
+
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
@@ -88,4 +90,60 @@ func SymbolToAsset(symbol string) *xmodels.Asset {
 		return nil
 	}
 	return asset
+}
+
+func StatusToModel(status string) *models.OrderStatus {
+	switch status {
+	case "NEW":
+		v := models.OrderStatus_New
+		return &v
+	case "CANCELED":
+		v := models.OrderStatus_Canceled
+		return &v
+	case "PARTIALLY_FILLED":
+		v := models.OrderStatus_PartiallyFilled
+		return &v
+	case "FILLED":
+		v := models.OrderStatus_Filled
+		return &v
+	case "EXPIRED":
+		v := models.OrderStatus_Expired
+		return &v
+	default:
+		return nil
+	}
+}
+
+func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (krakenf.SendOrderRequest, *messages.RejectionReason) {
+	var side string
+	var typ krakenf.OrderType
+	size := order.Size
+	if order.OrderSide == models.Side_Buy {
+		side = "BUY"
+	} else {
+		side = "SELL"
+	}
+	switch order.OrderType {
+	case models.OrderType_Limit:
+		typ = krakenf.LimitOrderType
+	case models.OrderType_Market:
+		typ = krakenf.MarketOrderType
+	case models.OrderType_Stop:
+		typ = krakenf.StopOrderType
+	case models.OrderType_IOC:
+		typ = krakenf.IOCOrderType
+	case models.OrderType_PostOnly:
+		typ = krakenf.PostOnlyOrderType
+	case models.OrderType_TakeProfit:
+		typ = krakenf.TakeProfitOrderType
+	case models.OrderType_TrailingStopLimit:
+		typ = krakenf.TrailingStopOrderType
+	default:
+		rej := messages.RejectionReason_UnsupportedOrderType
+		return nil, &rej
+	}
+
+	request := krakenf.NewSendOrderRequest(symbol, string(typ), size, side)
+
+	return request, nil
 }

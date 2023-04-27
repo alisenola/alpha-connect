@@ -2,14 +2,15 @@ package tests
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"gitlab.com/alphaticks/alpha-connect/tests"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"reflect"
-	"testing"
-	"time"
 )
 
 type ExPubTest struct {
