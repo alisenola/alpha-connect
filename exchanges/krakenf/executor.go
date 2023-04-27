@@ -369,9 +369,9 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 				context.Send(sender, response)
 				return
 			}
-			params.SetOrderID(orderIDInt)
+			params.SetOrderId(fmt.Sprint(orderIDInt))
 		} else if req.ClientOrderID != nil {
-			params.SetOrigClientOrderID(req.ClientOrderID.Value)
+			params.SetCliOrdID(req.ClientOrderID.Value)
 		} else {
 			response.RejectionReason = messages.RejectionReason_UnknownOrder
 			context.Send(sender, response)
