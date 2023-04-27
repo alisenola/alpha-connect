@@ -397,7 +397,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			return
 		}
 		if data.Error != "" {
-			state.logger.Warn(fmt.Sprintf("error posting order for %s", msg.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
 			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
 			context.Send(sender, response)
 			return
@@ -412,11 +412,72 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 }
 
 func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
-	msg := context.Message().(*messages.OrderMassCancelRequest)
-	context.Respond(&messages.OrderMassCancelResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.RejectionReason_UnsupportedRequest,
-	})
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	sender := context.Sender()
+	response := &messages.OrderMassCancelResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func() {
+		symbol := ""
+		if req.Filter != nil {
+			if req.Filter.Instrument != nil {
+				if req.Filter.Instrument.Symbol != nil {
+					sec := state.SymbolToSecurity(req.Filter.Instrument.Symbol.Value)
+					if sec == nil {
+						response.RejectionReason = messages.RejectionReason_UnknownSymbol
+						context.Send(sender, response)
+						return
+					}
+					symbol = req.Filter.Instrument.Symbol.Value
+				} else if req.Filter.Instrument.SecurityID != nil {
+					sec := state.IDToSecurity(req.Filter.Instrument.SecurityID.Value)
+					if sec == nil {
+						response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+						context.Send(sender, response)
+						return
+					}
+					symbol = sec.Symbol
+				}
+			}
+			if req.Filter.Side != nil || req.Filter.OrderStatus != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+				context.Send(sender, response)
+				return
+			}
+		}
+		if symbol == "" {
+			response.RejectionReason = messages.RejectionReason_UnknownSymbol
+			context.Send(sender, response)
+			return
+		}
+
+		params := krakenf.NewCancelOrderRequest(symbol)
+
+		request, weight, err := krakenf.CancelAllOrders(req.Account.ApiCredentials, params)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(weight)
+		var data krakenf.CancelAllOrdersResponse
+		if err := xutils.PerformJSONRequest(state.client, request, &data); err != nil {
+			state.logger.Warn("error cancelling orders", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.Error != "" {
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+		response.Success = true
+		context.Send(sender, response)
+	}()
 	return nil
 }
