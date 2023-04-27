@@ -117,7 +117,7 @@ func StatusToModel(status string) *models.OrderStatus {
 func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (krakenf.SendOrderRequest, *messages.RejectionReason) {
 	var side string
 	var typ krakenf.OrderType
-	size := order.Size
+	size := order.Quantity
 	if order.OrderSide == models.Side_Buy {
 		side = "BUY"
 	} else {
@@ -130,12 +130,6 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 		typ = krakenf.MarketOrderType
 	case models.OrderType_Stop:
 		typ = krakenf.StopOrderType
-	case models.OrderType_IOC:
-		typ = krakenf.IOCOrderType
-	case models.OrderType_PostOnly:
-		typ = krakenf.PostOnlyOrderType
-	case models.OrderType_TakeProfit:
-		typ = krakenf.TakeProfitOrderType
 	case models.OrderType_TrailingStopLimit:
 		typ = krakenf.TrailingStopOrderType
 	default:

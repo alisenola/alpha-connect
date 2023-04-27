@@ -332,10 +332,6 @@ const (
 	OrderType_LimitIfTouched    OrderType = 4
 	OrderType_MarketIfTouched   OrderType = 5
 	OrderType_TrailingStopLimit OrderType = 6
-	OrderType_PostOnly					OrderType = 7
-	OrderType_IOC								OrderType = 8
-	OrderType_TakeProfit 				OrderType = 9
-
 )
 
 // Enum value maps for OrderType.

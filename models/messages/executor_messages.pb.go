@@ -4076,7 +4076,6 @@ type NewOrder struct {
 	OrderSide             models.Side                   `protobuf:"varint,6,opt,name=order_side,json=orderSide,proto3,enum=models.Side" json:"order_side,omitempty"`
 	TimeInForce           models.TimeInForce            `protobuf:"varint,7,opt,name=time_in_force,json=timeInForce,proto3,enum=models.TimeInForce" json:"time_in_force,omitempty"`
 	Quantity              float64                       `protobuf:"fixed64,8,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	Size              		float64                       `protobuf:"fixed64,8,opt,name=size,proto3" json:"size,omitempty"`
 	Price                 *wrapperspb.DoubleValue       `protobuf:"bytes,9,opt,name=price,proto3" json:"price,omitempty"`
 	ExecutionInstructions []models.ExecutionInstruction `protobuf:"varint,10,rep,packed,name=execution_instructions,json=executionInstructions,proto3,enum=models.ExecutionInstruction" json:"execution_instructions,omitempty"`
 	Tag                   string                        `protobuf:"bytes,11,opt,name=tag,proto3" json:"tag,omitempty"`
