@@ -2,6 +2,13 @@ package krakenf
 
 import (
 	"fmt"
+	"math"
+	"net/http"
+	"reflect"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
@@ -13,12 +20,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
-	"math"
-	"net/http"
-	"reflect"
-	"sort"
-	"strings"
-	"time"
 )
 
 type checkSocket struct{}
@@ -509,6 +510,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			if report.ExecutionType == messages.ExecutionType_PendingNew {
 				fut := context.RequestFuture(state.krakenfExecutor, req, 10*time.Second)
 				context.ReenterAfter(fut, func(res interface{}, err error) {
+					fmt.Println("qqqqqqqqqqqqqq", res)
 					if req.ResponseType == messages.ResponseType_Result {
 						defer context.Send(sender, reqResponse)
 					}

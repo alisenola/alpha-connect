@@ -3,6 +3,10 @@ package account
 import (
 	"errors"
 	"fmt"
+	"math"
+	"sync"
+	"time"
+
 	"gitlab.com/alphaticks/alpha-connect/enum"
 	"gitlab.com/alphaticks/alpha-connect/modeling"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -11,9 +15,6 @@ import (
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
-	"sync"
-	"time"
 )
 
 func IsPending(status models.OrderStatus) bool {

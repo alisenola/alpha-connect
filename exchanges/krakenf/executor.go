@@ -220,12 +220,61 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 }
 
 func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	msg := context.Message().(*messages.HistoricalLiquidationsRequest)
-	context.Respond(&messages.HistoricalLiquidationsResponse{
-		RequestID:       msg.RequestID,
+	req := context.Message().(*messages.HistoricalLiquidationsRequest)
+	sender := context.Sender()
+	response := &messages.HistoricalLiquidationsResponse{
+		RequestID:       req.RequestID,
 		Success:         false,
 		RejectionReason: messages.RejectionReason_UnsupportedRequest,
-	})
+	}
+	go func() {
+		symbol := ""
+		if req.Instrument != nil {
+			if req.Instrument.Symbol != nil {
+				symbol = req.Instrument.Symbol.Value
+			} else if req.Instrument.SecurityID != nil {
+				sec := state.IDToSecurity(req.Instrument.SecurityID.Value)
+				if sec == nil {
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+					context.Send(sender, response)
+					return
+				}
+				symbol = sec.Symbol
+			}
+		} else {
+			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+			context.Send(sender, response)
+			return
+		}
+		params := krakenf.NewFundingRateRequest(symbol)
+
+		var request *http.Request
+		var err error
+		request, _, err = krakenf.GetHistoricalFundingRates(params)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+		var data krakenf.HistoricalFundingRatesResponse
+		if err := xutils.PerformJSONRequest(state.client, request, &data); err != nil {
+			state.logger.Warn("error getting historicalFundingRates", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.Error != "" {
+			state.logger.Warn(fmt.Sprintf("error getting historicalFundingRates"), log.Error(fmt.Errorf("%s", data.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		response.Success = true
+		context.Send(sender, response)
+	}()
 	return nil
 }
 

@@ -94,19 +94,22 @@ func SymbolToAsset(symbol string) *xmodels.Asset {
 
 func StatusToModel(status string) *models.OrderStatus {
 	switch status {
-	case "NEW":
+	case "new":
 		v := models.OrderStatus_New
 		return &v
-	case "CANCELED":
+	case "placed":
+		v := models.OrderStatus_Done
+		return &v
+	case "canceled":
 		v := models.OrderStatus_Canceled
 		return &v
-	case "PARTIALLY_FILLED":
+	case "partially_filled":
 		v := models.OrderStatus_PartiallyFilled
 		return &v
-	case "FILLED":
+	case "filled":
 		v := models.OrderStatus_Filled
 		return &v
-	case "EXPIRED":
+	case "expired":
 		v := models.OrderStatus_Expired
 		return &v
 	default:
@@ -138,6 +141,10 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 	}
 
 	request := krakenf.NewSendOrderRequest(symbol, string(typ), size, side)
+
+	if typ == "lmt" {
+		request.SetLimitPrice(100)
+	}
 
 	return request, nil
 }

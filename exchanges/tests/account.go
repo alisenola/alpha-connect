@@ -2,6 +2,11 @@ package tests
 
 import (
 	"fmt"
+	"math"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	uuid "github.com/satori/go.uuid"
 	"gitlab.com/alphaticks/alpha-connect/config"
@@ -11,10 +16,6 @@ import (
 	"gitlab.com/alphaticks/gorderbook"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
-	"reflect"
-	"testing"
-	"time"
 )
 
 type AccountTest struct {
@@ -229,6 +230,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	}
 
 	orderList, ok := res.(*messages.OrderList)
+
 	if !ok {
 		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
 	}
@@ -344,6 +346,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatal(err)
 	}
 	response, ok = res.(*messages.NewOrderSingleResponse)
+	fmt.Println("ssssssssssssssssss", res, respType)
 	if !ok {
 		t.Fatalf("was expecting *messages.NewOrderSingleResponse, got %s", reflect.TypeOf(res).String())
 	}
