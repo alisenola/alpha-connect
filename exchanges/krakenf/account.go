@@ -432,7 +432,11 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderStatusRequest)
+	if req.Filter != nil {
+		req.Filter.Instrument.Symbol.Value = strings.ToUpper(req.Filter.Instrument.Symbol.Value)
+	}
 	orders := state.account.GetOrders(req.Filter)
+
 	context.Respond(&messages.OrderList{
 		RequestID: req.RequestID,
 		Success:   true,
@@ -510,7 +514,6 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			if report.ExecutionType == messages.ExecutionType_PendingNew {
 				fut := context.RequestFuture(state.krakenfExecutor, req, 10*time.Second)
 				context.ReenterAfter(fut, func(res interface{}, err error) {
-					fmt.Println("qqqqqqqqqqqqqq", res)
 					if req.ResponseType == messages.ResponseType_Result {
 						defer context.Send(sender, reqResponse)
 					}

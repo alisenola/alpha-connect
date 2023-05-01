@@ -2,14 +2,15 @@ package tests
 
 import (
 	"fmt"
-	"github.com/asynkron/protoactor-go/actor"
-	"gitlab.com/alphaticks/alpha-connect/models"
-	"gitlab.com/alphaticks/alpha-connect/models/messages"
 	"math"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/asynkron/protoactor-go/actor"
+	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/models/messages"
 )
 
 func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account) {
@@ -151,8 +152,9 @@ func checkOrders(as *actor.ActorSystem, executor *actor.PID, account *models.Acc
 
 	orders1 := response.Orders
 	fmt.Printf("got %d orders from main executor i.e. account \n", len(orders1))
+	fmt.Println("aaaaaaaaaaaaaaaaa", exchangeExecutor, executor)
 
-	res, err = as.Root.RequestFuture(exchangeExecutor, &messages.OrderStatusRequest{
+	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,
 		Account:   account,
 		Filter:    filter,

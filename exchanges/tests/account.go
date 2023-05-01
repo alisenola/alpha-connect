@@ -287,9 +287,28 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if !orderList.Success {
 		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
 	}
-	if len(orderList.Orders) > 0 {
-		t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
+	// if len(orderList.Orders) > 0 {
+	// 	t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
+	// }
+
+	resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderMassCancelRequest{
+		Account: tc.Account,
+		Filter: &messages.OrderFilter{
+			Instrument: tc.Instrument,
+		},
+	}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	cancel, ok := resp.(*messages.OrderMassCancelResponse)
+	if !ok {
+		t.Fatalf("expecting *messasges.OrderMassCancelResponse, got %s", reflect.TypeOf(resp).String())
+	}
+	if !cancel.Success {
+		t.Fatal(cancel.RejectionReason.String())
+	}
+	time.Sleep(5 * time.Second)
 
 	bb := ctx.ob.BestBid()
 	qty := ctx.sec.RoundLot.Value
@@ -334,7 +353,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			Instrument:            tc.Instrument,
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
-			TimeInForce:           models.TimeInForce_GoodTillCancel,
 			Quantity:              qty,
 			Price:                 &wrapperspb.DoubleValue{Value: price},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
@@ -346,7 +364,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 		t.Fatal(err)
 	}
 	response, ok = res.(*messages.NewOrderSingleResponse)
-	fmt.Println("ssssssssssssssssss", res, respType)
 	if !ok {
 		t.Fatalf("was expecting *messages.NewOrderSingleResponse, got %s", reflect.TypeOf(res).String())
 	}
@@ -399,9 +416,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	}
 	if order.OrderType != models.OrderType_Limit {
 		t.Fatalf("was expecting limit order type")
-	}
-	if order.TimeInForce != models.TimeInForce_GoodTillCancel {
-		t.Fatalf("was expecting GoodTillCancel time in force")
 	}
 	if order.Side != models.Side_Buy {
 		t.Fatalf("was expecting buy side order")

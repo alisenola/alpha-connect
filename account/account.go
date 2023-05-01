@@ -986,7 +986,6 @@ func (accnt *Account) GetOrders(filter *messages.OrderFilter) []*models.Order {
 				continue
 			}
 		}
-
 		orders = append(orders, o.Order)
 	}
 

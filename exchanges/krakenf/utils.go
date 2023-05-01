@@ -2,6 +2,7 @@ package krakenf
 
 import (
 	"fmt"
+	"strings"
 
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/alpha-connect/models/messages"
@@ -118,13 +119,17 @@ func StatusToModel(status string) *models.OrderStatus {
 }
 
 func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecision, lotPrecision int) (krakenf.SendOrderRequest, *messages.RejectionReason) {
-	var side string
+	type OrderSide string
+	const BUY_ORDER = OrderSide("BUY")
+	const SELL_ODER = OrderSide("SELL")
+
 	var typ krakenf.OrderType
 	size := order.Quantity
+	var side OrderSide
 	if order.OrderSide == models.Side_Buy {
-		side = "BUY"
+		side = BUY_ORDER
 	} else {
-		side = "SELL"
+		side = SELL_ODER
 	}
 	switch order.OrderType {
 	case models.OrderType_Limit:
@@ -140,11 +145,12 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder, tickPrecisio
 		return nil, &rej
 	}
 
-	request := krakenf.NewSendOrderRequest(symbol, string(typ), size, side)
-
+	request := krakenf.NewSendOrderRequest(strings.ToLower(symbol), string(typ), size, string(side))
 	if typ == "lmt" {
 		request.SetLimitPrice(100)
 	}
+
+	request.SetCliOrdID(order.ClientOrderID)
 
 	return request, nil
 }

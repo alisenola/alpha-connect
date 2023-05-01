@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -279,6 +278,7 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 }
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
+	fmt.Println("lllllllllllllllll")
 	msg := context.Message().(*messages.MarketStatisticsRequest)
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
@@ -290,11 +290,6 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 
 func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	msg := context.Message().(*messages.NewOrderSingleRequest)
-	context.Respond(&messages.NewOrderSingleResponse{
-		RequestID:       msg.RequestID,
-		Success:         false,
-		RejectionReason: messages.RejectionReason_UnsupportedRequest,
-	})
 	sender := context.Sender()
 	response := &messages.NewOrderSingleResponse{
 		RequestID:  msg.RequestID,
@@ -322,6 +317,7 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 
 	go func() {
 		var tickPrecision, lotPrecision int
+		msg.Order.Instrument.Symbol.Value = strings.ToLower(msg.Order.Instrument.Symbol.Value)
 		sec, rej := state.InstrumentToSecurity(msg.Order.Instrument)
 		if rej != nil {
 			response.RejectionReason = *rej
@@ -392,33 +388,23 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 		Success:    false,
 	}
 	go func() {
-		symbol := ""
 		if req.Instrument != nil {
-			if req.Instrument.Symbol != nil {
-				symbol = req.Instrument.Symbol.Value
-			} else if req.Instrument.SecurityID != nil {
+			if req.Instrument.SecurityID != nil {
 				sec := state.IDToSecurity(req.Instrument.SecurityID.Value)
 				if sec == nil {
 					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 					context.Send(sender, response)
 					return
 				}
-				symbol = sec.Symbol
 			}
 		} else {
 			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
 			context.Send(sender, response)
 			return
 		}
-		params := krakenf.NewCancelOrderRequest(symbol)
+		params := krakenf.NewCancelOrderRequest("")
 		if req.OrderID != nil {
-			orderIDInt, err := strconv.ParseInt(req.OrderID.Value, 10, 64)
-			if err != nil {
-				response.RejectionReason = messages.RejectionReason_UnknownOrder
-				context.Send(sender, response)
-				return
-			}
-			params.SetOrderId(fmt.Sprint(orderIDInt))
+			params.SetOrderId(fmt.Sprint(req.OrderID))
 		} else if req.ClientOrderID != nil {
 			params.SetCliOrdID(req.ClientOrderID.Value)
 		} else {
@@ -426,6 +412,7 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
+		fmt.Println("xxxxxxxxxxxxxxxxxx", params)
 
 		var request *http.Request
 		var err error
