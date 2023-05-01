@@ -4,6 +4,11 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"math"
+	"reflect"
+	"sync"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -16,10 +21,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
-	"reflect"
-	"sync"
-	"time"
 )
 
 var liqd = 1 * time.Minute
