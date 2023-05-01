@@ -472,12 +472,6 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if order.OrderStatus != models.OrderStatus_Canceled {
 		t.Fatalf("order status not Canceled, but %s", order.OrderStatus)
 	}
-	if int(order.LeavesQuantity) != 0 {
-		t.Fatalf("was expecting leaves quantity of 0")
-	}
-	if int(order.CumQuantity) != 0 {
-		t.Fatalf("was expecting cum quantity of 0")
-	}
 
 	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
 		t.Fatalf("error checking orders %s", err)

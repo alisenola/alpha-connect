@@ -402,9 +402,9 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		params := krakenf.NewCancelOrderRequest("")
+		params := krakenf.NewCancelOrderRequest()
 		if req.OrderID != nil {
-			params.SetOrderId(fmt.Sprint(req.OrderID))
+			params.SetOrderId(req.OrderID.Value)
 		} else if req.ClientOrderID != nil {
 			params.SetCliOrdID(req.ClientOrderID.Value)
 		} else {
@@ -412,7 +412,6 @@ func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
-		fmt.Println("xxxxxxxxxxxxxxxxxx", params)
 
 		var request *http.Request
 		var err error
@@ -489,7 +488,7 @@ func (state *Executor) OnOrderMassCancelRequest(context actor.Context) error {
 			return
 		}
 
-		params := krakenf.NewCancelOrderRequest(symbol)
+		params := krakenf.NewCancelOrderRequest()
 
 		request, weight, err := krakenf.CancelAllOrders(req.Account.ApiCredentials, params)
 		if err != nil {

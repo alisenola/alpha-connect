@@ -4,6 +4,10 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"math"
+	"reflect"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -15,9 +19,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
-	"reflect"
-	"time"
 )
 
 type checkSockets struct{}
@@ -202,9 +203,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
-	}
+	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	// 	return fmt.Errorf("error connecting to okcoin websocket: %v", err)
+	// }
 
 	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2Channel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
@@ -259,22 +260,22 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 		_ = state.tradeWs.Disconnect()
 	}
 
-	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to okex websocket: %v", err)
-	}
+	// ws := okex.NewWebsocket()
+	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	// 	return fmt.Errorf("error connecting to okex websocket: %v", err)
+	// }
 
-	if err := ws.Subscribe(state.security.Symbol, okex.WSTradesChannel); err != nil {
-		return fmt.Errorf("error subscribing to trade stream")
-	}
+	// if err := ws.Subscribe(state.security.Symbol, okex.WSTradesChannel); err != nil {
+	// 	return fmt.Errorf("error subscribing to trade stream")
+	// }
 
-	state.tradeWs = ws
+	// state.tradeWs = ws
 
-	go func(ws *okex.Websocket, pid *actor.PID) {
-		for ws.ReadMessage() {
-			context.Send(pid, ws.Msg)
-		}
-	}(ws, context.Self())
+	// go func(ws *okex.Websocket, pid *actor.PID) {
+	// 	for ws.ReadMessage() {
+	// 		context.Send(pid, ws.Msg)
+	// 	}
+	// }(ws, context.Self())
 
 	return nil
 }

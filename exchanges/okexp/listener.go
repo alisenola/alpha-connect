@@ -4,6 +4,11 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"math"
+	"reflect"
+	"sync"
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/enum"
@@ -16,10 +21,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"math"
-	"reflect"
-	"sync"
-	"time"
 )
 
 var liqd = 1 * time.Minute
@@ -232,9 +233,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
-	}
+	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	// 	return fmt.Errorf("error connecting to okcoin websocket: %v", err)
+	// }
 
 	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2Channel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
@@ -290,9 +291,9 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-		return fmt.Errorf("error connecting to okex websocket: %v", err)
-	}
+	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	// 	return fmt.Errorf("error connecting to okex websocket: %v", err)
+	// }
 
 	if err := ws.Subscribe(state.security.Symbol, okex.WSTradesChannel); err != nil {
 		return fmt.Errorf("error subscribing to trade stream")
