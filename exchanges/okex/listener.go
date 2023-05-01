@@ -203,9 +203,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-	// 	return fmt.Errorf("error connecting to okcoin websocket: %v", err)
-	// }
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
+	}
 
 	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2Channel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
@@ -260,10 +260,10 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 		_ = state.tradeWs.Disconnect()
 	}
 
-	// ws := okex.NewWebsocket()
-	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-	// 	return fmt.Errorf("error connecting to okex websocket: %v", err)
-	// }
+	ws := okex.NewWebsocket()
+	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+		return fmt.Errorf("error connecting to okex websocket: %v", err)
+	}
 
 	// if err := ws.Subscribe(state.security.Symbol, okex.WSTradesChannel); err != nil {
 	// 	return fmt.Errorf("error subscribing to trade stream")
