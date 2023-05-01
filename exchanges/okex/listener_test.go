@@ -13,7 +13,7 @@ func TestMarketData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	exTests.LoadStatics(t)
+	exTests.LoadStatics()
 	tests.MarketData(t, tests.MDTest{
 		Symbol:            "BTC-USDT",
 		SecurityType:      enum.SecurityType_CRYPTO_SPOT,

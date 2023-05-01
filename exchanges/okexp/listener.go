@@ -232,7 +232,7 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	if err := ws.ConnectPublic(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
 	}
 
@@ -290,7 +290,7 @@ func (state *Listener) subscribeTrades(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
+	if err := ws.ConnectPublic(state.dialerPool.GetDialer()); err != nil {
 		return fmt.Errorf("error connecting to okex websocket: %v", err)
 	}
 
