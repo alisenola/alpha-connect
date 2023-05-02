@@ -887,7 +887,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Limit,
 			OrderSide:     models.Side_Buy,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 			Price:         &wrapperspb.DoubleValue{Value: 35000.},
 		},
 	}, 10*time.Second).Result()
@@ -904,6 +904,30 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	}
 
 	time.Sleep(5 * time.Second)
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
+		RequestID: 0,
+		Subscribe: false,
+		Account:   tc.Account,
+		Filter: &messages.OrderFilter{
+			ClientOrderID: &wrapperspb.StringValue{Value: orderID},
+		},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newOrderList, ok := res.(*messages.OrderList)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+	}
+	if !newOrderList.Success {
+		t.Fatalf("was expecting success: %s", newOrderList.RejectionReason.String())
+	}
+	if len(newOrderList.Orders) != 1 {
+		t.Fatalf("was expecting one order, got %d", len(newOrderList.Orders))
+	}
+	time.Sleep(1 * time.Second)
 
 	// Test replace quantity
 	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderReplaceRequest{
@@ -911,9 +935,9 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Account:    tc.Account,
 		Instrument: tc.Instrument,
 		Update: &messages.OrderUpdate{
-			OrderID:           nil,
-			OrigClientOrderID: &wrapperspb.StringValue{Value: orderID},
-			Quantity:          &wrapperspb.DoubleValue{Value: 0.002},
+			OrderID:           &wrapperspb.StringValue{Value: newOrderList.Orders[0].OrderID},
+			OrigClientOrderID: nil,
+			Quantity:          &wrapperspb.DoubleValue{Value: 2},
 			Price:             nil,
 		},
 	}, 10*time.Second).Result()
@@ -936,7 +960,7 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 		Subscribe: false,
 		Account:   tc.Account,
 		Filter: &messages.OrderFilter{
-			ClientOrderID: &wrapperspb.StringValue{Value: orderID},
+			OrderID: &wrapperspb.StringValue{Value: replaceResponse.OrderID},
 		},
 	}, 10*time.Second).Result()
 
@@ -954,8 +978,8 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if len(orderList.Orders) != 1 {
 		t.Fatalf("was expecting one order, got %d", len(orderList.Orders))
 	}
-	if orderList.Orders[0].LeavesQuantity != 0.002 {
-		t.Fatalf("was expecting quantity of 0.002")
+	if orderList.Orders[0].LeavesQuantity != 2 {
+		t.Fatalf("was expecting quantity of 2")
 	}
 }
 

@@ -432,7 +432,7 @@ func (state *AccountListener) OnBalancesRequest(context actor.Context) error {
 
 func (state *AccountListener) OnOrderStatusRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderStatusRequest)
-	if req.Filter != nil {
+	if req.Filter != nil && req.Filter.Instrument != nil {
 		req.Filter.Instrument.Symbol.Value = strings.ToUpper(req.Filter.Instrument.Symbol.Value)
 	}
 	orders := state.account.GetOrders(req.Filter)
@@ -716,6 +716,96 @@ func (state *AccountListener) OnNewOrderBulkRequest(context actor.Context) error
 
 func (state *AccountListener) OnOrderReplaceRequest(context actor.Context) error {
 	// TODO
+	req := context.Message().(*messages.OrderReplaceRequest)
+	var ID string
+	if req.Update.OrigClientOrderID != nil {
+		ID = req.Update.OrigClientOrderID.Value
+	} else if req.Update.OrderID != nil {
+		ID = req.Update.OrderID.Value
+	}
+	// forward to executor directly
+	fut := context.RequestFuture(state.krakenfExecutor, req, 10*time.Second)
+	fmt.Println("Editing ", ID)
+	report, rej := state.account.ReplaceOrder(ID, req.Update.Price, req.Update.Quantity)
+	if rej != nil {
+		context.Respond(&messages.OrderReplaceResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *rej,
+			Success:         false,
+		})
+	} else {
+		sender := context.Sender()
+		reqResponse := &messages.OrderReplaceResponse{
+			RequestID: req.RequestID,
+			Success:   false,
+		}
+
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+		if report.ExecutionType == messages.ExecutionType_PendingReplace {
+			context.ReenterAfter(fut, func(res interface{}, err error) {
+				defer context.Send(sender, reqResponse)
+				if err != nil {
+					fmt.Println("REJECT EDIT", ID)
+					report, err := state.account.RejectReplaceOrder(ID, messages.RejectionReason_Other)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					reqResponse.RejectionReason = messages.RejectionReason_Other
+					return
+				}
+				response := res.(*messages.OrderReplaceResponse)
+
+				if response.Success {
+					report, err := state.account.ConfirmReplaceOrder(ID, response.OrderID)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					reqResponse.OrderID = response.OrderID
+					reqResponse.Success = true
+				} else {
+					fmt.Println("REJECT EDIT", ID)
+					report, err := state.account.RejectReplaceOrder(ID, response.RejectionReason)
+					if err != nil {
+						panic(err)
+					}
+					if report != nil {
+						report.SeqNum = state.seqNum + 1
+						state.seqNum += 1
+						context.Send(context.Parent(), report)
+					}
+					if response.RejectionReason == messages.RejectionReason_UnknownOrder {
+						report, err := state.account.PendingFilled(ID)
+						if err != nil {
+							panic(err)
+						}
+						if report != nil {
+							report.SeqNum = state.seqNum + 1
+							state.seqNum += 1
+							context.Send(context.Parent(), report)
+						}
+					}
+					reqResponse.RejectionReason = response.RejectionReason
+				}
+			})
+		} else {
+			// Result, we are responsible for sending the response
+			fmt.Println("UNEXPECTED REPORT TYPE", report.ExecutionType.String())
+			reqResponse.Success = true
+			context.Send(sender, reqResponse)
+		}
+	}
 	return nil
 }
 

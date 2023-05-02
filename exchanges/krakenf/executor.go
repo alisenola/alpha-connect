@@ -378,6 +378,76 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderReplaceRequest)
+	sender := context.Sender()
+	response := &messages.OrderReplaceResponse{
+		RequestID:  req.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+	go func() {
+		if req.Instrument != nil {
+			if req.Instrument.SecurityID != nil {
+				sec := state.IDToSecurity(req.Instrument.SecurityID.Value)
+				if sec == nil {
+					response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+					context.Send(sender, response)
+					return
+				}
+			}
+		} else {
+			response.RejectionReason = messages.RejectionReason_UnknownSecurityID
+			context.Send(sender, response)
+			return
+		}
+		params := krakenf.NewEditOrderRequest()
+		if req.Update.OrderID != nil {
+			params.SetOrderId(req.Update.OrderID.Value)
+		} else if req.Update.OrigClientOrderID != nil {
+			params.SetCliOrdID(req.Update.OrigClientOrderID.Value)
+		} else {
+			response.RejectionReason = messages.RejectionReason_UnknownOrder
+			context.Send(sender, response)
+			return
+		}
+
+		if req.Update.Quantity != nil {
+			params.SetSize(req.Update.Quantity.Value)
+		}
+
+		var request *http.Request
+		var err error
+		request, _, err = krakenf.EditOrder(req.Account.ApiCredentials, params)
+		if err != nil {
+			response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+		var data krakenf.EditOrderResponse
+		if err := xutils.PerformJSONRequest(state.client, request, &data); err != nil {
+			state.logger.Warn("error editing order", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if data.Error != "" {
+			state.logger.Warn(fmt.Sprintf("error posting order for %s", req.Account.Name), log.Error(fmt.Errorf("%s", data.Error)))
+			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+			context.Send(sender, response)
+			return
+		}
+
+		response.OrderID = data.EditStatus.OrderId
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnOrderCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderCancelRequest)
 	sender := context.Sender()

@@ -36,6 +36,6 @@ func TestAccountListener(t *testing.T) {
 		OrderStatusRequest:  true,
 		GetPositionsLimit:   true,
 		GetPositionsMarket:  true,
-		OrderReplaceRequest: false,
+		OrderReplaceRequest: true,
 	})
 }
