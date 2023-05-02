@@ -1,13 +1,14 @@
 package krakenf_test
 
 import (
+	"testing"
+
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"testing"
 )
 
 var instrument = &models.Instrument{
@@ -33,8 +34,8 @@ func TestAccountListener(t *testing.T) {
 		Account:             krakenfAccount,
 		Instrument:          instrument,
 		OrderStatusRequest:  true,
-		GetPositionsLimit:   false,
-		GetPositionsMarket:  false,
+		GetPositionsLimit:   true,
+		GetPositionsMarket:  true,
 		OrderReplaceRequest: false,
 	})
 }

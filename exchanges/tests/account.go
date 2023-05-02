@@ -1096,7 +1096,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Buy,
-			Quantity:      0.005,
+			Quantity:      5,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -1123,7 +1123,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -1144,7 +1144,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -1163,7 +1163,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -1182,7 +1182,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {
@@ -1201,7 +1201,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
 			TimeInForce:   models.TimeInForce_Session,
-			Quantity:      0.001,
+			Quantity:      1,
 		},
 	}, 10*time.Second).Result()
 	if err != nil {

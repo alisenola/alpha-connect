@@ -278,7 +278,6 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 }
 
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
-	fmt.Println("lllllllllllllllll")
 	msg := context.Message().(*messages.MarketStatisticsRequest)
 	context.Respond(&messages.MarketStatisticsResponse{
 		RequestID:       msg.RequestID,
