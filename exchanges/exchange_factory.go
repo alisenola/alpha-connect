@@ -1,6 +1,9 @@
 package exchanges
 
 import (
+	"net/http"
+	"sync"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/config"
@@ -41,8 +44,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/utils"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
 	"gorm.io/gorm"
-	"net/http"
-	"sync"
 )
 
 // TODO sample size config
@@ -225,7 +226,7 @@ func NewExchangeExecutorProducer(exchange *models2.Exchange, config *config.Conf
 	case constants.OKCOIN.ID:
 		return func() actor.Actor { return okcoin.NewExecutor() }
 	case constants.OKEX.ID:
-		return func() actor.Actor { return okex.NewExecutor() }
+		return func() actor.Actor { return okex.NewExecutor(dialerPool, registry) }
 	case constants.DERIBIT.ID:
 		return func() actor.Actor { return deribit.NewExecutor() }
 	case constants.HUOBI.ID:

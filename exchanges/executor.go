@@ -3,6 +3,12 @@ package exchanges
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"reflect"
+	"runtime"
+	"time"
+
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/exchanges/types"
@@ -17,11 +23,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges/hitbtc"
 	xmodels "gitlab.com/alphaticks/xchanger/models"
 	"golang.org/x/net/proxy"
-	"net"
-	"net/http"
-	"reflect"
-	"runtime"
-	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"

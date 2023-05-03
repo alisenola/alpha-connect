@@ -1,12 +1,13 @@
 package tests
 
 import (
-	"gitlab.com/alphaticks/alpha-connect/config"
-	"gitlab.com/alphaticks/alpha-connect/tests"
 	"math"
 	"reflect"
 	"testing"
 	"time"
+
+	"gitlab.com/alphaticks/alpha-connect/config"
+	"gitlab.com/alphaticks/alpha-connect/tests"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"gitlab.com/alphaticks/alpha-connect/models"

@@ -203,9 +203,9 @@ func (state *Listener) subscribeOrderBook(context actor.Context) error {
 	}
 
 	ws := okex.NewWebsocket()
-	// if err := ws.Connect(state.dialerPool.GetDialer()); err != nil {
-	// 	return fmt.Errorf("error connecting to okcoin websocket: %v", err)
-	// }
+	if err := ws.ConnectPublic(state.dialerPool.GetDialer()); err != nil {
+		return fmt.Errorf("error connecting to okcoin websocket: %v", err)
+	}
 
 	if err := ws.Subscribe(state.security.Symbol, okex.WSBookL2Channel); err != nil {
 		return fmt.Errorf("error subscribing to depth stream for symbol")
