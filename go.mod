@@ -14,7 +14,7 @@ require (
 	gitlab.com/alphaticks/tickstore-go-client v0.0.0-20230120160008-9a4caa621693
 	gitlab.com/alphaticks/tickstore-grpc v0.0.0-20220513081230-2364b7f3c9bb
 	gitlab.com/alphaticks/tickstore-types v0.0.0-20221107131845-5b49f942c54f
-	gitlab.com/alphaticks/xchanger v0.0.0-20230504064854-840ba3d6b336
+	gitlab.com/alphaticks/xchanger v0.0.0-20230504172940-583ef9a71638
 )
 
 require (

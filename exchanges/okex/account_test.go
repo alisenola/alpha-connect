@@ -6,22 +6,22 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/exchanges/tests"
 	"gitlab.com/alphaticks/alpha-connect/models"
 	"gitlab.com/alphaticks/xchanger/constants"
-	"gitlab.com/alphaticks/xchanger/exchanges/krakenf"
+	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 var instrument = &models.Instrument{
-	SecurityID: wrapperspb.UInt64(1199421337905542595),
-	Exchange:   constants.KRAKENF,
-	Symbol:     wrapperspb.String("pf_ethusd"),
+	Exchange: constants.OKEX,
+	Symbol:   wrapperspb.String("BTC-USDT"),
 }
 
-var krakenfAccount = &models.Account{
-	Exchange: constants.KRAKENF,
+var okexAccount = &models.Account{
+	Exchange: constants.OKEX,
 	ApiCredentials: &xchangerModels.APICredentials{
-		APIKey:    "vYm2R19p4XgYL09UxKXkH0nA5nn3IR2q3KVh/qAu4/6k8WfrtORy75Vb",
-		APISecret: "dLuqPIvpaqmMzUpbN2YhgxFpJE2uDBVCZB2rRCKvqFoVMC0bXao3QaOritkTuuISvzBa+n6tnBHf0bUd62dYxqI7",
+		APIKey:    "0b7927eb-5dd7-4dd0-bc34-6dd576a007c5",
+		APISecret: "35227C3FEF945545DA45F419F100BE61",
+		AccountID: "npe9vnf*efp@drk!CRG",
 	},
 }
 
@@ -29,13 +29,13 @@ func TestAccountListener(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	krakenf.EnableTestNet()
+	okex.EnableTestnet()
 	tests.AccntTest(t, tests.AccountTest{
-		Account:             krakenfAccount,
-		Instrument:          instrument,
-		OrderStatusRequest:  true,
-		GetPositionsLimit:   true,
-		GetPositionsMarket:  true,
-		OrderReplaceRequest: true,
+		Account:            okexAccount,
+		Instrument:         instrument,
+		OrderStatusRequest: true,
+		//GetPositionsLimit:   true,
+		//GetPositionsMarket:  true,
+		//OrderReplaceRequest: true,
 	})
 }

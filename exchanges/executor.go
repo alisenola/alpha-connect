@@ -1193,6 +1193,7 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		return nil
 	}
 	accountManager, ok := state.accountManagers[msg.Account.Name]
+	fmt.Println("ssssssssssssssss", msg, "fffffffffffffff", accountManager, ok)
 	if !ok {
 		context.Respond(&messages.BalanceList{
 			RequestID:       msg.RequestID,

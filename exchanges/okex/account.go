@@ -189,9 +189,11 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
 	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
+
 	if err != nil {
 		return fmt.Errorf("error getting securities: %v", err)
 	}
+
 	securityList, ok := res.(*messages.SecurityList)
 	if !ok {
 		return fmt.Errorf("was expecting *messages.SecurityList, got %s", reflect.TypeOf(res).String())
@@ -503,7 +505,7 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 				return fmt.Errorf("error converting message to WSLogin")
 			}
 			if log.Msg != "" {
-				return fmt.Errorf("error login following accounts:", log)
+				return fmt.Errorf("error login following accounts:" + log.Msg)
 			}
 
 			if err := ws.PlaceOrder(params); err != nil {
@@ -583,17 +585,17 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error subscribing to open positions: %v", err)
 	}
 
-	var accountArgs []map[string]string
-	accountArg := okex.NewAccountRequest("account")
-	accountArgs = append(accountArgs, accountArg)
-	if err := ws.PrivateSubscribe(accountArgs); err != nil {
-		return fmt.Errorf("error subscribing to accounts: %v", err)
+	var orderArgs []map[string]string
+	orderArg := okex.NewOrderRequest("orders", "FUTURES")
+	orderArg.SetInstFamily("BTC-USD")
+	if err := ws.PrivateSubscribe(orderArgs); err != nil {
+		return fmt.Errorf("error subscribing to orders: %v", err)
 	}
 
 	// Get balances, positions, accounts
 	var balances []okex.WSBalanceAndPosition
 	var positions []okex.WSPosition
-	var accounts []okex.WSAccount
+	var orders []okex.WSOrder
 
 	ready := false
 	for !ready {
@@ -605,46 +607,46 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 			balances = msg
 		case []okex.WSPosition:
 			positions = msg
-		case []okex.WSAccount:
-			accounts = msg
+		case []okex.WSOrder:
+			orders = msg
 		default:
 			context.Send(context.Self(), ws.Msg)
 		}
-		ready = balances != nil && positions != nil && accounts != nil
+		ready = balances != nil && positions != nil && orders != nil
 	}
 
-	maccounts := make([]*models.Account, len(accounts))
-	for i, o := range accounts {
-		mo := WSOrderToModel(o)
-		sec, ok := state.symbolToSec[strings.ToLower(o.Instrument)]
+	morders := make([]*models.Order, len(orders))
+	for i, o := range orders {
+		mo := WSOrderToModel(&o)
+		sec, ok := state.symbolToSec[strings.ToLower(o.InstId)]
 		if !ok {
 			fmt.Println(state.symbolToSec)
-			return fmt.Errorf("got order for unknown symbol %s", o.Instrument)
+			return fmt.Errorf("got order for unknown symbol %s", o.InstId)
 		}
 		mo.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
 		morders[i] = mo
 	}
-	mpositions := make([]*models.Position, len(positions.Positions))
-	for i, p := range positions.Positions {
-		mp := WSPositionToModel(p)
-		sec, ok := state.symbolToSec[strings.ToLower(p.Instrument)]
+	mpositions := make([]*models.Position, len(positions))
+	for i, p := range positions {
+		mp := WSPositionToModel(&p)
+		sec, ok := state.symbolToSec[strings.ToLower(p.InstId)]
 		if !ok {
 			fmt.Println(state.symbolToSec)
-			return fmt.Errorf("got position for unknown symbol %s", p.Instrument)
+			return fmt.Errorf("got position for unknown symbol %s", p.InstId)
 		}
 		mp.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
 		mpositions[i] = mp
 	}
 	var mbalances []*models.Balance
-	for k, v := range balances.FlexFutures.Currencies {
+	for _, v := range balances[0].PosData {
 		// Get asset from symbol
-		asset := SymbolToAsset(k)
+		asset := SymbolToAsset(v.InstId)
 		if asset == nil {
-			return fmt.Errorf("unknown asset %s", k)
+			return fmt.Errorf("unknown asset %s", v.InstId)
 		}
 		mbalances = append(mbalances, &models.Balance{
 			Asset:    asset,
-			Quantity: v.Quantity,
+			Quantity: v.Pos,
 		})
 	}
 

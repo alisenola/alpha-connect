@@ -17,7 +17,7 @@ func WSOrderToModel(o *krakenf.Order) *models.Order {
 	ord := &models.Order{
 		OrderID: o.OrderId,
 		Instrument: &models.Instrument{
-			Exchange: constants.FBINANCE,
+			Exchange: constants.KRAKENF,
 			Symbol:   &wrapperspb.StringValue{Value: o.Instrument},
 		},
 		LeavesQuantity: o.Qty,
