@@ -218,10 +218,10 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 	return nil
 }
 
-func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) error {
-	req := context.Message().(*messages.HistoricalLiquidationsRequest)
+func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) error {
+	req := context.Message().(*messages.HistoricalFundingRatesRequest)
 	sender := context.Sender()
-	response := &messages.HistoricalLiquidationsResponse{
+	response := &messages.HistoricalFundingRatesResponse{
 		RequestID:       req.RequestID,
 		Success:         false,
 		RejectionReason: messages.RejectionReason_UnsupportedRequest,
