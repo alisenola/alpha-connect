@@ -2,6 +2,9 @@ package exchanges
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
+
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"gitlab.com/alphaticks/alpha-connect/account"
@@ -10,8 +13,6 @@ import (
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	tickstore_types "gitlab.com/alphaticks/tickstore-types"
 	"gorm.io/gorm"
-	"net/http"
-	"reflect"
 )
 
 // The account manager spawns an account listener and multiplex its messages
@@ -127,6 +128,7 @@ func (state *AccountManager) Receive(context actor.Context) {
 }
 
 func (state *AccountManager) Initialize(context actor.Context) error {
+	fmt.Println("xxxxxxxxxxxxxxxxxxx")
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -157,6 +159,7 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error spawning account listener: %s", err)
 		}
+
 		state.listener = listener
 	}
 
@@ -251,6 +254,7 @@ func (state *AccountManager) OnBalancesRequest(context actor.Context) error {
 		state.blcSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
 	}
+	fmt.Println("eeeeeeeeeeeeeee", state.listener)
 
 	context.Forward(state.listener)
 

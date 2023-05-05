@@ -107,6 +107,8 @@ func NewAccountListenerProducer(account *account.Account, registry registry.Stat
 		return func() actor.Actor { return bybitl.NewAccountListener(account, registry, db, client, readOnly) }
 	case constants.KRAKENF.ID:
 		return func() actor.Actor { return krakenf.NewAccountListener(account, registry, db, client, readOnly) }
+	case constants.OKEX.ID:
+		return func() actor.Actor { return okex.NewAccountListener(account, registry, db, client, readOnly) }
 	default:
 		return nil
 	}

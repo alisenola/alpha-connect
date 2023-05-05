@@ -109,7 +109,6 @@ func AccntTest(t *testing.T, tc AccountTest) {
 	}
 
 	// Get balances
-	fmt.Println("qqqqqqqqqqqqqqqqqqqq", tc.Account)
 	res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
 		Asset:   nil,
 		Account: tc.Account,

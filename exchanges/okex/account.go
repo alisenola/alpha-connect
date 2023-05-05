@@ -602,6 +602,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		if !ws.ReadMessage() {
 			return fmt.Errorf("error reading ws message")
 		}
+		fmt.Println("cccccccccccccccc", ws.Msg)
 		switch msg := ws.Msg.Message.(type) {
 		case []okex.WSBalanceAndPosition:
 			balances = msg
