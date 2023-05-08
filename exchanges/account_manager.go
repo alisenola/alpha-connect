@@ -128,7 +128,6 @@ func (state *AccountManager) Receive(context actor.Context) {
 }
 
 func (state *AccountManager) Initialize(context actor.Context) error {
-	fmt.Println("xxxxxxxxxxxxxxxxxxx")
 	state.logger = log.New(
 		log.InfoLevel,
 		"",
@@ -254,7 +253,6 @@ func (state *AccountManager) OnBalancesRequest(context actor.Context) error {
 		state.blcSubscribers[request.RequestID] = request.Subscriber
 		context.Watch(request.Subscriber)
 	}
-	fmt.Println("eeeeeeeeeeeeeee", state.listener)
 
 	context.Forward(state.listener)
 

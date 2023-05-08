@@ -539,6 +539,89 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 	return nil
 }
 
+func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderCancelRequest)
+	var ID string
+	if req.ClientOrderID != nil {
+		ID = req.ClientOrderID.Value
+	} else if req.OrderID != nil {
+		ID = req.OrderID.Value
+	}
+	// forward to executor directly
+	fmt.Println("CANCELING ", ID)
+	report, rej := state.account.CancelOrder(ID)
+	if rej != nil {
+		context.Respond(&messages.OrderCancelResponse{
+			RequestID:       req.RequestID,
+			RejectionReason: *rej,
+			Success:         false,
+		})
+	} else {
+		sender := context.Sender()
+		reqResponse := &messages.OrderCancelResponse{
+			RequestID: req.RequestID,
+			Success:   false,
+		}
+
+		// Ack, we are responsible for sending the response
+		if req.ResponseType == messages.ResponseType_Ack {
+			reqResponse.Success = true
+			context.Send(sender, reqResponse)
+		}
+
+		if state.ws != nil {
+			_ = state.ws.Disconnect()
+		}
+		start := time.Now()
+
+		ws := okex.NewWebsocket()
+		if err := ws.ConnectPrivate(nil); err != nil {
+			return fmt.Errorf("error connecting to the websocket: " + err.Error())
+		}
+
+		if err := ws.Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
+			return err
+		}
+
+		if !ws.ReadMessage() {
+			return ws.Err
+		}
+		log, ok := ws.Msg.Message.(okex.WSLoginResponse)
+		if !ok {
+			return fmt.Errorf("error converting message to WSLogin")
+		}
+		if log.Msg != "" {
+			return fmt.Errorf("error login following accounts:" + log.Msg)
+		}
+
+		cancelArg := okex.NewCancelOrderRequest(report.Instrument.Symbol.Value)
+		cancelArg.SetOrdId(req.OrderID.Value)
+
+		if err := ws.CancelOrder(cancelArg); err != nil {
+			return err
+		}
+
+		if !ws.ReadMessage() {
+			return ws.Err
+		}
+
+		cancelOrders, ok := ws.Msg.Message.([]okex.WSCancelOrder)
+		if !ok {
+			return fmt.Errorf("error converting message to []WSCancelOrder")
+		}
+
+		if cancelOrders[0].OrdId != req.OrderID.Value {
+			return fmt.Errorf("error invalid orderId")
+		}
+
+		reqResponse.NetworkRtt = durationpb.New(time.Since(start))
+		reqResponse.Success = true
+		context.Send(sender, reqResponse)
+	}
+
+	return nil
+}
+
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
 	if state.ws == nil || msg.WSID != state.ws.ID {
@@ -561,11 +644,11 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	ws := okex.NewWebsocket()
 	// TODO Dialer
 	if err := ws.ConnectPrivate(nil); err != nil {
-		return fmt.Errorf("error connecting to krakenf websocket: %v", err)
+		return fmt.Errorf("error connecting to okex websocket: %v", err)
 	}
 
 	if err := ws.Login(state.account.ApiCredentials, state.account.ApiCredentials.AccountID); err != nil {
-		return fmt.Errorf("error getting challenge: %v", err)
+		return fmt.Errorf("error getting login: %v", err)
 	}
 	if !ws.ReadMessage() {
 		return fmt.Errorf("error reading WSInfo response")
@@ -585,12 +668,12 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error subscribing to open positions: %v", err)
 	}
 
-	var orderArgs []map[string]string
-	orderArg := okex.NewOrderRequest("orders", "FUTURES")
-	orderArg.SetInstFamily("BTC-USD")
-	if err := ws.PrivateSubscribe(orderArgs); err != nil {
-		return fmt.Errorf("error subscribing to orders: %v", err)
-	}
+	// var orderArgs []map[string]string
+	// orderArg := okex.NewOrderRequest("orders", "FUTURES")
+	// orderArg.SetInstFamily("BTC-USD")
+	// if err := ws.PrivateSubscribe(orderArgs); err != nil {
+	// 	return fmt.Errorf("error subscribing to orders: %v", err)
+	// }
 
 	// Get balances, positions, accounts
 	var balances []okex.WSBalanceAndPosition
@@ -602,7 +685,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		if !ws.ReadMessage() {
 			return fmt.Errorf("error reading ws message")
 		}
-		fmt.Println("cccccccccccccccc", ws.Msg)
+		fmt.Println("cccccccccccccccc", ws.Msg.Message)
 		switch msg := ws.Msg.Message.(type) {
 		case []okex.WSBalanceAndPosition:
 			balances = msg
