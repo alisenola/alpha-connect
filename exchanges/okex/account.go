@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,6 +140,18 @@ func (state *AccountListener) Receive(context actor.Context) {
 	case *messages.NewOrderSingleRequest:
 		if err := state.OnNewOrderSingleRequest(context); err != nil {
 			state.logger.Error("error processing OnNewOrderSingleRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderCancelRequest:
+		if err := state.OnOrderCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderCancelRequest", log.Error(err))
+			panic(err)
+		}
+
+	case *messages.OrderMassCancelRequest:
+		if err := state.OnOrderMassCancelRequest(context); err != nil {
+			state.logger.Error("error processing OnOrderMassCancelRequest", log.Error(err))
 			panic(err)
 		}
 
@@ -622,6 +635,119 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 	return nil
 }
 
+func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
+	req := context.Message().(*messages.OrderMassCancelRequest)
+	orders := state.account.GetOrders(req.Filter)
+	fmt.Println("aaaaaaaaaaaaaa", orders)
+	if len(orders) == 0 {
+		context.Respond(&messages.OrderMassCancelResponse{
+			RequestID: req.RequestID,
+			Success:   true,
+		})
+		return nil
+	}
+	var reports []*messages.ExecutionReport
+	for _, o := range orders {
+		if o.OrderStatus != models.OrderStatus_New && o.OrderStatus != models.OrderStatus_PartiallyFilled {
+			continue
+		}
+		report, res := state.account.CancelOrder(o.ClientOrderID)
+		if res != nil {
+			// Reject all cancel order up until now
+			for _, r := range reports {
+				_, err := state.account.RejectCancelOrder(r.ClientOrderID.Value, messages.RejectionReason_Other)
+				if err != nil {
+					return err
+				}
+			}
+
+			context.Respond(&messages.OrderMassCancelResponse{
+				RequestID:       req.RequestID,
+				Success:         false,
+				RejectionReason: *res,
+			})
+
+			return nil
+		} else if report != nil {
+			reports = append(reports, report)
+		}
+	}
+
+	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID: req.RequestID,
+		Success:   true,
+	})
+
+	for _, report := range reports {
+		report.SeqNum = state.seqNum + 1
+		state.seqNum += 1
+		context.Send(context.Parent(), report)
+	}
+
+	if state.ws != nil {
+		_ = state.ws.Disconnect()
+	}
+
+	ws := okex.NewWebsocket()
+	if err := ws.ConnectPrivate(nil); err != nil {
+		return fmt.Errorf("error connecting to the websocket: " + err.Error())
+	}
+
+	if err := ws.Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
+		return err
+	}
+
+	if !ws.ReadMessage() {
+		return ws.Err
+	}
+	log, ok := ws.Msg.Message.(okex.WSLoginResponse)
+	if !ok {
+		return fmt.Errorf("error converting message to WSLogin")
+	}
+	if log.Msg != "" {
+		return fmt.Errorf("error login following accounts:" + log.Msg)
+	}
+	var cancelArgs []okex.CancelOrderRequest
+	if req.Filter.Instrument.Symbol == nil {
+		context.Respond(&messages.OrderMassCancelResponse{
+			RequestID:       req.RequestID,
+			Success:         false,
+			RejectionReason: messages.RejectionReason_UnknownSymbol,
+		})
+	}
+	cancelArg := okex.NewCancelOrderRequest(req.Filter.Instrument.Symbol.Value)
+	if req.Filter.OrderID != nil {
+		cancelArg.SetOrdId(req.Filter.OrderID.Value)
+	}
+	if req.Filter.ClientOrderID != nil {
+		cancelArg.SetOrdId(req.Filter.ClientOrderID.Value)
+	}
+	cancelArgs = append(cancelArgs, cancelArg)
+	if err := ws.BatchCancelOrders(cancelArgs); err != nil {
+		return err
+	}
+	if !ws.ReadMessage() {
+		return ws.Err
+	}
+	cancelOrders, ok := ws.Msg.Message.([]okex.WSCancelOrder)
+	fmt.Println("dddddddddddddd", cancelOrders)
+	if !ok {
+		return fmt.Errorf("error converting message to []WSCancelOrder")
+	}
+	for _, cancelOrder := range cancelOrders {
+		if cancelOrder.SMsg == "" {
+			return fmt.Errorf("error cancelling %s", cancelOrder.SMsg)
+		}
+	}
+
+	context.Respond(&messages.OrderMassCancelResponse{
+		RequestID: req.RequestID,
+		Success:   true,
+	})
+
+	return nil
+}
+
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
 	if state.ws == nil || msg.WSID != state.ws.ID {
@@ -668,12 +794,13 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		return fmt.Errorf("error subscribing to open positions: %v", err)
 	}
 
-	// var orderArgs []map[string]string
-	// orderArg := okex.NewOrderRequest("orders", "FUTURES")
-	// orderArg.SetInstFamily("BTC-USD")
-	// if err := ws.PrivateSubscribe(orderArgs); err != nil {
-	// 	return fmt.Errorf("error subscribing to orders: %v", err)
-	// }
+	var orderArgs []map[string]string
+	orderArg := okex.NewOrderRequest("orders", "FUTURES")
+	orderArg.SetInstFamily("BTC-USD")
+	orderArgs = append(orderArgs, orderArg)
+	if err := ws.PrivateSubscribe(orderArgs); err != nil {
+		return fmt.Errorf("error subscribing to orders: %v", err)
+	}
 
 	// Get balances, positions, accounts
 	var balances []okex.WSBalanceAndPosition
@@ -685,7 +812,6 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		if !ws.ReadMessage() {
 			return fmt.Errorf("error reading ws message")
 		}
-		fmt.Println("cccccccccccccccc", ws.Msg.Message)
 		switch msg := ws.Msg.Message.(type) {
 		case []okex.WSBalanceAndPosition:
 			balances = msg
@@ -696,7 +822,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		default:
 			context.Send(context.Self(), ws.Msg)
 		}
-		ready = balances != nil && positions != nil && orders != nil
+		ready = balances != nil && positions != nil
 	}
 
 	morders := make([]*models.Order, len(orders))
@@ -722,15 +848,19 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 		mpositions[i] = mp
 	}
 	var mbalances []*models.Balance
-	for _, v := range balances[0].PosData {
+	for _, v := range balances[0].BalData {
 		// Get asset from symbol
-		asset := SymbolToAsset(v.InstId)
+		asset := SymbolToAsset(v.Ccy)
 		if asset == nil {
-			return fmt.Errorf("unknown asset %s", v.InstId)
+			return fmt.Errorf("unknown asset %s", v.Ccy)
+		}
+		Qty, err := strconv.ParseFloat(v.CashBal, 64)
+		if err != nil {
+			fmt.Println("Error:", err)
 		}
 		mbalances = append(mbalances, &models.Balance{
 			Asset:    asset,
-			Quantity: v.Pos,
+			Quantity: Qty,
 		})
 	}
 

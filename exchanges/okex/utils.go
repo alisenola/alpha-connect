@@ -104,6 +104,9 @@ func WSOrderToModel(o *okex.WSOrder) *models.Order {
 }
 
 func SymbolToAsset(symbol string) *xmodels.Asset {
+	if sym, ok := okex.OKEX_SYMBOL_TO_GLOBAL_SYMBOL[symbol]; ok {
+		symbol = sym
+	}
 	asset, ok := constants.GetAssetBySymbol(symbol)
 	if !ok {
 		return nil
