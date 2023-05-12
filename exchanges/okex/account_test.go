@@ -34,8 +34,7 @@ func TestAccountListener(t *testing.T) {
 		Account:            okexAccount,
 		Instrument:         instrument,
 		OrderStatusRequest: true,
-		//GetPositionsLimit:   true,
-		//GetPositionsMarket:  true,
-		//OrderReplaceRequest: true,
+		GetPositionsLimit:  true,
+		GetPositionsMarket: true,
 	})
 }

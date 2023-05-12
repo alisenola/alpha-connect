@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -825,10 +826,13 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if ctx.sec.MinLimitQuantity != nil {
 		size = math.Max(size, ctx.sec.MinLimitQuantity.Value)
 	}
+	if size < 0.1 {
+		size = 0.1
+	}
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Limit,
 			OrderSide:     models.Side_Sell,
@@ -1145,7 +1149,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
@@ -1166,7 +1170,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
@@ -1185,7 +1189,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
@@ -1204,7 +1208,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,
@@ -1223,7 +1227,7 @@ func GetPositionsMarket(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	_, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,
 		Order: &messages.NewOrder{
-			ClientOrderID: uuid.NewV1().String(),
+			ClientOrderID: strings.Replace(uuid.NewV1().String(), "-", "", -1),
 			Instrument:    tc.Instrument,
 			OrderType:     models.OrderType_Market,
 			OrderSide:     models.Side_Sell,

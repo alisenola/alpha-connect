@@ -486,6 +486,10 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			RequestID: req.RequestID,
 			Success:   false,
 		}
+		if req.ResponseType == messages.ResponseType_Ack {
+			reqResponse.Success = true
+			context.Send(sender, reqResponse)
+		}
 
 		if report != nil {
 			report.Instrument.Symbol.Value = strings.ToLower(report.Instrument.Symbol.Value)
