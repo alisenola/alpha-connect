@@ -312,6 +312,9 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 
 	bb := ctx.ob.BestBid()
 	qty := ctx.sec.RoundLot.Value
+	if qty < 0.1 {
+		qty = 0.1
+	}
 	price := math.Round((bb.Price*0.9)/ctx.sec.MinPriceIncrement.Value) * ctx.sec.MinPriceIncrement.Value
 	if ctx.sec.MinLimitQuantity != nil {
 		qty = math.Max(qty, ctx.sec.MinLimitQuantity.Value)

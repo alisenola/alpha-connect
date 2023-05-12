@@ -19,9 +19,9 @@ var instrument = &models.Instrument{
 var okexAccount = &models.Account{
 	Exchange: constants.OKEX,
 	ApiCredentials: &xchangerModels.APICredentials{
-		APIKey:    "0b7927eb-5dd7-4dd0-bc34-6dd576a007c5",
-		APISecret: "35227C3FEF945545DA45F419F100BE61",
-		AccountID: "npe9vnf*efp@drk!CRG",
+		APIKey:    "0187a1c3-36e8-41bd-b84e-90b7347372c9",
+		APISecret: "6F3CEECAD897A0E243832C49D62EB7A2",
+		AccountID: "UStQhSVR7vK7h7g@",
 	},
 }
 

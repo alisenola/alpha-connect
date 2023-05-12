@@ -19,6 +19,7 @@ import (
 	"gitlab.com/alphaticks/xchanger"
 	"gitlab.com/alphaticks/xchanger/constants"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
+	"gitlab.com/alphaticks/xchanger/utils"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gorm.io/gorm"
@@ -539,6 +540,12 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 			reqResponse.Success = true
 			reqResponse.OrderID = orderId
 			fmt.Println("NEW SUCCESS", reqResponse.OrderID)
+			confirmReport, _ := state.account.ConfirmNewOrder(order.ClientOrderID, orderId, nil)
+			if confirmReport != nil {
+				confirmReport.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), confirmReport)
+			}
 			context.Send(sender, reqResponse)
 
 		} else {
@@ -626,10 +633,20 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 		if cancelOrders[0].OrdId != req.OrderID.Value {
 			return fmt.Errorf("error invalid orderId")
 		}
-
-		reqResponse.NetworkRtt = durationpb.New(time.Since(start))
-		reqResponse.Success = true
-		context.Send(sender, reqResponse)
+		if cancelOrders[0].SCode == "0" {
+			report, err := state.account.ConfirmCancelOrder(ID)
+			if err != nil {
+				panic(err)
+			}
+			if report != nil {
+				report.SeqNum = state.seqNum + 1
+				state.seqNum += 1
+				context.Send(context.Parent(), report)
+			}
+			reqResponse.NetworkRtt = durationpb.New(time.Since(start))
+			reqResponse.Success = true
+			context.Send(sender, reqResponse)
+		}
 	}
 
 	return nil
@@ -638,7 +655,6 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderMassCancelRequest)
 	orders := state.account.GetOrders(req.Filter)
-	fmt.Println("aaaaaaaaaaaaaa", orders)
 	if len(orders) == 0 {
 		context.Respond(&messages.OrderMassCancelResponse{
 			RequestID: req.RequestID,
@@ -788,24 +804,17 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	}
 
 	var positionArgs []map[string]string
-	positionArg := okex.NewPositionRequest("positions", "FUTURES")
+	positionArg := okex.NewPositionRequest("positions", "ANY")
 	positionArgs = append(positionArgs, positionArg)
 	if err := ws.PrivateSubscribe(positionArgs); err != nil {
 		return fmt.Errorf("error subscribing to open positions: %v", err)
 	}
 
-	var orderArgs []map[string]string
-	orderArg := okex.NewOrderRequest("orders", "FUTURES")
-	orderArg.SetInstFamily("BTC-USD")
-	orderArgs = append(orderArgs, orderArg)
-	if err := ws.PrivateSubscribe(orderArgs); err != nil {
-		return fmt.Errorf("error subscribing to orders: %v", err)
-	}
-
 	// Get balances, positions, accounts
 	var balances []okex.WSBalanceAndPosition
 	var positions []okex.WSPosition
-	var orders []okex.WSOrder
+	var orderHistory okex.OrderResponse
+	var openOrders okex.OrderResponse
 
 	ready := false
 	for !ready {
@@ -817,24 +826,65 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 			balances = msg
 		case []okex.WSPosition:
 			positions = msg
-		case []okex.WSOrder:
-			orders = msg
 		default:
 			context.Send(context.Self(), ws.Msg)
 		}
 		ready = balances != nil && positions != nil
 	}
 
-	morders := make([]*models.Order, len(orders))
-	for i, o := range orders {
+	orderHistoryArgs := okex.GetOrderRequest("SPOT")
+	orderHistoryReq, _, err := okex.GetOrdersHistory(state.account.ApiCredentials, state.account.ApiCredentials.AccountID, "1", orderHistoryArgs)
+	if err != nil {
+		return fmt.Errorf("error getting order request: %v", err)
+	}
+
+	if err := utils.PerformJSONRequest(state.client, orderHistoryReq, &orderHistory); err != nil {
+		return fmt.Errorf("error getting order response: %v", err)
+	}
+	if orderHistory.Code != "0" {
+		return fmt.Errorf(orderHistory.Msg)
+	}
+
+	openOrderArgs := okex.GetOrderRequest("SPOT")
+	openOrderReq, _, err := okex.GetOpenOrders(state.account.ApiCredentials, state.account.ApiCredentials.AccountID, "1", openOrderArgs)
+	if err != nil {
+		return fmt.Errorf("error getting order request: %v", err)
+	}
+
+	if err := utils.PerformJSONRequest(state.client, openOrderReq, &openOrders); err != nil {
+		return fmt.Errorf("error getting order response: %v", err)
+	}
+	if openOrders.Code != "0" {
+		return fmt.Errorf(openOrders.Msg)
+	}
+
+	index := len(orderHistory.Data)
+	morders := make([]*models.Order, len(orderHistory.Data)+len(openOrders.Data))
+	sort.Slice(orderHistory.Data, func(i, j int) bool {
+		return orderHistory.Data[i].UTime < orderHistory.Data[j].UTime
+	})
+	sort.Slice(openOrders.Data, func(i, j int) bool {
+		return openOrders.Data[i].UTime < openOrders.Data[j].UTime
+	})
+	for i, o := range orderHistory.Data {
 		mo := WSOrderToModel(&o)
-		sec, ok := state.symbolToSec[strings.ToLower(o.InstId)]
+		sec, ok := state.symbolToSec[o.InstId]
 		if !ok {
 			fmt.Println(state.symbolToSec)
 			return fmt.Errorf("got order for unknown symbol %s", o.InstId)
 		}
 		mo.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
 		morders[i] = mo
+	}
+	for i, o := range openOrders.Data {
+		mo := WSOrderToModel(&o)
+		sec, ok := state.symbolToSec[o.InstId]
+		if !ok {
+			fmt.Println(state.symbolToSec)
+			return fmt.Errorf("got order for unknown symbol %s", o.InstId)
+		}
+		mo.Instrument.SecurityID = wrapperspb.UInt64(sec.SecurityID)
+		morders[index+i] = mo
 	}
 	mpositions := make([]*models.Position, len(positions))
 	for i, p := range positions {

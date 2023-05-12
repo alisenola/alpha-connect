@@ -152,7 +152,7 @@ func checkOrders(as *actor.ActorSystem, executor *actor.PID, account *models.Acc
 
 	orders1 := response.Orders
 	fmt.Printf("got %d orders from main executor i.e. account \n", len(orders1))
-	fmt.Println("aaaaaaaaaaaaaaaaa", exchangeExecutor, executor)
+	fmt.Println(exchangeExecutor, executor)
 
 	res, err = as.Root.RequestFuture(executor, &messages.OrderStatusRequest{
 		RequestID: 0,

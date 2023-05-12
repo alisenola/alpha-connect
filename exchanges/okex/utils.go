@@ -2,6 +2,7 @@ package okex
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gitlab.com/alphaticks/alpha-connect/models"
@@ -32,12 +33,15 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder) (okex.PlaceO
 		return nil, &rej
 	}
 
-	request := okex.NewPlaceOrderRequest(string(side), strings.ToLower(symbol), tdMode, string(typ), fmt.Sprintf("%.6f", size))
+	request := okex.NewPlaceOrderRequest(strings.ToLower(string(side)), strings.ToUpper(symbol), tdMode, string(typ), strconv.FormatFloat(size, 'f', -1, 64))
 	if order.ClientOrderID != "" {
 		request.SetClOrdId(order.ClientOrderID)
 	}
 	if order.Tag != "" {
 		request.SetTag(order.Tag)
+	}
+	if order.Price != nil {
+		request.SetPx(strconv.FormatFloat(order.Price.Value, 'f', -1, 64))
 	}
 
 	return request, nil
@@ -58,7 +62,10 @@ func WSPositionToModel(p *okex.WSPosition) *models.Position {
 	return pos
 }
 
-func WSOrderToModel(o *okex.WSOrder) *models.Order {
+func WSOrderToModel(o *okex.OrderData) *models.Order {
+	sz, _ := strconv.ParseFloat(o.Sz, 64)
+	fillSz, _ := strconv.ParseFloat(o.FillSz, 64)
+	px, _ := strconv.ParseFloat(o.Px, 64)
 
 	ord := &models.Order{
 		OrderID: o.OrdId,
@@ -66,18 +73,20 @@ func WSOrderToModel(o *okex.WSOrder) *models.Order {
 			Exchange: constants.OKEX,
 			Symbol:   &wrapperspb.StringValue{Value: o.InstId},
 		},
-		LeavesQuantity: o.Sz,
-		CumQuantity:    o.FillSz,
+		LeavesQuantity: sz,
+		CumQuantity:    fillSz,
 	}
 
-	if o.ReduceOnly {
+	if o.ReduceOnly == "true" {
 		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ReduceOnly)
 	}
 
-	if o.Sz == 0. {
+	if sz == 0 {
 		ord.OrderStatus = models.OrderStatus_Filled
-	} else if o.FillSz > 0. {
+	} else if fillSz > 0 {
 		ord.OrderStatus = models.OrderStatus_PartiallyFilled
+	} else if o.CancelSourceReason != "" {
+		ord.OrderStatus = models.OrderStatus_Canceled
 	} else {
 		ord.OrderStatus = models.OrderStatus_New
 	}
@@ -99,7 +108,7 @@ func WSOrderToModel(o *okex.WSOrder) *models.Order {
 		ord.Side = models.Side_Sell
 	}
 
-	ord.Price = &wrapperspb.DoubleValue{Value: o.Px}
+	ord.Price = &wrapperspb.DoubleValue{Value: px}
 	return ord
 }
 

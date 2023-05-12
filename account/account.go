@@ -424,6 +424,7 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string, leavesQuantity
 			accnt.securities[sec.GetSecurity().SecurityID].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		}
 	}
+	fmt.Println("xxxxxxxxxxxxxxx", accnt.ordersClID)
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,
