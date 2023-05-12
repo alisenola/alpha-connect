@@ -823,7 +823,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 	ready := false
 	for !ready {
 		if !ws.ReadMessage() {
-			return fmt.Errorf("error reading ws message")
+			return fmt.Errorf("error reading ws message: %v", ws.Err)
 		}
 		switch msg := ws.Msg.Message.(type) {
 		case []okex.WSBalanceAndPosition:
