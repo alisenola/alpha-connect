@@ -288,34 +288,12 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if !orderList.Success {
 		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
 	}
-	// if len(orderList.Orders) > 0 {
-	// 	t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
-	// }
-
-	resp, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderMassCancelRequest{
-		Account: tc.Account,
-		Filter: &messages.OrderFilter{
-			Instrument: tc.Instrument,
-		},
-	}, 10*time.Second).Result()
-	if err != nil {
-		t.Fatal(err)
+	if len(orderList.Orders) > 0 {
+		t.Fatalf("was expecting no open order, got %d", len(orderList.Orders))
 	}
-
-	cancel, ok := resp.(*messages.OrderMassCancelResponse)
-	if !ok {
-		t.Fatalf("expecting *messasges.OrderMassCancelResponse, got %s", reflect.TypeOf(resp).String())
-	}
-	if !cancel.Success {
-		t.Fatal(cancel.RejectionReason.String())
-	}
-	time.Sleep(5 * time.Second)
 
 	bb := ctx.ob.BestBid()
 	qty := ctx.sec.RoundLot.Value
-	if qty < 0.1 {
-		qty = 0.1
-	}
 	price := math.Round((bb.Price*0.9)/ctx.sec.MinPriceIncrement.Value) * ctx.sec.MinPriceIncrement.Value
 	if ctx.sec.MinLimitQuantity != nil {
 		qty = math.Max(qty, ctx.sec.MinLimitQuantity.Value)
@@ -357,6 +335,7 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 			Instrument:            tc.Instrument,
 			OrderType:             models.OrderType_Limit,
 			OrderSide:             models.Side_Buy,
+			TimeInForce:           models.TimeInForce_GoodTillCancel,
 			Quantity:              qty,
 			Price:                 &wrapperspb.DoubleValue{Value: price},
 			ExecutionInstructions: []models.ExecutionInstruction{models.ExecutionInstruction_ParticipateDoNotInitiate},
@@ -421,6 +400,9 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	if order.OrderType != models.OrderType_Limit {
 		t.Fatalf("was expecting limit order type")
 	}
+	if order.TimeInForce != models.TimeInForce_GoodTillCancel {
+		t.Fatalf("was expecting GoodTillCancel time in force")
+	}
 	if order.Side != models.Side_Buy {
 		t.Fatalf("was expecting buy side order")
 	}
@@ -475,6 +457,12 @@ func OrderStatusRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest, respTy
 	order = orderList.Orders[0]
 	if order.OrderStatus != models.OrderStatus_Canceled {
 		t.Fatalf("order status not Canceled, but %s", order.OrderStatus)
+	}
+	if int(order.LeavesQuantity) != 0 {
+		t.Fatalf("was expecting leaves quantity of 0")
+	}
+	if int(order.CumQuantity) != 0 {
+		t.Fatalf("was expecting cum quantity of 0")
 	}
 
 	if err := checkOrders(ctx.as, ctx.executor, tc.Account, ctx.sec, filter); err != nil {
@@ -825,9 +813,6 @@ func GetPositionsLimitShort(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	size := ctx.sec.RoundLot.Value
 	if ctx.sec.MinLimitQuantity != nil {
 		size = math.Max(size, ctx.sec.MinLimitQuantity.Value)
-	}
-	if size < 0.1 {
-		size = 0.1
 	}
 	res, err := ctx.as.Root.RequestFuture(ctx.executor, &messages.NewOrderSingleRequest{
 		Account: tc.Account,

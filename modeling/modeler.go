@@ -149,8 +149,8 @@ func (state *Modeler) startQueries(context actor.Context) error {
 			for q.Err() == nil {
 				for q.Next() {
 					tick, obj, _ := q.Read()
-					//fmt.Println(i, state.selectors[i], obj.(tickobjects.Float64Object).Float64())
 					if err := state.model.Forward(i, tick, obj); err != nil {
+						state.logger.Error("error forwarding tick", log.Error(err))
 						_ = q.Close()
 					}
 				}

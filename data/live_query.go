@@ -371,7 +371,10 @@ func (lq *LiveQuery) Close() error {
 			f.receiver = nil
 		}
 	}
-	close(lq.ch)
+	if lq.ch != nil {
+		close(lq.ch)
+		lq.ch = nil
+	}
 	lq.err = fmt.Errorf("query closed")
 	return nil
 }

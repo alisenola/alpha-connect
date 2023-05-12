@@ -17,6 +17,8 @@ var instrument = &models.Instrument{
 	Symbol:     wrapperspb.String("pf_ethusd"),
 }
 
+// Account: xjzeyzmn@futures-demo.com
+// Password: oh5t4im43ddfo8e6y86g
 var krakenfAccount = &models.Account{
 	Exchange: constants.KRAKENF,
 	ApiCredentials: &xchangerModels.APICredentials{

@@ -158,7 +158,6 @@ func (state *AccountManager) Initialize(context actor.Context) error {
 		if err != nil {
 			return fmt.Errorf("error spawning account listener: %s", err)
 		}
-
 		state.listener = listener
 	}
 
