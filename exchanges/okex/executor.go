@@ -25,7 +25,6 @@ import (
 	"gitlab.com/alphaticks/xchanger/exchanges"
 	"gitlab.com/alphaticks/xchanger/exchanges/okex"
 	xutils "gitlab.com/alphaticks/xchanger/utils"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -173,6 +172,7 @@ func (state *Executor) UpdateSecurityList(context actor.Context) error {
 		security.SecurityID = utils.SecurityID(security.SecurityType, security.Symbol, security.Exchange.Name, security.MaturityDate)
 		security.MinPriceIncrement = &wrapperspb.DoubleValue{Value: pair.TickSize}
 		security.RoundLot = &wrapperspb.DoubleValue{Value: pair.LotSize}
+		security.MinLimitQuantity = &wrapperspb.DoubleValue{Value: pair.MinOrderSize}
 		securities = append(securities, &security)
 	}
 	state.SyncSecurities(securities, nil)
@@ -398,6 +398,169 @@ func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) er
 	return nil
 }
 
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderStatusRequest)
+	sender := context.Sender()
+	response := &messages.OrderList{
+		RequestID: msg.RequestID,
+		Success:   false,
+	}
+
+	go func() {
+		symbol := ""
+		orderID := ""
+		clOrderID := ""
+		var orderStatus *models.OrderStatus
+		if msg.Filter != nil {
+			if msg.Filter.OrderStatus != nil {
+				orderStatus = &msg.Filter.OrderStatus.Value
+			}
+			if msg.Filter.Side != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+				context.Send(sender, response)
+				return
+			}
+			if msg.Filter.Instrument != nil {
+				s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+				if rej != nil {
+					response.RejectionReason = *rej
+					context.Send(sender, response)
+					return
+				}
+				symbol = s
+			}
+			if msg.Filter.OrderID != nil {
+				orderID = msg.Filter.OrderID.Value
+			}
+			if msg.Filter.ClientOrderID != nil {
+				clOrderID = msg.Filter.ClientOrderID.Value
+			}
+		}
+
+		var request *http.Request
+		var weight int
+		var data []okex.OrderData
+		if orderID != "" || clOrderID != "" {
+			params := okex.GetOrderDetailsRequest(symbol)
+			if orderID != "" {
+				params.SetOrdId(orderID)
+			}
+			if clOrderID != "" {
+				params.SetClOrdId(clOrderID)
+			}
+			var err error
+			var ordersDetail okex.OrderResponse
+			request, weight, err = okex.GetOrderDetails(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID, "1", params)
+			if err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			if state.rateLimit.IsRateLimited() {
+				response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+				context.Send(sender, response)
+				return
+			}
+
+			state.rateLimit.Request(weight)
+			if err := xutils.PerformJSONRequest(state.client, request, &ordersDetail); err != nil {
+				state.logger.Warn("error fetching open orders", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+			if ordersDetail.Code != "0" {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			for _, o := range ordersDetail.Data {
+				data = append(data, o)
+			}
+		} else {
+			var err error
+			var orderHistoryData, openOrdersData okex.OrderResponse
+			orderHistoryArgs := okex.GetOrderRequest("SPOT")
+			request, weight, err = okex.GetOrdersHistory(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID, "1", orderHistoryArgs)
+			if err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			if err := xutils.PerformJSONRequest(state.client, request, &orderHistoryData); err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			if orderHistoryData.Code != "0" {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+
+			openOrderArgs := okex.GetOrderRequest("SPOT")
+			openOrderReq, _, err := okex.GetOpenOrders(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID, "1", openOrderArgs)
+			if err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+
+			if err := xutils.PerformJSONRequest(state.client, openOrderReq, &openOrdersData); err != nil {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			if openOrdersData.Code != "0" {
+				state.logger.Warn("error building request", log.Error(err))
+				response.RejectionReason = messages.RejectionReason_UnsupportedRequest
+				context.Send(sender, response)
+				return
+			}
+			sort.Slice(orderHistoryData.Data, func(i, j int) bool {
+				return orderHistoryData.Data[i].UTime < orderHistoryData.Data[j].UTime
+			})
+			sort.Slice(openOrdersData.Data, func(i, j int) bool {
+				return openOrdersData.Data[i].UTime < openOrdersData.Data[j].UTime
+			})
+			for _, o := range orderHistoryData.Data {
+				data = append(data, o)
+			}
+			for _, o := range openOrdersData.Data {
+				data = append(data, o)
+			}
+		}
+
+		var morders []*models.Order
+		for _, o := range data {
+			sec := state.SymbolToSecurity(o.InstId)
+			if sec == nil {
+				response.RejectionReason = messages.RejectionReason_UnknownSymbol
+				context.Send(sender, response)
+				return
+			}
+			ord := WSOrderToModel(&o)
+			if orderStatus != nil && ord.OrderStatus != *orderStatus {
+				continue
+			}
+			ord.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
+			morders = append(morders, ord)
+		}
+		response.Success = true
+		response.Orders = morders
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsRequest)
 	response := &messages.MarketStatisticsResponse{
@@ -505,114 +668,6 @@ func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 
 	response.Success = true
 	context.Respond(response)
-
-	return nil
-}
-
-func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
-	msg := context.Message().(*messages.NewOrderSingleRequest)
-	sender := context.Sender()
-	response := &messages.NewOrderSingleResponse{
-		RequestID:  msg.RequestID,
-		ResponseID: uint64(time.Now().UnixNano()),
-		Success:    false,
-	}
-
-	ar := state.rateLimit
-	if ar == nil {
-		var newAr *exchanges.RateLimit
-		ar = newAr
-	}
-
-	if ar.IsRateLimited() {
-		response.RejectionReason = messages.RejectionReason_AccountRateLimitExceeded
-		response.RateLimitDelay = durationpb.New(ar.DurationBeforeNextRequest(1))
-		context.Send(sender, response)
-		return nil
-	}
-	if ar.GetCapacity() > 0.9 && msg.Order.IsForceMaker() {
-		response.RejectionReason = messages.RejectionReason_TakerOnly
-		context.Send(sender, response)
-		return nil
-	}
-
-	go func() {
-		msg.Order.Instrument.Symbol.Value = strings.ToLower(msg.Order.Instrument.Symbol.Value)
-		sec, rej := state.InstrumentToSecurity(msg.Order.Instrument)
-		if rej != nil {
-			response.RejectionReason = *rej
-			context.Send(sender, response)
-			return
-		}
-
-		params, rej := buildPostOrderRequest(sec.Symbol, msg.Order)
-		if rej != nil {
-			response.RejectionReason = *rej
-			context.Send(sender, response)
-			return
-		}
-
-		if state.obWs != nil {
-			_ = state.obWs.Disconnect()
-		}
-		start := time.Now()
-
-		ws := okex.NewWebsocket()
-		if err := ws.ConnectPrivate(state.DialerPool.GetDialer()); err != nil {
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-
-		if err := ws.Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
-			response.RejectionReason = messages.RejectionReason_InvalidRequest
-			context.Send(sender, response)
-			return
-		}
-
-		if !ws.ReadMessage() {
-			response.RejectionReason = messages.RejectionReason_Other
-			context.Send(sender, response)
-			return
-		}
-		log, ok := ws.Msg.Message.(okex.WSLoginResponse)
-		if !ok {
-			response.RejectionReason = messages.RejectionReason_InvalidRequest
-			context.Send(sender, response)
-			return
-		}
-		if log.Msg != "" {
-			response.RejectionReason = messages.RejectionReason_InvalidRequest
-			context.Send(sender, response)
-			return
-		}
-
-		if err := ws.PlaceOrder(params); err != nil {
-			response.RejectionReason = messages.RejectionReason_ExchangeAPIError
-			context.Send(sender, response)
-			return
-		}
-
-		if !ws.ReadMessage() {
-			response.RejectionReason = messages.RejectionReason_Other
-			context.Send(sender, response)
-			return
-		}
-
-		orders, ok := ws.Msg.Message.([]okex.WSPlaceOrder)
-		if !ok {
-			response.RejectionReason = messages.RejectionReason_Other
-			context.Send(sender, response)
-			return
-		}
-		orderId := orders[0].OrdId
-
-		response.NetworkRtt = durationpb.New(time.Since(start))
-		response.Success = true
-		response.OrderID = orderId
-		fmt.Println("NEW SUCCESS", response.OrderID)
-		context.Send(sender, response)
-	}()
 
 	return nil
 }
