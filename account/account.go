@@ -159,6 +159,18 @@ func NewAccount(account *models.Account, fillCollector *FillCollector, makerFees
 		}
 		accnt.MarginCurrency = constants.TETHER
 		accnt.MarginPrecision = 1e8
+	case constants.KRAKENF.ID:
+		if constants.TETHER == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
+		accnt.MarginCurrency = constants.TETHER
+		accnt.MarginPrecision = 100000000
+	case constants.OKEX.ID:
+		if constants.TETHER == nil {
+			return nil, fmt.Errorf("not loaded")
+		}
+		accnt.MarginCurrency = constants.TETHER
+		accnt.MarginPrecision = 100000000
 	}
 	if accnt.MarginCurrency != nil {
 		accnt.assets[accnt.MarginCurrency.ID] = accnt.MarginCurrency
@@ -424,7 +436,6 @@ func (accnt *Account) ConfirmNewOrder(clientID string, ID string, leavesQuantity
 			accnt.securities[sec.GetSecurity().SecurityID].AddAskOrder(order.ClientOrderID, order.Price.Value, order.LeavesQuantity, 0)
 		}
 	}
-	fmt.Println("xxxxxxxxxxxxxxx", accnt.ordersClID)
 
 	return &messages.ExecutionReport{
 		OrderID:         order.OrderID,

@@ -16,7 +16,13 @@ import (
 func buildPostOrderRequest(symbol string, order *messages.NewOrder) (okex.PlaceOrderRequest, *messages.RejectionReason) {
 	var typ okex.OrderType
 	size := order.Quantity
-	tdMode := "cash"
+	var tdMode okex.TdMode
+	if order.TimeInForce == models.TimeInForce_GoodTillCancel {
+		tdMode = okex.CASH
+	} else if order.TimeInForce == models.TimeInForce_ImmediateOrCancel {
+		tdMode = okex.ISOLATED
+	}
+
 	var side okex.OrderSide
 	if order.OrderSide == models.Side_Buy {
 		side = okex.BUY_ORDER
@@ -33,7 +39,7 @@ func buildPostOrderRequest(symbol string, order *messages.NewOrder) (okex.PlaceO
 		return nil, &rej
 	}
 
-	request := okex.NewPlaceOrderRequest(strings.ToLower(string(side)), strings.ToUpper(symbol), tdMode, string(typ), strconv.FormatFloat(size, 'f', -1, 64))
+	request := okex.NewPlaceOrderRequest(strings.ToLower(string(side)), strings.ToUpper(symbol), string(tdMode), string(typ), strconv.FormatFloat(size, 'f', -1, 64))
 	if order.ClientOrderID != "" {
 		request.SetClOrdId(order.ClientOrderID)
 	}
@@ -106,6 +112,17 @@ func WSOrderToModel(o *okex.OrderData) *models.Order {
 		ord.Side = models.Side_Buy
 	case string(okex.SELL_ODER):
 		ord.Side = models.Side_Sell
+	}
+	switch o.TdMode {
+	case string(okex.CASH):
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
+	case string(okex.ISOLATED):
+		ord.TimeInForce = models.TimeInForce_ImmediateOrCancel
+	case string(okex.CROSS):
+		ord.TimeInForce = models.TimeInForce_GoodTillCancel
+		ord.ExecutionInstructions = append(ord.ExecutionInstructions, models.ExecutionInstruction_ParticipateDoNotInitiate)
+	default:
+		fmt.Println("UNKNOWN TOF", o.TdMode)
 	}
 
 	ord.Price = &wrapperspb.DoubleValue{Value: px}

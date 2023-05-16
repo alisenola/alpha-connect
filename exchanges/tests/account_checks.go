@@ -16,7 +16,7 @@ import (
 func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, account *models.Account) {
 	// Now check balance
 	exchangeExecutor := as.NewLocalPID(fmt.Sprintf("executor/exchanges/%s_executor", account.Exchange.Name))
-	res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
+	res, err := as.Root.RequestFuture(exchangeExecutor, &messages.BalancesRequest{
 		RequestID: 0,
 		Account:   account,
 	}, 10*time.Second).Result()

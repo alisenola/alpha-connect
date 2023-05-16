@@ -750,7 +750,6 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		return ws.Err
 	}
 	cancelOrders, ok := ws.Msg.Message.([]okex.WSCancelOrder)
-	fmt.Println("dddddddddddddd", cancelOrders)
 	if !ok {
 		return fmt.Errorf("error converting message to []WSCancelOrder")
 	}

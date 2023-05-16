@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -296,6 +297,112 @@ func (state *Executor) OnHistoricalLiquidationsRequest(context actor.Context) er
 		response.Success = true
 		context.Respond(response)
 	})
+
+	return nil
+}
+
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+	sender := context.Sender()
+	response := &messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		ws := okex.NewWebsocket()
+		// TODO Dialer
+		if err := ws.ConnectPrivate(nil); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if err := ws.Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+
+		var balanceArgs []map[string]string
+		balanceArg := okex.NewBalanceAndPositionRequest("balance_and_position")
+		balanceArgs = append(balanceArgs, balanceArg)
+		if err := ws.PrivateSubscribe(balanceArgs); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		_, ok := ws.Msg.Message.(okex.WSSubscribe)
+		if !ok {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		balanceAndPositions, ok := ws.Msg.Message.([]okex.WSBalanceAndPosition)
+		if !ok {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		for _, b := range balanceAndPositions[0].BalData {
+			if b.CashBal == "0" {
+				continue
+			}
+			asset := SymbolToAsset(b.Ccy)
+			if asset == nil {
+				state.logger.Error("got balance for unknown asset", log.String("asset", b.Ccy))
+				continue
+			}
+			Qty, err := strconv.ParseFloat(b.CashBal, 64)
+			if err != nil {
+				fmt.Println("Error:", err)
+			}
+			response.Balances = append(response.Balances, &models.Balance{
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: Qty,
+			})
+		}
+
+		response.Success = true
+		context.Send(sender, response)
+	}()
 
 	return nil
 }
