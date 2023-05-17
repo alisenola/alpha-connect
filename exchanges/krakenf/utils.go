@@ -63,6 +63,7 @@ func WSOrderToModel(o *krakenf.Order) *models.Order {
 		ord.Side = models.Side_Sell
 	}
 
+	ord.TimeInForce = models.TimeInForce_GoodTillCancel
 	ord.Price = &wrapperspb.DoubleValue{Value: o.LimitPrice}
 	return ord
 }

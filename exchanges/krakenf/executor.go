@@ -277,6 +277,140 @@ func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) er
 	return nil
 }
 
+func (state *Executor) OnOrderStatusRequest(context actor.Context) error {
+	msg := context.Message().(*messages.OrderStatusRequest)
+	sender := context.Sender()
+	response := &messages.OrderList{
+		RequestID: msg.RequestID,
+		Success:   false,
+	}
+
+	go func() {
+		symbol := ""
+		orderID := ""
+		var orderStatus *models.OrderStatus
+		if msg.Filter != nil {
+			if msg.Filter.OrderStatus != nil {
+				orderStatus = &msg.Filter.OrderStatus.Value
+			}
+			if msg.Filter.Side != nil {
+				response.RejectionReason = messages.RejectionReason_UnsupportedFilter
+				context.Send(sender, response)
+				return
+			}
+			if msg.Filter.Instrument != nil {
+				s, rej := state.InstrumentToSymbol(msg.Filter.Instrument)
+				if rej != nil {
+					response.RejectionReason = *rej
+					context.Send(sender, response)
+					return
+				}
+				symbol = s
+			}
+			if msg.Filter.OrderID != nil {
+				orderID = msg.Filter.OrderID.Value
+			}
+		}
+
+		ws := krakenf.NewWebsocket()
+		// TODO Dialer
+		if err := ws.Connect(nil); err != nil {
+			state.logger.Warn("error fetching orders", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if err := ws.GetChallenge(msg.Account.ApiCredentials); err != nil {
+			state.logger.Warn("error fetching orders", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		challenge, ok := ws.Msg.Message.(krakenf.WSChallengeResponse)
+		if !ok {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+
+		if err := ws.PrivateSubscribe(msg.Account.ApiCredentials, challenge.Message, krakenf.WSOpenOrdersVerboseFeed); err != nil {
+			state.logger.Warn("error fetching orders", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		data, ok := ws.Msg.Message.(krakenf.WSOpenOrdersVerboseSnapshot)
+		if !ok {
+			state.logger.Warn("error fetching orders", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		var morders []*models.Order
+		for _, o := range data.Orders {
+			sec := state.SymbolToSecurity(strings.ToLower(o.Instrument))
+			if sec == nil {
+				response.RejectionReason = messages.RejectionReason_UnknownSymbol
+				context.Send(sender, response)
+				return
+			}
+			if symbol != "" && o.Instrument != symbol {
+				continue
+			}
+			if orderID != "" && o.OrderId != orderID {
+				continue
+			}
+			ord := WSOrderToModel(o)
+			if orderStatus != nil && ord.OrderStatus != *orderStatus {
+				continue
+			}
+			ord.Instrument.SecurityID = &wrapperspb.UInt64Value{Value: sec.SecurityID}
+			morders = append(morders, ord)
+		}
+		response.Success = true
+		response.Orders = morders
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnMarketStatisticsRequest(context actor.Context) error {
 	msg := context.Message().(*messages.MarketStatisticsRequest)
 	context.Respond(&messages.MarketStatisticsResponse{
