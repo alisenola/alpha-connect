@@ -512,6 +512,107 @@ func (state *Executor) OnNewOrderSingleRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnBalancesRequest(context actor.Context) error {
+	msg := context.Message().(*messages.BalancesRequest)
+	sender := context.Sender()
+	response := &messages.BalanceList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		ws := krakenf.NewWebsocket()
+		// TODO Dialer
+		if err := ws.Connect(nil); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if err := ws.GetChallenge(msg.Account.ApiCredentials); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		challenge, ok := ws.Msg.Message.(krakenf.WSChallengeResponse)
+		if !ok {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+
+		if err := ws.PrivateSubscribe(msg.Account.ApiCredentials, challenge.Message, krakenf.WSBalanceFeed); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		data, ok := ws.Msg.Message.(krakenf.WSBalanceSnapshot)
+		if !ok {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		for k, b := range data.FlexFutures.Currencies {
+			asset := SymbolToAsset(k)
+			if asset == nil {
+				state.logger.Error("got balance for unknown asset", log.String("asset", k))
+				continue
+			}
+			response.Balances = append(response.Balances, &models.Balance{
+				Account:  msg.Account.Name,
+				Asset:    asset,
+				Quantity: b.Quantity,
+			})
+		}
+
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderReplaceRequest)
 	sender := context.Sender()
