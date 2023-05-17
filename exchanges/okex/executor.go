@@ -407,6 +407,137 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+	sender := context.Sender()
+	response := &messages.PositionList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		symbol := ""
+		if msg.Instrument != nil {
+			msg.Instrument.Symbol.Value = strings.ToUpper(msg.Instrument.Symbol.Value)
+			s, rej := state.InstrumentToSymbol(msg.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Send(sender, response)
+				return
+			}
+			symbol = s
+		}
+		ws := okex.NewWebsocket()
+		// TODO Dialer
+		if err := ws.ConnectPrivate(nil); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if err := ws.Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+
+		var positionArgs []map[string]string
+		positionArg := okex.NewPositionRequest("positions", "ANY")
+		positionArgs = append(positionArgs, positionArg)
+		if err := ws.PrivateSubscribe(positionArgs); err != nil {
+			state.logger.Warn("error fetching positions", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		_, ok := ws.Msg.Message.(okex.WSSubscribe)
+		if !ok {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		positions, ok := ws.Msg.Message.([]okex.WSPosition)
+		if !ok {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		for _, p := range positions {
+			if p.AvgPx == 0 {
+				continue
+			}
+			if symbol != "" && p.InstId != symbol {
+				continue
+			}
+			sec := state.SymbolToSecurity(p.InstId)
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unknown symbol %s", p.InstId))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+			var cost float64
+			if sec.IsInverse {
+				cost = ((1. / p.MarkPx) * sec.Multiplier.Value * p.AvgPx) - p.Upl
+			} else {
+				cost = (p.MarkPx * sec.Multiplier.Value * p.AvgPx) - p.Upl
+			}
+			pos := &models.Position{
+				Account: msg.Account.Name,
+				Instrument: &models.Instrument{
+					Exchange:   constants.FBINANCE,
+					Symbol:     &wrapperspb.StringValue{Value: p.InstId},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+				},
+				Quantity:         p.AvgPx,
+				Cost:             cost,
+				Cross:            false,
+				MarkPrice:        wrapperspb.Double(p.MarkPx),
+				MaxNotionalValue: wrapperspb.Double(p.NotionalUsd),
+			}
+			response.Positions = append(response.Positions, pos)
+		}
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnHistoricalFundingRatesRequest(context actor.Context) error {
 	msg := context.Message().(*messages.HistoricalFundingRatesRequest)
 	response := &messages.HistoricalFundingRatesResponse{

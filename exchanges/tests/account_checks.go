@@ -63,7 +63,6 @@ func checkBalances(t *testing.T, as *actor.ActorSystem, executor *actor.PID, acc
 		// TODO use exchange balance precision
 		rawB1 := int(math.Round(b1.Quantity * 1e8))
 		rawB2 := int(math.Round(b2.Quantity * 1e8))
-		fmt.Println(rawB1, rawB2)
 		if rawB1 != rawB2 {
 			t.Fatalf("different balance: %f %f", b1.Quantity, b2.Quantity)
 		}
