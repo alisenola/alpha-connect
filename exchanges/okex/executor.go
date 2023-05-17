@@ -32,8 +32,7 @@ import (
 type Executor struct {
 	extypes.BaseExecutor
 	client      *http.Client
-	obWs        *okex.Websocket
-	tradeWs     *okex.Websocket
+	ws          map[string]*okex.Websocket
 	securities  []*models.Security
 	rateLimit   *exchanges.RateLimit
 	queryRunner *actor.PID
@@ -87,10 +86,19 @@ func (state *Executor) Initialize(context actor.Context) error {
 		state.rateLimit = exchanges.NewRateLimit(6, time.Second)
 	}
 
+	state.ws = make(map[string]*okex.Websocket)
+
 	return state.UpdateSecurityList(context)
 }
 
 func (state *Executor) Clean(context actor.Context) error {
+	if state.ws != nil {
+		for _, ws := range state.ws {
+			if err := ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting socket", log.Error(err))
+			}
+		}
+	}
 	return nil
 }
 
@@ -310,28 +318,37 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		Success:    false,
 	}
 
-	go func() {
-		ws := okex.NewWebsocket()
-		// TODO Dialer
-		if err := ws.ConnectPrivate(nil); err != nil {
-			state.logger.Warn("error fetching balances", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
+	if state.ws[msg.Account.ApiCredentials.APIKey] == nil {
+		state.ws[msg.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
+	}
 
-		if err := ws.Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
-			state.logger.Warn("error fetching balances", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-		if !ws.ReadMessage() {
-			state.logger.Warn("error fetching balances", log.Error(ws.Err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
+	if state.ws[msg.Account.ApiCredentials.APIKey].Connected {
+		state.ws[msg.Account.ApiCredentials.APIKey].Disconnect()
+	}
+
+	if err := state.ws[msg.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+		state.logger.Warn("error fetching balances", log.Error(err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+
+	if err := state.ws[msg.Account.ApiCredentials.APIKey].Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
+		state.logger.Warn("error fetching balances", log.Error(err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+	if !state.ws[msg.Account.ApiCredentials.APIKey].ReadMessage() {
+		state.logger.Warn("error fetching balances", log.Error(state.ws[msg.Account.ApiCredentials.APIKey].Err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+
+	go func() {
+		ws := state.ws[msg.Account.ApiCredentials.APIKey]
+		// TODO Dialer
 
 		if state.rateLimit.IsRateLimited() {
 			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
@@ -416,6 +433,34 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 		Success:    false,
 	}
 
+	if state.ws[msg.Account.ApiCredentials.APIKey] == nil {
+		state.ws[msg.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
+	}
+
+	if state.ws[msg.Account.ApiCredentials.APIKey].Connected {
+		state.ws[msg.Account.ApiCredentials.APIKey].Disconnect()
+	}
+
+	if err := state.ws[msg.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+		state.logger.Warn("error fetching balances", log.Error(err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+
+	if err := state.ws[msg.Account.ApiCredentials.APIKey].Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
+		state.logger.Warn("error fetching balances", log.Error(err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+	if !state.ws[msg.Account.ApiCredentials.APIKey].ReadMessage() {
+		state.logger.Warn("error fetching balances", log.Error(state.ws[msg.Account.ApiCredentials.APIKey].Err))
+		response.RejectionReason = messages.RejectionReason_HTTPError
+		context.Send(sender, response)
+		return nil
+	}
+
 	go func() {
 		symbol := ""
 		if msg.Instrument != nil {
@@ -428,27 +473,7 @@ func (state *Executor) OnPositionsRequest(context actor.Context) error {
 			}
 			symbol = s
 		}
-		ws := okex.NewWebsocket()
-		// TODO Dialer
-		if err := ws.ConnectPrivate(nil); err != nil {
-			state.logger.Warn("error fetching balances", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-
-		if err := ws.Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
-			state.logger.Warn("error fetching balances", log.Error(err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-		if !ws.ReadMessage() {
-			state.logger.Warn("error fetching balances", log.Error(ws.Err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
+		ws := state.ws[msg.Account.ApiCredentials.APIKey]
 
 		if state.rateLimit.IsRateLimited() {
 			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
