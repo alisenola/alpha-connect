@@ -613,6 +613,133 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 	return nil
 }
 
+func (state *Executor) OnPositionsRequest(context actor.Context) error {
+	msg := context.Message().(*messages.PositionsRequest)
+	sender := context.Sender()
+	response := &messages.PositionList{
+		RequestID:  msg.RequestID,
+		ResponseID: uint64(time.Now().UnixNano()),
+		Success:    false,
+	}
+
+	go func() {
+		symbol := ""
+		if msg.Instrument != nil {
+			s, rej := state.InstrumentToSymbol(msg.Instrument)
+			if rej != nil {
+				response.RejectionReason = *rej
+				context.Send(sender, response)
+				return
+			}
+			symbol = s
+		}
+		ws := krakenf.NewWebsocket()
+		// TODO Dialer
+		if err := ws.Connect(nil); err != nil {
+			state.logger.Warn("error fetching positions", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if err := ws.GetChallenge(msg.Account.ApiCredentials); err != nil {
+			state.logger.Warn("error fetching positions", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		challenge, ok := ws.Msg.Message.(krakenf.WSChallengeResponse)
+		if !ok {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if state.rateLimit.IsRateLimited() {
+			response.RejectionReason = messages.RejectionReason_IPRateLimitExceeded
+			context.Send(sender, response)
+			return
+		}
+
+		state.rateLimit.Request(1)
+
+		if err := ws.PrivateSubscribe(msg.Account.ApiCredentials, challenge.Message, krakenf.WSOpenPositionsFeed); err != nil {
+			state.logger.Warn("error fetching positions", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		if !ws.ReadMessage() {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+
+		data, ok := ws.Msg.Message.(krakenf.WSOpenPositions)
+		if !ok {
+			state.logger.Warn("error fetching positions", log.Error(ws.Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
+		for _, p := range data.Positions {
+			if p.Balance == 0 {
+				continue
+			}
+			if symbol != "" && p.Instrument != symbol {
+				continue
+			}
+			sec := state.SymbolToSecurity(p.Instrument)
+			if sec == nil {
+				state.logger.Warn(fmt.Sprintf("unknown symbol %s", p.Instrument))
+				response.RejectionReason = messages.RejectionReason_ExchangeAPIError
+				context.Send(sender, response)
+				return
+			}
+			cost := p.Balance * p.EntryPrice
+			pos := &models.Position{
+				Account: msg.Account.Name,
+				Instrument: &models.Instrument{
+					Exchange:   constants.FBINANCE,
+					Symbol:     &wrapperspb.StringValue{Value: p.Instrument},
+					SecurityID: &wrapperspb.UInt64Value{Value: sec.SecurityID},
+				},
+				Quantity:         p.Balance,
+				Cost:             cost,
+				Cross:            false,
+				MarkPrice:        wrapperspb.Double(p.MarkPrice),
+				MaxNotionalValue: wrapperspb.Double(p.Pnl),
+			}
+			response.Positions = append(response.Positions, pos)
+		}
+		response.Success = true
+		context.Send(sender, response)
+	}()
+
+	return nil
+}
+
 func (state *Executor) OnOrderReplaceRequest(context actor.Context) error {
 	req := context.Message().(*messages.OrderReplaceRequest)
 	sender := context.Sender()
