@@ -4,6 +4,7 @@ import (
 	"gitlab.com/alphaticks/alpha-connect/account"
 	"gitlab.com/alphaticks/alpha-connect/config"
 	"gitlab.com/alphaticks/alpha-connect/models"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	registry "gitlab.com/alphaticks/alpha-public-registry-grpc"
 	xchangerModels "gitlab.com/alphaticks/xchanger/models"
 	xchangerUtils "gitlab.com/alphaticks/xchanger/utils"
@@ -126,6 +127,9 @@ func ReceiveExecutor(state Executor, context actor.Context) {
 			// Attention, no panic in restarting or infinite loop
 		}
 		state.GetLogger().Info("actor restarting")
+
+	case *utils.Ready:
+		context.Respond(&utils.Ready{})
 
 	case *messages.SecurityListRequest:
 		if err := state.OnSecurityListRequest(context); err != nil {

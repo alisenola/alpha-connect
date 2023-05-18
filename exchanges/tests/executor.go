@@ -2,6 +2,8 @@ package tests
 
 import (
 	"fmt"
+	"gitlab.com/alphaticks/alpha-connect/exchanges"
+	"gitlab.com/alphaticks/alpha-connect/utils"
 	"reflect"
 	"testing"
 	"time"
@@ -15,12 +17,14 @@ import (
 
 type ExPubTest struct {
 	Instrument                    *models.Instrument
+	Account                       *models.Account
 	SecurityListRequest           bool
 	HistoricalLiquidationsRequest bool
 	HistoricalFundingRateRequest  bool
 	OpenInterestRequest           bool
 	MarketDataRequest             bool
 	MarketStatisticsRequest       bool
+	BalancesRequest               bool
 }
 
 func ExPub(t *testing.T, tc ExPubTest) {
@@ -28,9 +32,26 @@ func ExPub(t *testing.T, tc ExPubTest) {
 		Exchanges:       []string{tc.Instrument.Exchange.Name},
 		RegistryAddress: "registry.alphaticks.io:8021",
 	}
+	if tc.Account != nil {
+		C.Accounts = []config.Account{{
+			Name:      tc.Account.Name,
+			Exchange:  tc.Account.Exchange.Name,
+			ID:        tc.Account.ApiCredentials.AccountID,
+			ApiKey:    tc.Account.ApiCredentials.APIKey,
+			ApiSecret: tc.Account.ApiCredentials.APISecret,
+			Reconcile: false,
+			Listen:    true,
+			ReadOnly:  false,
+		}}
+	}
 	as, executor, cleaner := tests.StartExecutor(t, C)
 	defer cleaner()
-
+	// wait for ready
+	_, err := as.Root.RequestFuture(executor, &utils.Ready{}, 10*time.Second).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor = exchanges.GetExchangeExecutor(as, tc.Instrument.Exchange)
 	if tc.SecurityListRequest {
 		t.Run("SecurityListRequest", func(t *testing.T) {
 			res, err := as.Root.RequestFuture(executor, &messages.SecurityListRequest{
@@ -161,6 +182,42 @@ func ExPub(t *testing.T, tc ExPubTest) {
 			if !v.Success {
 				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
 			}
+		})
+	}
+
+	if tc.BalancesRequest {
+		t.Run("BalancesRequest", func(t *testing.T) {
+			res, err := as.Root.RequestFuture(executor, &messages.BalancesRequest{
+				RequestID: 0,
+				Account:   tc.Account,
+			}, 10*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := res.(*messages.BalanceList)
+			if !ok {
+				t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+			fmt.Println(v.Balances)
+
+			res, err = as.Root.RequestFuture(executor, &messages.BalancesRequest{
+				RequestID: 0,
+				Account:   tc.Account,
+			}, 10*time.Second).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok = res.(*messages.BalanceList)
+			if !ok {
+				t.Fatalf("was expecting *messages.BalanceList, got %s", reflect.TypeOf(res).String())
+			}
+			if !v.Success {
+				t.Fatalf("was expecting success, go %s", v.RejectionReason.String())
+			}
+			fmt.Println(v.Balances)
 		})
 	}
 }

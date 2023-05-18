@@ -378,8 +378,6 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			switch msg := ws.Msg.Message.(type) {
 			case []okex.WSBalanceAndPosition:
 				balanceAndPositions = msg
-			default:
-				context.Send(context.Self(), ws.Msg)
 			}
 			ready = balanceAndPositions != nil
 		}
