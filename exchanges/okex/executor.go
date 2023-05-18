@@ -322,28 +322,26 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 		state.ws[msg.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
 	}
 
-	if state.ws[msg.Account.ApiCredentials.APIKey].Connected {
-		state.ws[msg.Account.ApiCredentials.APIKey].Disconnect()
-	}
+	if !state.ws[msg.Account.ApiCredentials.APIKey].Connected {
+		if err := state.ws[msg.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
 
-	if err := state.ws[msg.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
-		state.logger.Warn("error fetching balances", log.Error(err))
-		response.RejectionReason = messages.RejectionReason_HTTPError
-		context.Send(sender, response)
-		return nil
-	}
-
-	if err := state.ws[msg.Account.ApiCredentials.APIKey].Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
-		state.logger.Warn("error fetching balances", log.Error(err))
-		response.RejectionReason = messages.RejectionReason_HTTPError
-		context.Send(sender, response)
-		return nil
-	}
-	if !state.ws[msg.Account.ApiCredentials.APIKey].ReadMessage() {
-		state.logger.Warn("error fetching balances", log.Error(state.ws[msg.Account.ApiCredentials.APIKey].Err))
-		response.RejectionReason = messages.RejectionReason_HTTPError
-		context.Send(sender, response)
-		return nil
+		if err := state.ws[msg.Account.ApiCredentials.APIKey].Login(msg.Account.ApiCredentials, msg.Account.ApiCredentials.AccountID); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
+		if !state.ws[msg.Account.ApiCredentials.APIKey].ReadMessage() {
+			state.logger.Warn("error fetching balances", log.Error(state.ws[msg.Account.ApiCredentials.APIKey].Err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return nil
+		}
 	}
 
 	go func() {
@@ -367,30 +365,35 @@ func (state *Executor) OnBalancesRequest(context actor.Context) error {
 			context.Send(sender, response)
 			return
 		}
+		var balanceAndPositions []okex.WSBalanceAndPosition
 
+		ready := false
+		for !ready {
+			if !ws.ReadMessage() {
+				state.logger.Warn("error fetching balances", log.Error(ws.Err))
+				response.RejectionReason = messages.RejectionReason_HTTPError
+				context.Send(sender, response)
+				return
+			}
+			switch msg := ws.Msg.Message.(type) {
+			case []okex.WSBalanceAndPosition:
+				balanceAndPositions = msg
+			default:
+				context.Send(context.Self(), ws.Msg)
+			}
+			ready = balanceAndPositions != nil
+		}
+
+		var unSubscribeArgs []map[string]string
+		unSubscribeArg := okex.NewUnsubscribeRequest("balance_and_position")
+		unSubscribeArgs = append(unSubscribeArgs, unSubscribeArg)
+		if err := state.ws[msg.Account.ApiCredentials.APIKey].Unsubscribe(unSubscribeArgs); err != nil {
+			state.logger.Warn("error fetching balances", log.Error(err))
+			response.RejectionReason = messages.RejectionReason_HTTPError
+			context.Send(sender, response)
+			return
+		}
 		if !ws.ReadMessage() {
-			state.logger.Warn("error fetching balances", log.Error(ws.Err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-		_, ok := ws.Msg.Message.(okex.WSSubscribe)
-		if !ok {
-			state.logger.Warn("error fetching balances", log.Error(ws.Err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-
-		if !ws.ReadMessage() {
-			state.logger.Warn("error fetching balances", log.Error(ws.Err))
-			response.RejectionReason = messages.RejectionReason_HTTPError
-			context.Send(sender, response)
-			return
-		}
-
-		balanceAndPositions, ok := ws.Msg.Message.([]okex.WSBalanceAndPosition)
-		if !ok {
 			state.logger.Warn("error fetching balances", log.Error(ws.Err))
 			response.RejectionReason = messages.RejectionReason_HTTPError
 			context.Send(sender, response)
