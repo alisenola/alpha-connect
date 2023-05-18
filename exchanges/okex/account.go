@@ -35,7 +35,7 @@ type AccountListener struct {
 	readOnly                bool
 	seqNum                  uint64
 	okexExecutor            *actor.PID
-	ws                      *okex.Websocket
+	ws                      map[string]*okex.Websocket
 	executorManager         *actor.PID
 	logger                  *log.Logger
 	registry                registry.StaticClient
@@ -200,6 +200,7 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 	} else {
 		fmt.Println("USING CUSTOM CLIENT")
 	}
+	state.ws = make(map[string]*okex.Websocket)
 	// Request securities
 	executor := actor.NewPID(context.ActorSystem().Address(), "executor")
 	res, err := context.RequestFuture(executor, &messages.SecurityListRequest{}, 10*time.Second).Result()
@@ -321,8 +322,10 @@ func (state *AccountListener) Initialize(context actor.Context) error {
 // TODO
 func (state *AccountListener) Clean(context actor.Context) error {
 	if state.ws != nil {
-		if err := state.ws.Disconnect(); err != nil {
-			state.logger.Info("error disconnecting socket", log.Error(err))
+		for _, ws := range state.ws {
+			if err := ws.Disconnect(); err != nil {
+				state.logger.Info("error disconnecting socket", log.Error(err))
+			}
 		}
 	}
 
@@ -501,30 +504,33 @@ func (state *AccountListener) OnNewOrderSingleRequest(context actor.Context) err
 				return nil
 			}
 
-			if state.ws != nil {
-				_ = state.ws.Disconnect()
+			if state.ws[req.Account.ApiCredentials.APIKey] == nil {
+				state.ws[req.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
 			}
 			start := time.Now()
 
-			ws := okex.NewWebsocket()
-			if err := ws.ConnectPrivate(nil); err != nil {
-				return fmt.Errorf("error connecting to the websocket: " + err.Error())
+			if !state.ws[req.Account.ApiCredentials.APIKey].Connected {
+				if err := state.ws[req.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+					return fmt.Errorf("error connecting to the websocket: " + err.Error())
+				}
+
+				if err := state.ws[req.Account.ApiCredentials.APIKey].Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
+					return err
+				}
+
+				if !state.ws[req.Account.ApiCredentials.APIKey].ReadMessage() {
+					return state.ws[req.Account.ApiCredentials.APIKey].Err
+				}
+				log, ok := state.ws[req.Account.ApiCredentials.APIKey].Msg.Message.(okex.WSLoginResponse)
+				if !ok {
+					return fmt.Errorf("error converting message to WSLogin")
+				}
+				if log.Msg != "" {
+					return fmt.Errorf("error login following accounts:" + log.Msg)
+				}
 			}
 
-			if err := ws.Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
-				return err
-			}
-
-			if !ws.ReadMessage() {
-				return ws.Err
-			}
-			log, ok := ws.Msg.Message.(okex.WSLoginResponse)
-			if !ok {
-				return fmt.Errorf("error converting message to WSLogin")
-			}
-			if log.Msg != "" {
-				return fmt.Errorf("error login following accounts:" + log.Msg)
-			}
+			ws := state.ws[req.Account.ApiCredentials.APIKey]
 
 			if err := ws.PlaceOrder(params); err != nil {
 				return err
@@ -593,31 +599,33 @@ func (state *AccountListener) OnOrderCancelRequest(context actor.Context) error 
 			context.Send(sender, reqResponse)
 		}
 
-		if state.ws != nil {
-			_ = state.ws.Disconnect()
+		if state.ws[req.Account.ApiCredentials.APIKey] == nil {
+			state.ws[req.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
 		}
 		start := time.Now()
 
-		ws := okex.NewWebsocket()
-		if err := ws.ConnectPrivate(nil); err != nil {
-			return fmt.Errorf("error connecting to the websocket: " + err.Error())
+		if !state.ws[req.Account.ApiCredentials.APIKey].Connected {
+			if err := state.ws[req.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+				return fmt.Errorf("error connecting to the websocket: " + err.Error())
+			}
+
+			if err := state.ws[req.Account.ApiCredentials.APIKey].Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
+				return err
+			}
+
+			if !state.ws[req.Account.ApiCredentials.APIKey].ReadMessage() {
+				return state.ws[req.Account.ApiCredentials.APIKey].Err
+			}
+			log, ok := state.ws[req.Account.ApiCredentials.APIKey].Msg.Message.(okex.WSLoginResponse)
+			if !ok {
+				return fmt.Errorf("error converting message to WSLogin")
+			}
+			if log.Msg != "" {
+				return fmt.Errorf("error login following accounts:" + log.Msg)
+			}
 		}
 
-		if err := ws.Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
-			return err
-		}
-
-		if !ws.ReadMessage() {
-			return ws.Err
-		}
-		log, ok := ws.Msg.Message.(okex.WSLoginResponse)
-		if !ok {
-			return fmt.Errorf("error converting message to WSLogin")
-		}
-		if log.Msg != "" {
-			return fmt.Errorf("error login following accounts:" + log.Msg)
-		}
-
+		ws := state.ws[req.Account.ApiCredentials.APIKey]
 		cancelArg := okex.NewCancelOrderRequest(report.Instrument.Symbol.Value)
 		cancelArg.SetOrdId(req.OrderID.Value)
 
@@ -704,29 +712,32 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 		context.Send(context.Parent(), report)
 	}
 
-	if state.ws != nil {
-		_ = state.ws.Disconnect()
+	if state.ws[req.Account.ApiCredentials.APIKey] == nil {
+		state.ws[req.Account.ApiCredentials.APIKey] = okex.NewWebsocket()
 	}
 
-	ws := okex.NewWebsocket()
-	if err := ws.ConnectPrivate(nil); err != nil {
-		return fmt.Errorf("error connecting to the websocket: " + err.Error())
+	if !state.ws[req.Account.ApiCredentials.APIKey].Connected {
+		if err := state.ws[req.Account.ApiCredentials.APIKey].ConnectPrivate(nil); err != nil {
+			return fmt.Errorf("error connecting to the websocket: " + err.Error())
+		}
+
+		if err := state.ws[req.Account.ApiCredentials.APIKey].Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
+			return err
+		}
+
+		if !state.ws[req.Account.ApiCredentials.APIKey].ReadMessage() {
+			return state.ws[req.Account.ApiCredentials.APIKey].Err
+		}
+		log, ok := state.ws[req.Account.ApiCredentials.APIKey].Msg.Message.(okex.WSLoginResponse)
+		if !ok {
+			return fmt.Errorf("error converting message to WSLogin")
+		}
+		if log.Msg != "" {
+			return fmt.Errorf("error login following accounts:" + log.Msg)
+		}
 	}
 
-	if err := ws.Login(req.Account.ApiCredentials, req.Account.ApiCredentials.AccountID); err != nil {
-		return err
-	}
-
-	if !ws.ReadMessage() {
-		return ws.Err
-	}
-	log, ok := ws.Msg.Message.(okex.WSLoginResponse)
-	if !ok {
-		return fmt.Errorf("error converting message to WSLogin")
-	}
-	if log.Msg != "" {
-		return fmt.Errorf("error login following accounts:" + log.Msg)
-	}
+	ws := state.ws[req.Account.ApiCredentials.APIKey]
 	var cancelArgs []okex.CancelOrderRequest
 	if req.Filter.Instrument.Symbol == nil {
 		context.Respond(&messages.OrderMassCancelResponse{
@@ -769,7 +780,7 @@ func (state *AccountListener) OnOrderMassCancelRequest(context actor.Context) er
 
 func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 	msg := context.Message().(*xchanger.WebsocketMessage)
-	if state.ws == nil || msg.WSID != state.ws.ID {
+	if state.ws == nil || msg.WSID != state.ws[state.account.ApiCredentials.APIKey].ID {
 		return nil
 	}
 	state.lastPingTime = time.Now()
@@ -782,8 +793,8 @@ func (state *AccountListener) onWebsocketMessage(context actor.Context) error {
 }
 
 func (state *AccountListener) subscribeAccount(context actor.Context) error {
-	if state.ws != nil {
-		_ = state.ws.Disconnect()
+	if state.ws[state.account.ApiCredentials.APIKey] != nil {
+		_ = state.ws[state.account.ApiCredentials.APIKey].Disconnect()
 	}
 
 	ws := okex.NewWebsocket()
@@ -833,6 +844,26 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 			context.Send(context.Self(), ws.Msg)
 		}
 		ready = balances != nil && positions != nil
+	}
+
+	var unSubscribeArgs []map[string]string
+	unSubscribeArg := okex.NewUnsubscribeRequest("balance_and_position")
+	unSubscribeArgs = append(unSubscribeArgs, unSubscribeArg)
+	if err := ws.Unsubscribe(unSubscribeArgs); err != nil {
+		return fmt.Errorf("error subscribing to balance and position: %v", err)
+	}
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading ws message: %v", ws.Err)
+	}
+
+	var unSubscribePositionsArgs []map[string]string
+	unSubscribPositionsArg := okex.NewUnsubscribeRequest("positions")
+	unSubscribePositionsArgs = append(unSubscribePositionsArgs, unSubscribPositionsArg)
+	if err := ws.Unsubscribe(unSubscribeArgs); err != nil {
+		return fmt.Errorf("error subscribing to positions: %v", err)
+	}
+	if !ws.ReadMessage() {
+		return fmt.Errorf("error reading ws message: %v", ws.Err)
 	}
 
 	orderHistoryArgs := okex.GetOrderRequest("SPOT")
@@ -934,7 +965,7 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 			context.Send(pid, ws.Msg)
 		}
 	}(ws, context.Self())
-	state.ws = ws
+	state.ws[state.account.ApiCredentials.APIKey] = ws
 
 	return nil
 }
@@ -942,13 +973,13 @@ func (state *AccountListener) subscribeAccount(context actor.Context) error {
 func (state *AccountListener) checkSocket(context actor.Context) error {
 
 	if time.Since(state.lastPingTime) > 5*time.Second {
-		_ = state.ws.Ping()
+		_ = state.ws[state.account.ApiCredentials.APIKey].Ping()
 		state.lastPingTime = time.Now()
 	}
 
-	if state.ws.Err != nil || !state.ws.Connected {
-		if state.ws.Err != nil {
-			state.logger.Info("error on socket", log.Error(state.ws.Err))
+	if state.ws[state.account.ApiCredentials.APIKey].Err != nil || !state.ws[state.account.ApiCredentials.APIKey].Connected {
+		if state.ws[state.account.ApiCredentials.APIKey].Err != nil {
+			state.logger.Info("error on socket", log.Error(state.ws[state.account.ApiCredentials.APIKey].Err))
 		}
 		if err := state.subscribeAccount(context); err != nil {
 			return fmt.Errorf("error subscribing to account: %v", err)
