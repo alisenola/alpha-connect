@@ -973,6 +973,60 @@ func OrderReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
 	if orderList.Orders[0].LeavesQuantity != 2 {
 		t.Fatalf("was expecting quantity of 2")
 	}
+
+	fmt.Println("CANCELLING")
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderCancelRequest{
+		RequestID:  0,
+		Account:    tc.Account,
+		Instrument: tc.Instrument,
+		OrderID:    &wrapperspb.StringValue{Value: newOrderList.Orders[0].OrderID},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	mcResponse, ok := res.(*messages.OrderCancelResponse)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderCancelResponse, got %s", reflect.TypeOf(res).String())
+	}
+	if !mcResponse.Success {
+		t.Fatalf("was expecting successful request: %s", response.RejectionReason.String())
+	}
+
+	res, err = ctx.as.Root.RequestFuture(ctx.executor, &messages.OrderStatusRequest{
+		RequestID: 0,
+		Subscribe: false,
+		Account:   tc.Account,
+		Filter: &messages.OrderFilter{
+			OrderID:    &wrapperspb.StringValue{Value: newOrderList.Orders[0].OrderID},
+			Instrument: tc.Instrument,
+		},
+	}, 10*time.Second).Result()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderList, ok = res.(*messages.OrderList)
+	if !ok {
+		t.Fatalf("was expecting *messages.OrderList, got %s", reflect.TypeOf(res).String())
+	}
+	if !orderList.Success {
+		t.Fatalf("was expecting success: %s", orderList.RejectionReason.String())
+	}
+	if len(orderList.Orders) != 1 {
+		t.Fatalf("was expecting 1 order, got %d", len(orderList.Orders))
+	}
+	order := orderList.Orders[0]
+	if order.OrderStatus != models.OrderStatus_Canceled {
+		t.Fatalf("order status not Canceled, but %s", order.OrderStatus)
+	}
+	if int(order.LeavesQuantity) != 0 {
+		t.Fatalf("was expecting leaves quantity of 0")
+	}
+	if int(order.CumQuantity) != 0 {
+		t.Fatalf("was expecting cum quantity of 0")
+	}
 }
 
 func OrderBulkReplaceRequest(t *testing.T, ctx AccountTestCtx, tc AccountTest) {
